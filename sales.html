@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 매출 입력</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html" class="active">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="products.html">이용권 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="panel">
+      <h3>매출 등록</h3>
+      <div id="addErrorBox" class="error-text"></div>
+      <div id="addSuccessBox" class="success-text"></div>
+      <form id="addSaleForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>회원</label><select id="s_member" required><option value="">선택</option></select></div>
+          <div class="field"><label>상품 (선택)</label><select id="s_product"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>항목</label>
+            <select id="s_category">
+              <option value="membership_new">신규 회원권</option>
+              <option value="membership_renewal">회원권 재등록</option>
+              <option value="pt_new">신규 PT</option>
+              <option value="pt_renewal">PT 재등록</option>
+              <option value="group_pt_new">신규 그룹PT</option>
+              <option value="group_pt_renewal">그룹PT 재등록</option>
+              <option value="locker">락커</option>
+              <option value="clothes">운동복</option>
+            </select>
+          </div>
+          <div class="field"><label>금액(원)</label><input type="number" id="s_amount" min="0" required /></div>
+          <div class="field"><label>날짜</label><input type="date" id="s_date" required /></div>
+          <div class="field"><label>판매 담당자</label><select id="s_staff"></select></div>
+          <div class="field"><label>결제 수단</label>
+            <select id="s_payment">
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+              <option value="transfer">계좌이체</option>
+            </select>
+          </div>
+          <div class="field"><label>메모</label><input type="text" id="s_memo" placeholder="선택 입력" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>최근 매출 내역</h2>
+      <table id="salesTable">
+        <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th><th id="salesDeleteColHeader" style="display:none;"></th></tr></thead>
+        <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+    document.getElementById('s_date').value = new Date().toISOString().slice(0, 10);
+
+    let currentUserId = null;
+    let productsCache = [];
+    let isManagerFlag = false;
+
+    async function loadMemberOptions() {
+      const sel = document.getElementById('s_member');
+      try {
+        const members = await fetchMembers();
+        members.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id; opt.textContent = m.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) { /* 무시: 회원 없으면 옵션이 비어있음 */ }
+    }
+
+    // 상품(이용권)을 고르면 가격이 자동으로 채워지고, "항목"도 그 상품 카테고리에 맞는
+    // 재등록 항목으로 미리 선택해둠 (신규로 파는 거면 직접 "신규 ○○"로 바꾸면 됨)
+    // PRODUCT_CATEGORY_TO_SALE_CATEGORY는 data.js에 공용으로 정의되어 있음 (회원 상세 모달과 공유)
+
+    async function loadProductOptions() {
+      const sel = document.getElementById('s_product');
+      try {
+        productsCache = await fetchProducts(true);
+        const catLabel = key => (EXPIRY_CATEGORIES.find(c => c.key === key) || {}).label || key;
+        EXPIRY_CATEGORIES.forEach(cat => {
+          const inCat = productsCache.filter(p => p.category === cat.key);
+          if (inCat.length === 0) return;
+          const group = document.createElement('optgroup');
+          group.label = catLabel(cat.key);
+          inCat.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.price != null ? `${p.name} (${formatWon(p.price)})` : p.name;
+            group.appendChild(opt);
+          });
+          sel.appendChild(group);
+        });
+      } catch (e) { /* 무시: 상품 목록 없어도 직접 입력으로 매출 등록은 가능 */ }
+    }
+
+    document.getElementById('s_product').addEventListener('change', (e) => {
+      const product = productsCache.find(p => p.id === e.target.value);
+      if (!product) return;
+      if (product.price != null) document.getElementById('s_amount').value = product.price;
+      const saleCategory = PRODUCT_CATEGORY_TO_SALE_CATEGORY[product.category];
+      if (saleCategory) document.getElementById('s_category').value = saleCategory;
+    });
+
+    async function loadSales() {
+      const tbody = document.querySelector('#salesTable tbody');
+      try {
+        const sales = await fetchRecentSales(15);
+        if (sales.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 7 : 6}" class="muted" style="padding:16px;">등록된 매출이 없습니다.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = sales.map(s => `
+          <tr>
+            <td>${s.sale_date}</td>
+            <td>${s.member ? s.member.name : '-'}</td>
+            <td>${CATEGORY_LABEL[s.category] || s.category}</td>
+            <td>${s.staff ? s.staff.name : '-'}</td>
+            <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
+            <td style="text-align:right;">${formatWon(s.amount)}</td>
+            ${isManagerFlag ? `<td><button type="button" class="btn-link delete-sale-btn" data-id="${s.id}" style="color:#dc2626;">삭제</button></td>` : ''}
+          </tr>
+        `).join('');
+        if (isManagerFlag) {
+          tbody.querySelectorAll('.delete-sale-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              if (!confirm('이 매출 기록을 삭제할까요?\n이 매출로 자동 갱신됐던 회원의 이용권 만료일 등은 되돌아가지 않으니, 필요하면 회원 정보에서 직접 수정해주세요.')) return;
+              try {
+                await deleteSale(btn.dataset.id);
+                loadSales();
+              } catch (err) {
+                alert(err.message);
+              }
+            });
+          });
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 7 : 6}" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    // 판매 담당자 select 채우기: 트레이너는 RLS상 본인만 조회되고, 지점장은 전체 직원 중에서 고를 수 있음
+    async function loadStaffOptions() {
+      const sel = document.getElementById('s_staff');
+      sel.innerHTML = '';
+      try {
+        const staff = await fetchStaff();
+        staff.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          if (s.id === currentUserId) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        if (!sel.value && currentUserId) {
+          sel.innerHTML += `<option value="${currentUserId}" selected>나</option>`;
+        }
+      } catch (e) {
+        if (currentUserId) sel.innerHTML = `<option value="${currentUserId}" selected>나</option>`;
+      }
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        currentUserId = profile.id;
+        if (profile.role === 'manager') {
+          isManagerFlag = true;
+          document.getElementById('salesDeleteColHeader').style.display = '';
+        }
+      }
+      loadMemberOptions();
+      loadProductOptions();
+      loadStaffOptions();
+      loadSales();
+    })();
+
+    document.getElementById('addSaleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addErrorBox');
+      const successBox = document.getElementById('addSuccessBox');
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      try {
+        await addSale({
+          member_id: document.getElementById('s_member').value,
+          staff_id: document.getElementById('s_staff').value || currentUserId,
+          category: document.getElementById('s_category').value,
+          product_id: document.getElementById('s_product').value || null,
+          amount: Number(document.getElementById('s_amount').value),
+          sale_date: document.getElementById('s_date').value,
+          payment_method: document.getElementById('s_payment').value || null,
+          memo: document.getElementById('s_memo').value.trim() || null
+        });
+        successBox.textContent = '매출이 등록되었습니다.';
+        successBox.style.display = 'block';
+        document.getElementById('addSaleForm').reset();
+        document.getElementById('s_date').value = new Date().toISOString().slice(0, 10);
+        if (currentUserId) document.getElementById('s_staff').value = currentUserId; // reset()은 담당자를 첫 옵션으로 되돌리므로 다시 본인으로 맞춰줌
+        loadSales();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

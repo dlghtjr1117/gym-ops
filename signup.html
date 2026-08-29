@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 관리 - 계정 만들기</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="center-screen">
+    <div class="container" style="max-width:360px;">
+      <div class="text-center" style="margin-bottom:28px;">
+        <div class="logo-badge">C</div>
+        <h1 class="title">계정 만들기</h1>
+        <p class="subtitle">지점장 또는 트레이너로 가입하세요</p>
+      </div>
+
+      <div class="card">
+        <div id="errorBox" class="error-text"></div>
+        <div id="successBox" class="success-text"></div>
+
+        <form id="signupForm">
+          <div class="field">
+            <label>이름</label>
+            <input type="text" id="name" placeholder="홍길동" required />
+          </div>
+          <div class="field">
+            <label>이메일</label>
+            <input type="email" id="email" placeholder="you@example.com" required />
+          </div>
+          <div class="field">
+            <label>비밀번호</label>
+            <input type="password" id="password" placeholder="6자 이상" minlength="6" required />
+          </div>
+          <button type="submit" class="btn btn-primary" id="submitBtn">가입하기</button>
+        </form>
+      </div>
+
+      <p class="hint">이미 계정이 있으신가요? <a href="login.html">로그인</a></p>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    const form = document.getElementById('signupForm');
+    const errorBox = document.getElementById('errorBox');
+    const successBox = document.getElementById('successBox');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '가입 중...';
+
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        await signUp(email, password, name);
+        successBox.textContent = '가입 완료! 잠시 후 로그인 화면으로 이동합니다.';
+        successBox.style.display = 'block';
+        setTimeout(() => { location.href = 'login.html'; }, 1500);
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = '가입하기';
+      }
+    });
+  </script>
+</body>
+</html>

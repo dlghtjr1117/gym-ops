@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 업무 리스트</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="tasks.html" class="active">업무 리스트</a>
+      <a href="products.html">이용권 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="panel">
+      <h3>업무 추가</h3>
+      <p class="muted" style="margin:-6px 0 12px;">지점장은 아무에게나 업무를 배정할 수 있고, 트레이너는 본인 앞으로만 업무를 추가할 수 있어요. "매일"/"매주"로 등록하면 마이크로소프트 투두처럼 체크한 업무가 다음 주기에 자동으로 다시 미체크 상태로 돌아와요.</p>
+      <div id="addErrorBox" class="error-text"></div>
+      <div id="addSuccessBox" class="success-text"></div>
+      <form id="addTaskForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field" id="t_assigneeField"><label>담당자</label><select id="t_assignee" required></select></div>
+          <div class="field" id="t_memberField"><label>대상 회원 (선택)</label><select id="t_member"><option value="">없음</option></select></div>
+          <div class="field" style="grid-column: span 2;"><label>할 일</label><input type="text" id="t_title" placeholder="예: 락커룸 청소 / 강민재 회원 만료 TM 연락" required /></div>
+          <div class="field"><label>반복</label>
+            <select id="t_repeat">
+              <option value="none">반복 없음</option>
+              <option value="daily">매일</option>
+              <option value="weekly">매주</option>
+            </select>
+          </div>
+          <div class="field" id="t_weekdayField" style="display:none;">
+            <label>요일</label>
+            <select id="t_weekday">
+              <option value="0">일요일</option>
+              <option value="1" selected>월요일</option>
+              <option value="2">화요일</option>
+              <option value="3">수요일</option>
+              <option value="4">목요일</option>
+              <option value="5">금요일</option>
+              <option value="6">토요일</option>
+            </select>
+          </div>
+          <div class="field" id="t_dueField"><label>마감일 (선택)</label><input type="date" id="t_due" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2 id="taskListTitle">업무 목록</h2>
+      <div id="trainerTabs" class="filter-tabs"></div>
+      <p class="muted" id="taskProgress" style="margin:0 0 12px;"></p>
+      <div id="taskBody">
+        <p class="muted" style="padding:16px;">불러오는 중...</p>
+      </div>
+      <div class="report-nav" id="tasksPagination" style="justify-content:flex-end; margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let currentUserId = null;
+    let currentUserRole = null;
+    let tasksCache = [];
+    let trainersCache = [];
+    let activeAssigneeFilter = 'all';
+    let showCompleted = false;
+    let tasksPage = 1;
+    const TASKS_PAGE_SIZE = 15;
+
+    document.getElementById('t_repeat').addEventListener('change', (e) => {
+      const isRepeating = e.target.value !== 'none';
+      document.getElementById('t_weekdayField').style.display = e.target.value === 'weekly' ? '' : 'none';
+      document.getElementById('t_dueField').style.display = isRepeating ? 'none' : '';
+    });
+
+    // 담당자 선택: 지점장이면 전체 직원 목록, 트레이너면 본인 하나만(변경 불가) - RLS상 트레이너는
+    // 본인을 담당자로 하는 업무만 등록할 수 있기 때문에 처음부터 다른 사람을 못 고르게 함
+    async function loadAssigneeOptions(profile) {
+      const sel = document.getElementById('t_assignee');
+      try {
+        const staff = await fetchStaff();
+        if (profile.role === 'manager') {
+          staff.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+            if (s.id === profile.id) opt.selected = true;
+            sel.appendChild(opt);
+          });
+        } else {
+          const me = staff.find(s => s.id === profile.id) || { id: profile.id, name: profile.name };
+          const opt = document.createElement('option');
+          opt.value = me.id; opt.textContent = me.name; opt.selected = true;
+          sel.appendChild(opt);
+          sel.disabled = true;
+        }
+      } catch (e) {
+        sel.innerHTML = `<option value="${profile.id}">${profile.name}</option>`;
+      }
+    }
+
+    async function loadMemberOptions() {
+      const sel = document.getElementById('t_member');
+      try {
+        const members = await fetchMembers();
+        members.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id; opt.textContent = m.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) { /* 무시: 회원 없으면 옵션이 비어있음 */ }
+    }
+
+    function visibleTasks() {
+      return activeAssigneeFilter === 'all' ? tasksCache : tasksCache.filter(t => t.assignee_id === activeAssigneeFilter);
+    }
+
+    function renderProgress() {
+      const list = visibleTasks();
+      const done = list.filter(t => isTaskDone(t)).length;
+      document.getElementById('taskProgress').textContent =
+        list.length > 0 ? `오늘 기준 ${done} / ${list.length} 완료` : '';
+    }
+
+    // 지점장 전용: 담당자별로 걸러볼 수 있는 탭 (전체 + 트레이너 이름). 트레이너 로그인 화면에서는
+    // RLS로 이미 본인 업무만 보이기 때문에 탭 자체를 숨김
+    function renderTrainerTabs() {
+      const container = document.getElementById('trainerTabs');
+      if (currentUserRole !== 'manager') { container.innerHTML = ''; return; }
+      const counts = {};
+      tasksCache.forEach(t => { counts[t.assignee_id] = (counts[t.assignee_id] || 0) + 1; });
+      const tabs = [{ key: 'all', label: `전체 (${tasksCache.length})` }]
+        .concat(trainersCache.map(s => ({ key: s.id, label: `${s.name} (${counts[s.id] || 0})` })));
+      container.innerHTML = tabs.map(t =>
+        `<button type="button" class="filter-tab${t.key === activeAssigneeFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+      ).join('');
+      container.querySelectorAll('.filter-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeAssigneeFilter = btn.dataset.key;
+          tasksPage = 1; // 담당자 필터를 바꾸면 1페이지부터 다시 보여줌
+          renderTrainerTabs();
+          renderTaskBody();
+        });
+      });
+    }
+
+    function renderTaskRow(t) {
+      const done = isTaskDone(t);
+      const dueLabel = taskDueLabel(t);
+      const canEdit = currentUserRole === 'manager' || t.assignee_id === currentUserId;
+      const checkboxAttrs = canEdit
+        ? `onchange="handleToggleTask('${t.id}', this.checked)"`
+        : 'disabled title="담당자 본인만 체크할 수 있어요"';
+      const metaParts = [];
+      if (currentUserRole === 'manager') metaParts.push(t.assignee ? t.assignee.name : '미지정');
+      if (t.member) metaParts.push(t.member.name);
+      metaParts.push(dueLabel);
+      return `
+        <div class="checklist-row ${done ? 'row-done' : ''}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--slate-200);">
+          <input type="checkbox" ${done ? 'checked' : ''} ${checkboxAttrs} style="width:18px; height:18px; cursor:${canEdit ? 'pointer' : 'default'};" />
+          <div style="flex:1;">
+            <div style="font-size:14px; font-weight:600;">${t.title}</div>
+            <div class="muted" style="font-size:12px; margin-top:2px;">${metaParts.join(' · ')}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTaskBody() {
+      const container = document.getElementById('taskBody');
+      const paginationEl = document.getElementById('tasksPagination');
+      const list = visibleTasks();
+      if (list.length === 0) {
+        container.innerHTML = '<p class="muted" style="padding:16px;">해당하는 업무가 없습니다.</p>';
+        paginationEl.innerHTML = '';
+        renderProgress();
+        return;
+      }
+      const pendingAll = list.filter(t => !isTaskDone(t));
+      const completed = list.filter(t => isTaskDone(t));
+
+      // 미완료 업무가 많아질 수 있으니 15건씩 페이지로 나눠서 보여줌 (완료된 업무는 기본으로 접혀있어 별도 페이지 없이 전부 보여줌)
+      const totalPages = Math.max(1, Math.ceil(pendingAll.length / TASKS_PAGE_SIZE));
+      tasksPage = Math.min(Math.max(1, tasksPage), totalPages);
+      const startIdx = (tasksPage - 1) * TASKS_PAGE_SIZE;
+      const pending = pendingAll.slice(startIdx, startIdx + TASKS_PAGE_SIZE);
+
+      let html = '<div class="card" style="padding:0; overflow:hidden;">';
+      html += pending.length > 0 ? pending.map(renderTaskRow).join('') : '<p class="muted" style="padding:16px;">지금 남은 업무가 없어요 🎉</p>';
+      html += '</div>';
+
+      if (completed.length > 0) {
+        html += `
+          <button type="button" id="toggleCompletedBtn" class="btn-link" style="margin-top:12px;">${showCompleted ? '▲' : '▼'} 완료됨 ${completed.length}</button>
+          <div class="card" style="padding:0; overflow:hidden; margin-top:8px; ${showCompleted ? '' : 'display:none;'}" id="completedList">
+            ${completed.map(renderTaskRow).join('')}
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+      const toggleBtn = document.getElementById('toggleCompletedBtn');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => { showCompleted = !showCompleted; renderTaskBody(); });
+      }
+      if (pendingAll.length > TASKS_PAGE_SIZE) {
+        renderPagination(paginationEl, tasksPage, pendingAll.length, TASKS_PAGE_SIZE, (newPage) => {
+          tasksPage = newPage;
+          renderTaskBody();
+        });
+      } else {
+        paginationEl.innerHTML = '';
+      }
+      renderProgress();
+    }
+
+    async function handleToggleTask(id, checked) {
+      try {
+        await toggleTaskDone(id, checked);
+        const t = tasksCache.find(x => x.id === id);
+        if (t) {
+          t.status = checked ? 'done' : 'todo';
+          t.last_completed_at = checked ? new Date().toISOString() : null;
+        }
+        renderTaskBody();
+      } catch (err) {
+        alert(err.message);
+        loadTasks();
+      }
+    }
+
+    async function loadTasks() {
+      const container = document.getElementById('taskBody');
+      try {
+        tasksCache = await fetchTasks();
+        renderTrainerTabs();
+        renderTaskBody();
+      } catch (err) {
+        container.innerHTML = `<div class="error-text" style="display:block;">${err.message}</div>`;
+      }
+    }
+
+    document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addErrorBox');
+      const successBox = document.getElementById('addSuccessBox');
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      const repeatType = document.getElementById('t_repeat').value;
+      try {
+        await addTask({
+          assignee_id: document.getElementById('t_assignee').value,
+          member_id: document.getElementById('t_member').value || null,
+          title: document.getElementById('t_title').value.trim(),
+          due_date: repeatType === 'none' ? (document.getElementById('t_due').value || null) : null,
+          status: 'todo',
+          repeat_type: repeatType,
+          repeat_weekday: repeatType === 'weekly' ? Number(document.getElementById('t_weekday').value) : null
+        });
+        successBox.textContent = '업무가 등록되었습니다.';
+        successBox.style.display = 'block';
+        document.getElementById('t_title').value = '';
+        document.getElementById('t_due').value = '';
+        document.getElementById('t_member').value = '';
+        document.getElementById('t_repeat').value = 'none';
+        document.getElementById('t_weekdayField').style.display = 'none';
+        document.getElementById('t_dueField').style.display = '';
+        loadTasks();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        currentUserId = profile.id;
+        currentUserRole = profile.role;
+        document.getElementById('taskListTitle').textContent = profile.role === 'manager' ? '전체 업무 목록' : '내 업무 목록';
+        await loadAssigneeOptions(profile);
+        // "대상 회원" 선택 항목은 지점장/트레이너 화면 모두에서 안 보여줌 (업무에 회원을 굳이 안 엮어도 되니까)
+        document.getElementById('t_memberField').style.display = 'none';
+        if (profile.role === 'manager') {
+          try {
+            const staff = await fetchStaff();
+            trainersCache = staff.filter(s => s.role === 'trainer');
+          } catch (e) { /* 무시: 탭만 안 보일 뿐, 전체 목록은 그대로 보임 */ }
+        } else {
+          // 트레이너 화면에서는 본인 앞으로만 등록되니 "담당자" 선택 항목도 굳이 안 보여줌
+          // (담당자 select는 본인으로 이미 고정돼 있어서 숨겨도 제출값은 그대로 유지됨)
+          document.getElementById('t_assigneeField').style.display = 'none';
+        }
+      }
+      loadTasks();
+    })();
+  </script>
+</body>
+</html>

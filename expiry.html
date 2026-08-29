@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 만료회원 · TM 관리</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html" class="active">만료회원 · TM</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="products.html">이용권 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-card hero-blue" id="heroMembership">
+        <div class="hero-icon">🏋️</div>
+        <div class="hero-label">헬스이용권 · 45일 이내 만료</div>
+        <div class="hero-value"><span id="heroMembershipCount">0</span><span class="hero-unit">명</span></div>
+        <div class="hero-sub" id="heroMembershipSub">불러오는 중...</div>
+      </div>
+      <div class="hero-card hero-purple" id="heroGroupPt">
+        <div class="hero-icon">🤸</div>
+        <div class="hero-label">그룹PT · 45일 이내 만료</div>
+        <div class="hero-value"><span id="heroGroupPtCount">0</span><span class="hero-unit">명</span></div>
+        <div class="hero-sub" id="heroGroupPtSub">불러오는 중...</div>
+      </div>
+      <div class="hero-card hero-green">
+        <div class="hero-label">이번 달 재등록 확률</div>
+        <div class="hero-ring-wrap">
+          <svg class="hero-ring" viewBox="0 0 120 120">
+            <circle class="hero-ring-bg" cx="60" cy="60" r="52" />
+            <circle class="hero-ring-fg" id="renewalRingFg" cx="60" cy="60" r="52" />
+          </svg>
+          <div class="hero-ring-value"><span id="renewalRateValue">-</span><span class="hero-ring-percent">%</span></div>
+        </div>
+        <div class="hero-sub" id="renewalSub">불러오는 중...</div>
+      </div>
+    </div>
+    <p class="muted" style="margin:10px 2px 0;">헬스이용권 · 그룹PT 카드를 누르면 아래 목록이 해당 상품으로 필터돼요.</p>
+
+    <div class="section">
+      <h2>만료 예정 · 만료된 회원 <span class="muted">(오늘 기준 45일 이내 만료 또는 이미 만료)</span></h2>
+      <p class="muted" style="margin:-6px 0 12px;">맨 왼쪽 체크박스는 "내가 이미 확인/연락한 회원"을 표시해두는 용도예요 (TM 상태와는 별개로, 어디까지 훑어봤는지 흔적만 남겨요). <span id="checkedProgress"></span></p>
+      <div id="categoryTabs" class="filter-tabs"></div>
+      <table id="expiryTable" class="table-fixed" style="min-width:980px;">
+        <thead><tr>
+          <th style="width:40px;">확인</th><th style="width:11%;">이름</th><th style="width:14%;">전화번호</th><th style="width:5%;">성별</th>
+          <th style="width:15%;">만료일</th><th style="width:21%;">상품</th><th style="width:10%;">담당</th><th style="width:14%;">TM 상태</th>
+        </tr></thead>
+        <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+      <div class="report-nav" id="expiryPagination" style="justify-content:flex-end; margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let currentUserId = null;
+    let expiringItemsCache = [];
+    let activeCategoryFilter = 'all';
+    let expiryPage = 1;
+    const EXPIRY_PAGE_SIZE = 15;
+
+    // TM상태를 뱃지처럼 보이는 <select>로 렌더링 -> 바로 클릭해서 상태 변경 가능
+    function renderTmStatusCell(it) {
+      const currentStatus = it.latestTm ? it.latestTm.status : 'not_contacted';
+      // 아직 새 4가지 상태로 기록된 적 없는 회원(=한 번도 연락 안 한 회원)은 맨 위에
+      // 지금 상태를 그대로 보여주는 선택불가 옵션을 하나 추가해서, 고르기 전엔 값이 안 바뀌게 함
+      const extraOption = EDITABLE_TM_STATUSES.includes(currentStatus)
+        ? ''
+        : `<option value="${currentStatus}" selected disabled>${TM_STATUS_LABEL[currentStatus] || currentStatus}</option>`;
+      const options = EDITABLE_TM_STATUSES.map(key =>
+        `<option value="${key}" ${key === currentStatus ? 'selected' : ''}>${TM_STATUS_LABEL[key]}</option>`
+      ).join('');
+      return `<select class="badge ${TM_STATUS_BADGE[currentStatus]} tm-status-select"
+                data-member-id="${it.member.id}" data-category="${it.categoryKey}" onchange="handleInlineStatusChange(this)">${extraOption}${options}</select>`;
+    }
+
+    // TM상태 뱃지(select)에서 바로 상태를 바꾸면, 새 연락 기록으로 저장하고 표를 새로고침
+    // 어떤 상품(헬스이용권/그룹PT/개인PT 등)에 대한 기록인지도 같이 저장해서, 대시보드의
+    // 상품별 재등록 현황(FC/PT 재등록률)을 실제 데이터로 정확히 계산할 수 있게 함
+    async function handleInlineStatusChange(selectEl) {
+      const memberId = selectEl.dataset.memberId;
+      const category = selectEl.dataset.category;
+      const newStatus = selectEl.value;
+      selectEl.disabled = true;
+      try {
+        await addTmLog({
+          member_id: memberId,
+          staff_id: currentUserId,
+          status: newStatus,
+          category: category,
+          contact_date: new Date().toISOString().slice(0, 10),
+          memo: null
+        });
+        await loadExpiring();
+      } catch (err) {
+        alert(err.message);
+        selectEl.disabled = false;
+      }
+    }
+
+    // "확인" 체크박스: 회원 단위로 tm_checked_at을 저장/해제. 큰 목록을 매번 전체 새로고침하지 않도록
+    // 캐시에 있는 그 회원의 항목들만 로컬에서 업데이트하고 다시 그림
+    async function handleCheckedToggle(checkboxEl) {
+      const memberId = checkboxEl.dataset.memberId;
+      const checked = checkboxEl.checked;
+      checkboxEl.disabled = true;
+      try {
+        await updateMember(memberId, { tm_checked_at: checked ? new Date().toISOString() : null });
+        expiringItemsCache.forEach(it => {
+          if (it.member.id === memberId) it.member.tm_checked_at = checked ? new Date().toISOString() : null;
+        });
+        renderExpiryTable();
+      } catch (err) {
+        alert(err.message);
+        checkboxEl.checked = !checked;
+      } finally {
+        checkboxEl.disabled = false;
+      }
+    }
+
+    // 상단에 "확인 N / 전체 M명" 진행 상황 표시 (회원 단위 중복 제거해서 계산)
+    function renderCheckedProgress() {
+      const uniqueIds = new Set(expiringItemsCache.map(it => it.member.id));
+      const checkedIds = new Set(expiringItemsCache.filter(it => it.member.tm_checked_at).map(it => it.member.id));
+      document.getElementById('checkedProgress').textContent =
+        uniqueIds.size > 0 ? `(확인 ${checkedIds.size} / 전체 ${uniqueIds.size}명)` : '';
+    }
+
+    // 상품 필터 탭: 실제로 만료 임박 항목이 있는 카테고리만 "전체"와 함께 보여줌
+    function renderCategoryTabs() {
+      const counts = {};
+      expiringItemsCache.forEach(it => { counts[it.categoryKey] = (counts[it.categoryKey] || 0) + 1; });
+      const presentCats = EXPIRY_CATEGORIES.filter(c => counts[c.key]);
+
+      const tabs = [{ key: 'all', label: `전체 (${expiringItemsCache.length})` }]
+        .concat(presentCats.map(c => ({ key: c.key, label: `${c.label} (${counts[c.key]})` })));
+
+      document.getElementById('categoryTabs').innerHTML = tabs.map(t =>
+        `<button type="button" class="filter-tab${t.key === activeCategoryFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+      ).join('');
+
+      document.querySelectorAll('#categoryTabs .filter-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeCategoryFilter = btn.dataset.key;
+          expiryPage = 1; // 필터 탭을 바꾸면 1페이지부터 다시 보여줌
+          renderCategoryTabs();
+          renderExpiryTable();
+        });
+      });
+    }
+
+    function renderExpiryTable() {
+      const tbody = document.querySelector('#expiryTable tbody');
+      const paginationEl = document.getElementById('expiryPagination');
+      const allItems = activeCategoryFilter === 'all'
+        ? expiringItemsCache
+        : expiringItemsCache.filter(it => it.categoryKey === activeCategoryFilter);
+
+      if (allItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">해당하는 만료 예정 회원이 없습니다.</td></tr>';
+        paginationEl.innerHTML = '';
+        return;
+      }
+      const totalPages = Math.max(1, Math.ceil(allItems.length / EXPIRY_PAGE_SIZE));
+      expiryPage = Math.min(Math.max(1, expiryPage), totalPages);
+      const startIdx = (expiryPage - 1) * EXPIRY_PAGE_SIZE;
+      const items = allItems.slice(startIdx, startIdx + EXPIRY_PAGE_SIZE);
+      renderPagination(paginationEl, expiryPage, allItems.length, EXPIRY_PAGE_SIZE, (newPage) => {
+        expiryPage = newPage;
+        renderExpiryTable();
+      });
+      tbody.innerHTML = items.map(it => `
+        <tr class="${it.member.tm_checked_at ? 'row-checked' : ''}">
+          <td style="text-align:center;">
+            <input type="checkbox" class="tm-checked-box" data-member-id="${it.member.id}"
+              ${it.member.tm_checked_at ? 'checked' : ''} onchange="handleCheckedToggle(this)" />
+          </td>
+          <td class="cell-1line" title="${escapeHtml(it.member.name)}">${escapeHtml(it.member.name)}</td>
+          <td class="cell-1line">${it.member.phone || '-'}</td>
+          <td class="cell-1line">${it.member.gender || '-'}</td>
+          <td class="cell-1line">${it.expiryDate} ${remainingBadge(it.expiryDate)}</td>
+          <td><div class="mcell"><span class="mcell-label" title="${escapeHtml(it.productLabel)}">${escapeHtml(it.productLabel)}</span></div></td>
+          <td class="cell-1line" title="${escapeHtml(it.member.trainer ? it.member.trainer.name : '미지정')}">${it.member.trainer ? escapeHtml(it.member.trainer.name) : '미지정'}</td>
+          <td>${renderTmStatusCell(it)}</td>
+        </tr>
+      `).join('');
+      renderCheckedProgress();
+    }
+
+    async function loadExpiring() {
+      const tbody = document.querySelector('#expiryTable tbody');
+      try {
+        const items = await fetchExpiringItems(45);
+        expiringItemsCache = items;
+
+        renderCategoryTabs();
+        renderExpiryTable();
+
+        // 상단 히어로 카드(헬스이용권 · 그룹PT 45일 이내 만료 인원수)도 이미 불러온 items로 채움
+        // (대시보드처럼 fetchExpiringItems를 한 번 더 호출할 필요 없게)
+        const membershipCount = items.filter(it => it.categoryKey === 'membership').length;
+        const groupPtCount = items.filter(it => it.categoryKey === 'group_pt').length;
+        animateCount(document.getElementById('heroMembershipCount'), membershipCount);
+        animateCount(document.getElementById('heroGroupPtCount'), groupPtCount);
+        document.getElementById('heroMembershipSub').textContent =
+          membershipCount > 0 ? '연락이 필요해요' : '만료 예정 회원이 없어요';
+        document.getElementById('heroGroupPtSub').textContent =
+          groupPtCount > 0 ? '연락이 필요해요' : '만료 예정 회원이 없어요';
+      } catch (err) {
+        document.getElementById('categoryTabs').innerHTML = '';
+        tbody.innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        document.getElementById('heroMembershipSub').textContent = err.message;
+        document.getElementById('heroGroupPtSub').textContent = err.message;
+      }
+    }
+
+    // 헬스이용권 · 그룹PT 카드를 누르면 아래 표를 해당 상품 필터로 바로 전환해줌
+    document.getElementById('heroMembership').addEventListener('click', () => {
+      activeCategoryFilter = 'membership';
+      expiryPage = 1;
+      renderCategoryTabs();
+      renderExpiryTable();
+      document.getElementById('expiryTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('heroGroupPt').addEventListener('click', () => {
+      activeCategoryFilter = 'group_pt';
+      expiryPage = 1;
+      renderCategoryTabs();
+      renderExpiryTable();
+      document.getElementById('expiryTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    // 이번 달 재등록 확률 원형 그래프 (대시보드와 동일한 계산, data.js의 공용 setRenewalRing 사용)
+    (async () => {
+      try {
+        const { total, renewed, rate } = await fetchThisMonthRenewalRate();
+        setRenewalRing(rate);
+        document.getElementById('renewalSub').textContent =
+          total > 0 ? `이번 달 TM ${total}건 중 재등록 ${renewed}건` : '이번 달 기록된 TM이 아직 없어요';
+      } catch (err) {
+        document.getElementById('renewalSub').textContent = err.message;
+      }
+    })();
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        currentUserId = profile.id;
+      }
+      loadExpiring();
+    })();
+  </script>
+</body>
+</html>

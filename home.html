@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 홈</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html" class="active">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="products.html">이용권 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="home-banner">
+      <div class="greeting" id="homeGreeting">안녕하세요 👋</div>
+      <div class="sub">자주 쓰는 메뉴를 모아뒀어요. 필요한 항목을 눌러 바로 이동하세요.</div>
+    </div>
+
+    <div class="home-grid">
+      <div class="home-tile is-soon" id="tileScheduler">
+        <div class="home-tile-icon">📅</div>
+        <div class="home-tile-label">스케줄러</div>
+        <span class="home-tile-badge">준비중</span>
+      </div>
+      <a class="home-tile" href="members.html">
+        <div class="home-tile-icon">👤</div>
+        <div class="home-tile-label">고객관리</div>
+      </a>
+      <a class="home-tile" href="tasks.html">
+        <div class="home-tile-icon">💼</div>
+        <div class="home-tile-label">선생님 업무 리스트</div>
+      </a>
+      <a class="home-tile" href="expiry.html">
+        <div class="home-tile-icon">📞</div>
+        <div class="home-tile-label">재등록 · 만료 TM</div>
+      </a>
+    </div>
+
+    <div class="panel" id="backupPanel" style="display:none; margin-top:24px; max-width:560px;">
+      <h3>🗄 데이터 백업</h3>
+      <p class="muted" style="margin:-6px 0 12px;">
+        지금까지 입력된 회원 · 매출 · TM기록 · 업무 · 이용권상품 정보를 전부 엑셀 파일 하나로 내려받아요.
+        회원·매출 데이터는 Supabase에 안전하게 저장되어 있지만, 만약을 대비해 큰 변경을 한 뒤나 주기적으로
+        한 번씩 눌러서 컴퓨터(또는 구글 드라이브 등)에 따로 보관해두시는 걸 추천해요.
+      </p>
+      <button type="button" class="btn btn-outline" id="backupBtn" style="width:auto; padding-left:20px; padding-right:20px;">전체 데이터 백업 다운로드</button>
+      <div id="backupStatus" class="muted" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    document.getElementById('tileScheduler').addEventListener('click', () => {
+      alert('스케줄러(예약 캘린더) 기능은 준비 중이에요. 조금만 기다려주세요!');
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (!profile) {
+        document.getElementById('roleBadge').textContent = '프로필을 불러오지 못했어요';
+        return;
+      }
+      const roleLabel = profile.role === 'manager' ? '지점장' : '트레이너';
+      document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;
+      document.getElementById('homeGreeting').textContent = `안녕하세요, ${profile.name}님 👋`;
+      // 데이터 백업은 전체 데이터를 다 받아가는 기능이라 지점장 전용으로만 보여줌
+      // (트레이너 계정은 RLS상 본인 관련 데이터만 조회돼서 "전체" 백업이 되지 않기 때문)
+      if (profile.role === 'manager') {
+        document.getElementById('backupPanel').style.display = '';
+      }
+    })();
+
+    document.getElementById('backupBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('backupBtn');
+      const status = document.getElementById('backupStatus');
+      btn.disabled = true;
+      btn.textContent = '백업 만드는 중...';
+      status.style.color = '';
+      status.textContent = '';
+      try {
+        const data = await fetchAllDataForBackup();
+        const wb = XLSX.utils.book_new();
+        const addSheet = (name, rows) => {
+          const ws = XLSX.utils.json_to_sheet(rows && rows.length ? rows : [{ 안내: '데이터 없음' }]);
+          XLSX.utils.book_append_sheet(wb, ws, name);
+        };
+        addSheet('회원', data.members);
+        addSheet('매출', data.sales);
+        addSheet('TM기록', data.tmLogs);
+        addSheet('업무', data.tasks);
+        addSheet('이용권상품', data.products);
+        addSheet('직원', data.staff);
+
+        const now = new Date();
+        const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+        XLSX.writeFile(wb, `gym-ops-백업_${stamp}.xlsx`);
+
+        status.textContent = `백업 완료! (회원 ${data.members.length}명 · 매출 ${data.sales.length}건 · 업무 ${data.tasks.length}건) 다운로드 폴더를 확인해주세요.`;
+      } catch (err) {
+        status.style.color = '#dc2626';
+        status.textContent = '백업 중 오류가 발생했어요: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '전체 데이터 백업 다운로드';
+      }
+    });
+  </script>
+</body>
+</html>

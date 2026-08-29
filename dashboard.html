@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 대시보드</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html" class="active">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="products.html">이용권 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="section" style="margin-top:0;">
+      <h2>매출 보고</h2>
+      <div class="report-tabs">
+        <button type="button" class="report-tab active" data-mode="daily">일간 매출 보고</button>
+        <button type="button" class="report-tab" data-mode="weekly">주간 매출 보고</button>
+        <button type="button" class="report-tab" data-mode="monthly">월간 매출 보고</button>
+      </div>
+      <div class="report-nav">
+        <button type="button" class="report-nav-arrow" id="reportPrevBtn">◀</button>
+        <div class="report-period-label" id="reportPeriodLabel">-</div>
+        <button type="button" class="report-nav-arrow" id="reportNextBtn">▶</button>
+        <input type="date" id="reportDatePicker" />
+        <button type="button" class="btn-link" id="reportTodayBtn">오늘</button>
+      </div>
+      <div class="hero-grid" id="reportSummaryGrid" style="margin-top:14px;">
+        <div class="hero-card hero-blue">
+          <div class="hero-icon">💰</div>
+          <div class="hero-label">총매출 (FC+PT)</div>
+          <div class="hero-value hero-value-money" id="reportTotalAmount">-</div>
+          <div class="hero-sub" id="reportTotalCount">불러오는 중...</div>
+        </div>
+        <div class="hero-card hero-purple">
+          <div class="hero-icon">🏋️</div>
+          <div class="hero-label">FC매출 <span style="font-weight:400;">(헬스이용권·그룹PT·운동복·락커)</span></div>
+          <div class="hero-value hero-value-money" id="reportFcAmount">-</div>
+          <div class="hero-sub" id="reportFcCount">불러오는 중...</div>
+        </div>
+        <div class="hero-card hero-teal">
+          <div class="hero-icon">🤸</div>
+          <div class="hero-label">PT총매출 <span style="font-weight:400;">(개인PT)</span></div>
+          <div class="hero-value hero-value-money" id="reportPtAmount">-</div>
+          <div class="hero-sub" id="reportPtCount">불러오는 중...</div>
+        </div>
+      </div>
+      <table id="reportSalesTable" style="margin-top:14px;">
+        <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
+        <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>이번 달 상품별 재등록 현황 <span class="muted" style="font-weight:400;font-size:12px;">(만료회원·TM 상태 기준)</span></h2>
+      <div class="grid-3" id="categoryRenewalGrid">
+        <div class="stat-card">
+          <div class="label">헬스이용권 (FC)</div>
+          <div class="value" id="renewalMembershipValue">-</div>
+          <div class="delta muted" id="renewalMembershipSub">불러오는 중...</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">그룹PT</div>
+          <div class="value" id="renewalGroupPtValue">-</div>
+          <div class="delta muted" id="renewalGroupPtSub">불러오는 중...</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">개인PT</div>
+          <div class="value" id="renewalPtValue">-</div>
+          <div class="delta muted" id="renewalPtSub">불러오는 중...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>최근 매출 내역 <a href="sales.html" style="font-weight:400;font-size:12px;">+ 매출 등록하기</a></h2>
+      <table id="recentSalesTable">
+        <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th style="text-align:right;">금액</th></tr></thead>
+        <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+      <div class="report-nav" style="margin-top:10px; justify-content:flex-end;">
+        <button type="button" class="report-nav-arrow" id="recentSalesPrevBtn">◀</button>
+        <div class="muted" id="recentSalesPageLabel">-</div>
+        <button type="button" class="report-nav-arrow" id="recentSalesNextBtn">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    // 로그인 안 되어 있으면 login.html로 이동
+    requireLogin();
+
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (!profile) {
+        // 세션은 있는데 profiles 조회가 안 되는 경우(가입 직후 트리거 지연 등) 대비
+        document.getElementById('roleBadge').textContent = '프로필을 불러오지 못했어요';
+        return;
+      }
+      const roleLabel = profile.role === 'manager' ? '지점장' : '트레이너';
+      document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;
+    })();
+
+    // 헬스이용권 · 그룹PT 만료 임박 인원수 / 이번 달 재등록 확률 카드는 만료회원·TM 페이지에도 있어서
+    // (중복이라 이 페이지에서는 뺐음) animateCount / setRenewalRing 은 그 페이지에서 씀 (data.js에 공용 정의)
+
+    // ---- 매출 보고 (일간/주간/월간) ----
+    // 날짜는 시간대 문제를 피하려고 항상 'YYYY-MM-DD' 문자열로 다루고, Date 객체는 로컬 자정 기준으로만 만듦
+    const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토'];
+    function pad2(n) { return String(n).padStart(2, '0'); }
+    function toDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+    function parseDateStr(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+    function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+    function addMonths(d, n) { const r = new Date(d.getFullYear(), d.getMonth() + n, 1); return r; }
+    // 주간 보고는 월요일 시작 기준 (그 날짜가 속한 주의 월요일을 찾음)
+    function startOfWeek(d) {
+      const day = d.getDay(); // 0=일 ... 6=토
+      const diffToMonday = day === 0 ? -6 : 1 - day;
+      return addDays(d, diffToMonday);
+    }
+
+    let reportMode = 'daily';
+    let reportRefDate = new Date();
+
+    function getReportRange() {
+      if (reportMode === 'daily') {
+        const start = new Date(reportRefDate.getFullYear(), reportRefDate.getMonth(), reportRefDate.getDate());
+        return { start, end: addDays(start, 1) };
+      }
+      if (reportMode === 'weekly') {
+        const start = startOfWeek(reportRefDate);
+        return { start, end: addDays(start, 7) };
+      }
+      // monthly
+      const start = new Date(reportRefDate.getFullYear(), reportRefDate.getMonth(), 1);
+      return { start, end: addMonths(start, 1) };
+    }
+
+    function getReportPeriodLabel(start, end) {
+      if (reportMode === 'daily') {
+        return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일 (${WEEKDAY_KR[start.getDay()]})`;
+      }
+      if (reportMode === 'weekly') {
+        const lastDay = addDays(end, -1);
+        const sameMonth = start.getMonth() === lastDay.getMonth();
+        const startLabel = `${start.getMonth() + 1}월 ${start.getDate()}일`;
+        const endLabel = sameMonth ? `${lastDay.getDate()}일` : `${lastDay.getMonth() + 1}월 ${lastDay.getDate()}일`;
+        return `${start.getFullYear()}년 ${startLabel} ~ ${endLabel}`;
+      }
+      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
+    }
+
+    async function loadReport() {
+      const { start, end } = getReportRange();
+      document.getElementById('reportPeriodLabel').textContent = getReportPeriodLabel(start, end);
+      document.getElementById('reportDatePicker').value = toDateStr(reportRefDate);
+
+      const tbody = document.querySelector('#reportSalesTable tbody');
+      tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr>';
+      try {
+        const sales = await fetchSalesInRange(toDateStr(start), toDateStr(end));
+        // PT(개인PT 신규/재등록)만 따로 걸러내고, 나머지 전부(헬스이용권·그룹PT·운동복·락커)는 FC로 묶음
+        // -> 이렇게 하면 새 판매 항목이 추가돼도 항상 "총매출 = FC매출 + PT총매출"이 성립함
+        let totalAmount = 0, fcAmount = 0, ptAmount = 0, fcCount = 0, ptCount = 0;
+        sales.forEach(s => {
+          const amt = Number(s.amount);
+          totalAmount += amt;
+          if (s.category && PT_SALE_CATEGORIES.includes(s.category)) { ptAmount += amt; ptCount++; }
+          else { fcAmount += amt; fcCount++; }
+        });
+        document.getElementById('reportTotalAmount').textContent = formatWon(totalAmount);
+        document.getElementById('reportTotalCount').textContent = `${sales.length}건`;
+        document.getElementById('reportFcAmount').textContent = formatWon(fcAmount);
+        document.getElementById('reportFcCount').textContent = `${fcCount}건`;
+        document.getElementById('reportPtAmount').textContent = formatWon(ptAmount);
+        document.getElementById('reportPtCount').textContent = `${ptCount}건`;
+
+        if (sales.length === 0) {
+          const periodLabel = reportMode === 'daily' ? '이 날짜에' : reportMode === 'weekly' ? '이번 주에' : '이번 달에';
+          tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">${periodLabel} 등록된 매출이 없습니다.</td></tr>`;
+        } else {
+          tbody.innerHTML = sales.map(s => `
+            <tr>
+              <td>${s.sale_date}</td>
+              <td>${s.member ? s.member.name : '-'}</td>
+              <td>${CATEGORY_LABEL[s.category] || s.category}</td>
+              <td>${s.staff ? s.staff.name : '-'}</td>
+              <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
+              <td style="text-align:right;">${formatWon(s.amount)}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {
+        document.getElementById('reportTotalAmount').textContent = '오류';
+        tbody.innerHTML = `<tr><td colspan="6" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    document.querySelectorAll('.report-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.report-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        reportMode = btn.dataset.mode;
+        loadReport();
+      });
+    });
+    document.getElementById('reportPrevBtn').addEventListener('click', () => {
+      reportRefDate = reportMode === 'daily' ? addDays(reportRefDate, -1)
+        : reportMode === 'weekly' ? addDays(reportRefDate, -7)
+        : addMonths(reportRefDate, -1);
+      loadReport();
+    });
+    document.getElementById('reportNextBtn').addEventListener('click', () => {
+      reportRefDate = reportMode === 'daily' ? addDays(reportRefDate, 1)
+        : reportMode === 'weekly' ? addDays(reportRefDate, 7)
+        : addMonths(reportRefDate, 1);
+      loadReport();
+    });
+    document.getElementById('reportTodayBtn').addEventListener('click', () => {
+      reportRefDate = new Date();
+      loadReport();
+    });
+    document.getElementById('reportDatePicker').addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      reportRefDate = parseDateStr(e.target.value);
+      loadReport();
+    });
+    loadReport();
+
+    // ---- 최근 매출 내역 (5건씩 페이지 넘김) ----
+    // 한 번에 넉넉히 불러온 뒤 화면에서 5건씩 잘라서 보여줌 (매번 서버에 다시 요청할 필요 없게)
+    let recentSalesAll = [];
+    let recentSalesPage = 1;
+    const RECENT_SALES_PAGE_SIZE = 5;
+
+    function renderRecentSalesPage() {
+      const tbody = document.querySelector('#recentSalesTable tbody');
+      const totalPages = Math.max(1, Math.ceil(recentSalesAll.length / RECENT_SALES_PAGE_SIZE));
+      recentSalesPage = Math.min(Math.max(1, recentSalesPage), totalPages);
+
+      if (recentSalesAll.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">등록된 매출이 없습니다. 매출 등록 페이지에서 첫 매출을 입력해보세요.</td></tr>';
+      } else {
+        const startIdx = (recentSalesPage - 1) * RECENT_SALES_PAGE_SIZE;
+        const pageItems = recentSalesAll.slice(startIdx, startIdx + RECENT_SALES_PAGE_SIZE);
+        tbody.innerHTML = pageItems.map(s => `
+          <tr>
+            <td>${s.sale_date}</td>
+            <td>${s.member ? s.member.name : '-'}</td>
+            <td>${CATEGORY_LABEL[s.category] || s.category}</td>
+            <td>${s.staff ? s.staff.name : '-'}</td>
+            <td style="text-align:right;">${formatWon(s.amount)}</td>
+          </tr>
+        `).join('');
+      }
+
+      document.getElementById('recentSalesPageLabel').textContent = `${recentSalesPage} / ${totalPages}`;
+      document.getElementById('recentSalesPrevBtn').disabled = recentSalesPage <= 1;
+      document.getElementById('recentSalesNextBtn').disabled = recentSalesPage >= totalPages;
+    }
+
+    document.getElementById('recentSalesPrevBtn').addEventListener('click', () => {
+      recentSalesPage -= 1;
+      renderRecentSalesPage();
+    });
+    document.getElementById('recentSalesNextBtn').addEventListener('click', () => {
+      recentSalesPage += 1;
+      renderRecentSalesPage();
+    });
+
+    (async () => {
+      const tbody = document.querySelector('#recentSalesTable tbody');
+      try {
+        recentSalesAll = await fetchRecentSales(50);
+        renderRecentSalesPage();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    })();
+
+    // 상품별(헬스이용권/그룹PT/개인PT) 재등록 현황 카드 채우기
+    function fillCategoryRenewalCard(suffix, stat) {
+      const valueEl = document.getElementById(`renewal${suffix}Value`);
+      const subEl = document.getElementById(`renewal${suffix}Sub`);
+      if (!stat || stat.total === 0) {
+        valueEl.textContent = '-';
+        subEl.textContent = '이번 달 TM 기록 없음';
+        return;
+      }
+      valueEl.textContent = `${stat.rate}%`;
+      subEl.textContent = `${stat.total}건 중 재등록 ${stat.renewed}건`;
+    }
+
+    (async () => {
+      try {
+        const stats = await fetchCategoryRenewalStats();
+        fillCategoryRenewalCard('Membership', stats.membership);
+        fillCategoryRenewalCard('GroupPt', stats.group_pt);
+        fillCategoryRenewalCard('Pt', stats.pt);
+      } catch (err) {
+        document.getElementById('categoryRenewalGrid').innerHTML =
+          `<div class="error-text" style="display:block; grid-column:1/-1;">${err.message}</div>`;
+      }
+    })();
+
+  </script>
+</body>
+</html>
