@@ -26,37 +26,8 @@
   </div>
 
   <div class="wrap">
-    <div class="panel" id="addMemberPanel" style="display:none;">
-      <h3>회원 등록</h3>
-      <div id="addErrorBox" class="error-text"></div>
-      <form id="addMemberForm">
-        <div class="form-grid" style="margin-bottom:12px;">
-          <div class="field"><label>이름</label><input type="text" id="m_name" required /></div>
-          <div class="field"><label>전화번호</label><input type="text" id="m_phone" placeholder="010-0000-0000" /></div>
-          <div class="field"><label>담당 트레이너</label><select id="m_trainer"><option value="">미지정</option></select></div>
-        </div>
-        <p class="muted" style="margin:0 0 8px;">상품을 고르면 아래 종목/만료일/횟수가 자동으로 채워져요 (직접 입력해도 돼요).</p>
-        <div class="form-grid" style="margin-bottom:12px;">
-          <div class="field"><label>이용권 상품</label><select id="m_product_membership"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>그룹PT 상품</label><select id="m_product_group_pt"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>개인PT 상품</label><select id="m_product_pt"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>락커 상품</label><select id="m_product_locker"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>운동복 상품</label><select id="m_product_clothes"><option value="">직접 입력</option></select></div>
-        </div>
-        <div class="form-grid" style="margin-bottom:12px;">
-          <div class="field"><label>이용권 종목</label><input type="text" id="m_type" placeholder="예: 회원권 3개월" /></div>
-          <div class="field"><label>이용권 만료일</label><input type="date" id="m_end_date" /></div>
-          <div class="field"><label>그룹PT 종목</label><input type="text" id="m_gpt_type" placeholder="예: 필라테스" /></div>
-          <div class="field"><label>그룹PT 만료일</label><input type="date" id="m_gpt_end" /></div>
-        </div>
-        <div class="form-grid" style="margin-bottom:12px;">
-          <div class="field"><label>개인PT 만료일</label><input type="date" id="m_pt_end" /></div>
-          <div class="field"><label>개인PT 잔여횟수</label><input type="number" id="m_pt_remain" min="0" /></div>
-          <div class="field"><label>락커 만료일</label><input type="date" id="m_locker_end" /></div>
-          <div class="field"><label>운동복 만료일</label><input type="date" id="m_clothes_end" /></div>
-        </div>
-        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
-      </form>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+      <button type="button" class="btn btn-primary" id="openAddMemberBtn" style="display:none; width:auto; padding:10px 24px;">+ 회원 등록</button>
     </div>
 
     <div class="panel" id="uploadPanel" style="display:none;">
@@ -87,6 +58,44 @@
       </div>
       <div class="report-nav" id="membersPagination" style="justify-content:flex-end; margin-top:10px;"></div>
       <p class="muted" style="margin-top:8px;">회원을 클릭하면 상세 정보 확인, 이용권 판매(등록), 정보 수정을 할 수 있어요.</p>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="addMemberOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:720px;">
+      <div class="modal-header">
+        <h3>회원 등록</h3>
+        <button type="button" class="modal-close" id="am_closeBtn">&times;</button>
+      </div>
+      <div id="addErrorBox" class="error-text"></div>
+      <form id="addMemberForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>이름</label><input type="text" id="m_name" required /></div>
+          <div class="field"><label>전화번호</label><input type="text" id="m_phone" placeholder="010-0000-0000" /></div>
+          <div class="field"><label>담당 트레이너</label><select id="m_trainer"><option value="">미지정</option></select></div>
+        </div>
+        <p class="muted" style="margin:0 0 8px;">상품을 고르면 아래 종목/만료일/횟수가 자동으로 채워져요 (직접 입력해도 돼요).</p>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>이용권 상품</label><select id="m_product_membership"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>그룹PT 상품</label><select id="m_product_group_pt"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>개인PT 상품</label><select id="m_product_pt"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>락커 상품</label><select id="m_product_locker"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>운동복 상품</label><select id="m_product_clothes"><option value="">직접 입력</option></select></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>이용권 종목</label><input type="text" id="m_type" placeholder="예: 회원권 3개월" /></div>
+          <div class="field"><label>이용권 만료일</label><input type="date" id="m_end_date" /></div>
+          <div class="field"><label>그룹PT 종목</label><input type="text" id="m_gpt_type" placeholder="예: 필라테스" /></div>
+          <div class="field"><label>그룹PT 만료일</label><input type="date" id="m_gpt_end" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:18px;">
+          <div class="field"><label>개인PT 만료일</label><input type="date" id="m_pt_end" /></div>
+          <div class="field"><label>개인PT 잔여횟수</label><input type="number" id="m_pt_remain" min="0" /></div>
+          <div class="field"><label>락커 만료일</label><input type="date" id="m_locker_end" /></div>
+          <div class="field"><label>운동복 만료일</label><input type="date" id="m_clothes_end" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">등록</button>
+      </form>
     </div>
   </div>
 
@@ -725,7 +734,7 @@
         if (profile.role === 'manager') {
           isManagerFlag = true;
           document.getElementById('deleteColHeader').style.display = '';
-          document.getElementById('addMemberPanel').style.display = 'block';
+          document.getElementById('openAddMemberBtn').style.display = '';
           document.getElementById('uploadPanel').style.display = 'block';
           try {
             trainersCache = await fetchTrainers();
@@ -946,6 +955,22 @@
       }
     });
 
+    // ---- 회원 등록 모달 (비플처럼 "+ 회원 등록" 버튼을 누르면 작은 창으로 뜨게) ----
+    function openAddMemberModal() {
+      document.getElementById('addErrorBox').style.display = 'none';
+      document.getElementById('addMemberForm').reset();
+      document.getElementById('addMemberOverlay').style.display = 'flex';
+      document.getElementById('m_name').focus();
+    }
+    function closeAddMemberModal() {
+      document.getElementById('addMemberOverlay').style.display = 'none';
+    }
+    document.getElementById('openAddMemberBtn').addEventListener('click', openAddMemberModal);
+    document.getElementById('am_closeBtn').addEventListener('click', closeAddMemberModal);
+    document.getElementById('addMemberOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'addMemberOverlay') closeAddMemberModal();
+    });
+
     document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errorBox = document.getElementById('addErrorBox');
@@ -966,6 +991,7 @@
           workout_clothes_end_date: val('m_clothes_end') || null
         });
         document.getElementById('addMemberForm').reset();
+        closeAddMemberModal();
         loadMembers();
       } catch (err) {
         errorBox.textContent = err.message;
