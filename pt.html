@@ -202,7 +202,6 @@
               <option value="p25">25%</option>
               <option value="p50" selected>50%</option>
               <option value="p75">75%</option>
-              <option value="p100">100%</option>
               <option value="registered">등록</option>
               <option value="rolled_over">이월</option>
               <option value="missed">미스</option>
@@ -243,14 +242,14 @@
 
     let leadsCache = [];      // 선택된 트레이너의 pt_leads 전체 (월 필터는 화면에서)
     let careCache = [];       // 선택된 트레이너의 PT 케어 대상 회원
-    let monthSalesCache = []; // 이번 달 매출(전체) - PT 카테고리만 걸러서 사용
     let targetsCache = [];
 
     let monthAnchor = new Date();
 
     // 표시용 라벨
+    // 100%는 곧 "등록"이라 별도 옵션으로 두지 않고 등록 하나로 합침
     const PROB_SELECT_OPTIONS = [
-      { value: 'p25', label: '25%' }, { value: 'p50', label: '50%' }, { value: 'p75', label: '75%' }, { value: 'p100', label: '100%' },
+      { value: 'p25', label: '25%' }, { value: 'p50', label: '50%' }, { value: 'p75', label: '75%' },
       { value: 'registered', label: '등록' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }
     ];
     const PROB_BADGE = { p25: 'badge-slate', p50: 'badge-yellow', p75: 'badge-orange', p100: 'badge-green', registered: 'badge-green', rolled_over: 'badge-purple', missed: 'badge-red' };
@@ -264,11 +263,14 @@
     const CARE_PROB_BADGE = { '': '', '25': 'badge-slate', '50': 'badge-yellow', '75': 'badge-orange', '100': 'badge-green', '0': 'badge-red' };
 
     // 리드의 stage/probability -> 위 콤보select 값으로 변환
+    // (100%는 이제 "등록" 하나로 합쳐서, 옛날 데이터에 probability=100인데 stage는 아직 등록이 아닌 경우도
+    //  선택지가 사라지지 않도록 75%로 눌러서 보여줌)
     function leadToProbValue(l) {
       if (l.stage === 'registered') return 'registered';
       if (l.stage === 'rolled_over') return 'rolled_over';
       if (l.stage === 'missed') return 'missed';
-      return 'p' + (l.probability != null ? l.probability : 50);
+      const prob = l.probability != null ? l.probability : 50;
+      return 'p' + (prob >= 100 ? 75 : prob);
     }
 
     function getMonthRange() {
@@ -301,18 +303,16 @@
     });
 
     // ---- 매출 카드 ----
-    async function loadRevenueCards() {
-      const { startStr, endStr, monthStr } = getMonthRange();
+    // 확정 매출은 이 PT 시트(주차별 매출 기록)에서 "등록"으로 표시한 상담 건들의 금액 합계로 계산함
+    // (별도 매출입력 페이지의 sales 기록과는 독립적 - 이 시트 자체가 트레이너의 실시간 현황판 역할)
+    function loadRevenueCards() {
+      const { startStr, endStr } = getMonthRange();
+      const monthLeads = leadsCache.filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr);
 
-      try {
-        const sales = await fetchSalesInRange(startStr, endStr);
-        monthSalesCache = sales.filter(s => PT_SALE_CATEGORIES.includes(s.category) && s.staff_id === selectedTrainerId);
-        const confirmedTotal = monthSalesCache.reduce((sum, s) => sum + Number(s.amount), 0);
-        animateCount(document.getElementById('confirmedAmount'), confirmedTotal);
-        document.getElementById('confirmedSub').textContent = `이번 달 PT 매출 ${monthSalesCache.length}건`;
-      } catch (err) {
-        document.getElementById('confirmedSub').textContent = err.message;
-      }
+      const registeredLeads = monthLeads.filter(l => l.stage === 'registered');
+      const confirmedTotal = registeredLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
+      animateCount(document.getElementById('confirmedAmount'), confirmedTotal);
+      document.getElementById('confirmedSub').textContent = `이번 달 PT 매출 ${registeredLeads.length}건`;
 
       const targetRow = targetsCache.find(t => t.period_type === 'monthly' && t.period_start === formatDateStr(getMonthRange().start) && t.trainer_id === selectedTrainerId);
       const targetTotal = targetRow ? Number(targetRow.target_amount) : 0;
@@ -455,10 +455,13 @@
       document.getElementById('weeklyTotal').textContent = formatWon(total);
     }
 
+    // 이 달 "유형=재등록"으로 남긴 상담 건 중, 몇 건이 "등록"으로 확정됐는지
+    // (주차별 매출 기록 표에서 유형/확률을 바로 반영 - 별도 데이터가 아니라 이 표 자체가 근거)
     function loadRenewalMiniStats() {
-      const { monthStr } = getMonthRange();
-      const expected = careCache.filter(m => m.pt_expected_renewal_month === monthStr);
-      const confirmed = expected.filter(m => monthSalesCache.some(s => s.member_id === m.id));
+      const { startStr, endStr } = getMonthRange();
+      const monthLeads = leadsCache.filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr);
+      const expected = monthLeads.filter(l => l.source === '재등록');
+      const confirmed = expected.filter(l => l.stage === 'registered');
       document.getElementById('renewalExpectedCount').textContent = expected.length;
       document.getElementById('renewalConfirmedCount').textContent = confirmed.length;
       document.getElementById('renewalConfirmedRate').textContent = expected.length > 0 ? `${Math.round((confirmed.length / expected.length) * 100)}%` : '-';
@@ -770,7 +773,7 @@
       renderCareTable();
       renderOt1Table();
       renderOt2Table();
-      await loadRevenueCards(); // monthSalesCache까지 채워야 재등록 확정 조사 계산이 정확함
+      loadRevenueCards();
       loadAllMiniStats();
     }
 
