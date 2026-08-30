@@ -177,6 +177,16 @@ async function fetchThisMonthRenewalRate() {
   return { total, renewed, rate: total > 0 ? Math.round((renewed / total) * 100) : null };
 }
 
+// 등록/저장 등이 성공했을 때 화면 위쪽에 잠깐 떴다가 자동으로 사라지는 완료 알림
+// (여러 화면에서 재사용할 수 있게 공용 함수로 둠 - style.css의 .toast/@keyframes toast-pop과 함께 동작)
+function showToast(message) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = message;
+  document.body.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
 // 숫자를 0에서 목표값까지 부드럽게 증가시켜 보여줌 (대시보드/만료회원 페이지 히어로 카드에서 공통으로 사용)
 function animateCount(el, target, duration = 700) {
   const startTime = performance.now();
