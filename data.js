@@ -179,9 +179,9 @@ async function fetchThisMonthRenewalRate() {
 
 // 등록/저장 등이 성공했을 때 화면 위쪽에 잠깐 떴다가 자동으로 사라지는 완료 알림
 // (여러 화면에서 재사용할 수 있게 공용 함수로 둠 - style.css의 .toast/@keyframes toast-pop과 함께 동작)
-function showToast(message) {
+function showToast(message, type = 'success') {
   const el = document.createElement('div');
-  el.className = 'toast';
+  el.className = type === 'danger' ? 'toast toast-danger' : 'toast'; // 삭제처럼 "주의가 필요한" 알림은 빨간색으로 구분
   el.textContent = message;
   document.body.appendChild(el);
   el.addEventListener('animationend', () => el.remove());

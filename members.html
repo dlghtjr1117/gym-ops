@@ -328,6 +328,7 @@
             try {
               await deleteMember(btn.dataset.id);
               loadMembers();
+              showToast(`"${btn.dataset.name}" 회원님의 정보가 삭제되었습니다.`, 'danger');
             } catch (err) {
               alert(err.message);
             }
@@ -658,9 +659,11 @@
       if (!currentDetailMember) return;
       if (!confirm(`'${currentDetailMember.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM) 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
       try {
+        const deletedName = currentDetailMember.name;
         await deleteMember(currentDetailMember.id);
         closeMemberDetail();
         loadMembers();
+        showToast(`"${deletedName}" 회원님의 정보가 삭제되었습니다.`, 'danger');
       } catch (err) {
         const errorBox = document.getElementById('md_errorBox');
         errorBox.textContent = err.message;
