@@ -120,6 +120,13 @@
         <p class="muted" style="margin:14px 0 8px;">위에서 상품을 고르거나 금액을 적은 항목은 등록과 동시에 매출로도 기록돼요. 담당자·판매 시각을 확인해주세요.</p>
         <div class="form-grid" style="margin-bottom:18px;">
           <div class="field"><label>판매 담당자</label><select id="m_sale_staff"></select></div>
+          <div class="field"><label>결제 수단</label>
+            <select id="m_sale_payment">
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+              <option value="transfer">계좌이체</option>
+            </select>
+          </div>
           <div class="field"><label>판매 시각</label><input type="time" id="m_sale_time" /></div>
         </div>
         <!-- 이용권/그룹PT 종목명, 개인PT 잔여횟수는 위 상품 선택으로 자동 계산되고
@@ -139,7 +146,10 @@
           <h3 id="md_name">-</h3>
           <div class="muted" id="md_phone">-</div>
         </div>
-        <button type="button" class="modal-close" id="md_closeBtn">&times;</button>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <button type="button" class="btn-link" id="md_deleteBtn" style="display:none; color:#dc2626;">회원 삭제</button>
+          <button type="button" class="modal-close" id="md_closeBtn">&times;</button>
+        </div>
       </div>
 
       <div id="md_errorBox" class="error-text"></div>
@@ -642,6 +652,22 @@
       if (e.target.id === 'memberDetailOverlay') closeMemberDetail();
     });
 
+    // 상세 화면에서 바로 삭제 (테스트로 여러 번 등록해본 회원을 지울 때, 표 끝까지 스크롤 안 해도 되도록
+    // 회원을 클릭해서 들어온 이 화면에도 삭제 버튼을 둠 -> 표의 "삭제" 링크와 동작은 동일함)
+    document.getElementById('md_deleteBtn').addEventListener('click', async () => {
+      if (!currentDetailMember) return;
+      if (!confirm(`'${currentDetailMember.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM) 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
+      try {
+        await deleteMember(currentDetailMember.id);
+        closeMemberDetail();
+        loadMembers();
+      } catch (err) {
+        const errorBox = document.getElementById('md_errorBox');
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
     document.getElementById('md_saveBtn').addEventListener('click', async () => {
       if (!currentDetailMember) return;
       const errorBox = document.getElementById('md_errorBox');
@@ -830,6 +856,7 @@
           isManagerFlag = true;
           document.getElementById('deleteColHeader').style.display = '';
           document.getElementById('openAddMemberBtn').style.display = '';
+          document.getElementById('md_deleteBtn').style.display = '';
           document.getElementById('uploadPanel').style.display = 'block';
           try {
             trainersCache = await fetchTrainers();
@@ -1102,6 +1129,7 @@
         // 정가와 다르게 파는 경우) 그대로 매출로 기록함. 상품을 안 고르고 금액도 안 적은 칸만 건너뜀.
         // (담당자/판매 시각은 아래 두 칸을 공통으로 적용, 금액은 항목별로 직접 수정된 값을 그대로 사용)
         const saleStaffId = val('m_sale_staff') || currentUserId;
+        const salePayment = val('m_sale_payment') || null;
         const saleTime = val('m_sale_time') || null;
         const salesPayload = [];
         Object.keys(PRODUCT_SELECT_IDS).forEach(category => {
@@ -1120,16 +1148,32 @@
             amount: Number(amountRaw || 0),
             sale_date: saleDate,
             sale_time: saleTime,
+            payment_method: salePayment,
             memo: product ? '회원 등록과 함께 자동 기록' : '회원 등록과 함께 자동 기록 (직접 입력·가격 변동)'
           });
         });
+        // 회원 정보는 이미 저장된 상태이므로, 매출 기록이 실패하더라도 회원 등록 자체를
+        // "실패"로 처리하면 안 됨 (그대로 두면 화면엔 실패로 보이는데 실제로는 회원이 이미
+        // 생성돼 있어서, 사용자가 다시 등록을 누르면 회원이 중복 생성될 위험이 있음).
+        // 매출만 별도로 실패 처리해서 안내하고, 회원 등록 자체는 정상적으로 마무리함.
+        let saleWarning = null;
         if (salesPayload.length > 0) {
-          await addSales(salesPayload);
+          try {
+            await addSales(salesPayload);
+          } catch (saleErr) {
+            saleWarning = saleErr.message;
+          }
         }
 
         document.getElementById('addMemberForm').reset();
         closeAddMemberModal();
         loadMembers();
+        if (saleWarning) {
+          // 매출 기록만 실패한 경우는 alert로 바로 원인을 알려줘야 해서, 조용히 사라지는 토스트 대신 그대로 둠
+          alert(`회원("${newMember.name}") 등록은 완료됐지만, 매출 기록에는 실패했습니다.\n\n오류 내용: ${saleWarning}\n\n회원 목록에서 "${newMember.name}"을 클릭한 뒤, "이용권 판매" 항목에서 다시 등록해주세요.`);
+        } else {
+          showToast(`"${newMember.name}" 회원 등록이 완료되었습니다.`);
+        }
       } catch (err) {
         errorBox.textContent = err.message;
         errorBox.style.display = 'block';

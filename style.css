@@ -74,6 +74,22 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 .error-text { background: #fef2f2; color: var(--red-600); font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
 .success-text { background: #f0fdf4; color: var(--green-600); font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
 .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+/* 등록/저장 등이 완료됐을 때 화면 위에 잠깐 떴다 사라지는 완료 알림
+   ("등록됐는지 안됐는지 구분이 안 된다"는 피드백으로 추가함 - 한 번 반짝하고 사라지는 효과 포함) */
+.toast {
+  position: fixed; top: 24px; left: 50%; z-index: 500;
+  background: var(--green-600); color: #fff; font-size: 14px; font-weight: 700;
+  padding: 14px 24px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  pointer-events: none; animation: toast-pop 2.2s ease forwards;
+}
+@keyframes toast-pop {
+  0%   { opacity: 0; transform: translate(-50%, -6px) scale(0.9); }
+  12%  { opacity: 1; transform: translate(-50%, 0) scale(1.06); } /* 살짝 크게 튀면서 "깜빡" 느낌 */
+  22%  { transform: translate(-50%, 0) scale(1); }
+  82%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 0) scale(0.96); }
+}
 .btn-link { background: none; border: none; padding: 0; font-size: 12px; color: var(--slate-500); cursor: pointer; text-decoration: underline; }
 
 /* 대시보드용 */
