@@ -775,10 +775,12 @@ async function upsertPtTarget(target) {
 }
 
 // PT 잔여횟수가 적어 재등록 케어(상담)가 필요한 회원 목록 (기본: 잔여 3회 이하, 재원중인 회원만)
+// + 잔여횟수와 상관없이 트레이너가 직접 "PT 회원 관리" 시트에 추가한(pt_care_pinned=true) 회원도 함께 포함
 async function fetchPtCareMembers(threshold = 3) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name)` +
-    `&status=neq.left&pt_remaining_sessions=lte.${threshold}&pt_remaining_sessions=not.is.null` +
+    `&status=neq.left` +
+    `&or=(and(pt_remaining_sessions.lte.${threshold},pt_remaining_sessions.not.is.null),pt_care_pinned.eq.true)` +
     `&order=pt_remaining_sessions.asc.nullslast`,
     { headers: await authHeaders() }
   );

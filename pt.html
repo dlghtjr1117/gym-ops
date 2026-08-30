@@ -114,16 +114,19 @@
 
     <!-- 섹션 B: PT 회원관리 (잔여횟수 적은 회원 케어) -->
     <div class="section" id="sectionCare" style="margin-top:14px; display:none;">
-      <h2>PT 회원 관리 <span class="muted">(담당 회원 중 잔여 10회 미만 세일즈 플랜)</span></h2>
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+        <h2>PT 회원 관리 <span class="muted">(담당 회원 중 잔여 10회 미만 세일즈 플랜 + 직접 추가한 회원)</span></h2>
+        <button type="button" class="btn btn-primary" id="openAddCareMemberBtn" style="width:auto; padding-left:16px; padding-right:16px; flex-shrink:0;">+ PT 회원 추가</button>
+      </div>
       <p class="muted" style="margin:-6px 0 12px;">칸을 클릭해서 바로 입력하면 자동 저장돼요. 재등록확률·재등록예상횟수까지 여기서 한 번에 관리해요.</p>
       <div style="overflow-x:auto;">
-        <table id="careTable" class="table-fixed sheet-table" style="min-width:1080px;">
+        <table id="careTable" class="table-fixed sheet-table" style="min-width:1140px;">
           <thead><tr>
-            <th style="width:9%;">재등록예상시기</th><th style="width:9%;">이름</th><th style="width:7%;">남은횟수</th>
-            <th style="width:20%;">수업방향</th><th style="width:6%;">단기</th><th style="width:21%;">장기적 플랜(관리 방향)</th>
-            <th style="width:9%;">재등록예상횟수</th><th style="width:10%;">예상매출</th><th style="width:9%;">재등록확률</th>
+            <th style="width:8%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
+            <th style="width:18%;">수업방향</th><th style="width:5%;">단기</th><th style="width:19%;">장기적 플랜(관리 방향)</th>
+            <th style="width:8%;">재등록예상횟수</th><th style="width:9%;">예상매출</th><th style="width:8%;">재등록확률</th><th style="width:6%;"></th>
           </tr></thead>
-          <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tbody><tr><td colspan="10" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -211,6 +214,18 @@
         <div class="field"><label>특이사항 · 메모</label><input type="text" id="l_memo" placeholder="선택 입력" /></div>
         <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
       </form>
+    </div>
+  </div>
+
+  <!-- PT 회원 관리 시트에 회원 추가 모달 (담당 회원 중에서 검색해서 고르는 방식) -->
+  <div class="modal-overlay" id="addCareMemberOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-header">
+        <div><h3>PT 회원 관리에 추가</h3><p class="muted" style="margin:0;" id="addCareMemberHint"></p></div>
+        <button type="button" class="modal-close" id="closeAddCareMemberBtn">&times;</button>
+      </div>
+      <div class="field"><label>이름으로 검색</label><input type="text" id="careMemberSearch" placeholder="회원 이름을 입력하세요" autocomplete="off" /></div>
+      <div id="careMemberResults" style="max-height:280px; overflow-y:auto; border:1px solid var(--slate-200); border-radius:10px; margin-top:8px;"></div>
     </div>
   </div>
 
@@ -506,26 +521,86 @@
     function renderCareTable() {
       const tbody = document.querySelector('#careTable tbody');
       if (careCache.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">잔여 세션이 적은(10회 미만) 담당 회원이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="muted" style="padding:16px;">아직 목록이 비어 있습니다. "+ PT 회원 추가"로 직접 추가하거나, 잔여 10회 미만이 되면 자동으로 표시돼요.</td></tr>';
         return;
       }
       tbody.innerHTML = careCache.map(m => {
         const shortVal = m.pt_short_term_plan === 'O' ? 'O' : 'X';
         const probOptions = CARE_PROB_OPTIONS.map(o => `<option value="${o.value}" ${String(m.pt_expected_probability == null ? '' : m.pt_expected_probability) === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
         const careProbVal = m.pt_expected_probability == null ? '' : String(m.pt_expected_probability);
+        const remaining = m.pt_remaining_sessions;
+        const remainingHtml = remaining == null
+          ? '<span class="muted">-</span>'
+          : `<span class="badge ${remaining <= 1 ? 'badge-red' : 'badge-amber'}">${remaining}회</span>`;
         return `
         <tr>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" placeholder="YYYY-MM" /></td>
           <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
-          <td style="text-align:center;"><span class="badge ${m.pt_remaining_sessions <= 1 ? 'badge-red' : 'badge-amber'}">${m.pt_remaining_sessions}회</span></td>
+          <td style="text-align:center;">${remainingHtml}</td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_session_focus || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_session_focus',false)" placeholder="수업방향" /></td>
           <td style="text-align:center;"><button type="button" class="toggle-ox ${shortVal === 'O' ? 'is-o' : 'is-x'}" data-member-id="${m.id}" data-value="${shortVal}" onclick="handleToggleShortTerm(this)">${shortVal}</button></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_long_term_plan || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_long_term_plan',false)" placeholder="장기적 플랜" /></td>
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_sessions != null ? m.pt_expected_sessions : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_sessions',true)" placeholder="예상횟수" /></td>
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_amount != null ? m.pt_expected_amount : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_amount',true)" placeholder="예상매출" /></td>
           <td><select class="sheet-input badge ${CARE_PROB_BADGE[careProbVal] || ''}" data-member-id="${m.id}" onchange="handleCareProbSave(this)">${probOptions}</select></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleRemoveCareMember('${m.id}')">제외</button></td>
         </tr>`;
       }).join('');
+    }
+
+    // PT 회원 관리에 직접 추가하기 (담당 회원 중 검색해서 고르는 방식)
+    let careMemberPickerList = [];
+    function renderCareMemberResults(list) {
+      const box = document.getElementById('careMemberResults');
+      if (list.length === 0) {
+        box.innerHTML = '<div class="muted" style="padding:14px; font-size:12px;">추가할 수 있는 담당 회원이 없습니다. (이미 목록에 있거나, 담당 회원이 아닐 수 있어요)</div>';
+        return;
+      }
+      box.innerHTML = list.map(m => `
+        <button type="button" class="btn-link" style="display:flex; justify-content:space-between; width:100%; padding:10px 12px; border-bottom:1px solid var(--slate-100); text-align:left;" onclick="handleAddCareMember('${m.id}')">
+          <span>${escapeHtml(m.name)}</span>
+          <span class="muted">${m.pt_remaining_sessions != null ? `잔여 ${m.pt_remaining_sessions}회` : ''}</span>
+        </button>
+      `).join('');
+    }
+    async function openAddCareMemberModal() {
+      document.getElementById('addCareMemberHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 담당 회원 중에서 골라 추가해요.`;
+      document.getElementById('careMemberSearch').value = '';
+      document.getElementById('careMemberResults').innerHTML = '<div class="muted" style="padding:14px; font-size:12px;">불러오는 중...</div>';
+      document.getElementById('addCareMemberOverlay').style.display = 'flex';
+      try {
+        const all = await fetchMembers();
+        const pinnedIds = new Set(careCache.map(m => m.id));
+        careMemberPickerList = all.filter(m => m.assigned_trainer_id === selectedTrainerId && m.status !== 'left' && !pinnedIds.has(m.id));
+        renderCareMemberResults(careMemberPickerList);
+      } catch (err) {
+        document.getElementById('careMemberResults').innerHTML = `<div class="error-text" style="padding:14px;">${err.message}</div>`;
+      }
+    }
+    function closeAddCareMemberModal() { document.getElementById('addCareMemberOverlay').style.display = 'none'; }
+    document.getElementById('openAddCareMemberBtn').addEventListener('click', openAddCareMemberModal);
+    document.getElementById('closeAddCareMemberBtn').addEventListener('click', closeAddCareMemberModal);
+    document.getElementById('addCareMemberOverlay').addEventListener('click', (e) => { if (e.target.id === 'addCareMemberOverlay') closeAddCareMemberModal(); });
+    document.getElementById('careMemberSearch').addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      renderCareMemberResults(q ? careMemberPickerList.filter(m => m.name.includes(q)) : careMemberPickerList);
+    });
+    async function handleAddCareMember(id) {
+      try {
+        await updateMemberPtCare(id, { pt_care_pinned: true });
+        closeAddCareMemberModal();
+        careCache = (await fetchPtCareMembers(9)).filter(m => m.assigned_trainer_id === selectedTrainerId);
+        renderCareTable();
+        showToast('PT 회원 관리 목록에 추가되었습니다.');
+      } catch (err) { alert(err.message); }
+    }
+    async function handleRemoveCareMember(id) {
+      try {
+        await updateMemberPtCare(id, { pt_care_pinned: false });
+        careCache = (await fetchPtCareMembers(9)).filter(m => m.assigned_trainer_id === selectedTrainerId);
+        renderCareTable();
+        showToast('목록에서 제외되었습니다.', 'danger');
+      } catch (err) { alert(err.message); }
     }
 
     // ---- 섹션 C: OT 관리 (OT1/OT2 공용) ----
