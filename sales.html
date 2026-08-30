@@ -15,6 +15,7 @@
       <a href="members.html">회원 관리</a>
       <a href="sales.html" class="active">매출 입력</a>
       <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
       <a href="tasks.html">업무 리스트</a>
       <a href="products.html">이용권 관리</a>
     </div>
@@ -47,6 +48,7 @@
           </div>
           <div class="field"><label>금액(원)</label><input type="number" id="s_amount" min="0" required /></div>
           <div class="field"><label>날짜</label><input type="date" id="s_date" required /></div>
+          <div class="field"><label>시각</label><input type="time" id="s_time" /></div>
           <div class="field"><label>판매 담당자</label><select id="s_staff"></select></div>
           <div class="field"><label>결제 수단</label>
             <select id="s_payment">
@@ -76,7 +78,14 @@
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
+    // "시각"은 정확히 몇 시 몇 분에 결제됐는지 기록하는 용도라, 로컬 시각 기준으로 채워야 함
+    // (toISOString은 UTC라 시간대가 어긋나서 직접 계산함 - members.html의 nowTimeStr()과 동일한 방식)
+    function nowTimeStr() {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
     document.getElementById('s_date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('s_time').value = nowTimeStr();
 
     let currentUserId = null;
     let productsCache = [];
@@ -215,6 +224,7 @@
           product_id: document.getElementById('s_product').value || null,
           amount: Number(document.getElementById('s_amount').value),
           sale_date: document.getElementById('s_date').value,
+          sale_time: document.getElementById('s_time').value || null,
           payment_method: document.getElementById('s_payment').value || null,
           memo: document.getElementById('s_memo').value.trim() || null
         });
@@ -222,6 +232,7 @@
         successBox.style.display = 'block';
         document.getElementById('addSaleForm').reset();
         document.getElementById('s_date').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('s_time').value = nowTimeStr();
         if (currentUserId) document.getElementById('s_staff').value = currentUserId; // reset()은 담당자를 첫 옵션으로 되돌리므로 다시 본인으로 맞춰줌
         loadSales();
       } catch (err) {

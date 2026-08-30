@@ -90,6 +90,8 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
   82%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
   100% { opacity: 0; transform: translate(-50%, 0) scale(0.96); }
 }
+/* 삭제 등 "되돌릴 수 없는" 작업 완료 알림은 초록색 대신 빨간색으로 (showToast(msg, 'danger')) */
+.toast-danger { background: var(--red-600); }
 .btn-link { background: none; border: none; padding: 0; font-size: 12px; color: var(--slate-500); cursor: pointer; text-decoration: underline; }
 
 /* 대시보드용 */
@@ -128,6 +130,18 @@ tr:last-child td { border-bottom: none; }
 .badge-slate { background: var(--slate-200); color: var(--slate-700); }
 .badge-blue { background: #e0e7ff; color: var(--indigo-700); }
 .badge-orange { background: #ffedd5; color: #c2410c; }
+.badge-yellow { background: #fef9c3; color: #854d0e; }
+.badge-purple { background: #f3e8ff; color: #7e22ce; }
+
+/* PT 관리 - 주차별 매출 기록에서 확률(단계)에 따라 그 행 전체를 옅게 물들임
+   (뱃지 하나만 색이 있으면 눈에 잘 안 띈다는 피드백으로, 행 전체를 같은 색 계열로 표시함) */
+.row-prob-p25 td { background: var(--slate-100, #f1f5f9); }
+.row-prob-p50 td { background: #fef9c3; }
+.row-prob-p75 td { background: #ffedd5; }
+.row-prob-p100 td { background: #dcfce7; }
+.row-prob-registered td { background: #dcfce7; }
+.row-prob-rolled_over td { background: #f3e8ff; }
+.row-prob-missed td { background: #fee2e2; }
 
 /* 만료회원·TM 표에서 뱃지처럼 보이는 TM상태 <select> (클릭하면 바로 상태 변경) */
 select.tm-status-select {

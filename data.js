@@ -674,3 +674,119 @@ async function fetchAllDataForBackup() {
     staff
   };
 }
+
+// ---- PT 관리 (기존 엑셀 "주간 PT 시트"를 대체) ----
+// 리드 진행 단계: 상담중 -> OT예정 -> OT완료(등록대기) -> 등록완료 / 이번주에 못 끝나면 이월 / 연락두절 등은 미스
+const PT_LEAD_STAGE_LABEL = {
+  in_progress: '상담중',
+  ot_scheduled: 'OT예정',
+  ot_done: 'OT완료',
+  registered: '등록완료',
+  rolled_over: '이월',
+  missed: '미스'
+};
+const PT_LEAD_STAGE_BADGE = {
+  in_progress: 'badge-amber',
+  ot_scheduled: 'badge-blue',
+  ot_done: 'badge-slate',
+  registered: 'badge-green',
+  rolled_over: 'badge-slate',
+  missed: 'badge-red'
+};
+// 리드 단계 탭에 표시할 순서
+const PT_LEAD_STAGE_ORDER = ['in_progress', 'ot_scheduled', 'ot_done', 'registered', 'rolled_over', 'missed'];
+// 아직 성사/미스로 끝나지 않은(=파이프라인에 살아있는) 단계 - "예상 매출" 합계 계산에 사용
+const PT_LEAD_OPEN_STAGES = ['in_progress', 'ot_scheduled', 'ot_done', 'rolled_over'];
+
+// Date -> 'YYYY-MM-DD' (로컬 기준. toISOString은 UTC라 자정 근처에서 하루 밀릴 수 있어 직접 계산함)
+function formatDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+// 이번 주 월요일 / 이번 달 1일 문자열 (PT 목표 조회·설정 기준일로 사용)
+function thisWeekStartStr(refDate = new Date()) { return formatDateStr(startOfWeek(refDate)); }
+function thisMonthStartStr(refDate = new Date()) { return `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, '0')}-01`; }
+
+async function fetchPtLeads() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pt_leads?select=*,trainer:profiles(id,name)&order=created_at.desc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, 'PT 리드 목록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addPtLead(lead) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_leads`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(lead)
+  });
+  if (!res.ok) await throwApiError(res, 'PT 리드 등록에 실패했습니다.');
+  return res.json();
+}
+
+async function updatePtLead(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_leads?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, 'PT 리드 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deletePtLead(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_leads?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, 'PT 리드 삭제에 실패했습니다.');
+}
+
+// 리드를 실제 회원 등록 + 매출로 전환("등록 전환" 버튼)했을 때, 그 회원/매출 기록을
+// pt_leads 행에 연결해서 남겨둠 (회원 생성/매출 생성 자체는 addMember/addSales를 그대로 재사용)
+async function convertPtLead(leadId, { memberId, saleId }) {
+  return updatePtLead(leadId, {
+    stage: 'registered',
+    converted_member_id: memberId || null,
+    converted_sale_id: saleId || null
+  });
+}
+
+// ---- PT 매출 목표(주간/월간, 트레이너별) ----
+async function fetchPtTargets() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pt_targets?select=*,trainer:profiles(id,name)&order=period_start.desc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, 'PT 목표를 불러오지 못했습니다.');
+  return res.json();
+}
+
+// trainer_id+period_type+period_start가 이미 있으면 덮어쓰기(upsert) - migration_18의 unique 제약을 이용
+async function upsertPtTarget(target) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_targets?on_conflict=trainer_id,period_type,period_start`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify(target)
+  });
+  if (!res.ok) await throwApiError(res, 'PT 목표 저장에 실패했습니다.');
+  return res.json();
+}
+
+// PT 잔여횟수가 적어 재등록 케어(상담)가 필요한 회원 목록 (기본: 잔여 3회 이하, 재원중인 회원만)
+async function fetchPtCareMembers(threshold = 3) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name)` +
+    `&status=neq.left&pt_remaining_sessions=lte.${threshold}&pt_remaining_sessions=not.is.null` +
+    `&order=pt_remaining_sessions.asc.nullslast`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, 'PT 케어 대상 회원을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 회원의 PT 케어 메모(집중 포인트/단기·장기 계획/재등록 예상 시기·금액·확률) 저장
+async function updateMemberPtCare(id, patch) {
+  return updateMember(id, patch);
+}

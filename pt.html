@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - PT 관리</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
+  .sheet-input {
+    width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid transparent;
+    border-radius: 6px; background: transparent;
+  }
+  .sheet-input:hover { border-color: var(--slate-300); }
+  .sheet-input:focus { border-color: var(--indigo-600); background: var(--white); outline: none; }
+  select.sheet-input { cursor: pointer; }
+  .toggle-ox {
+    width: 30px; height: 26px; border-radius: 6px; border: 1px solid var(--slate-300); background: var(--white);
+    font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .toggle-ox.is-o { background: #dcfce7; border-color: #86efac; color: var(--green-600); }
+  .toggle-ox.is-x { background: #fee2e2; border-color: #fca5a5; color: var(--red-600); }
+  .week-band { font-size: 11px; font-weight: 700; color: var(--slate-500); white-space: nowrap; }
+  .sheet-table td, .sheet-table th { padding: 6px 8px; }
+  .mini-stat-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--white); }
+  .mini-stat-box .mini-title { font-size: 12px; font-weight: 700; color: var(--slate-500); margin-bottom: 8px; }
+  .mini-stat-box .mini-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .mini-stat-box .mini-row b { font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html" class="active">PT 관리</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="products.html">이용권 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap" style="max-width:1200px;">
+    <!-- 트레이너 선택(지점장만) + 월 선택 -->
+    <div class="report-nav">
+      <select id="trainerSelect" style="display:none; padding:7px 10px; font-size:13px; border:1px solid var(--slate-300); border-radius:8px; font-weight:700;"></select>
+      <span id="trainerNameLabel" style="display:none; font-weight:700; font-size:15px;"></span>
+      <div style="flex:1;"></div>
+      <button type="button" class="report-nav-arrow" id="monthPrevBtn">◀</button>
+      <div class="report-period-label" id="monthLabel">-</div>
+      <button type="button" class="report-nav-arrow" id="monthNextBtn">▶</button>
+    </div>
+
+    <!-- 매출 카드 3개 -->
+    <div class="hero-grid">
+      <div class="hero-card hero-blue" id="targetCard" style="cursor:pointer;">
+        <div class="hero-icon">🎯</div>
+        <div class="hero-label">목표 매출</div>
+        <div class="hero-value hero-value-money"><span id="targetAmount">0</span><span class="hero-unit">원</span></div>
+        <div class="hero-sub" id="targetSub">불러오는 중...</div>
+      </div>
+      <div class="hero-card hero-green" id="confirmedCard" style="cursor:pointer;">
+        <div class="hero-icon">✅</div>
+        <div class="hero-label">확정 매출 (이번 달 실제 PT 매출)</div>
+        <div class="hero-value hero-value-money"><span id="confirmedAmount">0</span><span class="hero-unit">원</span></div>
+        <div class="hero-sub" id="confirmedSub">불러오는 중...</div>
+      </div>
+      <div class="hero-card hero-purple" id="expectedCard" style="cursor:pointer;">
+        <div class="hero-icon">🔮</div>
+        <div class="hero-label">예상 매출 (상담 · OT 진행중 기준)</div>
+        <div class="hero-value hero-value-money"><span id="expectedAmount">0</span><span class="hero-unit">원</span></div>
+        <div class="hero-sub" id="expectedSub">불러오는 중...</div>
+      </div>
+    </div>
+    <p class="muted" style="margin:10px 2px 0;" id="targetHint"></p>
+
+    <!-- 탭: 각 항목을 눌러야 그 데이터만 넓게 나옴 (한 화면에 다 우겨넣지 않도록) -->
+    <div class="filter-tabs" id="sectionTabs" style="margin-top:22px;">
+      <button type="button" class="filter-tab active" data-tab="weekly" onclick="switchTab('weekly')">📅 주차별 매출 기록</button>
+      <button type="button" class="filter-tab" data-tab="care" onclick="switchTab('care')">🧑‍🤝‍🧑 PT 회원 관리</button>
+      <button type="button" class="filter-tab" data-tab="ot" onclick="switchTab('ot')">🎯 OT 관리</button>
+    </div>
+
+    <!-- 섹션 A: 주차별 매출 기록 -->
+    <div class="section" id="sectionWeekly" style="margin-top:14px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <h2 style="margin:0;">주차별 매출 기록</h2>
+        <button type="button" class="btn btn-primary" id="openAddLeadBtn" style="width:auto; padding-left:18px; padding-right:18px;">+ 상담/매출 기록 추가</button>
+      </div>
+      <div class="mini-stat-box" style="max-width:340px; margin-top:12px;">
+        <div class="mini-title">재등록 확정 조사 (이번 달)</div>
+        <div class="mini-row"><span>재등록 예상 인원</span><b id="renewalExpectedCount">0</b></div>
+        <div class="mini-row"><span>재등록 확정 인원</span><b id="renewalConfirmedCount">0</b></div>
+        <div class="mini-row"><span>재등록 확정률</span><b id="renewalConfirmedRate">-</b></div>
+      </div>
+      <div style="overflow-x:auto; margin-top:14px;">
+        <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:900px;">
+          <thead><tr>
+            <th style="width:6%;">주차</th><th style="width:12%;">날짜</th><th style="width:9%;">유형</th><th style="width:10%;">이름</th>
+            <th style="width:12%;">금액</th><th style="width:6%;">횟수</th><th style="width:9%;">확률</th><th style="width:30%;">특이사항 · 메모</th><th style="width:6%;"></th>
+          </tr></thead>
+          <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tfoot><tr><td colspan="4" style="text-align:right; font-weight:700;">합계</td><td id="weeklyTotal" style="font-weight:700;">0원</td><td colspan="4"></td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- 섹션 B: PT 회원관리 (잔여횟수 적은 회원 케어) -->
+    <div class="section" id="sectionCare" style="margin-top:14px; display:none;">
+      <h2>PT 회원 관리 <span class="muted">(담당 회원 중 잔여 10회 미만 세일즈 플랜)</span></h2>
+      <p class="muted" style="margin:-6px 0 12px;">칸을 클릭해서 바로 입력하면 자동 저장돼요. 재등록확률·재등록예상횟수까지 여기서 한 번에 관리해요.</p>
+      <div style="overflow-x:auto;">
+        <table id="careTable" class="table-fixed sheet-table" style="min-width:1080px;">
+          <thead><tr>
+            <th style="width:9%;">재등록예상시기</th><th style="width:9%;">이름</th><th style="width:7%;">남은횟수</th>
+            <th style="width:20%;">수업방향</th><th style="width:6%;">단기</th><th style="width:21%;">장기적 플랜(관리 방향)</th>
+            <th style="width:9%;">재등록예상횟수</th><th style="width:10%;">예상매출</th><th style="width:9%;">재등록확률</th>
+          </tr></thead>
+          <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 섹션 C: OT 관리 (OT1 최초 체험 / OT2 팔로우업 두 트랙) -->
+    <div class="section" id="sectionOt" style="margin-top:14px; display:none;">
+      <h2>OT 관리 <span class="muted">(이번 달 OT 예정 · 진행 대상)</span></h2>
+
+      <h3 style="font-size:14px; margin:18px 0 8px;">OT1 (최초 체험)</h3>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px;">
+        <div class="mini-stat-box"><div class="mini-title">OT1 진행</div><div class="mini-row"><span>이번 달 건수</span><b id="ot1TotalCount">0</b></div></div>
+        <div class="mini-stat-box"><div class="mini-title">OT1 완료</div><div class="mini-row"><span>완료 건수</span><b id="ot1DoneCount">0</b></div></div>
+        <div class="mini-stat-box"><div class="mini-title">OT1 성공률</div><div class="mini-row"><span>완료/진행</span><b id="ot1SuccessRate">-</b></div></div>
+      </div>
+      <div style="overflow-x:auto; margin-top:10px;">
+        <table id="ot1Table" class="table-fixed sheet-table" style="min-width:980px;">
+          <thead><tr>
+            <th style="width:14%;">OT1날짜</th><th style="width:12%;">연락드린날짜</th><th style="width:10%;">이름</th>
+            <th style="width:34%;">특이사항</th><th style="width:14%;">현황</th><th style="width:16%;">OT2 예정일</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:14px; margin:26px 0 8px;">OT2 (2차 팔로우업)</h3>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px;">
+        <div class="mini-stat-box"><div class="mini-title">OT2 진행</div><div class="mini-row"><span>이번 달 건수</span><b id="ot2TotalCount">0</b></div></div>
+        <div class="mini-stat-box"><div class="mini-title">OT2 완료</div><div class="mini-row"><span>완료 건수</span><b id="ot2DoneCount">0</b></div></div>
+        <div class="mini-stat-box"><div class="mini-title">OT2 성공률</div><div class="mini-row"><span>완료/진행</span><b id="ot2SuccessRate">-</b></div></div>
+      </div>
+      <div style="overflow-x:auto; margin-top:10px;">
+        <table id="ot2Table" class="table-fixed sheet-table" style="min-width:900px;">
+          <thead><tr>
+            <th style="width:16%;">OT2날짜</th><th style="width:12%;">이름</th>
+            <th style="width:52%;">특이사항</th><th style="width:20%;">현황</th>
+          </tr></thead>
+          <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상담/매출 기록 추가 모달 -->
+  <div class="modal-overlay" id="addLeadOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:640px;">
+      <div class="modal-header">
+        <div><h3>상담 · 매출 기록 추가</h3><p class="muted" style="margin:0;" id="addLeadTrainerHint"></p></div>
+        <button type="button" class="modal-close" id="closeAddLeadBtn">&times;</button>
+      </div>
+      <div id="addLeadErrorBox" class="error-text"></div>
+      <form id="addLeadForm">
+        <div class="form-grid">
+          <div class="field"><label>이름 *</label><input type="text" id="l_name" required /></div>
+          <div class="field"><label>전화번호</label><input type="text" id="l_phone" placeholder="선택 입력" /></div>
+          <div class="field"><label>유형</label>
+            <input type="text" id="l_source" list="sourceOptions" placeholder="예: 워크인, 필드, 오티, 재등록" />
+            <datalist id="sourceOptions">
+              <option value="워크인"></option><option value="필드"></option><option value="오티"></option>
+              <option value="재등록"></option><option value="지인소개"></option><option value="SNS"></option>
+            </datalist>
+          </div>
+          <div class="field"><label>상담일(날짜)</label><input type="date" id="l_contact_date" required /></div>
+          <div class="field"><label>금액(원)</label><input type="number" id="l_expected_amount" min="0" placeholder="예: 900000" /></div>
+          <div class="field"><label>횟수</label><input type="number" id="l_sessions" min="0" placeholder="예: 10" /></div>
+          <div class="field"><label>확률</label>
+            <select id="l_probability">
+              <option value="p25">25%</option>
+              <option value="p50" selected>50%</option>
+              <option value="p75">75%</option>
+              <option value="p100">100%</option>
+              <option value="registered">등록</option>
+              <option value="rolled_over">이월</option>
+              <option value="missed">미스</option>
+            </select>
+          </div>
+          <div class="field"><label>OT1 예정일 (해당 시 OT관리에도 표시됨)</label><input type="date" id="l_ot_date" /></div>
+          <div class="field"><label>OT2 예정일 (2차 팔로우업, 선택)</label><input type="date" id="l_ot2_date" /></div>
+        </div>
+        <div class="field"><label>특이사항 · 메모</label><input type="text" id="l_memo" placeholder="선택 입력" /></div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let currentUserId = null;
+    let isManagerFlag = false;
+    let staffCache = [];
+    let selectedTrainerId = null;
+
+    let leadsCache = [];      // 선택된 트레이너의 pt_leads 전체 (월 필터는 화면에서)
+    let careCache = [];       // 선택된 트레이너의 PT 케어 대상 회원
+    let monthSalesCache = []; // 이번 달 매출(전체) - PT 카테고리만 걸러서 사용
+    let targetsCache = [];
+
+    let monthAnchor = new Date();
+
+    // 표시용 라벨
+    const PROB_SELECT_OPTIONS = [
+      { value: 'p25', label: '25%' }, { value: 'p50', label: '50%' }, { value: 'p75', label: '75%' }, { value: 'p100', label: '100%' },
+      { value: 'registered', label: '등록' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }
+    ];
+    const PROB_BADGE = { p25: 'badge-slate', p50: 'badge-yellow', p75: 'badge-orange', p100: 'badge-green', registered: 'badge-green', rolled_over: 'badge-purple', missed: 'badge-red' };
+    const OT_STATUS_OPTIONS = [
+      { value: 'scheduled', label: '예정' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }, { value: 'done', label: '완료' }
+    ];
+    const OT_STATUS_BADGE = { scheduled: 'badge-blue', rolled_over: 'badge-slate', missed: 'badge-red', done: 'badge-green' };
+    const CARE_PROB_OPTIONS = [
+      { value: '', label: '미설정' }, { value: '25', label: '25%' }, { value: '50', label: '50%' }, { value: '75', label: '75%' }, { value: '100', label: '100%' }, { value: '0', label: '미스' }
+    ];
+    const CARE_PROB_BADGE = { '': '', '25': 'badge-slate', '50': 'badge-yellow', '75': 'badge-orange', '100': 'badge-green', '0': 'badge-red' };
+
+    // 리드의 stage/probability -> 위 콤보select 값으로 변환
+    function leadToProbValue(l) {
+      if (l.stage === 'registered') return 'registered';
+      if (l.stage === 'rolled_over') return 'rolled_over';
+      if (l.stage === 'missed') return 'missed';
+      return 'p' + (l.probability != null ? l.probability : 50);
+    }
+
+    function getMonthRange() {
+      const start = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
+      const end = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1);
+      return { start, end, startStr: formatDateStr(start), endStr: formatDateStr(end), monthStr: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}` };
+    }
+    function monthLabel() {
+      const { start } = getMonthRange();
+      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
+    }
+    // 상담일 기준 몇 주차인지 (그 달 1일부터 7일 단위로 끊음 - 달력상 "몇째 주"와는 살짝 다를 수 있음)
+    function weekOfMonth(dateStr) {
+      const day = Number(dateStr.slice(8, 10));
+      return Math.min(5, Math.ceil(day / 7));
+    }
+
+    function staffName(id) { const s = staffCache.find(x => x.id === id); return s ? s.name : '-'; }
+
+    // ---- 트레이너/월 선택 ----
+    function shiftMonth(dir) {
+      monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1);
+      reloadAll();
+    }
+    document.getElementById('monthPrevBtn').addEventListener('click', () => shiftMonth(-1));
+    document.getElementById('monthNextBtn').addEventListener('click', () => shiftMonth(1));
+    document.getElementById('trainerSelect').addEventListener('change', (e) => {
+      selectedTrainerId = e.target.value;
+      reloadAll();
+    });
+
+    // ---- 매출 카드 ----
+    async function loadRevenueCards() {
+      const { startStr, endStr, monthStr } = getMonthRange();
+
+      try {
+        const sales = await fetchSalesInRange(startStr, endStr);
+        monthSalesCache = sales.filter(s => PT_SALE_CATEGORIES.includes(s.category) && s.staff_id === selectedTrainerId);
+        const confirmedTotal = monthSalesCache.reduce((sum, s) => sum + Number(s.amount), 0);
+        animateCount(document.getElementById('confirmedAmount'), confirmedTotal);
+        document.getElementById('confirmedSub').textContent = `이번 달 PT 매출 ${monthSalesCache.length}건`;
+      } catch (err) {
+        document.getElementById('confirmedSub').textContent = err.message;
+      }
+
+      const targetRow = targetsCache.find(t => t.period_type === 'monthly' && t.period_start === formatDateStr(getMonthRange().start) && t.trainer_id === selectedTrainerId);
+      const targetTotal = targetRow ? Number(targetRow.target_amount) : 0;
+      animateCount(document.getElementById('targetAmount'), targetTotal);
+      document.getElementById('targetSub').textContent = targetTotal > 0
+        ? (isManagerFlag ? '목표 카드를 눌러 수정할 수 있어요' : '지점장이 설정한 목표예요')
+        : (isManagerFlag ? '목표 카드를 눌러 설정해보세요' : '아직 설정된 목표가 없어요');
+
+      // 예상 매출: 아직 등록/이월/미스로 끝나지 않은(25~100%) 리드들의 (금액 × 확률) 합
+      const openLeads = leadsCache.filter(l => l.stage !== 'registered' && l.stage !== 'missed' && l.stage !== 'rolled_over');
+      const expectedTotal = openLeads.reduce((sum, l) => {
+        const amt = Number(l.expected_amount || 0);
+        const prob = l.probability == null ? 50 : Number(l.probability);
+        return sum + amt * (prob / 100);
+      }, 0);
+      animateCount(document.getElementById('expectedAmount'), Math.round(expectedTotal));
+      document.getElementById('expectedSub').textContent = `진행중인 상담 ${openLeads.length}건 기준`;
+    }
+
+    // 탭 전환: 한 화면에 다 우겨넣지 않고, 누른 항목만 넓게 보여줌
+    function switchTab(tab) {
+      document.querySelectorAll('#sectionTabs .filter-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.getElementById('sectionWeekly').style.display = tab === 'weekly' ? '' : 'none';
+      document.getElementById('sectionCare').style.display = tab === 'care' ? '' : 'none';
+      document.getElementById('sectionOt').style.display = tab === 'ot' ? '' : 'none';
+      window.scrollTo({ top: document.getElementById('sectionTabs').offsetTop - 12, behavior: 'smooth' });
+    }
+    // 확정/예상 매출 카드를 누르면 그 근거가 되는 주차별 매출 기록으로 바로 이동
+    document.getElementById('confirmedCard').addEventListener('click', () => switchTab('weekly'));
+    document.getElementById('expectedCard').addEventListener('click', () => switchTab('weekly'));
+
+    document.getElementById('targetCard').addEventListener('click', async () => {
+      if (!isManagerFlag) return;
+      const trainerName = staffName(selectedTrainerId);
+      const input = prompt(`${trainerName} 트레이너의 ${monthLabel()} 목표 매출(원)을 입력해주세요.`);
+      if (input === null) return;
+      const amount = Number(input.replace(/[^0-9]/g, ''));
+      if (!amount || amount <= 0) { alert('올바른 금액을 입력해주세요.'); return; }
+      try {
+        await upsertPtTarget({
+          trainer_id: selectedTrainerId, period_type: 'monthly',
+          period_start: formatDateStr(getMonthRange().start), target_amount: amount
+        });
+        showToast('목표 매출이 저장되었습니다.');
+        targetsCache = await fetchPtTargets();
+        loadRevenueCards();
+      } catch (err) { alert(err.message); }
+    });
+
+    // ---- 섹션 A: 주차별 매출 기록 ----
+    function renderProbSelect(lead) {
+      const val = leadToProbValue(lead);
+      const options = PROB_SELECT_OPTIONS.map(o => `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`).join('');
+      return `<select class="badge ${PROB_BADGE[val]} sheet-input" data-lead-id="${lead.id}" onchange="handleProbChange(this)">${options}</select>`;
+    }
+    async function handleProbChange(selectEl) {
+      const id = selectEl.dataset.leadId;
+      const val = selectEl.value;
+      const patch = val.startsWith('p') ? { stage: 'in_progress', probability: Number(val.slice(1)) } : { stage: val };
+      selectEl.disabled = true;
+      try {
+        await updatePtLead(id, patch);
+        await reloadLeadsOnly();
+      } catch (err) { alert(err.message); selectEl.disabled = false; }
+    }
+
+    async function handleLeadFieldSave(inputEl, field, isNumber) {
+      const id = inputEl.dataset.leadId;
+      let value = inputEl.value.trim();
+      if (isNumber) value = value === '' ? null : Number(value);
+      else value = value === '' ? null : value;
+      try {
+        await updatePtLead(id, { [field]: value });
+        const lead = leadsCache.find(l => l.id === id);
+        if (lead) lead[field] = value;
+      } catch (err) { alert(err.message); }
+    }
+
+    async function handleLeadDelete(id) {
+      if (!confirm('이 기록을 삭제할까요?')) return;
+      try {
+        await deletePtLead(id);
+        await reloadLeadsOnly();
+        showToast('기록이 삭제되었습니다.', 'danger');
+      } catch (err) { alert(err.message); }
+    }
+
+    function renderWeeklyTable() {
+      const tbody = document.querySelector('#weeklyTable tbody');
+      const { startStr, endStr } = getMonthRange();
+      const items = leadsCache
+        .filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr)
+        .slice()
+        .sort((a, b) => (a.contact_date < b.contact_date ? -1 : a.contact_date > b.contact_date ? 1 : 0));
+
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ 상담/매출 기록 추가"로 남겨보세요.</td></tr>';
+        document.getElementById('weeklyTotal').textContent = '0원';
+        return;
+      }
+
+      // 주차별로 그룹핑해서 첫 행에만 "n주차" rowspan을 줌
+      const byWeek = {};
+      items.forEach(l => { const w = weekOfMonth(l.contact_date); (byWeek[w] = byWeek[w] || []).push(l); });
+      const weekKeys = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
+
+      let html = '';
+      let total = 0;
+      weekKeys.forEach(w => {
+        const rows = byWeek[w];
+        rows.forEach((l, idx) => {
+          total += Number(l.expected_amount || 0);
+          html += `<tr class="row-prob-${leadToProbValue(l)}">`;
+          if (idx === 0) html += `<td rowspan="${rows.length}" class="week-band" style="text-align:center; background:var(--slate-50);">${w}주차</td>`;
+          html += `
+            <td><input class="sheet-input" type="date" value="${l.contact_date || ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'contact_date',false)" /></td>
+            <td><input class="sheet-input" type="text" value="${escapeHtml(l.source || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'source',false)" placeholder="유형" /></td>
+            <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
+            <td><input class="sheet-input" type="number" min="0" value="${l.expected_amount != null ? l.expected_amount : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'expected_amount',true)" placeholder="금액" /></td>
+            <td><input class="sheet-input" type="number" min="0" value="${l.sessions != null ? l.sessions : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'sessions',true)" placeholder="횟수" /></td>
+            <td>${renderProbSelect(l)}</td>
+            <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="메모" /></td>
+            <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleLeadDelete('${l.id}')">삭제</button></td>
+          `;
+          html += '</tr>';
+        });
+      });
+      tbody.innerHTML = html;
+      document.getElementById('weeklyTotal').textContent = formatWon(total);
+    }
+
+    function loadRenewalMiniStats() {
+      const { monthStr } = getMonthRange();
+      const expected = careCache.filter(m => m.pt_expected_renewal_month === monthStr);
+      const confirmed = expected.filter(m => monthSalesCache.some(s => s.member_id === m.id));
+      document.getElementById('renewalExpectedCount').textContent = expected.length;
+      document.getElementById('renewalConfirmedCount').textContent = confirmed.length;
+      document.getElementById('renewalConfirmedRate').textContent = expected.length > 0 ? `${Math.round((confirmed.length / expected.length) * 100)}%` : '-';
+    }
+
+    // OT1/OT2 공용: dateField/statusField만 바꿔서 진행·완료·성공률 계산
+    function loadOtMiniStats(dateField, statusField, idPrefix) {
+      const { startStr, endStr } = getMonthRange();
+      const items = leadsCache.filter(l => l[dateField] && l[dateField] >= startStr && l[dateField] < endStr);
+      const doneItems = items.filter(l => l[statusField] === 'done');
+      document.getElementById(idPrefix + 'TotalCount').textContent = items.length;
+      document.getElementById(idPrefix + 'DoneCount').textContent = doneItems.length;
+      document.getElementById(idPrefix + 'SuccessRate').textContent = items.length > 0 ? `${Math.round((doneItems.length / items.length) * 100)}%` : '-';
+    }
+    function loadAllMiniStats() {
+      loadRenewalMiniStats();
+      loadOtMiniStats('ot_date', 'ot_status', 'ot1');
+      loadOtMiniStats('ot2_date', 'ot2_status', 'ot2');
+    }
+
+    // ---- 섹션 B: PT 회원 관리 ----
+    async function handleCareFieldSave(inputEl, field, isNumber) {
+      const id = inputEl.dataset.memberId;
+      let value = inputEl.value.trim();
+      if (isNumber) value = value === '' ? null : Number(value);
+      else value = value === '' ? null : value;
+      try {
+        await updateMemberPtCare(id, { [field]: value });
+        const m = careCache.find(x => x.id === id);
+        if (m) m[field] = value;
+      } catch (err) { alert(err.message); }
+    }
+    async function handleCareProbSave(selectEl) {
+      const id = selectEl.dataset.memberId;
+      const raw = selectEl.value;
+      const value = raw === '' ? null : Number(raw);
+      try {
+        await updateMemberPtCare(id, { pt_expected_probability: value });
+        const m = careCache.find(x => x.id === id);
+        if (m) m.pt_expected_probability = value;
+        selectEl.className = 'sheet-input badge ' + (CARE_PROB_BADGE[raw] || '');
+      } catch (err) { alert(err.message); }
+    }
+    async function handleToggleShortTerm(btn) {
+      const id = btn.dataset.memberId;
+      const current = btn.dataset.value === 'O' ? 'O' : 'X';
+      const next = current === 'O' ? 'X' : 'O';
+      btn.disabled = true;
+      try {
+        await updateMemberPtCare(id, { pt_short_term_plan: next });
+        btn.dataset.value = next;
+        btn.textContent = next;
+        btn.className = 'toggle-ox ' + (next === 'O' ? 'is-o' : 'is-x');
+        const m = careCache.find(x => x.id === id);
+        if (m) m.pt_short_term_plan = next;
+      } catch (err) { alert(err.message); }
+      btn.disabled = false;
+    }
+
+    function renderCareTable() {
+      const tbody = document.querySelector('#careTable tbody');
+      if (careCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">잔여 세션이 적은(10회 미만) 담당 회원이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = careCache.map(m => {
+        const shortVal = m.pt_short_term_plan === 'O' ? 'O' : 'X';
+        const probOptions = CARE_PROB_OPTIONS.map(o => `<option value="${o.value}" ${String(m.pt_expected_probability == null ? '' : m.pt_expected_probability) === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+        const careProbVal = m.pt_expected_probability == null ? '' : String(m.pt_expected_probability);
+        return `
+        <tr>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" placeholder="YYYY-MM" /></td>
+          <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
+          <td style="text-align:center;"><span class="badge ${m.pt_remaining_sessions <= 1 ? 'badge-red' : 'badge-amber'}">${m.pt_remaining_sessions}회</span></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_session_focus || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_session_focus',false)" placeholder="수업방향" /></td>
+          <td style="text-align:center;"><button type="button" class="toggle-ox ${shortVal === 'O' ? 'is-o' : 'is-x'}" data-member-id="${m.id}" data-value="${shortVal}" onclick="handleToggleShortTerm(this)">${shortVal}</button></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_long_term_plan || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_long_term_plan',false)" placeholder="장기적 플랜" /></td>
+          <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_sessions != null ? m.pt_expected_sessions : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_sessions',true)" placeholder="예상횟수" /></td>
+          <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_amount != null ? m.pt_expected_amount : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_amount',true)" placeholder="예상매출" /></td>
+          <td><select class="sheet-input badge ${CARE_PROB_BADGE[careProbVal] || ''}" data-member-id="${m.id}" onchange="handleCareProbSave(this)">${probOptions}</select></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ---- 섹션 C: OT 관리 (OT1/OT2 공용) ----
+    async function handleOtStatusFieldSave(selectEl, field) {
+      const id = selectEl.dataset.leadId;
+      try {
+        await updatePtLead(id, { [field]: selectEl.value });
+        const l = leadsCache.find(x => x.id === id);
+        if (l) l[field] = selectEl.value;
+        loadAllMiniStats();
+      } catch (err) { alert(err.message); }
+    }
+    // OT2 예정일을 넣으면 자동으로 ot2_status를 '예정'으로 세팅 (OT2 표에 바로 나타나게)
+    async function handleOt2DateSave(inputEl) {
+      const id = inputEl.dataset.leadId;
+      const value = inputEl.value || null;
+      try {
+        const patch = { ot2_date: value };
+        const lead = leadsCache.find(l => l.id === id);
+        if (value && lead && !lead.ot2_status) patch.ot2_status = 'scheduled';
+        await updatePtLead(id, patch);
+        if (lead) Object.assign(lead, patch);
+        renderOt1Table(); renderOt2Table(); loadAllMiniStats();
+      } catch (err) { alert(err.message); }
+    }
+
+    function renderOt1Table() {
+      const tbody = document.querySelector('#ot1Table tbody');
+      const { startStr, endStr } = getMonthRange();
+      const items = leadsCache
+        .filter(l => l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
+        .slice()
+        .sort((a, b) => (a.ot_date < b.ot_date ? -1 : a.ot_date > b.ot_date ? 1 : 0));
+
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(l => {
+        const status = l.ot_status || 'scheduled';
+        const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
+        return `
+        <tr>
+          <td><input class="sheet-input" type="date" value="${l.ot_date || ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'ot_date',false)" /></td>
+          <td class="cell-1line">${l.contact_date || '-'}</td>
+          <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
+          <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot_status')">${options}</select></td>
+          <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderOt2Table() {
+      const tbody = document.querySelector('#ot2Table tbody');
+      const { startStr, endStr } = getMonthRange();
+      const items = leadsCache
+        .filter(l => l.ot2_date && l.ot2_date >= startStr && l.ot2_date < endStr)
+        .slice()
+        .sort((a, b) => (a.ot2_date < b.ot2_date ? -1 : a.ot2_date > b.ot2_date ? 1 : 0));
+
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted" style="padding:16px;">이번 달 OT2(2차 팔로우업) 기록이 없습니다. OT1 표 오른쪽에서 OT2 예정일을 넣으면 여기 나타나요.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(l => {
+        const status = l.ot2_status || 'scheduled';
+        const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
+        return `
+        <tr>
+          <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
+          <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
+          <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot2_status')">${options}</select></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ---- 상담/매출 기록 추가 ----
+    function openAddLeadModal() {
+      document.getElementById('addLeadForm').reset();
+      document.getElementById('addLeadErrorBox').style.display = 'none';
+      document.getElementById('l_contact_date').value = formatDateStr(new Date());
+      document.getElementById('l_probability').value = 'p50';
+      document.getElementById('addLeadTrainerHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 기록으로 등록돼요.`;
+      document.getElementById('addLeadOverlay').style.display = 'flex';
+    }
+    function closeAddLeadModal() { document.getElementById('addLeadOverlay').style.display = 'none'; }
+    document.getElementById('openAddLeadBtn').addEventListener('click', openAddLeadModal);
+    document.getElementById('closeAddLeadBtn').addEventListener('click', closeAddLeadModal);
+    document.getElementById('addLeadOverlay').addEventListener('click', (e) => { if (e.target.id === 'addLeadOverlay') closeAddLeadModal(); });
+
+    document.getElementById('addLeadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addLeadErrorBox');
+      errorBox.style.display = 'none';
+      const probVal = document.getElementById('l_probability').value;
+      const stagePatch = probVal.startsWith('p') ? { stage: 'in_progress', probability: Number(probVal.slice(1)) } : { stage: probVal, probability: null };
+      const otDate = document.getElementById('l_ot_date').value || null;
+      const ot2Date = document.getElementById('l_ot2_date').value || null;
+      try {
+        await addPtLead({
+          trainer_id: selectedTrainerId,
+          name: document.getElementById('l_name').value.trim(),
+          phone: document.getElementById('l_phone').value.trim() || null,
+          source: document.getElementById('l_source').value.trim() || null,
+          contact_date: document.getElementById('l_contact_date').value || formatDateStr(new Date()),
+          expected_amount: document.getElementById('l_expected_amount').value ? Number(document.getElementById('l_expected_amount').value) : null,
+          sessions: document.getElementById('l_sessions').value ? Number(document.getElementById('l_sessions').value) : null,
+          ot_date: otDate,
+          ot_status: otDate ? 'scheduled' : null,
+          ot2_date: ot2Date,
+          ot2_status: ot2Date ? 'scheduled' : null,
+          memo: document.getElementById('l_memo').value.trim() || null,
+          ...stagePatch
+        });
+        closeAddLeadModal();
+        await reloadLeadsOnly();
+        showToast('기록이 등록되었습니다.');
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    // ---- 로드 ----
+    async function reloadLeadsOnly() {
+      try {
+        const all = await fetchPtLeads();
+        leadsCache = all.filter(l => l.trainer_id === selectedTrainerId);
+      } catch (err) { leadsCache = []; }
+      renderWeeklyTable();
+      renderOt1Table();
+      renderOt2Table();
+      loadAllMiniStats();
+      loadRevenueCards();
+    }
+
+    async function reloadAll() {
+      if (!selectedTrainerId) return;
+      document.getElementById('monthLabel').textContent = monthLabel();
+      if (isManagerFlag) document.getElementById('trainerSelect').value = selectedTrainerId;
+      else document.getElementById('trainerNameLabel').textContent = `${staffName(selectedTrainerId)} 트레이너님의 PT 시트`;
+
+      try {
+        const allLeads = await fetchPtLeads();
+        leadsCache = allLeads.filter(l => l.trainer_id === selectedTrainerId);
+      } catch (err) {
+        leadsCache = [];
+        document.querySelector('#weeklyTable tbody').innerHTML = `<tr><td colspan="9" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+      try {
+        const allCare = await fetchPtCareMembers(9); // 10회 미만(=9회 이하)까지 포함
+        careCache = allCare.filter(m => m.assigned_trainer_id === selectedTrainerId);
+      } catch (err) { careCache = []; }
+      try {
+        targetsCache = await fetchPtTargets();
+      } catch (err) { targetsCache = []; }
+
+      renderWeeklyTable();
+      renderCareTable();
+      renderOt1Table();
+      renderOt2Table();
+      await loadRevenueCards(); // monthSalesCache까지 채워야 재등록 확정 조사 계산이 정확함
+      loadAllMiniStats();
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (!profile) return;
+      document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+      currentUserId = profile.id;
+      isManagerFlag = profile.role === 'manager';
+
+      try { staffCache = await fetchStaff(); } catch (e) { staffCache = []; }
+
+      if (isManagerFlag) {
+        const sel = document.getElementById('trainerSelect');
+        const trainers = staffCache.filter(s => s.role === 'trainer').concat(staffCache.filter(s => s.role === 'manager'));
+        trainers.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          sel.appendChild(opt);
+        });
+        sel.style.display = '';
+        selectedTrainerId = trainers.length > 0 ? trainers[0].id : currentUserId;
+        sel.value = selectedTrainerId;
+      } else {
+        selectedTrainerId = currentUserId;
+        document.getElementById('trainerNameLabel').style.display = '';
+      }
+
+      reloadAll();
+    })();
+  </script>
+</body>
+</html>
