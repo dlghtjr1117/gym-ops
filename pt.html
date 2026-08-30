@@ -103,8 +103,8 @@
       <div style="overflow-x:auto; margin-top:14px;">
         <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:900px;">
           <thead><tr>
-            <th style="width:6%;">주차</th><th style="width:12%;">날짜</th><th style="width:9%;">유형</th><th style="width:10%;">이름</th>
-            <th style="width:12%;">금액</th><th style="width:6%;">횟수</th><th style="width:9%;">확률</th><th style="width:30%;">특이사항 · 메모</th><th style="width:6%;"></th>
+            <th style="width:8%;">주차</th><th style="width:12%;">날짜</th><th style="width:10%;">유형</th><th style="width:10%;">이름</th>
+            <th style="width:12%;">금액</th><th style="width:6%;">횟수</th><th style="width:9%;">확률</th><th style="width:27%;">특이사항 · 메모</th><th style="width:6%;"></th>
           </tr></thead>
           <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
           <tfoot><tr><td colspan="4" style="text-align:right; font-weight:700;">합계</td><td id="weeklyTotal" style="font-weight:700;">0원</td><td colspan="4"></td></tr></tfoot>
@@ -178,12 +178,18 @@
         <div class="form-grid">
           <div class="field"><label>이름 *</label><input type="text" id="l_name" required /></div>
           <div class="field"><label>전화번호</label><input type="text" id="l_phone" placeholder="선택 입력" /></div>
+          <div class="field"><label>주차</label>
+            <select id="l_week">
+              <option value="1">1주차</option><option value="2">2주차</option><option value="3">3주차</option>
+              <option value="4">4주차</option><option value="5">5주차</option>
+            </select>
+          </div>
           <div class="field"><label>유형</label>
-            <input type="text" id="l_source" list="sourceOptions" placeholder="예: 워크인, 필드, 오티, 재등록" />
-            <datalist id="sourceOptions">
-              <option value="워크인"></option><option value="필드"></option><option value="오티"></option>
-              <option value="재등록"></option><option value="지인소개"></option><option value="SNS"></option>
-            </datalist>
+            <select id="l_source">
+              <option value="">선택 안 함</option>
+              <option value="재등록">재등록</option><option value="오티">오티</option><option value="워크인">워크인</option>
+              <option value="지인소개">지인소개</option><option value="필드">필드</option><option value="당근">당근</option><option value="블로그">블로그</option>
+            </select>
           </div>
           <div class="field"><label>상담일(날짜)</label><input type="date" id="l_contact_date" required /></div>
           <div class="field"><label>금액(원)</label><input type="number" id="l_expected_amount" min="0" placeholder="예: 900000" /></div>
@@ -342,6 +348,21 @@
     });
 
     // ---- 섹션 A: 주차별 매출 기록 ----
+    const SOURCE_OPTIONS = ['재등록', '오티', '워크인', '지인소개', '필드', '당근', '블로그'];
+    function renderSourceSelect(lead) {
+      const cur = lead.source || '';
+      const opts = SOURCE_OPTIONS.slice();
+      if (cur && !opts.includes(cur)) opts.push(cur); // 예전 자유입력 값도 안 사라지게 유지
+      const optionsHtml = ['<option value="">선택</option>'].concat(
+        opts.map(o => `<option value="${escapeHtml(o)}" ${o === cur ? 'selected' : ''}>${escapeHtml(o)}</option>`)
+      ).join('');
+      return `<select class="sheet-input" data-lead-id="${lead.id}" onchange="handleLeadFieldSave(this,'source',false)">${optionsHtml}</select>`;
+    }
+    function renderWeekSelect(lead) {
+      const cur = lead.week_no != null ? lead.week_no : weekOfMonth(lead.contact_date);
+      const optionsHtml = [1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === cur ? 'selected' : ''}>${n}주차</option>`).join('');
+      return `<select class="sheet-input week-band" data-lead-id="${lead.id}" onchange="handleLeadFieldSave(this,'week_no',true)">${optionsHtml}</select>`;
+    }
     function renderProbSelect(lead) {
       const val = leadToProbValue(lead);
       const options = PROB_SELECT_OPTIONS.map(o => `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`).join('');
@@ -385,7 +406,12 @@
       const items = leadsCache
         .filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr)
         .slice()
-        .sort((a, b) => (a.contact_date < b.contact_date ? -1 : a.contact_date > b.contact_date ? 1 : 0));
+        .sort((a, b) => {
+          const wa = a.week_no != null ? a.week_no : weekOfMonth(a.contact_date);
+          const wb = b.week_no != null ? b.week_no : weekOfMonth(b.contact_date);
+          if (wa !== wb) return wa - wb;
+          return (a.contact_date < b.contact_date ? -1 : a.contact_date > b.contact_date ? 1 : 0);
+        });
 
       if (items.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ 상담/매출 기록 추가"로 남겨보세요.</td></tr>';
@@ -393,31 +419,22 @@
         return;
       }
 
-      // 주차별로 그룹핑해서 첫 행에만 "n주차" rowspan을 줌
-      const byWeek = {};
-      items.forEach(l => { const w = weekOfMonth(l.contact_date); (byWeek[w] = byWeek[w] || []).push(l); });
-      const weekKeys = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
-
+      // 칸마다 바로 클릭해서 수정 가능 (주차도 직접 선택 가능하도록 select로)
       let html = '';
       let total = 0;
-      weekKeys.forEach(w => {
-        const rows = byWeek[w];
-        rows.forEach((l, idx) => {
-          total += Number(l.expected_amount || 0);
-          html += `<tr class="row-prob-${leadToProbValue(l)}">`;
-          if (idx === 0) html += `<td rowspan="${rows.length}" class="week-band" style="text-align:center; background:var(--slate-50);">${w}주차</td>`;
-          html += `
+      items.forEach(l => {
+        total += Number(l.expected_amount || 0);
+        html += `<tr class="row-prob-${leadToProbValue(l)}">
+            <td>${renderWeekSelect(l)}</td>
             <td><input class="sheet-input" type="date" value="${l.contact_date || ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'contact_date',false)" /></td>
-            <td><input class="sheet-input" type="text" value="${escapeHtml(l.source || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'source',false)" placeholder="유형" /></td>
-            <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
+            <td>${renderSourceSelect(l)}</td>
+            <td><input class="sheet-input" type="text" value="${escapeHtml(l.name || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'name',false)" placeholder="이름" /></td>
             <td><input class="sheet-input" type="number" min="0" value="${l.expected_amount != null ? l.expected_amount : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'expected_amount',true)" placeholder="금액" /></td>
             <td><input class="sheet-input" type="number" min="0" value="${l.sessions != null ? l.sessions : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'sessions',true)" placeholder="횟수" /></td>
             <td>${renderProbSelect(l)}</td>
             <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="메모" /></td>
             <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleLeadDelete('${l.id}')">삭제</button></td>
-          `;
-          html += '</tr>';
-        });
+          </tr>`;
       });
       tbody.innerHTML = html;
       document.getElementById('weeklyTotal').textContent = formatWon(total);
@@ -592,6 +609,7 @@
       document.getElementById('addLeadForm').reset();
       document.getElementById('addLeadErrorBox').style.display = 'none';
       document.getElementById('l_contact_date').value = formatDateStr(new Date());
+      document.getElementById('l_week').value = String(weekOfMonth(formatDateStr(new Date())));
       document.getElementById('l_probability').value = 'p50';
       document.getElementById('addLeadTrainerHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 기록으로 등록돼요.`;
       document.getElementById('addLeadOverlay').style.display = 'flex';
@@ -600,6 +618,10 @@
     document.getElementById('openAddLeadBtn').addEventListener('click', openAddLeadModal);
     document.getElementById('closeAddLeadBtn').addEventListener('click', closeAddLeadModal);
     document.getElementById('addLeadOverlay').addEventListener('click', (e) => { if (e.target.id === 'addLeadOverlay') closeAddLeadModal(); });
+    // 상담일을 바꾸면 주차도 자동으로 맞춰서 제안 (직접 눌러서 바꿀 수도 있음)
+    document.getElementById('l_contact_date').addEventListener('change', (e) => {
+      if (e.target.value) document.getElementById('l_week').value = String(weekOfMonth(e.target.value));
+    });
 
     document.getElementById('addLeadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -614,7 +636,8 @@
           trainer_id: selectedTrainerId,
           name: document.getElementById('l_name').value.trim(),
           phone: document.getElementById('l_phone').value.trim() || null,
-          source: document.getElementById('l_source').value.trim() || null,
+          source: document.getElementById('l_source').value || null,
+          week_no: Number(document.getElementById('l_week').value) || null,
           contact_date: document.getElementById('l_contact_date').value || formatDateStr(new Date()),
           expected_amount: document.getElementById('l_expected_amount').value ? Number(document.getElementById('l_expected_amount').value) : null,
           sessions: document.getElementById('l_sessions').value ? Number(document.getElementById('l_sessions').value) : null,
