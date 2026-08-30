@@ -62,7 +62,7 @@
   </div>
 
   <div class="modal-overlay" id="addMemberOverlay" style="display:none;">
-    <div class="modal-box" style="max-width:720px;">
+    <div class="modal-box" style="max-width:820px;">
       <div class="modal-header">
         <h3>회원 등록</h3>
         <button type="button" class="modal-close" id="am_closeBtn">&times;</button>
@@ -74,26 +74,56 @@
           <div class="field"><label>전화번호</label><input type="text" id="m_phone" placeholder="010-0000-0000" /></div>
           <div class="field"><label>담당 트레이너</label><select id="m_trainer"><option value="">미지정</option></select></div>
         </div>
-        <p class="muted" style="margin:0 0 8px;">상품을 고르면 아래 종목/만료일/횟수가 자동으로 채워져요 (직접 입력해도 돼요).</p>
         <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>생년월일</label><input type="date" id="m_birth" /></div>
+          <div class="field"><label>주소</label><input type="text" id="m_address" placeholder="예: 서울시 강남구 ..." /></div>
+        </div>
+        <div class="field" style="margin-bottom:18px;">
+          <label>메모 (특이사항)</label>
+          <textarea id="m_memo" rows="2" placeholder="예: 무릎 부상 있음, 저녁 시간대 선호 등" style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
+        </div>
+        <p class="muted" style="margin:0 0 8px;">상품을 고르면 시작일 기준으로 만료일이 자동 계산돼요. 시작일을 바꾸면 만료일도 그에 맞게 다시 계산돼요 (필요하면 만료일을 직접 수정해도 돼요).</p>
+        <div class="form-grid" style="margin-bottom:18px;">
           <div class="field"><label>이용권 상품</label><select id="m_product_membership"><option value="">직접 입력</option></select></div>
           <div class="field"><label>그룹PT 상품</label><select id="m_product_group_pt"><option value="">직접 입력</option></select></div>
           <div class="field"><label>개인PT 상품</label><select id="m_product_pt"><option value="">직접 입력</option></select></div>
           <div class="field"><label>락커 상품</label><select id="m_product_locker"><option value="">직접 입력</option></select></div>
           <div class="field"><label>운동복 상품</label><select id="m_product_clothes"><option value="">직접 입력</option></select></div>
         </div>
+        <p class="muted" style="margin:0 0 8px;">상품을 고르면 금액이 자동으로 채워지고, 매출로 바로 기록돼요. "직접 입력"으로 두고 금액만 적어도(할인 등으로 정가와 다르게 파는 경우) 그 금액 그대로 매출에 남아요.</p>
+        <div class="form-grid" style="margin-bottom:18px;">
+          <div class="field"><label>이용권 금액</label><input type="number" min="0" id="m_amount_membership" placeholder="원" /></div>
+          <div class="field"><label>그룹PT 금액</label><input type="number" min="0" id="m_amount_group_pt" placeholder="원" /></div>
+          <div class="field"><label>개인PT 금액</label><input type="number" min="0" id="m_amount_pt" placeholder="원" /></div>
+          <div class="field"><label>락커 금액</label><input type="number" min="0" id="m_amount_locker" placeholder="원" /></div>
+          <div class="field"><label>운동복 금액</label><input type="number" min="0" id="m_amount_clothes" placeholder="원" /></div>
+        </div>
         <div class="form-grid" style="margin-bottom:12px;">
-          <div class="field"><label>이용권 종목</label><input type="text" id="m_type" placeholder="예: 회원권 3개월" /></div>
+          <div class="field"><label>이용권 시작일</label><input type="date" id="m_start" /></div>
           <div class="field"><label>이용권 만료일</label><input type="date" id="m_end_date" /></div>
-          <div class="field"><label>그룹PT 종목</label><input type="text" id="m_gpt_type" placeholder="예: 필라테스" /></div>
+          <div class="field"><label>그룹PT 시작일</label><input type="date" id="m_gpt_start" /></div>
           <div class="field"><label>그룹PT 만료일</label><input type="date" id="m_gpt_end" /></div>
         </div>
-        <div class="form-grid" style="margin-bottom:18px;">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>개인PT 시작일</label><input type="date" id="m_pt_start" /></div>
           <div class="field"><label>개인PT 만료일</label><input type="date" id="m_pt_end" /></div>
-          <div class="field"><label>개인PT 잔여횟수</label><input type="number" id="m_pt_remain" min="0" /></div>
+          <div class="field"><label>락커 시작일</label><input type="date" id="m_locker_start" /></div>
           <div class="field"><label>락커 만료일</label><input type="date" id="m_locker_end" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:18px;">
+          <div class="field"><label>운동복 시작일</label><input type="date" id="m_clothes_start" /></div>
           <div class="field"><label>운동복 만료일</label><input type="date" id="m_clothes_end" /></div>
         </div>
+        <p class="muted" style="margin:0 0 8px;">위에서 상품을 고른 항목은 등록과 동시에 매출로도 기록돼요. 담당자·판매 시각을 확인해주세요.</p>
+        <div class="form-grid" style="margin-bottom:18px;">
+          <div class="field"><label>판매 담당자</label><select id="m_sale_staff"></select></div>
+          <div class="field"><label>판매 시각</label><input type="time" id="m_sale_time" /></div>
+        </div>
+        <!-- 이용권/그룹PT 종목명, 개인PT 잔여횟수는 위 상품 선택으로 자동 계산되고
+             화면에 따로 안 보여줘도 되는 값이라, 입력칸은 숨겨두고 값만 자동으로 채워 넣음 -->
+        <input type="hidden" id="m_type" />
+        <input type="hidden" id="m_gpt_type" />
+        <input type="hidden" id="m_pt_remain" />
         <button type="submit" class="btn btn-primary" style="width:100%;">등록</button>
       </form>
     </div>
@@ -118,6 +148,14 @@
           <div class="field"><label>이름</label><input type="text" id="md_f_name" /></div>
           <div class="field"><label>전화번호</label><input type="text" id="md_f_phone" placeholder="010-0000-0000" /></div>
           <div class="field"><label>담당 트레이너</label><select id="md_f_trainer"><option value="">미지정</option></select></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>생년월일</label><input type="date" id="md_f_birth" /></div>
+          <div class="field"><label>주소</label><input type="text" id="md_f_address" placeholder="예: 서울시 강남구 ..." /></div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>메모 (특이사항)</label>
+          <textarea id="md_f_memo" rows="2" placeholder="예: 무릎 부상 있음, 저녁 시간대 선호 등" style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
         </div>
         <div class="form-grid" style="margin-bottom:12px;">
           <div class="field"><label>이용권 종목</label><input type="text" id="md_f_type" placeholder="예: 회원권 3개월" /></div>
@@ -309,6 +347,11 @@
     let saleDetailKey = null; // 상세설정 팝업에서 지금 편집 중인 장바구니 항목의 key
 
     const todayStr = () => new Date().toISOString().slice(0, 10);
+    // "판매 시각" 입력칸 기본값용: 로컬 시각 기준 "HH:MM" (toISOString은 UTC라 시간대가 어긋나서 직접 계산함)
+    const nowTimeStr = () => {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
 
     function fillTrainerSelect(selectEl, currentTrainerId) {
       selectEl.innerHTML = '<option value="">미지정</option>';
@@ -334,8 +377,8 @@
     // 판매 담당자 select 채우기 (누가 이 이용권을 판매했는지 기록으로 남기기 위함).
     // 트레이너 계정은 RLS상 본인 프로필만 조회되므로 자연스럽게 본인만 선택 가능하고,
     // 지점장 계정은 전체 직원 중에서 담당자를 골라 대신 등록해줄 수 있음
-    async function loadStaffForSaleModal() {
-      const sel = document.getElementById('md_sale_staff');
+    async function loadStaffForSaleModal(selectId = 'md_sale_staff') {
+      const sel = document.getElementById(selectId);
       sel.innerHTML = '';
       try {
         const staff = await fetchStaff();
@@ -561,6 +604,9 @@
 
       document.getElementById('md_f_name').value = m.name || '';
       document.getElementById('md_f_phone').value = m.phone || '';
+      document.getElementById('md_f_birth').value = m.birth_date || '';
+      document.getElementById('md_f_address').value = m.address || '';
+      document.getElementById('md_f_memo').value = m.memo || '';
       fillDetailMembershipFields(m);
 
       const trainerField = document.getElementById('md_f_trainer');
@@ -603,6 +649,9 @@
       const patch = {
         name: val('md_f_name'),
         phone: normalizePhone(val('md_f_phone')),
+        birth_date: val('md_f_birth') || null,
+        address: val('md_f_address') || null,
+        memo: val('md_f_memo') || null,
         membership_type: val('md_f_type') || null,
         membership_end_date: val('md_f_end_date') || null,
         group_pt_type: val('md_f_gpt_type') || null,
@@ -695,6 +744,18 @@
       membership: 'm_product_membership', group_pt: 'm_product_group_pt', pt: 'm_product_pt',
       locker: 'm_product_locker', clothes: 'm_product_clothes'
     };
+    const START_INPUT_IDS = {
+      membership: 'm_start', group_pt: 'm_gpt_start', pt: 'm_pt_start', locker: 'm_locker_start', clothes: 'm_clothes_start'
+    };
+    // 상품을 고르면 이 금액 입력칸에 상품 가격을 기본값으로 채워줌 (등록과 동시에 매출로 기록되므로 금액이 꼭 필요함)
+    const AMOUNT_INPUT_IDS = {
+      membership: 'm_amount_membership', group_pt: 'm_amount_group_pt', pt: 'm_amount_pt',
+      locker: 'm_amount_locker', clothes: 'm_amount_clothes'
+    };
+    // 신규 회원 등록이므로 이용권/그룹PT/개인PT는 항상 "신규"로 매출 기록 (락커/운동복은 신규·재등록 구분이 따로 없음)
+    const NEW_MEMBER_SALE_CATEGORY = {
+      membership: 'membership_new', group_pt: 'group_pt_new', pt: 'pt_new', locker: 'locker', clothes: 'clothes'
+    };
     async function loadProductQuickFill() {
       try {
         const products = await fetchProducts(true);
@@ -710,20 +771,39 @@
         });
       } catch (e) { /* 무시: 상품 없어도 직접 입력으로 회원 등록 가능 */ }
     }
-    Object.entries(PRODUCT_SELECT_IDS).forEach(([category, selectId]) => {
-      document.getElementById(selectId).addEventListener('change', (e) => {
-        const product = (productsByCategory[category] || []).find(p => p.id === e.target.value);
-        if (!product) return;
-        const fill = computeProductFill(product, null);
-        if (fill.membership_type !== undefined) document.getElementById('m_type').value = fill.membership_type || '';
-        if (fill.membership_end_date !== undefined) document.getElementById('m_end_date').value = fill.membership_end_date || '';
-        if (fill.group_pt_type !== undefined) document.getElementById('m_gpt_type').value = fill.group_pt_type || '';
-        if (fill.group_pt_end_date !== undefined) document.getElementById('m_gpt_end').value = fill.group_pt_end_date || '';
-        if (fill.pt_end_date !== undefined) document.getElementById('m_pt_end').value = fill.pt_end_date || '';
-        if (fill.pt_remaining_sessions !== undefined) document.getElementById('m_pt_remain').value = fill.pt_remaining_sessions ?? '';
-        if (fill.locker_end_date !== undefined) document.getElementById('m_locker_end').value = fill.locker_end_date || '';
-        if (fill.workout_clothes_end_date !== undefined) document.getElementById('m_clothes_end').value = fill.workout_clothes_end_date || '';
+    // 이 카테고리에 상품이 선택된 상태면, (시작일 입력값 또는 오늘 날짜) 기준으로 만료일 등을 다시 계산해서 채움
+    // -> 상품을 처음 고를 때뿐 아니라, 나중에 시작일을 바꿀 때도 같은 함수로 다시 계산함
+    function recalcCategoryFill(category) {
+      const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
+      const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
+      if (!product) return; // "직접 입력"인 상태면 자동 계산하지 않음
+      const startInputId = START_INPUT_IDS[category];
+      const startVal = startInputId ? (document.getElementById(startInputId).value || todayStr()) : null;
+      const fill = computeProductFill(product, startVal);
+      if (fill.membership_type !== undefined) document.getElementById('m_type').value = fill.membership_type || '';
+      if (fill.membership_end_date !== undefined) document.getElementById('m_end_date').value = fill.membership_end_date || '';
+      if (fill.group_pt_type !== undefined) document.getElementById('m_gpt_type').value = fill.group_pt_type || '';
+      if (fill.group_pt_end_date !== undefined) document.getElementById('m_gpt_end').value = fill.group_pt_end_date || '';
+      if (fill.pt_end_date !== undefined) document.getElementById('m_pt_end').value = fill.pt_end_date || '';
+      if (fill.pt_remaining_sessions !== undefined) document.getElementById('m_pt_remain').value = fill.pt_remaining_sessions ?? '';
+      if (fill.locker_end_date !== undefined) document.getElementById('m_locker_end').value = fill.locker_end_date || '';
+      if (fill.workout_clothes_end_date !== undefined) document.getElementById('m_clothes_end').value = fill.workout_clothes_end_date || '';
+    }
+    Object.keys(PRODUCT_SELECT_IDS).forEach(category => {
+      const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
+      selectEl.addEventListener('change', () => {
+        recalcCategoryFill(category);
+        // 상품을 바꾸면 금액도 그 상품 가격으로 다시 채워줌 (직접 입력으로 돌아가면 금액은 비워둠)
+        const amountInputId = AMOUNT_INPUT_IDS[category];
+        if (amountInputId) {
+          const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
+          document.getElementById(amountInputId).value = (product && product.price != null) ? product.price : '';
+        }
       });
+      const startInputId = START_INPUT_IDS[category];
+      if (startInputId) {
+        document.getElementById(startInputId).addEventListener('change', () => recalcCategoryFill(category));
+      }
     });
 
     (async () => {
@@ -746,6 +826,7 @@
             });
           } catch (e) { /* 트레이너 목록 못 불러와도 회원 등록 자체는 진행 가능 */ }
           loadProductQuickFill();
+          loadStaffForSaleModal('m_sale_staff'); // 회원 등록 팝업의 "판매 담당자" 목록 (기본값: 나)
         }
       }
       loadMembers();
@@ -959,6 +1040,12 @@
     function openAddMemberModal() {
       document.getElementById('addErrorBox').style.display = 'none';
       document.getElementById('addMemberForm').reset();
+      // 시작일은 보통 "오늘부터"인 경우가 대부분이라, 열 때마다 오늘 날짜로 미리 채워둠 (필요하면 바꾸면 됨)
+      const today = todayStr();
+      ['m_start', 'm_gpt_start', 'm_pt_start', 'm_locker_start', 'm_clothes_start'].forEach(id => {
+        document.getElementById(id).value = today;
+      });
+      document.getElementById('m_sale_time').value = nowTimeStr(); // 판매 시각도 여는 시점의 현재 시각으로 미리 채워둠
       document.getElementById('addMemberOverlay').style.display = 'flex';
       document.getElementById('m_name').focus();
     }
@@ -977,10 +1064,13 @@
       errorBox.style.display = 'none';
       const val = id => document.getElementById(id).value.trim();
       try {
-        await addMember({
+        const newMemberRows = await addMember({
           name: val('m_name'),
           phone: normalizePhone(val('m_phone')),
           assigned_trainer_id: val('m_trainer') || null,
+          birth_date: val('m_birth') || null,
+          address: val('m_address') || null,
+          memo: val('m_memo') || null,
           membership_type: val('m_type') || null,
           membership_end_date: val('m_end_date') || null,
           group_pt_type: val('m_gpt_type') || null,
@@ -990,6 +1080,37 @@
           locker_end_date: val('m_locker_end') || null,
           workout_clothes_end_date: val('m_clothes_end') || null
         });
+        const newMember = newMemberRows[0];
+
+        // 상품을 고른 항목뿐 아니라, "직접 입력"이라도 금액을 입력했으면(트레이너쌤 할인 등으로
+        // 정가와 다르게 파는 경우) 그대로 매출로 기록함. 상품을 안 고르고 금액도 안 적은 칸만 건너뜀.
+        // (담당자/판매 시각은 아래 두 칸을 공통으로 적용, 금액은 항목별로 직접 수정된 값을 그대로 사용)
+        const saleStaffId = val('m_sale_staff') || currentUserId;
+        const saleTime = val('m_sale_time') || null;
+        const salesPayload = [];
+        Object.keys(PRODUCT_SELECT_IDS).forEach(category => {
+          const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
+          const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
+          const amountInputId = AMOUNT_INPUT_IDS[category];
+          const amountRaw = amountInputId ? val(amountInputId) : '';
+          if (!product && amountRaw === '') return; // 상품도 안 고르고 금액도 안 적었으면 매출 안 남김
+          const startInputId = START_INPUT_IDS[category];
+          const saleDate = (startInputId ? val(startInputId) : '') || todayStr();
+          salesPayload.push({
+            member_id: newMember.id,
+            staff_id: saleStaffId,
+            category: NEW_MEMBER_SALE_CATEGORY[category] || 'membership_new',
+            product_id: product ? product.id : null, // 직접 입력이면 연결된 상품 없이 금액만 기록
+            amount: Number(amountRaw || 0),
+            sale_date: saleDate,
+            sale_time: saleTime,
+            memo: product ? '회원 등록과 함께 자동 기록' : '회원 등록과 함께 자동 기록 (직접 입력·가격 변동)'
+          });
+        });
+        if (salesPayload.length > 0) {
+          await addSales(salesPayload);
+        }
+
         document.getElementById('addMemberForm').reset();
         closeAddMemberModal();
         loadMembers();
