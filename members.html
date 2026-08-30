@@ -82,39 +82,42 @@
           <label>메모 (특이사항)</label>
           <textarea id="m_memo" rows="2" placeholder="예: 무릎 부상 있음, 저녁 시간대 선호 등" style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
         </div>
-        <p class="muted" style="margin:0 0 8px;">상품을 고르면 시작일 기준으로 만료일이 자동 계산돼요. 시작일을 바꾸면 만료일도 그에 맞게 다시 계산돼요 (필요하면 만료일을 직접 수정해도 돼요).</p>
-        <div class="form-grid" style="margin-bottom:18px;">
+        <p class="muted" style="margin:0 0 8px;">상품을 고르면 시작일 기준 만료일과 금액이 자동으로 채워져요. "직접 입력"으로 두고 금액만 적어도(할인 등으로 정가와 다르게 파는 경우) 그 금액 그대로 매출로 기록돼요.</p>
+
+        <div class="form-grid" style="margin-bottom:10px;">
           <div class="field"><label>이용권 상품</label><select id="m_product_membership"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>그룹PT 상품</label><select id="m_product_group_pt"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>개인PT 상품</label><select id="m_product_pt"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>락커 상품</label><select id="m_product_locker"><option value="">직접 입력</option></select></div>
-          <div class="field"><label>운동복 상품</label><select id="m_product_clothes"><option value="">직접 입력</option></select></div>
-        </div>
-        <p class="muted" style="margin:0 0 8px;">상품을 고르면 금액이 자동으로 채워지고, 매출로 바로 기록돼요. "직접 입력"으로 두고 금액만 적어도(할인 등으로 정가와 다르게 파는 경우) 그 금액 그대로 매출에 남아요.</p>
-        <div class="form-grid" style="margin-bottom:18px;">
-          <div class="field"><label>이용권 금액</label><input type="number" min="0" id="m_amount_membership" placeholder="원" /></div>
-          <div class="field"><label>그룹PT 금액</label><input type="number" min="0" id="m_amount_group_pt" placeholder="원" /></div>
-          <div class="field"><label>개인PT 금액</label><input type="number" min="0" id="m_amount_pt" placeholder="원" /></div>
-          <div class="field"><label>락커 금액</label><input type="number" min="0" id="m_amount_locker" placeholder="원" /></div>
-          <div class="field"><label>운동복 금액</label><input type="number" min="0" id="m_amount_clothes" placeholder="원" /></div>
-        </div>
-        <div class="form-grid" style="margin-bottom:12px;">
           <div class="field"><label>이용권 시작일</label><input type="date" id="m_start" /></div>
           <div class="field"><label>이용권 만료일</label><input type="date" id="m_end_date" /></div>
+          <div class="field"><label>이용권 금액</label><input type="number" min="0" id="m_amount_membership" placeholder="원" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="field"><label>그룹PT 상품</label><select id="m_product_group_pt"><option value="">직접 입력</option></select></div>
           <div class="field"><label>그룹PT 시작일</label><input type="date" id="m_gpt_start" /></div>
           <div class="field"><label>그룹PT 만료일</label><input type="date" id="m_gpt_end" /></div>
+          <div class="field"><label>그룹PT 금액</label><input type="number" min="0" id="m_amount_group_pt" placeholder="원" /></div>
         </div>
-        <div class="form-grid" style="margin-bottom:12px;">
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="field"><label>개인PT 상품</label><select id="m_product_pt"><option value="">직접 입력</option></select></div>
           <div class="field"><label>개인PT 시작일</label><input type="date" id="m_pt_start" /></div>
           <div class="field"><label>개인PT 만료일</label><input type="date" id="m_pt_end" /></div>
+          <div class="field"><label>개인PT 금액</label><input type="number" min="0" id="m_amount_pt" placeholder="원" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="field"><label>락커 상품</label><select id="m_product_locker"><option value="">직접 입력</option></select></div>
           <div class="field"><label>락커 시작일</label><input type="date" id="m_locker_start" /></div>
           <div class="field"><label>락커 만료일</label><input type="date" id="m_locker_end" /></div>
+          <div class="field"><label>락커 금액</label><input type="number" min="0" id="m_amount_locker" placeholder="원" /></div>
         </div>
-        <div class="form-grid" style="margin-bottom:18px;">
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div class="field"><label>운동복 상품</label><select id="m_product_clothes"><option value="">직접 입력</option></select></div>
           <div class="field"><label>운동복 시작일</label><input type="date" id="m_clothes_start" /></div>
           <div class="field"><label>운동복 만료일</label><input type="date" id="m_clothes_end" /></div>
+          <div class="field"><label>운동복 금액</label><input type="number" min="0" id="m_amount_clothes" placeholder="원" /></div>
         </div>
-        <p class="muted" style="margin:0 0 8px;">위에서 상품을 고른 항목은 등록과 동시에 매출로도 기록돼요. 담당자·판매 시각을 확인해주세요.</p>
+
+        <div id="m_sale_total" class="sale-total">합계 0원</div>
+
+        <p class="muted" style="margin:14px 0 8px;">위에서 상품을 고르거나 금액을 적은 항목은 등록과 동시에 매출로도 기록돼요. 담당자·판매 시각을 확인해주세요.</p>
         <div class="form-grid" style="margin-bottom:18px;">
           <div class="field"><label>판매 담당자</label><select id="m_sale_staff"></select></div>
           <div class="field"><label>판매 시각</label><input type="time" id="m_sale_time" /></div>
@@ -756,6 +759,17 @@
     const NEW_MEMBER_SALE_CATEGORY = {
       membership: 'membership_new', group_pt: 'group_pt_new', pt: 'pt_new', locker: 'locker', clothes: 'clothes'
     };
+    // 이용권/그룹PT/개인PT/락커/운동복 금액 칸 5개를 합쳐서 "합계 ○○원"으로 보여줌
+    function updateAddMemberTotal() {
+      const total = Object.values(AMOUNT_INPUT_IDS).reduce((sum, id) => {
+        const v = Number(document.getElementById(id).value || 0);
+        return sum + (Number.isFinite(v) ? v : 0);
+      }, 0);
+      document.getElementById('m_sale_total').textContent = `합계 ${formatWon(total)}`;
+    }
+    Object.values(AMOUNT_INPUT_IDS).forEach(id => {
+      document.getElementById(id).addEventListener('input', updateAddMemberTotal);
+    });
     async function loadProductQuickFill() {
       try {
         const products = await fetchProducts(true);
@@ -798,6 +812,7 @@
         if (amountInputId) {
           const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
           document.getElementById(amountInputId).value = (product && product.price != null) ? product.price : '';
+          updateAddMemberTotal();
         }
       });
       const startInputId = START_INPUT_IDS[category];
@@ -1046,6 +1061,7 @@
         document.getElementById(id).value = today;
       });
       document.getElementById('m_sale_time').value = nowTimeStr(); // 판매 시각도 여는 시점의 현재 시각으로 미리 채워둠
+      updateAddMemberTotal(); // reset()으로 금액 칸들이 비워진 뒤라 합계도 0원으로 다시 표시
       document.getElementById('addMemberOverlay').style.display = 'flex';
       document.getElementById('m_name').focus();
     }
