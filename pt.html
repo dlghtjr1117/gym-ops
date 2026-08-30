@@ -321,13 +321,10 @@
         ? (isManagerFlag ? '목표 카드를 눌러 수정할 수 있어요' : '지점장이 설정한 목표예요')
         : (isManagerFlag ? '목표 카드를 눌러 설정해보세요' : '아직 설정된 목표가 없어요');
 
-      // 예상 매출: 아직 등록/이월/미스로 끝나지 않은(25~100%) 리드들의 (금액 × 확률) 합
+      // 예상 매출: 아직 등록/이월/미스로 끝나지 않은 리드들의 금액 합계 그대로
+      // (확률은 등록 가능성 표시일 뿐, 금액에 곱해서 깎는 값이 아님)
       const openLeads = leadsCache.filter(l => l.stage !== 'registered' && l.stage !== 'missed' && l.stage !== 'rolled_over');
-      const expectedTotal = openLeads.reduce((sum, l) => {
-        const amt = Number(l.expected_amount || 0);
-        const prob = l.probability == null ? 50 : Number(l.probability);
-        return sum + amt * (prob / 100);
-      }, 0);
+      const expectedTotal = openLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
       animateCount(document.getElementById('expectedAmount'), Math.round(expectedTotal));
       document.getElementById('expectedSub').textContent = `진행중인 상담 ${openLeads.length}건 기준`;
     }
