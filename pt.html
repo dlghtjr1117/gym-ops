@@ -164,12 +164,12 @@
         <div class="mini-stat-box"><div class="mini-title">OT1 성공률</div><div class="mini-row"><span>완료/진행</span><b id="ot1SuccessRate">-</b></div></div>
       </div>
       <div style="overflow-x:auto; margin-top:10px;">
-        <table id="ot1Table" class="table-fixed sheet-table" style="min-width:980px;">
+        <table id="ot1Table" class="table-fixed sheet-table" style="min-width:1080px;">
           <thead><tr>
-            <th style="width:14%;">OT1날짜</th><th style="width:12%;">연락드린날짜</th><th style="width:10%;">이름</th>
-            <th style="width:34%;">특이사항</th><th style="width:14%;">현황</th><th style="width:16%;">OT2 예정일</th>
+            <th style="width:13%;">OT1날짜</th><th style="width:11%;">연락드린날짜</th><th style="width:9%;">이름</th>
+            <th style="width:28%;">특이사항</th><th style="width:13%;">현황</th><th style="width:12%;">예상 등록률</th><th style="width:14%;">OT2 예정일</th>
           </tr></thead>
-          <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tbody><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
 
@@ -180,12 +180,12 @@
         <div class="mini-stat-box"><div class="mini-title">OT2 성공률</div><div class="mini-row"><span>완료/진행</span><b id="ot2SuccessRate">-</b></div></div>
       </div>
       <div style="overflow-x:auto; margin-top:10px;">
-        <table id="ot2Table" class="table-fixed sheet-table" style="min-width:900px;">
+        <table id="ot2Table" class="table-fixed sheet-table" style="min-width:1000px;">
           <thead><tr>
-            <th style="width:16%;">OT2날짜</th><th style="width:12%;">이름</th>
-            <th style="width:52%;">특이사항</th><th style="width:20%;">현황</th>
+            <th style="width:14%;">OT2날짜</th><th style="width:10%;">이름</th>
+            <th style="width:40%;">특이사항</th><th style="width:18%;">현황</th><th style="width:18%;">예상 등록률</th>
           </tr></thead>
-          <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
 
@@ -342,7 +342,12 @@
     const OT_STATUS_OPTIONS = [
       { value: 'scheduled', label: '예정' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }, { value: 'done', label: '완료' }
     ];
-    const OT_STATUS_BADGE = { scheduled: 'badge-blue', rolled_over: 'badge-slate', missed: 'badge-red', done: 'badge-green' };
+    const OT_STATUS_BADGE = { scheduled: 'badge-orange', rolled_over: 'badge-purple', missed: 'badge-red', done: 'badge-green' };
+    // OT1/OT2 각각의 "예상 등록률" - 주차별 매출 기록의 재등록확률과는 별개의 독립적인 값
+    const OT_PROB_OPTIONS = [
+      { value: '', label: '미설정' }, { value: '25', label: '25%' }, { value: '50', label: '50%' }, { value: '75', label: '75%' }
+    ];
+    const OT_PROB_BADGE = { '': '', '25': 'badge-slate', '50': 'badge-yellow', '75': 'badge-orange' };
     // PT 회원 관리(재등록확률)도 100%를 따로 두지 않고 "등록"으로 합치고, "이월" 단계를 추가함
     const CARE_PROB_OPTIONS = [
       { value: '', label: '미설정' }, { value: 'p25', label: '25%' }, { value: 'p50', label: '50%' }, { value: 'p75', label: '75%' },
@@ -742,13 +747,30 @@
     }
 
     // ---- 섹션 C: OT 관리 (OT1/OT2 공용) ----
+    // 현황(예정/이월/미스/완료)이 바뀌면 뱃지 색뿐 아니라 그 행 전체 배경색도 같이 바꿔줌
     async function handleOtStatusFieldSave(selectEl, field) {
       const id = selectEl.dataset.leadId;
+      const value = selectEl.value;
       try {
-        await updatePtLead(id, { [field]: selectEl.value });
+        await updatePtLead(id, { [field]: value });
         const l = leadsCache.find(x => x.id === id);
-        if (l) l[field] = selectEl.value;
+        if (l) l[field] = value;
+        selectEl.className = 'badge ' + (OT_STATUS_BADGE[value] || '') + ' sheet-input';
+        const row = selectEl.closest('tr');
+        if (row) row.className = 'row-otstatus-' + value;
         loadAllMiniStats();
+      } catch (err) { alert(err.message); }
+    }
+    // OT1/OT2 각각의 "예상 등록률"(25%/50%/75%) 저장
+    async function handleOtProbSave(selectEl, field) {
+      const id = selectEl.dataset.leadId;
+      const raw = selectEl.value;
+      const value = raw === '' ? null : Number(raw);
+      try {
+        await updatePtLead(id, { [field]: value });
+        const l = leadsCache.find(x => x.id === id);
+        if (l) l[field] = value;
+        selectEl.className = 'sheet-input badge ' + (OT_PROB_BADGE[raw] || '');
       } catch (err) { alert(err.message); }
     }
     // OT2 예정일을 넣으면 자동으로 ot2_status를 '예정'으로 세팅 (OT2 표에 바로 나타나게)
@@ -774,19 +796,22 @@
         .sort((a, b) => (a.ot_date < b.ot_date ? -1 : a.ot_date > b.ot_date ? 1 : 0));
 
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>';
         return;
       }
       tbody.innerHTML = items.map(l => {
         const status = l.ot_status || 'scheduled';
         const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
+        const probVal = l.ot_expected_probability != null ? String(l.ot_expected_probability) : '';
+        const probOptions = OT_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === probVal ? 'selected' : ''}>${o.label}</option>`).join('');
         return `
-        <tr>
+        <tr class="row-otstatus-${status}">
           <td><input class="sheet-input" type="date" value="${l.ot_date || ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'ot_date',false)" /></td>
           <td class="cell-1line">${l.contact_date || '-'}</td>
           <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
           <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot_status')">${options}</select></td>
+          <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot_expected_probability')">${probOptions}</select></td>
           <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
         </tr>`;
       }).join('');
@@ -801,18 +826,21 @@
         .sort((a, b) => (a.ot2_date < b.ot2_date ? -1 : a.ot2_date > b.ot2_date ? 1 : 0));
 
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="muted" style="padding:16px;">이번 달 OT2(2차 팔로우업) 기록이 없습니다. OT1 표 오른쪽에서 OT2 예정일을 넣으면 여기 나타나요.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이번 달 OT2(2차 팔로우업) 기록이 없습니다. OT1 표 오른쪽에서 OT2 예정일을 넣으면 여기 나타나요.</td></tr>';
         return;
       }
       tbody.innerHTML = items.map(l => {
         const status = l.ot2_status || 'scheduled';
         const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
+        const probVal = l.ot2_expected_probability != null ? String(l.ot2_expected_probability) : '';
+        const probOptions = OT_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === probVal ? 'selected' : ''}>${o.label}</option>`).join('');
         return `
-        <tr>
+        <tr class="row-otstatus-${status}">
           <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
           <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
           <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot2_status')">${options}</select></td>
+          <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot2_expected_probability')">${probOptions}</select></td>
         </tr>`;
       }).join('');
     }

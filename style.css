@@ -151,6 +151,12 @@ tr:last-child td { border-bottom: none; }
 .row-care-rolled_over td { background: #f3e8ff; }
 .row-care-missed td { background: #fee2e2; }
 
+/* PT 관리 - OT 관리(OT1/OT2 현황)도 동일하게 행 전체를 물들임: 예정=주황, 이월=보라, 미스=빨강, 완료=초록 */
+.row-otstatus-scheduled td { background: #ffedd5; }
+.row-otstatus-rolled_over td { background: #f3e8ff; }
+.row-otstatus-missed td { background: #fee2e2; }
+.row-otstatus-done td { background: #dcfce7; }
+
 /* 만료회원·TM 표에서 뱃지처럼 보이는 TM상태 <select> (클릭하면 바로 상태 변경) */
 select.tm-status-select {
   border: none; cursor: pointer; outline: none; max-width: 100%;
