@@ -141,10 +141,10 @@
       </div>
       <p class="muted" style="margin:-6px 0 12px;">칸을 클릭해서 바로 입력하면 자동 저장돼요. 재등록확률·재등록예상횟수까지 여기서 한 번에 관리해요.</p>
       <div style="overflow-x:auto;">
-        <table id="careTable" class="table-fixed sheet-table" style="min-width:1140px;">
+        <table id="careTable" class="table-fixed sheet-table" style="min-width:1220px;">
           <thead><tr>
-            <th style="width:8%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
-            <th style="width:18%;">수업방향</th><th style="width:5%;">단기</th><th style="width:19%;">장기적 플랜(관리 방향)</th>
+            <th style="width:13%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
+            <th style="width:15%;">수업방향</th><th style="width:5%;">단기</th><th style="width:16%;">장기적 플랜(관리 방향)</th>
             <th style="width:8%;">재등록예상횟수</th><th style="width:9%;">예상매출</th><th style="width:8%;">재등록확률</th><th style="width:6%;"></th>
           </tr></thead>
           <tbody><tr><td colspan="10" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
@@ -248,7 +248,7 @@
       <form id="addCareMemberForm">
         <div class="form-grid">
           <div class="field"><label>이름 *</label><input type="text" id="cm_name" required /></div>
-          <div class="field"><label>재등록예상시기</label><input type="text" id="cm_renewal_month" placeholder="예: 2026-09" /></div>
+          <div class="field"><label>재등록예상시기</label><input type="month" id="cm_renewal_month" /></div>
           <div class="field"><label>남은횟수</label><input type="number" id="cm_remaining_sessions" min="0" placeholder="예: 5" /></div>
           <div class="field"><label>단기</label>
             <select id="cm_short_term_plan">
@@ -591,7 +591,7 @@
           : `<span class="badge ${remaining <= 1 ? 'badge-red' : 'badge-amber'}">${remaining}회</span>`;
         return `
         <tr>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" placeholder="YYYY-MM" /></td>
+          <td><input class="sheet-input" type="month" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" /></td>
           <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
           <td style="text-align:center;">${remainingHtml}</td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_session_focus || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_session_focus',false)" placeholder="수업방향" /></td>
