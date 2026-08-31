@@ -151,6 +151,9 @@
     const SG_WEEKDAY_SHORT = ['일', '월', '화', '수', '목', '금', '토'];
     const STATUS_LABEL = { booked: '예약', attended: '출석', absent: '결석', cancelled: '취소' };
     const STATUS_CLASS = { booked: 'sg-booked', attended: 'sg-attended', absent: 'sg-absent', cancelled: 'sg-cancelled' };
+    // 출석/결석은 둘 다 "수업이 진행됨(노쇼 포함)"으로 보고 잔여횟수를 차감함. 취소·삭제는 수업이 아예 없었던 것이므로 차감하지 않고,
+    // 이미 차감된 상태(출석/결석)에서 취소·삭제로 바뀌면 차감했던 1회를 복구함.
+    const DECREMENTING_STATUSES = ['attended', 'absent'];
     const pad = (n) => String(n).padStart(2, '0');
 
     function startOfWeekLocal(d) {
@@ -379,19 +382,35 @@
       const b = bookingsCache.find(x => x.id === activeBookingId);
       if (!b) return;
       try {
-        if (status === 'attended') {
-          const remain = b.member ? b.member.pt_remaining_sessions : null;
+        const wasDecrementing = DECREMENTING_STATUSES.includes(b.status);
+        const willDecrement = DECREMENTING_STATUSES.includes(status);
+        const hasRemainInfo = !!(b.member && b.member.pt_remaining_sessions != null);
+
+        if (willDecrement && !wasDecrementing) {
+          // 예약/취소 -> 출석 또는 결석: 수업이 진행된 것(노쇼 포함)으로 보고 1회 차감
+          const remain = hasRemainInfo ? b.member.pt_remaining_sessions : null;
           const msg = remain != null
-            ? `출석 처리하면 ${b.member.name} 회원의 개인PT 잔여횟수가 ${remain}회 → ${remain - 1}회로 차감돼요. 계속할까요?`
-            : `출석 처리할까요? (이 회원은 개인PT 잔여횟수가 기록되어 있지 않아 차감은 되지 않아요)`;
+            ? `"${STATUS_LABEL[status]}" 처리하면 ${b.member.name} 회원의 개인PT 잔여횟수가 ${remain}회 → ${remain - 1}회로 차감돼요. 계속할까요?`
+            : `"${STATUS_LABEL[status]}" 처리할까요? (이 회원은 개인PT 잔여횟수가 기록되어 있지 않아 차감은 되지 않아요)`;
           if (!confirm(msg)) return;
-          await updatePtBooking(b.id, { status: 'attended' });
+          await updatePtBooking(b.id, { status });
           if (remain != null) {
             await updateMember(b.member.id, { pt_remaining_sessions: remain - 1 });
             const mc = membersCache.find(x => x.id === b.member.id);
             if (mc) mc.pt_remaining_sessions = remain - 1;
           }
+        } else if (!willDecrement && wasDecrementing && hasRemainInfo) {
+          // 출석/결석(이미 차감됨) -> 취소: 수업이 없었던 것으로 되므로 차감했던 1회를 복구
+          const remain = b.member.pt_remaining_sessions;
+          const restored = remain + 1;
+          const msg = `이 예약은 이미 "${STATUS_LABEL[b.status]}" 처리되어 잔여횟수가 차감된 상태예요. "${STATUS_LABEL[status]}"(으)로 바꾸면 ${b.member.name} 회원의 잔여횟수가 ${remain}회 → ${restored}회로 복구돼요. 계속할까요?`;
+          if (!confirm(msg)) return;
+          await updatePtBooking(b.id, { status });
+          await updateMember(b.member.id, { pt_remaining_sessions: restored });
+          const mc = membersCache.find(x => x.id === b.member.id);
+          if (mc) mc.pt_remaining_sessions = restored;
         } else {
+          // 그 외 (예: 출석 ↔ 결석 서로 전환, 예약 ↔ 취소): 이미 차감/복구 상태가 같으므로 잔여횟수는 건드리지 않고 상태만 변경
           await updatePtBooking(b.id, { status });
         }
         closeActionModal();
@@ -404,9 +423,20 @@
     document.getElementById('ac_absentBtn').addEventListener('click', () => setBookingStatus('absent'));
     document.getElementById('ac_cancelBtn').addEventListener('click', () => setBookingStatus('cancelled'));
     document.getElementById('ac_deleteBtn').addEventListener('click', async () => {
-      if (!confirm('이 예약을 완전히 삭제할까요? (삭제하면 잔여횟수는 자동으로 되돌려지지 않아요)')) return;
+      const b = bookingsCache.find(x => x.id === activeBookingId);
+      const wasDecrementing = !!(b && DECREMENTING_STATUSES.includes(b.status) && b.member && b.member.pt_remaining_sessions != null);
+      const confirmMsg = wasDecrementing
+        ? `이 예약은 "${STATUS_LABEL[b.status]}" 처리되어 있어요. 삭제하면 ${b.member.name} 회원의 개인PT 잔여횟수가 ${b.member.pt_remaining_sessions}회 → ${b.member.pt_remaining_sessions + 1}회로 복구돼요. 계속 삭제할까요?`
+        : '이 예약을 완전히 삭제할까요?';
+      if (!confirm(confirmMsg)) return;
       try {
         await deletePtBooking(activeBookingId);
+        if (wasDecrementing) {
+          const restored = b.member.pt_remaining_sessions + 1;
+          await updateMember(b.member.id, { pt_remaining_sessions: restored });
+          const mc = membersCache.find(x => x.id === b.member.id);
+          if (mc) mc.pt_remaining_sessions = restored;
+        }
         closeActionModal();
         reloadBookings();
       } catch (err) {
