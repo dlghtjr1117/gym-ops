@@ -474,8 +474,17 @@
       ).join('');
       return `<select class="sheet-input" data-lead-id="${lead.id}" onchange="handleLeadFieldSave(this,'source',false)">${optionsHtml}</select>`;
     }
+    // 상담일(contact_date)이 이번 달이면 그 날짜로, 상담일은 지난 달인데 OT일(ot_date)만 이번 달이면
+    // OT일 기준으로 주차를 계산 (예: 8/31에 연락해서 9/2 OT를 잡은 경우, 9월 화면에서는 9/2 기준 주차로 보여줌)
+    function weekNoForMonth(lead) {
+      if (lead.week_no != null) return lead.week_no;
+      const { startStr, endStr } = getMonthRange();
+      const inMonth = (d) => d && d >= startStr && d < endStr;
+      const dateForWeek = inMonth(lead.contact_date) ? lead.contact_date : (inMonth(lead.ot_date) ? lead.ot_date : lead.contact_date);
+      return weekOfMonth(dateForWeek);
+    }
     function renderWeekSelect(lead) {
-      const cur = lead.week_no != null ? lead.week_no : weekOfMonth(lead.contact_date);
+      const cur = weekNoForMonth(lead);
       const optionsHtml = [1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === cur ? 'selected' : ''}>${n}주차</option>`).join('');
       return `<select class="sheet-input week-band" data-lead-id="${lead.id}" onchange="handleLeadFieldSave(this,'week_no',true)">${optionsHtml}</select>`;
     }
@@ -519,12 +528,17 @@
     function renderWeeklyTable() {
       const tbody = document.querySelector('#weeklyTable tbody');
       const { startStr, endStr } = getMonthRange();
+      // 상담일(contact_date)이 이번 달인 리드뿐 아니라, 상담은 지난 달에 했어도 OT일(ot_date)이 이번 달로
+      // 잡힌 리드도 이번 달 표에 같이 보여줌 (예: 8/31에 연락→9/2 OT 확정된 경우 9월 표에도 나오게)
       const items = leadsCache
-        .filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr)
+        .filter(l =>
+          (l.contact_date && l.contact_date >= startStr && l.contact_date < endStr) ||
+          (l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
+        )
         .slice()
         .sort((a, b) => {
-          const wa = a.week_no != null ? a.week_no : weekOfMonth(a.contact_date);
-          const wb = b.week_no != null ? b.week_no : weekOfMonth(b.contact_date);
+          const wa = weekNoForMonth(a);
+          const wb = weekNoForMonth(b);
           if (wa !== wb) return wa - wb;
           return (a.contact_date < b.contact_date ? -1 : a.contact_date > b.contact_date ? 1 : 0);
         });
@@ -561,7 +575,11 @@
     // 재등록 확정 조사 / OT 확정 조사가 이 함수 하나를 공유해서 씀
     function loadConfirmMiniStats(sourceValue, idPrefix) {
       const { startStr, endStr } = getMonthRange();
-      const monthLeads = leadsCache.filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr);
+      // 주차별 매출 기록 표와 동일한 기준: 상담일 또는 OT일이 이번 달이면 포함
+      const monthLeads = leadsCache.filter(l =>
+        (l.contact_date && l.contact_date >= startStr && l.contact_date < endStr) ||
+        (l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
+      );
       const expected = monthLeads.filter(l => l.source === sourceValue);
       const confirmed = expected.filter(l => l.stage === 'registered');
       document.getElementById(idPrefix + 'ExpectedCount').textContent = expected.length;
