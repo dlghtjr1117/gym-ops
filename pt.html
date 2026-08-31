@@ -261,11 +261,12 @@
           <div class="field"><label>재등록확률</label>
             <select id="cm_expected_probability">
               <option value="" selected>미설정</option>
-              <option value="25">25%</option>
-              <option value="50">50%</option>
-              <option value="75">75%</option>
-              <option value="100">100%</option>
-              <option value="0">미스</option>
+              <option value="p25">25%</option>
+              <option value="p50">50%</option>
+              <option value="p75">75%</option>
+              <option value="registered">등록</option>
+              <option value="rolled_over">이월</option>
+              <option value="missed">미스</option>
             </select>
           </div>
         </div>
@@ -305,10 +306,12 @@
       { value: 'scheduled', label: '예정' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }, { value: 'done', label: '완료' }
     ];
     const OT_STATUS_BADGE = { scheduled: 'badge-blue', rolled_over: 'badge-slate', missed: 'badge-red', done: 'badge-green' };
+    // PT 회원 관리(재등록확률)도 100%를 따로 두지 않고 "등록"으로 합치고, "이월" 단계를 추가함
     const CARE_PROB_OPTIONS = [
-      { value: '', label: '미설정' }, { value: '25', label: '25%' }, { value: '50', label: '50%' }, { value: '75', label: '75%' }, { value: '100', label: '100%' }, { value: '0', label: '미스' }
+      { value: '', label: '미설정' }, { value: 'p25', label: '25%' }, { value: 'p50', label: '50%' }, { value: 'p75', label: '75%' },
+      { value: 'registered', label: '등록' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }
     ];
-    const CARE_PROB_BADGE = { '': '', '25': 'badge-slate', '50': 'badge-yellow', '75': 'badge-orange', '100': 'badge-green', '0': 'badge-red' };
+    const CARE_PROB_BADGE = { '': '', p25: 'badge-slate', p50: 'badge-yellow', p75: 'badge-orange', registered: 'badge-green', rolled_over: 'badge-purple', missed: 'badge-red' };
 
     // 리드의 stage/probability -> 위 콤보select 값으로 변환
     // (100%는 이제 "등록" 하나로 합쳐서, 옛날 데이터에 probability=100인데 stage는 아직 등록이 아닌 경우도
@@ -318,6 +321,15 @@
       if (l.stage === 'rolled_over') return 'rolled_over';
       if (l.stage === 'missed') return 'missed';
       const prob = l.probability != null ? l.probability : 50;
+      return 'p' + (prob >= 100 ? 75 : prob);
+    }
+    // PT 회원 관리 표의 재등록확률 콤보select 값으로 변환 (위 leadToProbValue와 같은 방식)
+    function careProbValue(m) {
+      if (m.renewal_stage === 'registered') return 'registered';
+      if (m.renewal_stage === 'rolled_over') return 'rolled_over';
+      if (m.renewal_stage === 'missed') return 'missed';
+      if (m.pt_expected_probability == null) return '';
+      const prob = Number(m.pt_expected_probability);
       return 'p' + (prob >= 100 ? 75 : prob);
     }
 
@@ -551,12 +563,18 @@
     async function handleCareProbSave(selectEl) {
       const id = selectEl.dataset.memberId;
       const raw = selectEl.value;
-      const value = raw === '' ? null : Number(raw);
+      const patch = raw === ''
+        ? { renewal_stage: 'in_progress', pt_expected_probability: null }
+        : raw.startsWith('p')
+          ? { renewal_stage: 'in_progress', pt_expected_probability: Number(raw.slice(1)) }
+          : { renewal_stage: raw };
       try {
-        await updatePtCareLog(id, { pt_expected_probability: value });
+        await updatePtCareLog(id, patch);
         const m = careCache.find(x => x.id === id);
-        if (m) m.pt_expected_probability = value;
+        if (m) Object.assign(m, patch);
         selectEl.className = 'sheet-input badge ' + (CARE_PROB_BADGE[raw] || '');
+        const row = selectEl.closest('tr');
+        if (row) row.className = 'row-care-' + raw;
       } catch (err) { alert(err.message); }
     }
     async function handleToggleShortTerm(btn) {
@@ -583,14 +601,14 @@
       }
       tbody.innerHTML = careCache.map(m => {
         const shortVal = m.pt_short_term_plan === 'O' ? 'O' : 'X';
-        const probOptions = CARE_PROB_OPTIONS.map(o => `<option value="${o.value}" ${String(m.pt_expected_probability == null ? '' : m.pt_expected_probability) === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
-        const careProbVal = m.pt_expected_probability == null ? '' : String(m.pt_expected_probability);
+        const careProbVal = careProbValue(m);
+        const probOptions = CARE_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === careProbVal ? 'selected' : ''}>${o.label}</option>`).join('');
         const remaining = m.pt_remaining_sessions;
         const remainingHtml = remaining == null
           ? '<span class="muted">-</span>'
           : `<span class="badge ${remaining <= 1 ? 'badge-red' : 'badge-amber'}">${remaining}회</span>`;
         return `
-        <tr>
+        <tr class="row-care-${careProbVal}">
           <td><input class="sheet-input" type="month" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" /></td>
           <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
           <td style="text-align:center;">${remainingHtml}</td>
@@ -632,6 +650,11 @@
       const errorBox = document.getElementById('addCareMemberErrorBox');
       errorBox.style.display = 'none';
       const probRaw = document.getElementById('cm_expected_probability').value;
+      const probPatch = probRaw === ''
+        ? { renewal_stage: 'in_progress', pt_expected_probability: null }
+        : probRaw.startsWith('p')
+          ? { renewal_stage: 'in_progress', pt_expected_probability: Number(probRaw.slice(1)) }
+          : { renewal_stage: probRaw, pt_expected_probability: null };
       try {
         await addPtCareLog({
           trainer_id: selectedTrainerId,
@@ -644,7 +667,7 @@
           pt_long_term_plan: document.getElementById('cm_long_term_plan').value.trim() || null,
           pt_expected_sessions: document.getElementById('cm_expected_sessions').value ? Number(document.getElementById('cm_expected_sessions').value) : null,
           pt_expected_amount: document.getElementById('cm_expected_amount').value ? Number(document.getElementById('cm_expected_amount').value) : null,
-          pt_expected_probability: probRaw === '' ? null : Number(probRaw)
+          ...probPatch
         });
         closeAddCareMemberModal();
         await reloadCareLogsOnly();
