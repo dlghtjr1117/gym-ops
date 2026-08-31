@@ -536,13 +536,64 @@
       const options = PROB_SELECT_OPTIONS.map(o => `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`).join('');
       return `<select class="badge ${PROB_BADGE[val]} sheet-input" data-lead-id="${lead.id}" onchange="handleProbChange(this)">${options}</select>`;
     }
+    // "YYYY-MM-DD" 문자열을 n개월 뒤로 옮긴 뒤, 그 달 1일 문자열로 돌려줌
+    function firstDayOfMonthAfter(dateStr, n) {
+      const [y, m] = dateStr.split('-').map(Number);
+      const d = new Date(y, m - 1 + n, 1);
+      return formatDateStr(d);
+    }
+    // "이월" 처리된 상담/매출 기록을 다음 달 주차별 매출 기록에도 자동으로 만들어줌
+    // (PT 회원 관리의 "이월" 자동 이관과 같은 개념). 이름/연락처/유형/예상매출/횟수/메모는 그대로 옮기고,
+    // 날짜는 다음 달 1일로(주차는 1주차로), 확률은 새로 시작하는 상담이니 50%로 리셋함. OT 날짜는
+    // 이번 달 특정 일정에 묶여있던 값이라 그대로 넘기지 않고 비워둠(필요하면 다음 달 표에서 다시 잡음).
+    // 다음 달에 같은 이름의 기록이 이미 있으면 중복으로 만들지 않음.
+    async function carryOverLeadToNextMonth(lead) {
+      const nextMonthFirstDay = firstDayOfMonthAfter(lead.contact_date || formatDateStr(new Date()), 1);
+      const nextMonthLabel = `${Number(nextMonthFirstDay.slice(5, 7))}월`;
+      const nmStart = nextMonthFirstDay;
+      const nmEnd = firstDayOfMonthAfter(nextMonthFirstDay, 1);
+      try {
+        const all = await fetchPtLeads();
+        const dup = all.find(l => l.trainer_id === lead.trainer_id && l.name === lead.name &&
+          ((l.contact_date && l.contact_date >= nmStart && l.contact_date < nmEnd) ||
+           (l.ot_date && l.ot_date >= nmStart && l.ot_date < nmEnd)));
+        if (dup) {
+          showToast(`${nextMonthLabel}에 이미 같은 이름의 기록이 있어서 새로 만들지 않았어요.`);
+          return;
+        }
+        await addPtLead({
+          trainer_id: lead.trainer_id,
+          name: lead.name,
+          phone: lead.phone || null,
+          source: lead.source || null,
+          week_no: 1,
+          contact_date: nextMonthFirstDay,
+          expected_amount: lead.expected_amount != null ? lead.expected_amount : null,
+          sessions: lead.sessions != null ? lead.sessions : null,
+          ot_date: null,
+          ot_status: null,
+          ot2_date: null,
+          ot2_status: null,
+          memo: lead.memo || null,
+          stage: 'in_progress',
+          probability: 50
+        });
+        showToast(`이월 처리됐어요. ${nextMonthLabel} 주차별 매출 기록에도 자동으로 추가됐어요.`);
+      } catch (err) {
+        alert('다음 달로 이월하는 중 문제가 생겼어요: ' + err.message);
+      }
+    }
     async function handleProbChange(selectEl) {
       const id = selectEl.dataset.leadId;
       const val = selectEl.value;
+      const lead = leadsCache.find(l => l.id === id);
       const patch = val.startsWith('p') ? { stage: 'in_progress', probability: Number(val.slice(1)) } : { stage: val };
       selectEl.disabled = true;
       try {
         await updatePtLead(id, patch);
+        if (val === 'rolled_over' && lead) {
+          await carryOverLeadToNextMonth(lead);
+        }
         await reloadLeadsOnly();
       } catch (err) { alert(err.message); selectEl.disabled = false; }
     }
@@ -946,6 +997,12 @@
         selectEl.className = 'badge ' + (OT_STATUS_BADGE[value] || '') + ' sheet-input';
         const row = selectEl.closest('tr');
         if (row) row.className = 'row-otstatus-' + value;
+        // OT1/OT2 현황도 "이월"로 바뀌면 주차별 매출 기록의 이월과 같은 방식으로 다음 달에 자동으로
+        // 이어서 만들어줌 (OT 날짜는 이번 달 특정 일정에 묶여있던 값이라 새로 잡을 수 있게 비워서 넘김)
+        if (value === 'rolled_over' && l) {
+          await carryOverLeadToNextMonth(l);
+          await reloadLeadsOnly();
+        }
         loadAllMiniStats();
       } catch (err) { alert(err.message); }
     }
