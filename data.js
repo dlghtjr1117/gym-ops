@@ -533,6 +533,18 @@ async function addTask(task) {
   return res.json();
 }
 
+// 업무 내용(담당자/할 일/반복 설정/마감일)을 수정. 등록할 때 반복(매일·매주) 설정을
+// 잘못 했거나 나중에 바꾸고 싶을 때, 새로 지우고 다시 만들 필요 없이 그 자리에서 고칠 수 있게 함
+async function updateTask(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '업무 수정에 실패했습니다.');
+  return res.json();
+}
+
 async function updateTaskStatus(id, status) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${id}`, {
     method: 'PATCH',
@@ -889,4 +901,103 @@ async function deletePtOtNoResponse(id) {
     headers: await authHeaders()
   });
   if (!res.ok) await throwApiError(res, 'OT 미응답 기록 삭제에 실패했습니다.');
+}
+
+// ---- 미팅 기록일지(meetings.html) ----
+async function fetchMeetingLogs() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/meeting_logs?select=*,author:author_id(id,name)&order=meeting_date.desc,created_at.desc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '미팅 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addMeetingLog(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/meeting_logs`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '미팅 기록 등록에 실패했습니다.');
+  return res.json();
+}
+
+async function updateMeetingLog(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/meeting_logs?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '미팅 기록 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deleteMeetingLog(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/meeting_logs?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '미팅 기록 삭제에 실패했습니다.');
+}
+
+// 녹음한 오디오(Blob)를 Supabase Edge Function("transcribe-summarize")으로 보내서
+// 전사(transcript)+요약(summary)을 받아옴. Edge Function 배포와 OPENAI_API_KEY 설정이
+// 먼저 되어 있어야 동작함 (AI_MEETING_SETUP.md 참고)
+async function transcribeAndSummarize(audioBlob) {
+  const token = await getValidAccessToken();
+  const form = new FormData();
+  form.append('audio', audioBlob, 'recording.webm');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-summarize`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${token}`
+    },
+    body: form
+  });
+  if (!res.ok) await throwApiError(res, 'AI 정리에 실패했습니다.');
+  return res.json(); // { transcript, summary }
+}
+
+// ---- PT 스케줄(schedule.html) ----
+// start_at 기준으로 [startStr, endStr) 구간(보통 1주일치)의 예약을 가져옴. 회원의 이름·전화번호·
+// PT 잔여횟수를 같이 받아와야 화면에 바로 표시할 수 있어서 members를 조인해서 가져옴
+async function fetchPtBookings(trainerId, startStr, endStr) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pt_bookings?trainer_id=eq.${trainerId}&start_at=gte.${startStr}&start_at=lt.${endStr}` +
+    `&select=*,member:member_id(id,name,phone,pt_remaining_sessions),trainer:trainer_id(id,name)` +
+    `&order=start_at.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, 'PT 스케줄을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addPtBooking(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_bookings`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '예약 등록에 실패했습니다.');
+  return res.json();
+}
+
+async function updatePtBooking(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_bookings?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '예약 상태 변경에 실패했습니다.');
+  return res.json();
+}
+
+async function deletePtBooking(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_bookings?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '예약 삭제에 실패했습니다.');
 }
