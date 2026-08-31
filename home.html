@@ -36,11 +36,10 @@
     </div>
 
     <div class="home-grid">
-      <div class="home-tile is-soon" id="tileScheduler">
+      <a class="home-tile" href="schedule.html">
         <div class="home-tile-icon">📅</div>
         <div class="home-tile-label">스케줄러</div>
-        <span class="home-tile-badge">준비중</span>
-      </div>
+      </a>
       <a class="home-tile" href="members.html">
         <div class="home-tile-icon">👤</div>
         <div class="home-tile-label">고객관리</div>
@@ -77,10 +76,6 @@
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
-
-    document.getElementById('tileScheduler').addEventListener('click', () => {
-      alert('스케줄러(예약 캘린더) 기능은 준비 중이에요. 조금만 기다려주세요!');
-    });
 
     (async () => {
       const profile = await getMyProfile();
