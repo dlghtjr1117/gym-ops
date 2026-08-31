@@ -87,23 +87,42 @@ function requireLogin() {
 }
 
 // 로그인한 사람의 profiles 행(이름, 역할) 조회 — RLS 덕분에 본인 것만 조회됨
+// 모든 페이지가 맨 처음에 이 함수부터 호출하므로, 여기서 문제가 생기면 그 여파가 제일 큼:
+// 1) 네트워크 오류로 fetch 자체가 throw되면, 그 오류를 안 잡아줄 경우 페이지 전체 초기화 코드가
+//    그 자리에서 조용히 멈춰버림(화면은 "로딩 중..."만 뜬 채 텅 빈 그대로, 새로고침 전까진 안 풀림).
+// 2) 와이파이가 잠깐 끊기는 등 "일시적인" 오류인 경우가 많아서, 한 번 실패했다고 바로 포기하지 않고
+//    잠깐 쉬었다가 한 번 더 시도해봄 — 이러면 사용자가 직접 새로고침 안 해도 저절로 뜨는 경우가 많아짐.
+// 그래도 안 되면 예외를 던지지 않고 null을 돌려줘서, 각 페이지가 이미 갖고 있는
+// "if (!profile) { ... }" 처리로 자연스럽게(멈추지 않고) 넘어가도록 함.
 async function getMyProfile() {
   const session = getSession();
   if (!session) return null;
   const token = await getValidAccessToken();
   if (!token) return null;
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=id,name,role`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${token}`
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=id,name,role`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      if (!res.ok) {
+        if (attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue; }
+        return null;
       }
+      const rows = await res.json();
+      return rows[0] || null;
+    } catch (e) {
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue; }
+      return null;
     }
-  );
-  if (!res.ok) return null;
-  const rows = await res.json();
-  return rows[0] || null;
+  }
+  return null;
 }
 
 // 트레이너는 상단 메뉴에서 "매출 입력"/"만료회원 · TM"/"이용권 관리"를 안 보이게 함

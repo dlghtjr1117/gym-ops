@@ -217,26 +217,23 @@
 
     // 담당자 선택: 지점장이면 전체 직원 목록, 트레이너면 본인 하나만(변경 불가) - RLS상 트레이너는
     // 본인을 담당자로 하는 업무만 등록할 수 있기 때문에 처음부터 다른 사람을 못 고르게 함
-    async function loadAssigneeOptions(profile) {
+    // fetchStaff()로 이미 받아온 직원 목록으로 "담당자" select를 채움 (예전엔 이 함수 안에서
+    // fetchStaff()를 따로 불러서, 아래 트레이너 필터 탭용 fetchStaff()와 합쳐 같은 요청이 두 번 나갔었음)
+    function populateAssigneeOptions(profile, staff) {
       const sel = document.getElementById('t_assignee');
-      try {
-        const staff = await fetchStaff();
-        if (profile.role === 'manager') {
-          staff.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
-            if (s.id === profile.id) opt.selected = true;
-            sel.appendChild(opt);
-          });
-        } else {
-          const me = staff.find(s => s.id === profile.id) || { id: profile.id, name: profile.name };
+      if (profile.role === 'manager') {
+        staff.forEach(s => {
           const opt = document.createElement('option');
-          opt.value = me.id; opt.textContent = me.name; opt.selected = true;
+          opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          if (s.id === profile.id) opt.selected = true;
           sel.appendChild(opt);
-          sel.disabled = true;
-        }
-      } catch (e) {
-        sel.innerHTML = `<option value="${profile.id}">${profile.name}</option>`;
+        });
+      } else {
+        const me = staff.find(s => s.id === profile.id) || { id: profile.id, name: profile.name };
+        const opt = document.createElement('option');
+        opt.value = me.id; opt.textContent = me.name; opt.selected = true;
+        sel.appendChild(opt);
+        sel.disabled = true;
       }
     }
 
@@ -421,21 +418,28 @@
         currentUserId = profile.id;
         currentUserRole = profile.role;
         document.getElementById('taskListTitle').textContent = profile.role === 'manager' ? '전체 업무 목록' : '내 업무 목록';
-        await loadAssigneeOptions(profile);
         // "대상 회원" 선택 항목은 지점장/트레이너 화면 모두에서 안 보여줌 (업무에 회원을 굳이 안 엮어도 되니까)
         document.getElementById('t_memberField').style.display = 'none';
-        if (profile.role === 'manager') {
-          try {
-            const staff = await fetchStaff();
-            // 트레이너뿐 아니라 지점장(본인 포함)도 업무를 배정받을 수 있으므로,
-            // 권한과 상관없이 전체 직원을 담당자별 필터 탭에 보여줌
-            trainersCache = staff;
-          } catch (e) { /* 무시: 탭만 안 보일 뿐, 전체 목록은 그대로 보임 */ }
-        } else {
+        if (profile.role !== 'manager') {
           // 트레이너 화면에서는 본인 앞으로만 등록되니 "담당자" 선택 항목도 굳이 안 보여줌
           // (담당자 select는 본인으로 이미 고정돼 있어서 숨겨도 제출값은 그대로 유지됨)
           document.getElementById('t_assigneeField').style.display = 'none';
         }
+        // 담당자 select/필터 탭에 쓸 직원 목록은 화면의 핵심(업무 목록) 로딩을 막지 않도록 따로 불러옴
+        fetchStaff().then(staff => {
+          populateAssigneeOptions(profile, staff);
+          // 트레이너뿐 아니라 지점장(본인 포함)도 업무를 배정받을 수 있으므로,
+          // 권한과 상관없이 전체 직원을 담당자별 필터 탭에 보여줌
+          if (profile.role === 'manager') {
+            trainersCache = staff;
+            // loadTasks()가 이 요청보다 먼저 끝나서 탭을 이미 그렸을 수도 있으니(담당자 목록 없이),
+            // 직원 목록이 도착한 시점에 탭을 다시 그려서 항상 채워지도록 함
+            renderTrainerTabs();
+          }
+        }).catch(() => {
+          document.getElementById('t_assignee').innerHTML = `<option value="${profile.id}">${profile.name}</option>`;
+          /* 필터 탭은 못 불러와도 무시: 탭만 안 보일 뿐, 전체 목록은 그대로 보임 */
+        });
       }
       loadTasks();
     })();

@@ -453,8 +453,10 @@
       currentUserRole = profile.role;
       isManagerFlag = profile.role === 'manager';
 
-      try { staffCache = await fetchStaff(); } catch (e) { staffCache = []; }
-      try { membersCache = await fetchMembers(); } catch (e) { membersCache = []; }
+      // 서로 무관한 두 요청이니 동시에 보냄 (하나씩 기다리면 그만큼 초기 로딩이 느려짐)
+      const [staffResult, membersResult] = await Promise.allSettled([fetchStaff(), fetchMembers()]);
+      staffCache = staffResult.status === 'fulfilled' ? staffResult.value : [];
+      membersCache = membersResult.status === 'fulfilled' ? membersResult.value : [];
 
       if (isManagerFlag) {
         const sel = document.getElementById('trainerSelect');

@@ -1192,26 +1192,25 @@
       if (isManagerFlag) document.getElementById('trainerSelect').value = selectedTrainerId;
       else document.getElementById('trainerNameLabel').textContent = `${staffName(selectedTrainerId)} 트레이너님의 PT 시트`;
 
-      try {
-        const allLeads = await fetchPtLeads();
-        leadsCache = allLeads.filter(l => l.trainer_id === selectedTrainerId);
-      } catch (err) {
+      // 4개 요청을 순서대로 하나씩 기다리면 화면이 뜨기까지 그만큼 느려지므로, 서로 의존관계가 없는
+      // 요청들은 한꺼번에 보내고(Promise.allSettled) 결과만 각자 따로 처리함 (로딩 체감 속도 개선)
+      const { monthStr } = getMonthRange();
+      const [leadsResult, careResult, noResponseResult, targetsResult] = await Promise.allSettled([
+        fetchPtLeads(), fetchPtCareLogs(), fetchPtOtNoResponse(), fetchPtTargets()
+      ]);
+      if (leadsResult.status === 'fulfilled') {
+        leadsCache = leadsResult.value.filter(l => l.trainer_id === selectedTrainerId);
+      } else {
         leadsCache = [];
-        document.querySelector('#weeklyTable tbody').innerHTML = `<tr><td colspan="9" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        document.querySelector('#weeklyTable tbody').innerHTML = `<tr><td colspan="9" class="error-text" style="display:table-cell;">${leadsResult.reason.message}</td></tr>`;
       }
-      try {
-        const allCare = await fetchPtCareLogs();
-        const { monthStr } = getMonthRange();
-        careCache = allCare.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr);
-      } catch (err) { careCache = []; }
-      try {
-        const allNoResponse = await fetchPtOtNoResponse();
-        const { monthStr } = getMonthRange();
-        otNoResponseCache = allNoResponse.filter(r => r.trainer_id === selectedTrainerId && r.period_month === monthStr);
-      } catch (err) { otNoResponseCache = []; }
-      try {
-        targetsCache = await fetchPtTargets();
-      } catch (err) { targetsCache = []; }
+      careCache = careResult.status === 'fulfilled'
+        ? careResult.value.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr)
+        : [];
+      otNoResponseCache = noResponseResult.status === 'fulfilled'
+        ? noResponseResult.value.filter(r => r.trainer_id === selectedTrainerId && r.period_month === monthStr)
+        : [];
+      targetsCache = targetsResult.status === 'fulfilled' ? targetsResult.value : [];
 
       renderWeeklyTable();
       renderCareTable();
@@ -1230,8 +1229,10 @@
       currentUserId = profile.id;
       isManagerFlag = profile.role === 'manager';
 
-      try { staffCache = await fetchStaff(); } catch (e) { staffCache = []; }
-      try { membersCache = await fetchMembers(); } catch (e) { membersCache = []; }
+      // 서로 무관한 두 요청이니 동시에 보냄 (하나씩 기다리면 그만큼 초기 로딩이 느려짐)
+      const [staffResult, membersResult] = await Promise.allSettled([fetchStaff(), fetchMembers()]);
+      staffCache = staffResult.status === 'fulfilled' ? staffResult.value : [];
+      membersCache = membersResult.status === 'fulfilled' ? membersResult.value : [];
 
       if (isManagerFlag) {
         const sel = document.getElementById('trainerSelect');

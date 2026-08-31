@@ -868,15 +868,17 @@
           document.getElementById('deleteColHeader').style.display = '';
           document.getElementById('md_deleteBtn').style.display = '';
           document.getElementById('uploadPanel').style.display = 'block';
-          try {
-            trainersCache = await fetchTrainers();
+          // 트레이너 목록은 "회원 등록" 팝업의 담당 트레이너 select에서만 쓰이므로, 화면의 핵심인
+          // 회원 목록(loadMembers) 로딩을 막지 않도록 기다리지 않고 따로 불러옴
+          fetchTrainers().then(list => {
+            trainersCache = list;
             const sel = document.getElementById('m_trainer');
             trainersCache.forEach(t => {
               const opt = document.createElement('option');
               opt.value = t.id; opt.textContent = t.name;
               sel.appendChild(opt);
             });
-          } catch (e) { /* 트레이너 목록 못 불러와도 회원 등록 자체는 진행 가능 */ }
+          }).catch(() => { /* 트레이너 목록 못 불러와도 회원 등록 자체는 진행 가능 */ });
         } else {
           // 트레이너는 담당 트레이너 목록을 조회할 권한이 없으므로(RLS상 본인만 조회 가능),
           // "담당 트레이너" 칸은 본인으로 고정해서 보여줌
