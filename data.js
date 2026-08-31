@@ -792,3 +792,42 @@ async function fetchPtCareMembers(threshold = 3) {
 async function updateMemberPtCare(id, patch) {
   return updateMember(id, patch);
 }
+
+// ---- PT 회원 관리 월별 기록(pt_care_logs) ----
+// "잔여횟수 적은 회원 자동 표시"가 아니라, 트레이너가 매달 직접 입력해서 쌓아가는 방식
+async function fetchPtCareLogs() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pt_care_logs?select=*&order=period_month.desc,created_at.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, 'PT 회원 관리 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addPtCareLog(log) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_care_logs`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(log)
+  });
+  if (!res.ok) await throwApiError(res, 'PT 회원 관리 기록 추가에 실패했습니다.');
+  return res.json();
+}
+
+async function updatePtCareLog(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_care_logs?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, 'PT 회원 관리 기록 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deletePtCareLog(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_care_logs?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, 'PT 회원 관리 기록 삭제에 실패했습니다.');
+}

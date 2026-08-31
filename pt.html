@@ -136,10 +136,10 @@
     <!-- 섹션 B: PT 회원관리 (잔여횟수 적은 회원 케어) -->
     <div class="section" id="sectionCare" style="margin-top:14px; display:none;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-        <h2>PT 회원 관리 <span class="muted">(담당 회원 중 잔여 10회 미만 세일즈 플랜 + 직접 추가한 회원)</span></h2>
+        <h2>PT 회원 관리 <span class="muted">(이번 달 직접 기록한 회원 - 월별로 따로 쌓여요)</span></h2>
         <button type="button" class="btn btn-primary" id="openAddCareMemberBtn" style="width:auto; padding-left:16px; padding-right:16px; flex-shrink:0;">+ PT 회원 추가</button>
       </div>
-      <p class="muted" style="margin:-6px 0 12px;">칸을 클릭해서 바로 입력하면 자동 저장돼요. 재등록확률·재등록예상횟수까지 여기서 한 번에 관리해요.</p>
+      <p class="muted" style="margin:-6px 0 12px;">칸을 클릭해서 바로 입력하면 자동 저장돼요. 이번 달에 추가한 기록만 보이고, 지난 달 기록은 그대로 남아있어요 (월 이동해서 확인 가능).</p>
       <div style="overflow-x:auto;">
         <table id="careTable" class="table-fixed sheet-table" style="min-width:1220px;">
           <thead><tr>
@@ -543,7 +543,7 @@
       if (isNumber) value = value === '' ? null : Number(value);
       else value = value === '' ? null : value;
       try {
-        await updateMemberPtCare(id, { [field]: value });
+        await updatePtCareLog(id, { [field]: value });
         const m = careCache.find(x => x.id === id);
         if (m) m[field] = value;
       } catch (err) { alert(err.message); }
@@ -553,7 +553,7 @@
       const raw = selectEl.value;
       const value = raw === '' ? null : Number(raw);
       try {
-        await updateMemberPtCare(id, { pt_expected_probability: value });
+        await updatePtCareLog(id, { pt_expected_probability: value });
         const m = careCache.find(x => x.id === id);
         if (m) m.pt_expected_probability = value;
         selectEl.className = 'sheet-input badge ' + (CARE_PROB_BADGE[raw] || '');
@@ -565,7 +565,7 @@
       const next = current === 'O' ? 'X' : 'O';
       btn.disabled = true;
       try {
-        await updateMemberPtCare(id, { pt_short_term_plan: next });
+        await updatePtCareLog(id, { pt_short_term_plan: next });
         btn.dataset.value = next;
         btn.textContent = next;
         btn.className = 'toggle-ox ' + (next === 'O' ? 'is-o' : 'is-x');
@@ -578,7 +578,7 @@
     function renderCareTable() {
       const tbody = document.querySelector('#careTable tbody');
       if (careCache.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="muted" style="padding:16px;">아직 목록이 비어 있습니다. "+ PT 회원 추가"로 직접 추가하거나, 잔여 10회 미만이 되면 자동으로 표시돼요.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ PT 회원 추가"로 이번 달 케어 대상 회원을 남겨보세요.</td></tr>';
         return;
       }
       tbody.innerHTML = careCache.map(m => {
@@ -600,7 +600,7 @@
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_sessions != null ? m.pt_expected_sessions : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_sessions',true)" placeholder="예상횟수" /></td>
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_amount != null ? m.pt_expected_amount : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_amount',true)" placeholder="예상매출" /></td>
           <td><select class="sheet-input badge ${CARE_PROB_BADGE[careProbVal] || ''}" data-member-id="${m.id}" onchange="handleCareProbSave(this)">${probOptions}</select></td>
-          <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleRemoveCareMember('${m.id}')">제외</button></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleDeleteCareLog('${m.id}')">삭제</button></td>
         </tr>`;
       }).join('');
     }
@@ -617,16 +617,26 @@
     document.getElementById('closeAddCareMemberBtn').addEventListener('click', closeAddCareMemberModal);
     document.getElementById('addCareMemberOverlay').addEventListener('click', (e) => { if (e.target.id === 'addCareMemberOverlay') closeAddCareMemberModal(); });
 
+    // 현재 선택된 트레이너 + 현재 보고 있는 달 기준으로 careCache를 다시 채움
+    async function reloadCareLogsOnly() {
+      const { monthStr } = getMonthRange();
+      try {
+        const all = await fetchPtCareLogs();
+        careCache = all.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr);
+      } catch (err) { careCache = []; }
+      renderCareTable();
+    }
+
     document.getElementById('addCareMemberForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errorBox = document.getElementById('addCareMemberErrorBox');
       errorBox.style.display = 'none';
       const probRaw = document.getElementById('cm_expected_probability').value;
       try {
-        await addMember({
+        await addPtCareLog({
+          trainer_id: selectedTrainerId,
+          period_month: getMonthRange().monthStr,
           name: document.getElementById('cm_name').value.trim(),
-          assigned_trainer_id: selectedTrainerId,
-          pt_care_pinned: true,
           pt_expected_renewal_month: document.getElementById('cm_renewal_month').value.trim() || null,
           pt_remaining_sessions: document.getElementById('cm_remaining_sessions').value ? Number(document.getElementById('cm_remaining_sessions').value) : null,
           pt_session_focus: document.getElementById('cm_session_focus').value.trim() || null,
@@ -637,20 +647,19 @@
           pt_expected_probability: probRaw === '' ? null : Number(probRaw)
         });
         closeAddCareMemberModal();
-        careCache = (await fetchPtCareMembers(9)).filter(m => m.assigned_trainer_id === selectedTrainerId);
-        renderCareTable();
+        await reloadCareLogsOnly();
         showToast('PT 회원 관리 목록에 추가되었습니다.');
       } catch (err) {
         errorBox.textContent = err.message;
         errorBox.style.display = 'block';
       }
     });
-    async function handleRemoveCareMember(id) {
+    async function handleDeleteCareLog(id) {
+      if (!confirm('이 기록을 삭제할까요?')) return;
       try {
-        await updateMemberPtCare(id, { pt_care_pinned: false });
-        careCache = (await fetchPtCareMembers(9)).filter(m => m.assigned_trainer_id === selectedTrainerId);
-        renderCareTable();
-        showToast('목록에서 제외되었습니다.', 'danger');
+        await deletePtCareLog(id);
+        await reloadCareLogsOnly();
+        showToast('기록이 삭제되었습니다.', 'danger');
       } catch (err) { alert(err.message); }
     }
 
@@ -810,8 +819,9 @@
         document.querySelector('#weeklyTable tbody').innerHTML = `<tr><td colspan="9" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
       try {
-        const allCare = await fetchPtCareMembers(9); // 10회 미만(=9회 이하)까지 포함
-        careCache = allCare.filter(m => m.assigned_trainer_id === selectedTrainerId);
+        const allCare = await fetchPtCareLogs();
+        const { monthStr } = getMonthRange();
+        careCache = allCare.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr);
       } catch (err) { careCache = []; }
       try {
         targetsCache = await fetchPtTargets();
