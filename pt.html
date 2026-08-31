@@ -411,6 +411,15 @@
       const { start } = getMonthRange();
       return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
     }
+    // 리드가 "이번 달"에 속하는 기준: 상담일(contact_date) 또는 OT일(ot_date) 둘 중 하나라도 이번 달에
+    // 걸치면 포함. 주차별 매출 기록 표 / 확정·예상 매출 카드 / 재등록·OT 확정 조사 미니 요약이 전부
+    // 이 기준 하나만 같이 쓰도록 공용 함수로 뺌 — 예전엔 이 기준이 곳곳에 따로 복사돼 있어서,
+    // 예상 매출 카드만 날짜 범위를 아예 안 걸러서(상태만 보고) 계산하는 바람에 이번 달 표에는
+    // 없는 지난 리드가 매달 계속 예상 매출에 잡히는 문제가 있었음 (트레이너 상관없이 다 같은 버그였음)
+    function isLeadInMonth(l, startStr, endStr) {
+      return (l.contact_date && l.contact_date >= startStr && l.contact_date < endStr) ||
+             (l.ot_date && l.ot_date >= startStr && l.ot_date < endStr);
+    }
     // 상담일 기준 몇 주차인지 (그 달 1일부터 7일 단위로 끊음 - 달력상 "몇째 주"와는 살짝 다를 수 있음)
     function weekOfMonth(dateStr) {
       const day = Number(dateStr.slice(8, 10));
@@ -436,7 +445,7 @@
     // (별도 매출입력 페이지의 sales 기록과는 독립적 - 이 시트 자체가 트레이너의 실시간 현황판 역할)
     function loadRevenueCards() {
       const { startStr, endStr } = getMonthRange();
-      const monthLeads = leadsCache.filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr);
+      const monthLeads = leadsCache.filter(l => isLeadInMonth(l, startStr, endStr));
 
       const registeredLeads = monthLeads.filter(l => l.stage === 'registered');
       const confirmedTotal = registeredLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
@@ -457,9 +466,11 @@
         ? '목표를 먼저 설정해주세요'
         : (confirmedTotal >= targetTotal ? '목표 달성! 🎉' : `확정 매출 ${formatWon(confirmedTotal)} 기준`);
 
-      // 예상 매출: 아직 등록/이월/미스로 끝나지 않은 리드들의 금액 합계 그대로
-      // (확률은 등록 가능성 표시일 뿐, 금액에 곱해서 깎는 값이 아님)
-      const openLeads = leadsCache.filter(l => l.stage !== 'registered' && l.stage !== 'missed' && l.stage !== 'rolled_over');
+      // 예상 매출: "이번 달" 리드(주차별 매출 기록 표와 동일한 기준) 중 아직 등록/이월/미스로 끝나지
+      // 않은 것들의 금액 합계 그대로 (확률은 등록 가능성 표시일 뿐, 금액에 곱해서 깎는 값이 아님).
+      // 예전엔 여기만 monthLeads가 아니라 leadsCache 전체(달 상관없이 이 트레이너의 모든 리드)에서
+      // 걸러서, 몇 달 전에 남겨두고 상태를 안 바꾼 리드가 계속 이번 달 예상 매출에 잡히는 버그가 있었음
+      const openLeads = monthLeads.filter(l => l.stage !== 'registered' && l.stage !== 'missed' && l.stage !== 'rolled_over');
       const expectedTotal = openLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
       animateCount(document.getElementById('expectedAmount'), Math.round(expectedTotal));
       document.getElementById('expectedSub').textContent = `진행중인 상담 ${openLeads.length}건 기준`;
@@ -563,10 +574,7 @@
       // 상담일(contact_date)이 이번 달인 리드뿐 아니라, 상담은 지난 달에 했어도 OT일(ot_date)이 이번 달로
       // 잡힌 리드도 이번 달 표에 같이 보여줌 (예: 8/31에 연락→9/2 OT 확정된 경우 9월 표에도 나오게)
       const items = leadsCache
-        .filter(l =>
-          (l.contact_date && l.contact_date >= startStr && l.contact_date < endStr) ||
-          (l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
-        )
+        .filter(l => isLeadInMonth(l, startStr, endStr))
         .slice()
         .sort((a, b) => {
           const wa = weekNoForMonth(a);
@@ -608,10 +616,7 @@
     function loadConfirmMiniStats(sourceValue, idPrefix) {
       const { startStr, endStr } = getMonthRange();
       // 주차별 매출 기록 표와 동일한 기준: 상담일 또는 OT일이 이번 달이면 포함
-      const monthLeads = leadsCache.filter(l =>
-        (l.contact_date && l.contact_date >= startStr && l.contact_date < endStr) ||
-        (l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
-      );
+      const monthLeads = leadsCache.filter(l => isLeadInMonth(l, startStr, endStr));
       const expected = monthLeads.filter(l => l.source === sourceValue);
       const confirmed = expected.filter(l => l.stage === 'registered');
       document.getElementById(idPrefix + 'ExpectedCount').textContent = expected.length;
