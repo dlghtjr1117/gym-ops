@@ -188,6 +188,40 @@
           <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
+
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-top:26px;">
+        <h3 style="font-size:14px; margin:0 0 2px;">OT 연락 미응답 <span class="muted" style="font-weight:400;">(OT 잡으려고 연락드렸는데 응답이 없으셨던 분)</span></h3>
+        <button type="button" class="btn btn-primary" id="openAddOtNoResponseBtn" style="width:auto; padding-left:16px; padding-right:16px; flex-shrink:0;">+ 미응답 기록 추가</button>
+      </div>
+      <p class="muted" style="margin:2px 0 10px;">아직 OT 일정조차 못 잡은 분들을 따로 남겨두는 표예요. 칸을 클릭해서 바로 입력하면 자동 저장되고, 월 이동해서 지난 달 기록도 확인할 수 있어요.</p>
+      <div class="mini-stat-box" style="max-width:220px; margin-bottom:10px;"><div class="mini-title">이번 달 미응답</div><div class="mini-row"><span>건수</span><b id="otNoResponseCount">0</b></div></div>
+      <div style="overflow-x:auto;">
+        <table id="otNoResponseTable" class="table-fixed sheet-table" style="min-width:700px;">
+          <thead><tr>
+            <th style="width:16%;">연락드린날짜</th><th style="width:16%;">이름</th><th style="width:58%;">특이사항</th><th style="width:10%;"></th>
+          </tr></thead>
+          <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- OT 연락 미응답 기록 추가 모달 -->
+  <div class="modal-overlay" id="addOtNoResponseOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-header">
+        <div><h3>OT 연락 미응답 기록 추가</h3><p class="muted" style="margin:0;" id="addOtNoResponseHint"></p></div>
+        <button type="button" class="modal-close" id="closeAddOtNoResponseBtn">&times;</button>
+      </div>
+      <div id="addOtNoResponseErrorBox" class="error-text"></div>
+      <form id="addOtNoResponseForm">
+        <div class="form-grid">
+          <div class="field"><label>이름 *</label><input type="text" id="nr_name" required /></div>
+          <div class="field"><label>연락드린날짜</label><input type="date" id="nr_contact_date" /></div>
+        </div>
+        <div class="field"><label>특이사항 · 메모</label><input type="text" id="nr_memo" placeholder="선택 입력" /></div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
+      </form>
     </div>
   </div>
 
@@ -292,6 +326,7 @@
 
     let leadsCache = [];      // 선택된 트레이너의 pt_leads 전체 (월 필터는 화면에서)
     let careCache = [];       // 선택된 트레이너의 PT 케어 대상 회원
+    let otNoResponseCache = []; // 선택된 트레이너의 이번 달 OT 연락 미응답 기록
     let targetsCache = [];
 
     let monthAnchor = new Date();
@@ -763,6 +798,84 @@
       }).join('');
     }
 
+    // ---- OT 연락 미응답 (pt_ot_no_response) ----
+    function renderOtNoResponseTable() {
+      const tbody = document.querySelector('#otNoResponseTable tbody');
+      document.getElementById('otNoResponseCount').textContent = otNoResponseCache.length;
+      if (otNoResponseCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted" style="padding:16px;">이번 달 미응답 기록이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = otNoResponseCache.map(r => `
+        <tr>
+          <td><input class="sheet-input" type="date" value="${r.contact_date || ''}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'contact_date',false)" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(r.name)}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'name',false)" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(r.memo || '')}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleDeleteOtNoResponse('${r.id}')">삭제</button></td>
+        </tr>`).join('');
+    }
+
+    async function handleOtNoResponseFieldSave(inputEl, field) {
+      const id = inputEl.dataset.id;
+      const value = inputEl.value.trim ? inputEl.value.trim() : inputEl.value;
+      try {
+        await updatePtOtNoResponse(id, { [field]: value || null });
+        const r = otNoResponseCache.find(x => x.id === id);
+        if (r) r[field] = value || null;
+      } catch (err) { alert(err.message); }
+    }
+
+    async function handleDeleteOtNoResponse(id) {
+      if (!confirm('이 기록을 삭제할까요?')) return;
+      try {
+        await deletePtOtNoResponse(id);
+        await reloadOtNoResponseOnly();
+        showToast('기록이 삭제되었습니다.', 'danger');
+      } catch (err) { alert(err.message); }
+    }
+
+    async function reloadOtNoResponseOnly() {
+      const { monthStr } = getMonthRange();
+      try {
+        const all = await fetchPtOtNoResponse();
+        otNoResponseCache = all.filter(r => r.trainer_id === selectedTrainerId && r.period_month === monthStr);
+      } catch (err) { otNoResponseCache = []; }
+      renderOtNoResponseTable();
+    }
+
+    function openAddOtNoResponseModal() {
+      document.getElementById('addOtNoResponseForm').reset();
+      document.getElementById('addOtNoResponseErrorBox').style.display = 'none';
+      document.getElementById('nr_contact_date').value = formatDateStr(new Date());
+      document.getElementById('addOtNoResponseHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 기록으로 등록돼요.`;
+      document.getElementById('addOtNoResponseOverlay').style.display = 'flex';
+    }
+    function closeAddOtNoResponseModal() { document.getElementById('addOtNoResponseOverlay').style.display = 'none'; }
+    document.getElementById('openAddOtNoResponseBtn').addEventListener('click', openAddOtNoResponseModal);
+    document.getElementById('closeAddOtNoResponseBtn').addEventListener('click', closeAddOtNoResponseModal);
+    document.getElementById('addOtNoResponseOverlay').addEventListener('click', (e) => { if (e.target.id === 'addOtNoResponseOverlay') closeAddOtNoResponseModal(); });
+
+    document.getElementById('addOtNoResponseForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addOtNoResponseErrorBox');
+      errorBox.style.display = 'none';
+      try {
+        await addPtOtNoResponse({
+          trainer_id: selectedTrainerId,
+          period_month: getMonthRange().monthStr,
+          name: document.getElementById('nr_name').value.trim(),
+          contact_date: document.getElementById('nr_contact_date').value || null,
+          memo: document.getElementById('nr_memo').value.trim() || null
+        });
+        closeAddOtNoResponseModal();
+        await reloadOtNoResponseOnly();
+        showToast('미응답 기록이 추가되었습니다.');
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
     // ---- 상담/매출 기록 추가 ----
     function openAddLeadModal() {
       document.getElementById('addLeadForm').reset();
@@ -848,6 +961,11 @@
         careCache = allCare.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr);
       } catch (err) { careCache = []; }
       try {
+        const allNoResponse = await fetchPtOtNoResponse();
+        const { monthStr } = getMonthRange();
+        otNoResponseCache = allNoResponse.filter(r => r.trainer_id === selectedTrainerId && r.period_month === monthStr);
+      } catch (err) { otNoResponseCache = []; }
+      try {
         targetsCache = await fetchPtTargets();
       } catch (err) { targetsCache = []; }
 
@@ -855,6 +973,7 @@
       renderCareTable();
       renderOt1Table();
       renderOt2Table();
+      renderOtNoResponseTable();
       loadRevenueCards();
       loadAllMiniStats();
     }
