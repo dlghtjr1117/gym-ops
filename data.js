@@ -831,3 +831,24 @@ async function deletePtCareLog(id) {
   });
   if (!res.ok) await throwApiError(res, 'PT 회원 관리 기록 삭제에 실패했습니다.');
 }
+
+// ---- 직원(profiles) - 직원 관리 화면 ----
+// 지점장이면 RLS 덕분에 전체 직원이 조회되고, 트레이너면 본인 행만 조회됨
+async function fetchProfiles() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,phone,created_at&order=created_at.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '직원 목록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 직원 권한(트레이너 <-> 지점장) 변경. RLS 정책상 지점장만 성공함 (migration_25 필요)
+async function updateProfileRole(id, role) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ role })
+  });
+  if (!res.ok) await throwApiError(res, '권한 변경에 실패했습니다.');
+}

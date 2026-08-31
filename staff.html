@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 직원 관리</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  /* 이 페이지 전용 - 권한 드롭다운을 뱃지처럼 보이게 */
+  .role-select {
+    padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 999px; border: 1px solid transparent;
+    cursor: pointer; appearance: none; -webkit-appearance: none; background-position: right 8px center; background-repeat: no-repeat;
+  }
+  .role-select:disabled { cursor: default; opacity: .85; }
+  .role-select.role-manager { background-color: #e0e7ff; color: var(--indigo-700); }
+  .role-select.role-trainer { background-color: var(--slate-200); color: var(--slate-700); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html" class="active">직원 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="managerOnlyNotice" class="panel" style="display:none;">
+      <p class="muted" style="margin:0;">직원 권한을 바꾸는 건 지점장만 할 수 있어요. 여기서는 본인 정보만 보여요.</p>
+    </div>
+
+    <div class="section">
+      <h2>직원 목록</h2>
+      <p class="muted" style="margin:-4px 0 12px;">권한 칸을 클릭해서 트레이너 ↔ 지점장으로 바로 전환할 수 있어요. 지점장으로 바꾸면 그 직원도 전체 회원 · 매출 · PT 기록을 다 볼 수 있게 돼요. 본인 권한은 실수로 잠기는 걸 막기 위해 여기서 바꿀 수 없어요 — 다른 지점장에게 부탁해주세요.</p>
+      <table id="staffTable">
+        <thead><tr><th>이름</th><th>연락처</th><th>가입일</th><th>권한</th></tr></thead>
+        <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let myId = null;
+    let isManagerFlag = false;
+
+    function formatJoinDate(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function renderStaffTable(list) {
+      const tbody = document.querySelector('#staffTable tbody');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted" style="padding:16px;">직원이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(p => {
+        const isMe = p.id === myId;
+        const canEdit = isManagerFlag && !isMe;
+        return `
+        <tr>
+          <td>${escapeHtml(p.name)}${isMe ? ' <span class="muted" style="font-size:11px;">(나)</span>' : ''}</td>
+          <td>${p.phone ? escapeHtml(p.phone) : '<span class="muted">-</span>'}</td>
+          <td>${formatJoinDate(p.created_at)}</td>
+          <td>
+            <select class="role-select ${p.role === 'manager' ? 'role-manager' : 'role-trainer'}" data-id="${p.id}" ${canEdit ? '' : 'disabled'}>
+              <option value="trainer" ${p.role === 'trainer' ? 'selected' : ''}>트레이너</option>
+              <option value="manager" ${p.role === 'manager' ? 'selected' : ''}>지점장</option>
+            </select>
+          </td>
+        </tr>`;
+      }).join('');
+
+      if (isManagerFlag) {
+        tbody.querySelectorAll('.role-select:not(:disabled)').forEach(sel => {
+          sel.addEventListener('change', async () => {
+            const id = sel.dataset.id;
+            const newRole = sel.value;
+            const roleLabel = newRole === 'manager' ? '지점장' : '트레이너';
+            if (!confirm(`이 직원을 ${roleLabel}(으)로 전환할까요?`)) {
+              sel.value = sel.value === 'manager' ? 'trainer' : 'manager'; // 취소하면 원래 값으로 되돌림
+              return;
+            }
+            sel.disabled = true;
+            try {
+              await updateProfileRole(id, newRole);
+              sel.className = 'role-select ' + (newRole === 'manager' ? 'role-manager' : 'role-trainer');
+              showToast(`${roleLabel} 권한으로 변경되었습니다.`);
+            } catch (err) {
+              alert(err.message);
+              sel.value = newRole === 'manager' ? 'trainer' : 'manager';
+            } finally {
+              sel.disabled = false;
+            }
+          });
+        });
+      }
+    }
+
+    async function loadStaff() {
+      const tbody = document.querySelector('#staffTable tbody');
+      try {
+        const list = await fetchProfiles();
+        renderStaffTable(list);
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        myId = profile.id;
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        if (profile.role === 'manager') {
+          isManagerFlag = true;
+        } else {
+          document.getElementById('managerOnlyNotice').style.display = 'block';
+        }
+      }
+      loadStaff();
+    })();
+  </script>
+</body>
+</html>
