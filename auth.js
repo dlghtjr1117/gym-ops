@@ -105,3 +105,16 @@ async function getMyProfile() {
   const rows = await res.json();
   return rows[0] || null;
 }
+
+// 트레이너는 상단 메뉴에서 "매출 입력"/"만료회원 · TM"/"이용권 관리"를 안 보이게 함
+// (매출 입력·만료회원 관리는 FC 담당 업무라 트레이너는 대시보드/회원관리/PT관리/업무리스트/직원관리만 쓰면 됨)
+// 지점장은 그대로 전체 메뉴가 다 보임. 각 페이지에서 getMyProfile() 이후에 호출.
+function applyRoleNav(profile) {
+  if (!profile || profile.role === 'manager') return;
+  const hideHrefs = ['sales.html', 'expiry.html', 'products.html'];
+  document.querySelectorAll('.topnav a').forEach((a) => {
+    if (hideHrefs.includes(a.getAttribute('href'))) {
+      a.style.display = 'none';
+    }
+  });
+}

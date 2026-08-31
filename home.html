@@ -89,6 +89,7 @@
       const roleLabel = profile.role === 'manager' ? '지점장' : '트레이너';
       document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;
       document.getElementById('homeGreeting').textContent = `안녕하세요, ${profile.name}님 👋`;
+      applyRoleNav(profile);
       // 데이터 백업은 전체 데이터를 다 받아가는 기능이라 지점장 전용으로만 보여줌
       // (트레이너 계정은 RLS상 본인 관련 데이터만 조회돼서 "전체" 백업이 되지 않기 때문)
       if (profile.role === 'manager') {

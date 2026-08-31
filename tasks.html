@@ -143,8 +143,8 @@
         list.length > 0 ? `오늘 기준 ${done} / ${list.length} 완료` : '';
     }
 
-    // 지점장 전용: 담당자별로 걸러볼 수 있는 탭 (전체 + 트레이너 이름). 트레이너 로그인 화면에서는
-    // RLS로 이미 본인 업무만 보이기 때문에 탭 자체를 숨김
+    // 지점장 전용: 담당자별로 걸러볼 수 있는 탭 (전체 + 전체 직원 이름, 지점장/트레이너 구분 없이 다 보여줌).
+    // 트레이너 로그인 화면에서는 RLS로 이미 본인 업무만 보이기 때문에 탭 자체를 숨김
     function renderTrainerTabs() {
       const container = document.getElementById('trainerTabs');
       if (currentUserRole !== 'manager') { container.innerHTML = ''; return; }
@@ -296,6 +296,7 @@
       const profile = await getMyProfile();
       if (profile) {
         document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
         currentUserId = profile.id;
         currentUserRole = profile.role;
         document.getElementById('taskListTitle').textContent = profile.role === 'manager' ? '전체 업무 목록' : '내 업무 목록';
@@ -305,7 +306,9 @@
         if (profile.role === 'manager') {
           try {
             const staff = await fetchStaff();
-            trainersCache = staff.filter(s => s.role === 'trainer');
+            // 트레이너뿐 아니라 지점장(본인 포함)도 업무를 배정받을 수 있으므로,
+            // 권한과 상관없이 전체 직원을 담당자별 필터 탭에 보여줌
+            trainersCache = staff;
           } catch (e) { /* 무시: 탭만 안 보일 뿐, 전체 목록은 그대로 보임 */ }
         } else {
           // 트레이너 화면에서는 본인 앞으로만 등록되니 "담당자" 선택 항목도 굳이 안 보여줌

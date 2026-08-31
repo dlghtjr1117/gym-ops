@@ -120,6 +120,7 @@
       }
       const roleLabel = profile.role === 'manager' ? '지점장' : '트레이너';
       document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;
+      applyRoleNav(profile);
     })();
 
     // 헬스이용권 · 그룹PT 만료 임박 인원수 / 이번 달 재등록 확률 카드는 만료회원·TM 페이지에도 있어서

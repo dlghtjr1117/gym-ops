@@ -269,6 +269,7 @@
       const profile = await getMyProfile();
       if (profile) {
         document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
         currentUserId = profile.id;
       }
       loadExpiring();

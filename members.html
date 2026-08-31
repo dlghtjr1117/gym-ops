@@ -857,11 +857,13 @@
       const profile = await getMyProfile();
       if (profile) {
         document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
         currentUserId = profile.id;
+        // "+ 회원 등록"은 지점장·트레이너 모두 가능 (트레이너도 신규 회원을 직접 등록할 수 있어야 함)
+        document.getElementById('openAddMemberBtn').style.display = '';
         if (profile.role === 'manager') {
           isManagerFlag = true;
           document.getElementById('deleteColHeader').style.display = '';
-          document.getElementById('openAddMemberBtn').style.display = '';
           document.getElementById('md_deleteBtn').style.display = '';
           document.getElementById('uploadPanel').style.display = 'block';
           try {
@@ -873,9 +875,15 @@
               sel.appendChild(opt);
             });
           } catch (e) { /* 트레이너 목록 못 불러와도 회원 등록 자체는 진행 가능 */ }
-          loadProductQuickFill();
-          loadStaffForSaleModal('m_sale_staff'); // 회원 등록 팝업의 "판매 담당자" 목록 (기본값: 나)
+        } else {
+          // 트레이너는 담당 트레이너 목록을 조회할 권한이 없으므로(RLS상 본인만 조회 가능),
+          // "담당 트레이너" 칸은 본인으로 고정해서 보여줌
+          const sel = document.getElementById('m_trainer');
+          sel.innerHTML = `<option value="${profile.id}" selected>${profile.name} (나)</option>`;
+          sel.disabled = true;
         }
+        loadProductQuickFill();
+        loadStaffForSaleModal('m_sale_staff'); // 회원 등록 팝업의 "판매 담당자" 목록 (기본값: 나)
       }
       loadMembers();
     })();

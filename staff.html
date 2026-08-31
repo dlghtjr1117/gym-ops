@@ -131,6 +131,7 @@
       if (profile) {
         myId = profile.id;
         document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
         if (profile.role === 'manager') {
           isManagerFlag = true;
         } else {
