@@ -33,6 +33,17 @@
   .sg-remain { color: var(--slate-500); font-size: 10.5px; margin-top: 1px; }
   .sg-summary { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; }
   .sg-summary b { font-size:15px; }
+  .member-search-results {
+    position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 20;
+    background: var(--white); border: 1px solid var(--slate-200); border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08); max-height: 220px; overflow-y: auto;
+  }
+  .member-search-item { padding: 9px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--slate-100); }
+  .member-search-item:last-child { border-bottom: none; }
+  .member-search-item:hover, .member-search-item.active { background: var(--slate-50); }
+  .member-search-item .msi-name { font-weight: 700; }
+  .member-search-item .msi-sub { color: var(--slate-500); font-size: 11.5px; margin-top: 1px; }
+  .member-search-selected { margin-top: 6px; font-size: 12px; color: var(--green-600); font-weight: 600; display: none; }
 </style>
 </head>
 <body>
@@ -86,7 +97,19 @@
       <div id="nbErrorBox" class="error-text"></div>
       <form id="newBookingForm">
         <div class="field"><label id="nb_dateTimeLabel">-</label></div>
-        <div class="field"><label>회원</label><select id="nb_member" required></select></div>
+        <div class="field" style="position:relative;">
+          <label>회원 (이름 또는 전화번호 뒷자리로 검색)</label>
+          <input type="text" id="nb_memberSearch" placeholder="예: 8523 또는 홍길동" autocomplete="off" />
+          <div id="nb_memberResults" class="member-search-results" style="display:none;"></div>
+          <input type="hidden" id="nb_member" />
+          <div id="nb_memberSelected" class="member-search-selected"></div>
+        </div>
+        <div class="field" id="nb_infoField" style="display:none;">
+          <label>담당자</label>
+          <div id="nb_trainerInfo" class="card" style="padding:9px 12px; font-size:13px; font-weight:600;"></div>
+          <label style="margin-top:12px;">예약 정보 (개인PT 이용권)</label>
+          <div id="nb_ptInfo" class="card" style="padding:9px 12px; font-size:13px; line-height:1.7;"></div>
+        </div>
         <div class="field"><label>수업 시간</label>
           <select id="nb_duration">
             <option value="25">25분</option>
@@ -226,23 +249,97 @@
     document.getElementById('trainerSelect').addEventListener('change', (e) => { selectedTrainerId = e.target.value; reloadBookings(); });
 
     // ---- 새 예약 ----
+    // 회원 목록이 많으면 하나씩 스크롤해서 찾기 힘드니까, 회원 관리 화면과 똑같은 방식(이름 또는
+    // 전화번호 뒷자리 일부)으로 검색해서 바로 골라 넣을 수 있게 함
+    function matchesMemberSearch(m, query) {
+      const q = query.trim();
+      if (!q) return false;
+      const qDigits = q.replace(/[^0-9]/g, '');
+      const nameMatch = m.name && m.name.toLowerCase().includes(q.toLowerCase());
+      const phoneDigits = (m.phone || '').replace(/[^0-9]/g, '');
+      const phoneMatch = qDigits.length > 0 && phoneDigits.includes(qDigits);
+      return nameMatch || phoneMatch;
+    }
+    function memberSubLabel(m) {
+      const parts = [m.phone || '전화번호 없음'];
+      parts.push(m.pt_remaining_sessions != null ? `잔여 ${m.pt_remaining_sessions}회` : '잔여횟수 미기록');
+      if (m.assigned_trainer_id === selectedTrainerId) parts.push('내 담당');
+      return parts.join(' · ');
+    }
+    function renderMemberSearchResults(list) {
+      const box = document.getElementById('nb_memberResults');
+      if (list.length === 0) {
+        box.innerHTML = '<div class="member-search-item muted">일치하는 회원이 없어요</div>';
+      } else {
+        box.innerHTML = list.slice(0, 8).map(m => `
+          <div class="member-search-item" data-id="${m.id}">
+            <div class="msi-name">${m.name}</div>
+            <div class="msi-sub">${memberSubLabel(m)}</div>
+          </div>
+        `).join('');
+        box.querySelectorAll('.member-search-item[data-id]').forEach(item => {
+          item.addEventListener('click', () => selectMemberForBooking(item.dataset.id));
+        });
+      }
+      box.style.display = 'block';
+    }
+    function selectMemberForBooking(id) {
+      const m = membersCache.find(x => x.id === id);
+      if (!m) return;
+      document.getElementById('nb_member').value = id;
+      document.getElementById('nb_memberSearch').value = m.name;
+      document.getElementById('nb_memberResults').style.display = 'none';
+      const selectedEl = document.getElementById('nb_memberSelected');
+      selectedEl.textContent = `✓ 선택됨: ${m.name} (${memberSubLabel(m)})`;
+      selectedEl.style.display = 'block';
+
+      // 회원을 고르면 담당 트레이너와 개인PT 잔여횟수/만료일을 자동으로 보여줌
+      // (지금 보고 있는 스케줄의 트레이너와 회원의 실제 담당 트레이너가 다를 수도 있어서 그 경우 안내 문구를 같이 보여줌)
+      const trainer = staffCache.find(s => s.id === m.assigned_trainer_id);
+      const trainerHtml = trainer
+        ? `${trainer.role === 'manager' ? '지점장' : '트레이너'} ${trainer.name}`
+        : '담당 트레이너 미지정';
+      const mismatchNote = (m.assigned_trainer_id && m.assigned_trainer_id !== selectedTrainerId)
+        ? `<div class="muted" style="font-size:11.5px; margin-top:3px;">⚠️ 지금 보고 있는 ${staffName(selectedTrainerId)} 트레이너의 스케줄과 담당자가 달라요</div>`
+        : '';
+      document.getElementById('nb_trainerInfo').innerHTML = trainerHtml + mismatchNote;
+
+      const remainLabel = m.pt_remaining_sessions != null ? `${m.pt_remaining_sessions}회` : '기록 없음';
+      const expiryLabel = m.pt_end_date || '기록 없음';
+      document.getElementById('nb_ptInfo').innerHTML =
+        `잔여횟수: <b>${remainLabel}</b><br/>만료 예정일: <b>${expiryLabel}</b>`;
+      document.getElementById('nb_infoField').style.display = 'block';
+    }
+    document.getElementById('nb_memberSearch').addEventListener('input', (e) => {
+      document.getElementById('nb_member').value = '';
+      document.getElementById('nb_memberSelected').style.display = 'none';
+      document.getElementById('nb_infoField').style.display = 'none';
+      const query = e.target.value;
+      if (!query.trim()) { document.getElementById('nb_memberResults').style.display = 'none'; return; }
+      renderMemberSearchResults(membersCache.filter(m => matchesMemberSearch(m, query)));
+    });
+    document.getElementById('nb_memberSearch').addEventListener('focus', (e) => {
+      if (e.target.value.trim()) document.getElementById('nb_memberResults').style.display = 'block';
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#nb_memberSearch') && !e.target.closest('#nb_memberResults')) {
+        document.getElementById('nb_memberResults').style.display = 'none';
+      }
+    });
+
     function openNewBookingModal(dateStr, hour) {
       pendingSlot = { dateStr, hour };
       document.getElementById('nbErrorBox').style.display = 'none';
       document.getElementById('nb_dateTimeLabel').textContent = `${dateStr} ${pad(hour)}:00 · ${staffName(selectedTrainerId)} 트레이너`;
-      const sel = document.getElementById('nb_member');
-      sel.innerHTML = '';
-      const mine = membersCache.filter(m => m.assigned_trainer_id === selectedTrainerId);
-      const others = membersCache.filter(m => m.assigned_trainer_id !== selectedTrainerId);
-      [...mine, ...others].forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.pt_remaining_sessions != null ? `${m.name} (잔여 ${m.pt_remaining_sessions}회)` : m.name;
-        sel.appendChild(opt);
-      });
+      document.getElementById('nb_member').value = '';
+      document.getElementById('nb_memberSearch').value = '';
+      document.getElementById('nb_memberResults').style.display = 'none';
+      document.getElementById('nb_memberSelected').style.display = 'none';
+      document.getElementById('nb_infoField').style.display = 'none';
       document.getElementById('nb_duration').value = '50';
       document.getElementById('nb_memo').value = '';
       document.getElementById('newBookingOverlay').style.display = 'flex';
+      setTimeout(() => document.getElementById('nb_memberSearch').focus(), 50);
     }
     function closeNewBookingModal() { document.getElementById('newBookingOverlay').style.display = 'none'; }
     document.getElementById('nb_closeBtn').addEventListener('click', closeNewBookingModal);
@@ -252,6 +349,12 @@
       e.preventDefault();
       const errorBox = document.getElementById('nbErrorBox');
       errorBox.style.display = 'none';
+      if (!document.getElementById('nb_member').value) {
+        errorBox.textContent = '검색해서 회원을 목록에서 선택해주세요.';
+        errorBox.style.display = 'block';
+        document.getElementById('nb_memberSearch').focus();
+        return;
+      }
       const { dateStr, hour } = pendingSlot;
       const [y, m, d] = dateStr.split('-').map(Number);
       const start = new Date(y, m - 1, d, hour, 0, 0);
