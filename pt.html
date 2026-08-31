@@ -833,7 +833,9 @@
         await addPtLead({
           trainer_id: selectedTrainerId,
           name: row.name,
+          source: '오티',
           contact_date: row.contact_date || formatDateStr(new Date()),
+          week_no: weekOfMonth(row.contact_date || formatDateStr(new Date())),
           ot_date: otDate,
           ot_status: 'scheduled',
           memo: row.memo || null
