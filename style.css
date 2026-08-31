@@ -102,6 +102,14 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 .topnav a { font-size: 13px; font-weight: 600; color: var(--slate-500); text-decoration: none; padding: 6px 12px; border-radius: 8px; }
 .topnav a:hover { background: var(--slate-50); color: var(--slate-900); }
 .topnav a.active { background: #eef2ff; color: var(--indigo-600); }
+/* 휴대폰처럼 화면이 좁을 때: 메뉴 글자가 세로로 쪼개지지 않도록 줄바꿈을 막고,
+   대신 메뉴 줄 전체를 옆으로 밀어서(가로 스크롤) 볼 수 있게 함 */
+@media (max-width: 720px) {
+  .topbar { padding: 12px 14px; }
+  .topnav { width: 100%; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .topnav::-webkit-scrollbar { display: none; }
+  .topnav a { flex: 0 0 auto; white-space: nowrap; }
+}
 .panel { background: var(--white); border: 1px solid var(--slate-200); border-radius: 14px; padding: 18px; margin-top: 16px; }
 .panel h3 { font-size: 14px; margin: 0 0 14px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 12px; align-items: end; }
