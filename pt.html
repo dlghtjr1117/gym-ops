@@ -26,6 +26,13 @@
   .mini-stat-box .mini-title { font-size: 12px; font-weight: 700; color: var(--slate-500); margin-bottom: 8px; }
   .mini-stat-box .mini-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
   .mini-stat-box .mini-row b { font-weight: 700; }
+  .mini-stat-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+  .mini-stat-row .mini-stat-box { flex: 1 1 300px; max-width: 340px; margin-top: 0; }
+  /* 매출 카드가 3개에서 4개(목표/남은/확정/예상)로 늘어난 이 페이지 전용 그리드 */
+  #revenueHeroGrid { grid-template-columns: repeat(4, 1fr); }
+  .hero-amber { background: linear-gradient(135deg, #b45309, #f59e0b 55%, #fcd34d); }
+  @media (max-width: 1080px) { #revenueHeroGrid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { #revenueHeroGrid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -58,13 +65,19 @@
       <button type="button" class="report-nav-arrow" id="monthNextBtn">▶</button>
     </div>
 
-    <!-- 매출 카드 3개 -->
-    <div class="hero-grid">
+    <!-- 매출 카드 4개 -->
+    <div class="hero-grid" id="revenueHeroGrid">
       <div class="hero-card hero-blue" id="targetCard" style="cursor:pointer;">
         <div class="hero-icon">🎯</div>
         <div class="hero-label">목표 매출</div>
         <div class="hero-value hero-value-money"><span id="targetAmount">0</span><span class="hero-unit">원</span></div>
         <div class="hero-sub" id="targetSub">불러오는 중...</div>
+      </div>
+      <div class="hero-card hero-amber" id="remainingCard">
+        <div class="hero-icon">📉</div>
+        <div class="hero-label">목표까지 남은 매출</div>
+        <div class="hero-value hero-value-money"><span id="remainingAmount">0</span><span class="hero-unit">원</span></div>
+        <div class="hero-sub" id="remainingSub">불러오는 중...</div>
       </div>
       <div class="hero-card hero-green" id="confirmedCard" style="cursor:pointer;">
         <div class="hero-icon">✅</div>
@@ -94,11 +107,19 @@
         <h2 style="margin:0;">주차별 매출 기록</h2>
         <button type="button" class="btn btn-primary" id="openAddLeadBtn" style="width:auto; padding-left:18px; padding-right:18px;">+ 상담/매출 기록 추가</button>
       </div>
-      <div class="mini-stat-box" style="max-width:340px; margin-top:12px;">
-        <div class="mini-title">재등록 확정 조사 (이번 달)</div>
-        <div class="mini-row"><span>재등록 예상 인원</span><b id="renewalExpectedCount">0</b></div>
-        <div class="mini-row"><span>재등록 확정 인원</span><b id="renewalConfirmedCount">0</b></div>
-        <div class="mini-row"><span>재등록 확정률</span><b id="renewalConfirmedRate">-</b></div>
+      <div class="mini-stat-row">
+        <div class="mini-stat-box">
+          <div class="mini-title">재등록 확정 조사 (이번 달)</div>
+          <div class="mini-row"><span>재등록 예상 인원</span><b id="renewalExpectedCount">0</b></div>
+          <div class="mini-row"><span>재등록 확정 인원</span><b id="renewalConfirmedCount">0</b></div>
+          <div class="mini-row"><span>재등록 확정률</span><b id="renewalConfirmedRate">-</b></div>
+        </div>
+        <div class="mini-stat-box">
+          <div class="mini-title">OT 확정 조사 (이번 달)</div>
+          <div class="mini-row"><span>OT 예상 인원</span><b id="otConfirmExpectedCount">0</b></div>
+          <div class="mini-row"><span>OT 확정 인원</span><b id="otConfirmConfirmedCount">0</b></div>
+          <div class="mini-row"><span>OT 확정률</span><b id="otConfirmConfirmedRate">-</b></div>
+        </div>
       </div>
       <div style="overflow-x:auto; margin-top:14px;">
         <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:900px;">
@@ -321,6 +342,13 @@
         ? (isManagerFlag ? '목표 카드를 눌러 수정할 수 있어요' : '지점장이 설정한 목표예요')
         : (isManagerFlag ? '목표 카드를 눌러 설정해보세요' : '아직 설정된 목표가 없어요');
 
+      // 남은 매출: 목표 매출 - 확정 매출 (목표를 넘겼으면 0으로 표시하고 달성했다고 안내)
+      const remainingTotal = Math.max(targetTotal - confirmedTotal, 0);
+      animateCount(document.getElementById('remainingAmount'), remainingTotal);
+      document.getElementById('remainingSub').textContent = targetTotal <= 0
+        ? '목표를 먼저 설정해주세요'
+        : (confirmedTotal >= targetTotal ? '목표 달성! 🎉' : `확정 매출 ${formatWon(confirmedTotal)} 기준`);
+
       // 예상 매출: 아직 등록/이월/미스로 끝나지 않은 리드들의 금액 합계 그대로
       // (확률은 등록 가능성 표시일 뿐, 금액에 곱해서 깎는 값이 아님)
       const openLeads = leadsCache.filter(l => l.stage !== 'registered' && l.stage !== 'missed' && l.stage !== 'rolled_over');
@@ -452,16 +480,17 @@
       document.getElementById('weeklyTotal').textContent = formatWon(total);
     }
 
-    // 이 달 "유형=재등록"으로 남긴 상담 건 중, 몇 건이 "등록"으로 확정됐는지
+    // 이 달 "유형=sourceValue"로 남긴 상담 건 중, 몇 건이 "등록"으로 확정됐는지
     // (주차별 매출 기록 표에서 유형/확률을 바로 반영 - 별도 데이터가 아니라 이 표 자체가 근거)
-    function loadRenewalMiniStats() {
+    // 재등록 확정 조사 / OT 확정 조사가 이 함수 하나를 공유해서 씀
+    function loadConfirmMiniStats(sourceValue, idPrefix) {
       const { startStr, endStr } = getMonthRange();
       const monthLeads = leadsCache.filter(l => l.contact_date && l.contact_date >= startStr && l.contact_date < endStr);
-      const expected = monthLeads.filter(l => l.source === '재등록');
+      const expected = monthLeads.filter(l => l.source === sourceValue);
       const confirmed = expected.filter(l => l.stage === 'registered');
-      document.getElementById('renewalExpectedCount').textContent = expected.length;
-      document.getElementById('renewalConfirmedCount').textContent = confirmed.length;
-      document.getElementById('renewalConfirmedRate').textContent = expected.length > 0 ? `${Math.round((confirmed.length / expected.length) * 100)}%` : '-';
+      document.getElementById(idPrefix + 'ExpectedCount').textContent = expected.length;
+      document.getElementById(idPrefix + 'ConfirmedCount').textContent = confirmed.length;
+      document.getElementById(idPrefix + 'ConfirmedRate').textContent = expected.length > 0 ? `${Math.round((confirmed.length / expected.length) * 100)}%` : '-';
     }
 
     // OT1/OT2 공용: dateField/statusField만 바꿔서 진행·완료·성공률 계산
@@ -474,7 +503,8 @@
       document.getElementById(idPrefix + 'SuccessRate').textContent = items.length > 0 ? `${Math.round((doneItems.length / items.length) * 100)}%` : '-';
     }
     function loadAllMiniStats() {
-      loadRenewalMiniStats();
+      loadConfirmMiniStats('재등록', 'renewal');
+      loadConfirmMiniStats('오티', 'otConfirm');
       loadOtMiniStats('ot_date', 'ot_status', 'ot1');
       loadOtMiniStats('ot2_date', 'ot2_status', 'ot2');
     }
