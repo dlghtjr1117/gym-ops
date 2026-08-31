@@ -852,3 +852,41 @@ async function updateProfileRole(id, role) {
   });
   if (!res.ok) await throwApiError(res, '권한 변경에 실패했습니다.');
 }
+
+// ---- OT 연락 미응답 기록 (pt_ot_no_response) - PT 관리 > OT 관리 탭 하단 ----
+async function fetchPtOtNoResponse() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pt_ot_no_response?select=*&order=period_month.desc,created_at.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, 'OT 미응답 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addPtOtNoResponse(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_ot_no_response`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, 'OT 미응답 기록 추가에 실패했습니다.');
+  return res.json();
+}
+
+async function updatePtOtNoResponse(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_ot_no_response?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, 'OT 미응답 기록 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deletePtOtNoResponse(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_ot_no_response?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, 'OT 미응답 기록 삭제에 실패했습니다.');
+}
