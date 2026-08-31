@@ -237,15 +237,42 @@
     </div>
   </div>
 
-  <!-- PT 회원 관리 시트에 회원 추가 모달 (담당 회원 중에서 검색해서 고르는 방식) -->
+  <!-- PT 회원 관리 시트에 회원 추가 모달 ("상담/매출 기록 추가"처럼 바로 입력해서 새로 만드는 방식) -->
   <div class="modal-overlay" id="addCareMemberOverlay" style="display:none;">
-    <div class="modal-box" style="max-width:520px;">
+    <div class="modal-box" style="max-width:640px;">
       <div class="modal-header">
         <div><h3>PT 회원 관리에 추가</h3><p class="muted" style="margin:0;" id="addCareMemberHint"></p></div>
         <button type="button" class="modal-close" id="closeAddCareMemberBtn">&times;</button>
       </div>
-      <div class="field"><label>이름으로 검색</label><input type="text" id="careMemberSearch" placeholder="회원 이름을 입력하세요" autocomplete="off" /></div>
-      <div id="careMemberResults" style="max-height:280px; overflow-y:auto; border:1px solid var(--slate-200); border-radius:10px; margin-top:8px;"></div>
+      <div id="addCareMemberErrorBox" class="error-text"></div>
+      <form id="addCareMemberForm">
+        <div class="form-grid">
+          <div class="field"><label>이름 *</label><input type="text" id="cm_name" required /></div>
+          <div class="field"><label>재등록예상시기</label><input type="text" id="cm_renewal_month" placeholder="예: 2026-09" /></div>
+          <div class="field"><label>남은횟수</label><input type="number" id="cm_remaining_sessions" min="0" placeholder="예: 5" /></div>
+          <div class="field"><label>단기</label>
+            <select id="cm_short_term_plan">
+              <option value="X" selected>X</option>
+              <option value="O">O</option>
+            </select>
+          </div>
+          <div class="field"><label>재등록예상횟수</label><input type="number" id="cm_expected_sessions" min="0" placeholder="예: 20" /></div>
+          <div class="field"><label>예상매출(원)</label><input type="number" id="cm_expected_amount" min="0" placeholder="예: 1200000" /></div>
+          <div class="field"><label>재등록확률</label>
+            <select id="cm_expected_probability">
+              <option value="" selected>미설정</option>
+              <option value="25">25%</option>
+              <option value="50">50%</option>
+              <option value="75">75%</option>
+              <option value="100">100%</option>
+              <option value="0">미스</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>수업방향</label><input type="text" id="cm_session_focus" placeholder="선택 입력" /></div>
+        <div class="field"><label>장기적 플랜(관리 방향)</label><input type="text" id="cm_long_term_plan" placeholder="선택 입력" /></div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
+      </form>
     </div>
   </div>
 
@@ -578,52 +605,46 @@
       }).join('');
     }
 
-    // PT 회원 관리에 직접 추가하기 (담당 회원 중 검색해서 고르는 방식)
-    let careMemberPickerList = [];
-    function renderCareMemberResults(list) {
-      const box = document.getElementById('careMemberResults');
-      if (list.length === 0) {
-        box.innerHTML = '<div class="muted" style="padding:14px; font-size:12px;">추가할 수 있는 담당 회원이 없습니다. (이미 목록에 있거나, 담당 회원이 아닐 수 있어요)</div>';
-        return;
-      }
-      box.innerHTML = list.map(m => `
-        <button type="button" class="btn-link" style="display:flex; justify-content:space-between; width:100%; padding:10px 12px; border-bottom:1px solid var(--slate-100); text-align:left;" onclick="handleAddCareMember('${m.id}')">
-          <span>${escapeHtml(m.name)}</span>
-          <span class="muted">${m.pt_remaining_sessions != null ? `잔여 ${m.pt_remaining_sessions}회` : ''}</span>
-        </button>
-      `).join('');
-    }
-    async function openAddCareMemberModal() {
-      document.getElementById('addCareMemberHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 담당 회원 중에서 골라 추가해요.`;
-      document.getElementById('careMemberSearch').value = '';
-      document.getElementById('careMemberResults').innerHTML = '<div class="muted" style="padding:14px; font-size:12px;">불러오는 중...</div>';
+    // PT 회원 관리에 직접 추가하기 ("+ 상담/매출 기록 추가"처럼 바로 입력해서 새로 만드는 방식)
+    function openAddCareMemberModal() {
+      document.getElementById('addCareMemberForm').reset();
+      document.getElementById('addCareMemberErrorBox').style.display = 'none';
+      document.getElementById('addCareMemberHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 기록으로 추가돼요.`;
       document.getElementById('addCareMemberOverlay').style.display = 'flex';
-      try {
-        const all = await fetchMembers();
-        const pinnedIds = new Set(careCache.map(m => m.id));
-        careMemberPickerList = all.filter(m => m.assigned_trainer_id === selectedTrainerId && m.status !== 'left' && !pinnedIds.has(m.id));
-        renderCareMemberResults(careMemberPickerList);
-      } catch (err) {
-        document.getElementById('careMemberResults').innerHTML = `<div class="error-text" style="padding:14px;">${err.message}</div>`;
-      }
     }
     function closeAddCareMemberModal() { document.getElementById('addCareMemberOverlay').style.display = 'none'; }
     document.getElementById('openAddCareMemberBtn').addEventListener('click', openAddCareMemberModal);
     document.getElementById('closeAddCareMemberBtn').addEventListener('click', closeAddCareMemberModal);
     document.getElementById('addCareMemberOverlay').addEventListener('click', (e) => { if (e.target.id === 'addCareMemberOverlay') closeAddCareMemberModal(); });
-    document.getElementById('careMemberSearch').addEventListener('input', (e) => {
-      const q = e.target.value.trim();
-      renderCareMemberResults(q ? careMemberPickerList.filter(m => m.name.includes(q)) : careMemberPickerList);
-    });
-    async function handleAddCareMember(id) {
+
+    document.getElementById('addCareMemberForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addCareMemberErrorBox');
+      errorBox.style.display = 'none';
+      const probRaw = document.getElementById('cm_expected_probability').value;
       try {
-        await updateMemberPtCare(id, { pt_care_pinned: true });
+        await addMember({
+          name: document.getElementById('cm_name').value.trim(),
+          assigned_trainer_id: selectedTrainerId,
+          pt_care_pinned: true,
+          pt_expected_renewal_month: document.getElementById('cm_renewal_month').value.trim() || null,
+          pt_remaining_sessions: document.getElementById('cm_remaining_sessions').value ? Number(document.getElementById('cm_remaining_sessions').value) : null,
+          pt_session_focus: document.getElementById('cm_session_focus').value.trim() || null,
+          pt_short_term_plan: document.getElementById('cm_short_term_plan').value,
+          pt_long_term_plan: document.getElementById('cm_long_term_plan').value.trim() || null,
+          pt_expected_sessions: document.getElementById('cm_expected_sessions').value ? Number(document.getElementById('cm_expected_sessions').value) : null,
+          pt_expected_amount: document.getElementById('cm_expected_amount').value ? Number(document.getElementById('cm_expected_amount').value) : null,
+          pt_expected_probability: probRaw === '' ? null : Number(probRaw)
+        });
         closeAddCareMemberModal();
         careCache = (await fetchPtCareMembers(9)).filter(m => m.assigned_trainer_id === selectedTrainerId);
         renderCareTable();
         showToast('PT 회원 관리 목록에 추가되었습니다.');
-      } catch (err) { alert(err.message); }
-    }
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
     async function handleRemoveCareMember(id) {
       try {
         await updateMemberPtCare(id, { pt_care_pinned: false });
