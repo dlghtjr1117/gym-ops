@@ -131,7 +131,12 @@ async function getMyProfile() {
 function applyRoleNav(profile) {
   if (!profile || profile.role === 'manager') return;
   const hideHrefs = ['sales.html', 'expiry.html', 'products.html'];
-  document.querySelectorAll('.topnav a').forEach((a) => {
+  // 상단 메뉴(.topnav) 말고도 홈 화면의 바로가기 타일(home.html)이나 대시보드의
+  // "+ 매출 등록하기" 같은 인라인 링크(dashboard.html)에도 같은 href가 쓰이고 있어서,
+  // .topnav 안쪽만 가리면 트레이너가 그 링크들을 타고 들어가 매출 입력/만료회원/이용권
+  // 관리 화면에 그대로 접근할 수 있었음(해당 페이지들 자체엔 role 체크가 없음).
+  // 그래서 .topnav a 대신 페이지 전체의 a[href]를 다 검사하도록 넓힘.
+  document.querySelectorAll('a[href]').forEach((a) => {
     if (hideHrefs.includes(a.getAttribute('href'))) {
       a.style.display = 'none';
     }
