@@ -647,6 +647,44 @@
         if (m) m[field] = value;
       } catch (err) { alert(err.message); }
     }
+    // "YYYY-MM" 형식의 period_month를 한 달 뒤로
+    function nextMonthStr(monthStr) {
+      const [y, mo] = monthStr.split('-').map(Number);
+      const d = new Date(y, mo, 1); // mo는 이미 1~12이므로 그대로 넣으면 다음 달 1일이 됨
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    // "이월" 처리된 회원을 다음 달 PT 회원 관리에도 자동으로 만들어줌 (연동된 회원이면 member_id로,
+    // 아니면 이름으로 중복 여부를 확인해서 같은 회원 기록이 이미 있으면 새로 만들지 않음)
+    async function carryOverCareLogToNextMonth(m) {
+      const nextMonth = nextMonthStr(m.period_month);
+      try {
+        const all = await fetchPtCareLogs();
+        const dup = all.find(x => x.trainer_id === m.trainer_id && x.period_month === nextMonth &&
+          (m.member_id ? x.member_id === m.member_id : x.name === m.name));
+        if (dup) {
+          showToast(`${Number(nextMonth.slice(5, 7))}월에 이미 같은 회원 기록이 있어서 새로 만들지 않았어요.`);
+          return;
+        }
+        await addPtCareLog({
+          trainer_id: m.trainer_id,
+          period_month: nextMonth,
+          member_id: m.member_id || null,
+          name: m.name,
+          pt_expected_renewal_month: m.pt_expected_renewal_month || null,
+          pt_remaining_sessions: m.pt_remaining_sessions != null ? m.pt_remaining_sessions : null,
+          pt_session_focus: m.pt_session_focus || null,
+          pt_short_term_plan: m.pt_short_term_plan || 'X',
+          pt_long_term_plan: m.pt_long_term_plan || null,
+          pt_expected_sessions: m.pt_expected_sessions != null ? m.pt_expected_sessions : null,
+          pt_expected_amount: m.pt_expected_amount != null ? m.pt_expected_amount : null,
+          renewal_stage: 'in_progress',
+          pt_expected_probability: null
+        });
+        showToast(`이월 처리됐어요. ${Number(nextMonth.slice(5, 7))}월 PT 회원 관리에도 자동으로 추가됐어요.`);
+      } catch (err) {
+        alert('다음 달로 이월하는 중 문제가 생겼어요: ' + err.message);
+      }
+    }
     async function handleCareProbSave(selectEl) {
       const id = selectEl.dataset.memberId;
       const raw = selectEl.value;
@@ -662,6 +700,9 @@
         selectEl.className = 'sheet-input badge ' + (CARE_PROB_BADGE[raw] || '');
         const row = selectEl.closest('tr');
         if (row) row.className = 'row-care-' + raw;
+        if (raw === 'rolled_over' && m) {
+          await carryOverCareLogToNextMonth(m);
+        }
       } catch (err) { alert(err.message); }
     }
     async function handleToggleShortTerm(btn) {
