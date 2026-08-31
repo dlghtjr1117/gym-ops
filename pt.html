@@ -284,10 +284,17 @@
       </div>
       <div id="addCareMemberErrorBox" class="error-text"></div>
       <form id="addCareMemberForm">
+        <div class="field" style="position:relative;">
+          <label>회원 검색 (선택 — 등록된 회원과 연결하면 잔여횟수가 실시간으로 연동돼요)</label>
+          <input type="text" id="cm_memberSearch" placeholder="이름 또는 전화번호 뒷자리로 검색" autocomplete="off" />
+          <div id="cm_memberResults" class="member-search-results" style="display:none;"></div>
+          <input type="hidden" id="cm_member_id" />
+          <div id="cm_memberSelected" class="member-search-selected"></div>
+        </div>
         <div class="form-grid">
           <div class="field"><label>이름 *</label><input type="text" id="cm_name" required /></div>
           <div class="field"><label>재등록예상시기</label><input type="month" id="cm_renewal_month" /></div>
-          <div class="field"><label>남은횟수</label><input type="number" id="cm_remaining_sessions" min="0" placeholder="예: 5" /></div>
+          <div class="field"><label>남은횟수 <span id="cm_remainingHint" class="muted" style="display:none;">(연동된 회원이라 자동으로 채워져요)</span></label><input type="number" id="cm_remaining_sessions" min="0" placeholder="예: 5" /></div>
           <div class="field"><label>단기</label>
             <select id="cm_short_term_plan">
               <option value="X" selected>X</option>
@@ -315,6 +322,23 @@
     </div>
   </div>
 
+  <!-- 이미 추가된(연동 안 된) PT 회원 관리 행을 실제 회원과 나중에 연결할 때 쓰는 작은 모달 -->
+  <div class="modal-overlay" id="careLinkOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3>회원 연결</h3>
+        <button type="button" class="modal-close" id="cl_closeBtn">&times;</button>
+      </div>
+      <p class="muted" style="margin-top:-6px;">등록된 회원과 연결하면 앞으로 잔여횟수가 실시간으로 자동 반영돼요 (PT 스케줄에서 출석 체크할 때도 여기 숫자가 같이 바뀜).</p>
+      <div id="clErrorBox" class="error-text"></div>
+      <div class="field" style="position:relative;">
+        <label>회원 검색</label>
+        <input type="text" id="cl_memberSearch" placeholder="이름 또는 전화번호 뒷자리로 검색" autocomplete="off" />
+        <div id="cl_memberResults" class="member-search-results" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script src="data.js"></script>
@@ -325,6 +349,7 @@
     let currentUserId = null;
     let isManagerFlag = false;
     let staffCache = [];
+    let membersCache = [];
     let selectedTrainerId = null;
 
     let leadsCache = [];      // 선택된 트레이너의 pt_leads 전체 (월 필터는 화면에서)
@@ -665,15 +690,20 @@
         const shortVal = m.pt_short_term_plan === 'O' ? 'O' : 'X';
         const careProbVal = careProbValue(m);
         const probOptions = CARE_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === careProbVal ? 'selected' : ''}>${o.label}</option>`).join('');
-        const remaining = m.pt_remaining_sessions;
+        // member_id가 연결돼 있으면 실제 회원의 잔여횟수(실시간)를 쓰고, 아니면 이 행에 저장된 값을 그대로 씀
+        const linked = !!m.member;
+        const remaining = linked ? m.member.pt_remaining_sessions : m.pt_remaining_sessions;
         const remainingHtml = remaining == null
           ? '<span class="muted">-</span>'
           : `<span class="badge ${remaining <= 1 ? 'badge-red' : 'badge-amber'}">${remaining}회</span>`;
+        const linkHtml = linked
+          ? '<div class="muted" style="font-size:10.5px; margin-top:2px;">🔗 연동됨</div>'
+          : `<div style="margin-top:2px;"><button type="button" class="btn-link" style="font-size:10.5px;" onclick="openCareLinkModal('${m.id}')">회원 연결</button></div>`;
         return `
         <tr class="row-care-${careProbVal}">
           <td><input class="sheet-input" type="month" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" /></td>
           <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
-          <td style="text-align:center;">${remainingHtml}</td>
+          <td style="text-align:center;">${remainingHtml}${linkHtml}</td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_session_focus || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_session_focus',false)" placeholder="수업방향" /></td>
           <td style="text-align:center;"><button type="button" class="toggle-ox ${shortVal === 'O' ? 'is-o' : 'is-x'}" data-member-id="${m.id}" data-value="${shortVal}" onclick="handleToggleShortTerm(this)">${shortVal}</button></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_long_term_plan || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_long_term_plan',false)" placeholder="장기적 플랜" /></td>
@@ -686,16 +716,105 @@
     }
 
     // PT 회원 관리에 직접 추가하기 ("+ 상담/매출 기록 추가"처럼 바로 입력해서 새로 만드는 방식)
+    // 회원 검색으로 실제 회원과 연결하면 이름/잔여횟수가 자동으로 채워지고, 이후로는 그 회원의
+    // 잔여횟수(members.pt_remaining_sessions)가 바뀔 때마다(PT 스케줄 출석 처리 등) 실시간으로 반영됨
+    function renderCareMemberResults(query, listBoxId, onPick) {
+      const box = document.getElementById(listBoxId);
+      const list = membersCache.filter(m => matchesMemberSearch(m, query));
+      if (list.length === 0) {
+        box.innerHTML = '<div class="member-search-item muted">일치하는 회원이 없어요</div>';
+      } else {
+        box.innerHTML = list.slice(0, 8).map(m => `
+          <div class="member-search-item" data-id="${m.id}">
+            <div class="msi-name">${m.name}</div>
+            <div class="msi-sub">${m.phone || '전화번호 없음'} · ${m.pt_remaining_sessions != null ? '잔여 ' + m.pt_remaining_sessions + '회' : '잔여횟수 미기록'}</div>
+          </div>
+        `).join('');
+        box.querySelectorAll('.member-search-item[data-id]').forEach(item => {
+          item.addEventListener('click', () => onPick(item.dataset.id));
+        });
+      }
+      box.style.display = 'block';
+    }
+    function selectCareMember(id) {
+      const m = membersCache.find(x => x.id === id);
+      if (!m) return;
+      document.getElementById('cm_member_id').value = id;
+      document.getElementById('cm_memberSearch').value = m.name;
+      document.getElementById('cm_memberResults').style.display = 'none';
+      const selectedEl = document.getElementById('cm_memberSelected');
+      selectedEl.textContent = `✓ 연결됨: ${m.name} (${m.phone || '전화번호 없음'})`;
+      selectedEl.style.display = 'block';
+      document.getElementById('cm_name').value = m.name;
+      document.getElementById('cm_name').readOnly = true;
+      document.getElementById('cm_remaining_sessions').value = m.pt_remaining_sessions != null ? m.pt_remaining_sessions : '';
+      document.getElementById('cm_remaining_sessions').disabled = true;
+      document.getElementById('cm_remainingHint').style.display = '';
+    }
+    document.getElementById('cm_memberSearch').addEventListener('input', (e) => {
+      document.getElementById('cm_member_id').value = '';
+      document.getElementById('cm_memberSelected').style.display = 'none';
+      document.getElementById('cm_name').readOnly = false;
+      document.getElementById('cm_remaining_sessions').disabled = false;
+      document.getElementById('cm_remainingHint').style.display = 'none';
+      const query = e.target.value;
+      if (!query.trim()) { document.getElementById('cm_memberResults').style.display = 'none'; return; }
+      renderCareMemberResults(query, 'cm_memberResults', selectCareMember);
+    });
+    document.getElementById('cm_memberSearch').addEventListener('focus', (e) => {
+      if (e.target.value.trim()) document.getElementById('cm_memberResults').style.display = 'block';
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#cm_memberSearch') && !e.target.closest('#cm_memberResults')) {
+        document.getElementById('cm_memberResults').style.display = 'none';
+      }
+    });
+
     function openAddCareMemberModal() {
       document.getElementById('addCareMemberForm').reset();
       document.getElementById('addCareMemberErrorBox').style.display = 'none';
       document.getElementById('addCareMemberHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 기록으로 추가돼요.`;
+      document.getElementById('cm_member_id').value = '';
+      document.getElementById('cm_memberSelected').style.display = 'none';
+      document.getElementById('cm_memberResults').style.display = 'none';
+      document.getElementById('cm_name').readOnly = false;
+      document.getElementById('cm_remaining_sessions').disabled = false;
+      document.getElementById('cm_remainingHint').style.display = 'none';
       document.getElementById('addCareMemberOverlay').style.display = 'flex';
     }
     function closeAddCareMemberModal() { document.getElementById('addCareMemberOverlay').style.display = 'none'; }
     document.getElementById('openAddCareMemberBtn').addEventListener('click', openAddCareMemberModal);
     document.getElementById('closeAddCareMemberBtn').addEventListener('click', closeAddCareMemberModal);
     document.getElementById('addCareMemberOverlay').addEventListener('click', (e) => { if (e.target.id === 'addCareMemberOverlay') closeAddCareMemberModal(); });
+
+    // ---- 기존(연동 안 된) PT 회원 관리 행을 나중에 실제 회원과 연결하기 ----
+    let careLinkTargetId = null;
+    function openCareLinkModal(logId) {
+      careLinkTargetId = logId;
+      document.getElementById('clErrorBox').style.display = 'none';
+      document.getElementById('cl_memberSearch').value = '';
+      document.getElementById('cl_memberResults').style.display = 'none';
+      document.getElementById('careLinkOverlay').style.display = 'flex';
+      setTimeout(() => document.getElementById('cl_memberSearch').focus(), 50);
+    }
+    function closeCareLinkModal() { document.getElementById('careLinkOverlay').style.display = 'none'; }
+    document.getElementById('cl_closeBtn').addEventListener('click', closeCareLinkModal);
+    document.getElementById('careLinkOverlay').addEventListener('click', (e) => { if (e.target.id === 'careLinkOverlay') closeCareLinkModal(); });
+    document.getElementById('cl_memberSearch').addEventListener('input', (e) => {
+      const query = e.target.value;
+      if (!query.trim()) { document.getElementById('cl_memberResults').style.display = 'none'; return; }
+      renderCareMemberResults(query, 'cl_memberResults', async (id) => {
+        try {
+          await updatePtCareLog(careLinkTargetId, { member_id: id });
+          closeCareLinkModal();
+          await reloadCareLogsOnly();
+          showToast('회원과 연결됐어요. 이제 잔여횟수가 자동으로 반영돼요.');
+        } catch (err) {
+          document.getElementById('clErrorBox').textContent = err.message;
+          document.getElementById('clErrorBox').style.display = 'block';
+        }
+      });
+    });
 
     // 현재 선택된 트레이너 + 현재 보고 있는 달 기준으로 careCache를 다시 채움
     async function reloadCareLogsOnly() {
@@ -721,6 +840,7 @@
         await addPtCareLog({
           trainer_id: selectedTrainerId,
           period_month: getMonthRange().monthStr,
+          member_id: document.getElementById('cm_member_id').value || null,
           name: document.getElementById('cm_name').value.trim(),
           pt_expected_renewal_month: document.getElementById('cm_renewal_month').value.trim() || null,
           pt_remaining_sessions: document.getElementById('cm_remaining_sessions').value ? Number(document.getElementById('cm_remaining_sessions').value) : null,
@@ -1070,6 +1190,7 @@
       isManagerFlag = profile.role === 'manager';
 
       try { staffCache = await fetchStaff(); } catch (e) { staffCache = []; }
+      try { membersCache = await fetchMembers(); } catch (e) { membersCache = []; }
 
       if (isManagerFlag) {
         const sel = document.getElementById('trainerSelect');

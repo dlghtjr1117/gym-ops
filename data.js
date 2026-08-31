@@ -61,6 +61,20 @@ async function fetchMembers() {
   return res.json();
 }
 
+// 이름 또는 전화번호 뒷자리 일부로 회원을 찾는 공용 검색 매칭 함수 (검색어가 없으면 false —
+// "타이핑하기 전엔 아무것도 안 보여주는" 드롭다운 검색 UI용. 회원 관리 표의 "검색하면 필터링,
+// 비어있으면 전체 표시"용 matchesSearch와는 용도가 달라서 별도 함수로 둠)
+// PT 스케줄 예약 화면, PT 회원 관리 "회원 연결" 등에서 공용으로 씀
+function matchesMemberSearch(m, query) {
+  const q = (query || '').trim();
+  if (!q) return false;
+  const qDigits = q.replace(/[^0-9]/g, '');
+  const nameMatch = m.name && m.name.toLowerCase().includes(q.toLowerCase());
+  const phoneDigits = (m.phone || '').replace(/[^0-9]/g, '');
+  const phoneMatch = qDigits.length > 0 && phoneDigits.includes(qDigits);
+  return nameMatch || phoneMatch;
+}
+
 async function fetchTrainers() {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/profiles?role=eq.trainer&select=id,name&order=name.asc`,
@@ -807,9 +821,12 @@ async function updateMemberPtCare(id, patch) {
 
 // ---- PT 회원 관리 월별 기록(pt_care_logs) ----
 // "잔여횟수 적은 회원 자동 표시"가 아니라, 트레이너가 매달 직접 입력해서 쌓아가는 방식
+// member_id가 연결된 행은 실제 회원의 개인PT 잔여횟수(members.pt_remaining_sessions)를 함께 가져와서,
+// PT 스케줄에서 출석 체크로 잔여횟수가 바뀌면 이 화면에도 그대로(실시간) 반영되게 함.
+// member_id가 비어있는(연결 안 된) 옛날 행은 이 행 자체에 저장된 pt_remaining_sessions 값을 그대로 씀
 async function fetchPtCareLogs() {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pt_care_logs?select=*&order=period_month.desc,created_at.asc`,
+    `${SUPABASE_URL}/rest/v1/pt_care_logs?select=*,member:member_id(id,name,phone,pt_remaining_sessions)&order=period_month.desc,created_at.asc`,
     { headers: await authHeaders() }
   );
   if (!res.ok) await throwApiError(res, 'PT 회원 관리 기록을 불러오지 못했습니다.');
