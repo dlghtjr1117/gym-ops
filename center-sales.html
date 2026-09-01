@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 센터 매출</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  /* 매출 카드가 4개(FC/PT/올바른/총매출)라 pt.html과 동일한 4열 그리드를 씀 */
+  #salesHeroGrid { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 1080px) { #salesHeroGrid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { #salesHeroGrid { grid-template-columns: 1fr; } }
+  .week-divider td { background: var(--slate-50); font-weight: 700; font-size: 12px; color: var(--slate-500); padding: 8px 10px; }
+  #settleTables table { margin-bottom: 18px; }
+  #settleTables th, #settleTables td { padding: 7px 9px; font-size: 12.5px; }
+  .fc-target-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 2px 0; }
+  .fc-target-box input { width: 140px; padding: 6px 8px; border: 1px solid var(--slate-300); border-radius: 8px; font-size: 13px; }
+  .trainer-total-row td { font-weight: 800; background: var(--slate-50); }
+  .pm-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .pm-box { flex: 1 1 160px; border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--white); }
+  .pm-box .pm-label { font-size: 12px; color: var(--slate-500); font-weight: 700; margin-bottom: 6px; }
+  .pm-box .pm-amount { font-size: 19px; font-weight: 800; }
+  .pm-box .pm-count { font-size: 11px; color: var(--slate-400); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="center-sales.html" class="active">센터 매출</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap" style="max-width:1240px;">
+    <!-- 지점장 전용 화면 - 트레이너 계정으로 직접 주소를 쳐서 들어와도 집계 데이터가 보이지 않도록 막음
+         (다른 FC 화면들은 메뉴만 숨기고 화면 자체엔 체크가 없어서, 트레이너가 링크만 알면 들어갈 수 있는
+         문제가 있었음 - 이 화면은 새로 만드는 김에 처음부터 안쪽에서도 막아둠) -->
+    <div id="accessDenied" class="panel" style="display:none; max-width:480px;">
+      <h3>🔒 접근 권한이 없어요</h3>
+      <p class="muted">센터 매출은 지점장만 볼 수 있는 화면이에요.</p>
+    </div>
+
+    <div id="pageBody" style="display:none;">
+      <div class="report-nav">
+        <div class="report-period-label" style="min-width:auto; font-size:17px;">📊 센터 총 매출</div>
+        <div style="flex:1;"></div>
+        <button type="button" class="report-nav-arrow" id="monthPrevBtn">◀</button>
+        <div class="report-period-label" id="monthLabel">-</div>
+        <button type="button" class="report-nav-arrow" id="monthNextBtn">▶</button>
+      </div>
+
+      <div class="fc-target-box">
+        <label class="muted" style="font-size:13px;">FC 목표 매출(월)</label>
+        <input type="number" id="fcTargetInput" min="0" placeholder="예: 37000000" />
+        <button type="button" class="btn btn-outline" id="saveFcTargetBtn" style="width:auto; padding:6px 14px; font-size:13px;">저장</button>
+        <span class="muted" id="fcTargetSavedNote" style="font-size:12px;"></span>
+        <span class="muted" style="font-size:12px;">· PT 목표는 <a href="pt.html">PT 관리</a>에서 트레이너별로 설정한 값의 합계예요</span>
+      </div>
+
+      <div class="hero-grid" id="salesHeroGrid" style="margin-top:14px;">
+        <div class="hero-card hero-blue">
+          <div class="hero-icon">🏢</div>
+          <div class="hero-label">FC 매출</div>
+          <div class="hero-value hero-value-money"><span id="fcAmount">0</span><span class="hero-unit">원</span></div>
+          <div class="hero-sub" id="fcSub">불러오는 중...</div>
+        </div>
+        <div class="hero-card hero-purple">
+          <div class="hero-icon">🏋️‍♂️</div>
+          <div class="hero-label">PT 매출</div>
+          <div class="hero-value hero-value-money"><span id="ptAmount">0</span><span class="hero-unit">원</span></div>
+          <div class="hero-sub" id="ptSub">불러오는 중...</div>
+        </div>
+        <div class="hero-card hero-teal">
+          <div class="hero-icon">🧘</div>
+          <div class="hero-label">올바른(그룹PT) 매출</div>
+          <div class="hero-value hero-value-money"><span id="groupPtAmount">0</span><span class="hero-unit">원</span></div>
+          <div class="hero-sub" id="groupPtSub">불러오는 중...</div>
+        </div>
+        <div class="hero-card hero-green">
+          <div class="hero-icon">💰</div>
+          <div class="hero-label">총 매출</div>
+          <div class="hero-value hero-value-money"><span id="totalAmount">0</span><span class="hero-unit">원</span></div>
+          <div class="hero-sub" id="totalSub">불러오는 중...</div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-top:22px;">
+        <h2>결제수단별 매출</h2>
+        <div class="pm-row" id="paymentBreakdownRow"></div>
+      </div>
+
+      <div class="section" style="margin-top:22px;">
+        <h2>트레이너별 매출</h2>
+        <div style="overflow-x:auto;">
+          <table id="trainerTable">
+            <thead><tr>
+              <th>이름</th>
+              <th style="text-align:right;">회원권</th>
+              <th style="text-align:right;">올바른(그룹PT)</th>
+              <th style="text-align:right;">락커·일일권·운동복·양도</th>
+              <th style="text-align:right;">FC 합계</th>
+              <th style="text-align:right;">PT 합계</th>
+              <th style="text-align:right;">총 합계</th>
+            </tr></thead>
+            <tbody><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="filter-tabs" id="settleTabs" style="margin-top:22px;">
+        <button type="button" class="filter-tab active" data-tab="pt" onclick="switchSettleTab('pt')">PT 정산표</button>
+        <button type="button" class="filter-tab" data-tab="membership" onclick="switchSettleTab('membership')">회원권 정산표</button>
+        <button type="button" class="filter-tab" data-tab="group_pt" onclick="switchSettleTab('group_pt')">올바른 정산표</button>
+        <button type="button" class="filter-tab" data-tab="etc" onclick="switchSettleTab('etc')">일일권·락커·운동복·양도 정산표</button>
+      </div>
+      <div class="section" id="settleTables" style="margin-top:14px;">
+        <p class="muted" style="margin:0 0 10px;">개별 매출 건의 수정·삭제는 <a href="sales.html">매출 입력</a> 화면에서 할 수 있어요. 여기는 조회 전용이에요.</p>
+        <div id="settleTableWrap">불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let monthAnchor = new Date();
+    let isManagerFlag = false;
+    let staffCache = [];
+    let salesCache = [];
+    let ptTargetsCache = [];
+    let centerTargetCache = null;
+    let currentSettleTab = 'pt';
+
+    function getMonthRange() {
+      const start = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
+      const end = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1);
+      return { start, end, startStr: formatDateStr(start), endStr: formatDateStr(end), monthStr: formatDateStr(start) };
+    }
+    function monthLabel() {
+      const { start } = getMonthRange();
+      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
+    }
+    // pt.html의 주차별 매출 기록과 같은 기준(그 달 1일부터 7일 단위) - 앱 전체에서 "몇 주차"의 뜻을 통일함
+    function weekOfMonth(dateStr) {
+      const day = Number(dateStr.slice(8, 10));
+      return Math.min(5, Math.ceil(day / 7));
+    }
+    function staffName(id) { const s = staffCache.find(x => x.id === id); return s ? s.name : '-'; }
+
+    function shiftMonth(dir) {
+      monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1);
+      reloadAll();
+    }
+    document.getElementById('monthPrevBtn').addEventListener('click', () => shiftMonth(-1));
+    document.getElementById('monthNextBtn').addEventListener('click', () => shiftMonth(1));
+
+    function switchSettleTab(tab) {
+      currentSettleTab = tab;
+      document.querySelectorAll('#settleTabs .filter-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      renderSettleTable();
+    }
+
+    // ---- 매출 카드 + 트레이너별 표 ----
+    function loadHeroCards() {
+      const fcTarget = centerTargetCache ? Number(centerTargetCache.fc_target_amount) : 0;
+      const { monthStr } = getMonthRange();
+      const ptTarget = ptTargetsCache
+        .filter(t => t.period_type === 'monthly' && t.period_start === monthStr)
+        .reduce((sum, t) => sum + Number(t.target_amount), 0);
+
+      let fcActual = 0, ptActual = 0, groupPtActual = 0;
+      salesCache.forEach(s => {
+        const amt = Number(s.amount);
+        if (CENTER_SALES_BUCKETS.pt.includes(s.category)) { ptActual += amt; }
+        else { fcActual += amt; }
+        if (CENTER_SALES_BUCKETS.group_pt.includes(s.category)) groupPtActual += amt;
+      });
+      const totalActual = fcActual + ptActual;
+      const totalTarget = fcTarget + ptTarget;
+      const remaining = Math.max(totalTarget - totalActual, 0);
+      const pct = (target, actual) => target > 0 ? `${((actual / target) * 100).toFixed(1)}%` : '목표 미설정';
+
+      animateCount(document.getElementById('fcAmount'), fcActual);
+      document.getElementById('fcSub').textContent = fcTarget > 0 ? `목표 ${formatWon(fcTarget)} · 달성률 ${pct(fcTarget, fcActual)}` : '목표를 입력해보세요';
+
+      animateCount(document.getElementById('ptAmount'), ptActual);
+      document.getElementById('ptSub').textContent = ptTarget > 0 ? `목표 ${formatWon(ptTarget)} · 달성률 ${pct(ptTarget, ptActual)}` : 'PT 관리에서 목표를 설정해보세요';
+
+      animateCount(document.getElementById('groupPtAmount'), groupPtActual);
+      document.getElementById('groupPtSub').textContent = `이번 달 그룹PT(올바른) 매출`;
+
+      animateCount(document.getElementById('totalAmount'), totalActual);
+      document.getElementById('totalSub').textContent = totalTarget > 0
+        ? `목표 ${formatWon(totalTarget)} · 달성률 ${pct(totalTarget, totalActual)} · 남은 타겟 ${formatWon(remaining)}`
+        : `FC+PT 목표를 입력하면 달성률이 표시돼요`;
+    }
+
+    // 카드/현금/계좌이체/키오스크 결제수단별 합산 - 결제수단이 아직 없는(비어있는) 예전 매출 기록은
+    // "미입력"으로 따로 모아서 보여줌 (합계에서 빠뜨리지 않기 위함)
+    const PAYMENT_METHODS_ORDER = ['card', 'cash', 'transfer', 'kiosk'];
+    function renderPaymentBreakdown() {
+      const row = document.getElementById('paymentBreakdownRow');
+      const totals = {}; const counts = {};
+      PAYMENT_METHODS_ORDER.forEach(pm => { totals[pm] = 0; counts[pm] = 0; });
+      let unsetTotal = 0, unsetCount = 0;
+      salesCache.forEach(s => {
+        const amt = Number(s.amount);
+        if (s.payment_method && PAYMENT_METHODS_ORDER.includes(s.payment_method)) {
+          totals[s.payment_method] += amt; counts[s.payment_method]++;
+        } else {
+          unsetTotal += amt; unsetCount++;
+        }
+      });
+      let html = PAYMENT_METHODS_ORDER.map(pm => `
+        <div class="pm-box">
+          <div class="pm-label">${PAYMENT_METHOD_LABEL[pm]}</div>
+          <div class="pm-amount">${formatWon(totals[pm])}</div>
+          <div class="pm-count">${counts[pm]}건</div>
+        </div>`).join('');
+      if (unsetCount > 0) {
+        html += `
+        <div class="pm-box">
+          <div class="pm-label">결제수단 미입력</div>
+          <div class="pm-amount">${formatWon(unsetTotal)}</div>
+          <div class="pm-count">${unsetCount}건</div>
+        </div>`;
+      }
+      row.innerHTML = html;
+    }
+
+    function renderTrainerTable() {
+      const tbody = document.querySelector('#trainerTable tbody');
+      if (staffCache.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:16px;">등록된 직원이 없습니다.</td></tr>`;
+        return;
+      }
+      const sumFor = (staffId, categories) => salesCache
+        .filter(s => s.staff_id === staffId && categories.includes(s.category))
+        .reduce((sum, s) => sum + Number(s.amount), 0);
+
+      let grand = { membership: 0, group_pt: 0, etc: 0, fc: 0, pt: 0, total: 0 };
+      const rows = staffCache.map(st => {
+        const membership = sumFor(st.id, CENTER_SALES_BUCKETS.membership);
+        const groupPt = sumFor(st.id, CENTER_SALES_BUCKETS.group_pt);
+        const etc = sumFor(st.id, CENTER_SALES_BUCKETS.etc);
+        const pt = sumFor(st.id, CENTER_SALES_BUCKETS.pt);
+        const fc = membership + groupPt + etc;
+        const total = fc + pt;
+        grand.membership += membership; grand.group_pt += groupPt; grand.etc += etc;
+        grand.fc += fc; grand.pt += pt; grand.total += total;
+        return `<tr>
+          <td>${escapeHtml(st.name)}</td>
+          <td style="text-align:right;">${formatWon(membership)}</td>
+          <td style="text-align:right;">${formatWon(groupPt)}</td>
+          <td style="text-align:right;">${formatWon(etc)}</td>
+          <td style="text-align:right;">${formatWon(fc)}</td>
+          <td style="text-align:right;">${formatWon(pt)}</td>
+          <td style="text-align:right; font-weight:700;">${formatWon(total)}</td>
+        </tr>`;
+      }).join('');
+      tbody.innerHTML = rows + `
+        <tr class="trainer-total-row">
+          <td>총 합계</td>
+          <td style="text-align:right;">${formatWon(grand.membership)}</td>
+          <td style="text-align:right;">${formatWon(grand.group_pt)}</td>
+          <td style="text-align:right;">${formatWon(grand.etc)}</td>
+          <td style="text-align:right;">${formatWon(grand.fc)}</td>
+          <td style="text-align:right;">${formatWon(grand.pt)}</td>
+          <td style="text-align:right;">${formatWon(grand.total)}</td>
+        </tr>`;
+    }
+
+    // ---- 정산표(탭 4개) ----
+    function saleItemLabel(s) {
+      return (s.product && s.product.name) ? s.product.name : (CATEGORY_LABEL[s.category] || s.category);
+    }
+    function saleNewRenewalLabel(s) {
+      if (s.category.endsWith('_new')) return '신규';
+      if (s.category.endsWith('_renewal')) return '재등록';
+      return '-';
+    }
+
+    function renderSettleTable() {
+      const wrap = document.getElementById('settleTableWrap');
+      const categories = CENTER_SALES_BUCKETS[currentSettleTab];
+      const rows = salesCache.filter(s => categories.includes(s.category)).sort((a, b) => (a.sale_date < b.sale_date ? -1 : a.sale_date > b.sale_date ? 1 : 0));
+
+      if (rows.length === 0) {
+        wrap.innerHTML = `<p class="muted" style="padding:16px 0;">이번 달 기록이 없습니다.</p>`;
+        return;
+      }
+
+      const showAssign = currentSettleTab === 'pt';
+      const showNewRenewal = currentSettleTab !== 'etc';
+      const byWeek = {};
+      rows.forEach(s => { const w = weekOfMonth(s.sale_date); (byWeek[w] = byWeek[w] || []).push(s); });
+
+      let html = `<table><thead><tr>
+        <th style="width:5%;">번호</th><th style="width:10%;">날짜</th><th>종목</th><th>이름</th>
+        <th>결제방법</th><th style="text-align:right;">금액</th><th>담당자</th>
+        ${showAssign ? '<th>배정</th>' : ''}${showNewRenewal ? '<th>신규/재등록</th>' : ''}<th>비고</th>
+      </tr></thead><tbody>`;
+
+      let grandTotal = 0, grandCount = 0;
+      Object.keys(byWeek).sort((a, b) => a - b).forEach(week => {
+        const weekRows = byWeek[week];
+        const weekTotal = weekRows.reduce((sum, s) => sum + Number(s.amount), 0);
+        grandTotal += weekTotal; grandCount += weekRows.length;
+        html += `<tr class="week-divider"><td colspan="${5 + (showAssign ? 1 : 0) + (showNewRenewal ? 1 : 0) + 2}">${week}주차 · ${weekRows.length}건 · ${formatWon(weekTotal)}</td></tr>`;
+        weekRows.forEach((s, i) => {
+          const assignedTrainerId = s.member ? s.member.assigned_trainer_id : null;
+          html += `<tr>
+            <td>${i + 1}</td>
+            <td>${s.sale_date}</td>
+            <td>${escapeHtml(saleItemLabel(s))}</td>
+            <td>${s.member ? escapeHtml(s.member.name) : '-'}</td>
+            <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
+            <td style="text-align:right;">${formatWon(s.amount)}</td>
+            <td>${s.staff ? escapeHtml(s.staff.name) : '-'}</td>
+            ${showAssign ? `<td>${assignedTrainerId ? escapeHtml(staffName(assignedTrainerId)) : '-'}</td>` : ''}
+            ${showNewRenewal ? `<td>${saleNewRenewalLabel(s)}</td>` : ''}
+            <td>${s.memo ? escapeHtml(s.memo) : '-'}</td>
+          </tr>`;
+        });
+      });
+      html += `</tbody></table><p class="muted" style="margin-top:-8px;">이번 달 합계: ${grandCount}건 · ${formatWon(grandTotal)}</p>`;
+      wrap.innerHTML = html;
+    }
+
+    // ---- FC 목표 저장 ----
+    document.getElementById('saveFcTargetBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('saveFcTargetBtn');
+      const note = document.getElementById('fcTargetSavedNote');
+      const val = Number(document.getElementById('fcTargetInput').value || 0);
+      btn.disabled = true;
+      try {
+        centerTargetCache = (await upsertCenterTarget(getMonthRange().monthStr, val))[0];
+        note.textContent = '저장됐어요';
+        note.style.color = 'var(--green-600)';
+        loadHeroCards();
+      } catch (err) {
+        note.textContent = '저장 실패: ' + err.message;
+        note.style.color = '#dc2626';
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => { note.textContent = ''; }, 2500);
+      }
+    });
+
+    // ---- 전체 로드 ----
+    async function reloadAll() {
+      document.getElementById('monthLabel').textContent = monthLabel();
+      const { startStr, endStr, monthStr } = getMonthRange();
+
+      const [salesResult, targetsResult, centerTargetResult] = await Promise.allSettled([
+        fetchSalesInRange(startStr, endStr),
+        fetchPtTargets(),
+        fetchCenterTarget(monthStr)
+      ]);
+      salesCache = salesResult.status === 'fulfilled' ? salesResult.value : [];
+      ptTargetsCache = targetsResult.status === 'fulfilled' ? targetsResult.value : [];
+      centerTargetCache = centerTargetResult.status === 'fulfilled' ? centerTargetResult.value : null;
+
+      document.getElementById('fcTargetInput').value = centerTargetCache ? centerTargetCache.fc_target_amount : '';
+
+      loadHeroCards();
+      renderPaymentBreakdown();
+      renderTrainerTable();
+      renderSettleTable();
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (!profile) {
+        document.getElementById('roleBadge').textContent = '프로필을 불러오지 못했어요';
+        return;
+      }
+      document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+      applyRoleNav(profile);
+      isManagerFlag = profile.role === 'manager';
+
+      if (!isManagerFlag) {
+        document.getElementById('accessDenied').style.display = '';
+        return;
+      }
+      document.getElementById('pageBody').style.display = '';
+
+      try {
+        staffCache = await fetchStaff();
+      } catch (e) { staffCache = []; }
+
+      await reloadAll();
+    })();
+  </script>
+</body>
+</html>
