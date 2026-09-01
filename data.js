@@ -896,6 +896,57 @@ async function deletePtCareLog(id) {
   if (!res.ok) await throwApiError(res, 'PT 회원 관리 기록 삭제에 실패했습니다.');
 }
 
+// pt.html의 "주차별 매출 기록"이 쓰는 monthStr과 같은 'YYYY-MM' 형식 (pt_care_logs.period_month가 이 형식)
+function thisPeriodMonthStr(refDate = new Date()) { return `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, '0')}`; }
+
+// 회원 관리(members.html)에서 개인PT가 포함된 회원을 등록하면서 담당 트레이너를 같이 지정했을 때,
+// 그 트레이너가 PT 관리 > PT 회원 관리 탭에서 매번 "+ PT 회원 추가"로 직접 찾아 넣지 않아도 되도록
+// 자동으로 연동된 행을 만들어줌 (member_id로 바로 연결되어 있어서 잔여횟수도 실시간으로 따라감).
+// 이번 달에 같은 회원이 그 트레이너 시트에 이미 있으면 중복으로 만들지 않고 그 행을 그대로 씀.
+async function ensurePtCareLogForMember(memberId, memberName, trainerId) {
+  const monthStr = thisPeriodMonthStr();
+  const all = await fetchPtCareLogs();
+  const dup = all.find(l => l.member_id === memberId && l.trainer_id === trainerId && l.period_month === monthStr);
+  if (dup) return dup;
+  const rows = await addPtCareLog({
+    trainer_id: trainerId,
+    period_month: monthStr,
+    member_id: memberId,
+    name: memberName,
+    pt_expected_renewal_month: null,
+    pt_remaining_sessions: null,
+    pt_session_focus: null,
+    pt_short_term_plan: null,
+    pt_long_term_plan: null,
+    pt_expected_sessions: null,
+    pt_expected_amount: null,
+    renewal_stage: 'in_progress',
+    pt_expected_probability: null
+  });
+  return rows[0];
+}
+
+// 회원의 담당 트레이너가 바뀌었을 때, 그 회원의 "이번 달" PT 회원 관리 기록만 새 트레이너 시트로
+// 옮겨줌 (트레이너 항목만 바꿔치기 - 적어뒀던 메모/계획 등은 그대로 유지됨). 지난 달까지의 기록은
+// 그때 실제로 담당했던 트레이너의 이력이므로 건드리지 않고 그대로 둠.
+// 새 트레이너 시트에 이미 이번 달 같은 회원 기록이 있으면(중복 방지), 잘못 배정됐던 옛 기록은 대신 지움.
+async function movePtCareLogToNewTrainer(memberId, newTrainerId) {
+  if (!newTrainerId) return 0; // "미지정"으로 바꾸는 경우는 pt_care_logs.trainer_id가 NOT NULL이라 옮길 수 없음 - 그대로 둠
+  const monthStr = thisPeriodMonthStr();
+  const all = await fetchPtCareLogs();
+  const misassigned = all.filter(l => l.member_id === memberId && l.period_month === monthStr && l.trainer_id !== newTrainerId);
+  if (misassigned.length === 0) return 0;
+  const alreadyThere = all.find(l => l.member_id === memberId && l.period_month === monthStr && l.trainer_id === newTrainerId);
+  for (const row of misassigned) {
+    if (alreadyThere) {
+      await deletePtCareLog(row.id);
+    } else {
+      await updatePtCareLog(row.id, { trainer_id: newTrainerId });
+    }
+  }
+  return misassigned.length;
+}
+
 // ---- 직원(profiles) - 직원 관리 화면 ----
 // 지점장이면 RLS 덕분에 전체 직원이 조회되고, 트레이너면 본인 행만 조회됨
 async function fetchProfiles() {

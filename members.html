@@ -701,6 +701,7 @@
         locker_end_date: val('md_f_locker_end') || null,
         workout_clothes_end_date: val('md_f_clothes_end') || null
       };
+      const previousTrainerId = currentDetailMember.assigned_trainer_id || null;
       if (isManagerFlag) patch.assigned_trainer_id = document.getElementById('md_f_trainer').value || null;
       try {
         const rows = await updateMember(currentDetailMember.id, patch);
@@ -709,6 +710,16 @@
         successBox.style.display = 'block';
         document.getElementById('md_name').textContent = currentDetailMember.name;
         document.getElementById('md_phone').textContent = currentDetailMember.phone || '전화번호 없음';
+
+        // 담당 트레이너가 바뀌었으면, 이번 달 PT 회원 관리 기록만 새 트레이너 시트로 옮겨줌
+        // (지난 달까지의 기록은 그때 실제로 담당했던 트레이너 이력이라 그대로 둠 - "미지정"으로
+        //  바꾸는 경우는 옮길 곳이 없어서 건드리지 않음)
+        if (isManagerFlag && patch.assigned_trainer_id && patch.assigned_trainer_id !== previousTrainerId) {
+          try {
+            await movePtCareLogToNewTrainer(currentDetailMember.id, patch.assigned_trainer_id);
+          } catch (moveErr) { /* 담당자 변경 자체는 이미 저장됐으니 조용히 넘어감 */ }
+        }
+
         await loadMembers();
       } catch (err) {
         errorBox.textContent = err.message;
@@ -1186,6 +1197,17 @@
           } catch (saleErr) {
             saleWarning = saleErr.message;
           }
+        }
+
+        // 개인PT가 포함되고 담당 트레이너도 지정했으면, 그 트레이너의 PT 관리 > PT 회원 관리 탭에도
+        // 자동으로 연동된 행을 만들어줌 (트레이너가 매번 "+PT 회원 추가"로 직접 찾아 넣지 않아도 됨).
+        // 매출 기록과 마찬가지로 이 부분이 실패해도 회원 등록 자체는 이미 끝난 상태라 실패 처리하지 않고,
+        // 안 되면 트레이너가 PT 회원 관리 탭에서 "회원 연결"로 수동 연동하면 됨
+        const ptSaleIncluded = salesPayload.some(s => s.category === 'pt_new');
+        if (ptSaleIncluded && newMember.assigned_trainer_id) {
+          try {
+            await ensurePtCareLogForMember(newMember.id, newMember.name, newMember.assigned_trainer_id);
+          } catch (careLinkErr) { /* 조용히 넘어감 - 아래 saleWarning과 별개로 치명적이지 않음 */ }
         }
 
         document.getElementById('addMemberForm').reset();

@@ -16,11 +16,7 @@
   .fc-target-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 2px 0; }
   .fc-target-box input { width: 140px; padding: 6px 8px; border: 1px solid var(--slate-300); border-radius: 8px; font-size: 13px; }
   .trainer-total-row td { font-weight: 800; background: var(--slate-50); }
-  .pm-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-  .pm-box { flex: 1 1 160px; border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--white); }
-  .pm-box .pm-label { font-size: 12px; color: var(--slate-500); font-weight: 700; margin-bottom: 6px; }
-  .pm-box .pm-amount { font-size: 19px; font-weight: 800; }
-  .pm-box .pm-count { font-size: 11px; color: var(--slate-400); margin-top: 2px; }
+  #paymentBreakdownTable th, #paymentBreakdownTable td { padding: 7px 9px; font-size: 12.5px; }
 </style>
 </head>
 <body>
@@ -101,7 +97,20 @@
 
       <div class="section" style="margin-top:22px;">
         <h2>결제수단별 매출</h2>
-        <div class="pm-row" id="paymentBreakdownRow"></div>
+        <div style="overflow-x:auto;">
+          <table id="paymentBreakdownTable">
+            <thead><tr>
+              <th>결제수단</th>
+              <th style="text-align:right;">회원권</th>
+              <th style="text-align:right;">올바른(그룹PT)</th>
+              <th style="text-align:right;">락커·일일권·운동복·양도</th>
+              <th style="text-align:right;">개인PT</th>
+              <th style="text-align:right;">합계</th>
+              <th style="text-align:right;">건수</th>
+            </tr></thead>
+            <tbody><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="section" style="margin-top:22px;">
@@ -214,37 +223,63 @@
         : `FC+PT 목표를 입력하면 달성률이 표시돼요`;
     }
 
-    // 카드/현금/계좌이체/키오스크 결제수단별 합산 - 결제수단이 아직 없는(비어있는) 예전 매출 기록은
-    // "미입력"으로 따로 모아서 보여줌 (합계에서 빠뜨리지 않기 위함)
+    // 카드/현금/계좌이체/키오스크 결제수단별로, 회원권/올바른(그룹PT)/기타(락커·일일권·운동복·양도)/개인PT
+    // 항목별 금액까지 전부 따로 보여줌. 결제수단이 아직 없는(비어있는) 예전 매출 기록은
+    // "미입력" 행으로 따로 모아서 보여줌 (합계에서 빠뜨리지 않기 위함)
     const PAYMENT_METHODS_ORDER = ['card', 'cash', 'transfer', 'kiosk'];
     function renderPaymentBreakdown() {
-      const row = document.getElementById('paymentBreakdownRow');
-      const totals = {}; const counts = {};
-      PAYMENT_METHODS_ORDER.forEach(pm => { totals[pm] = 0; counts[pm] = 0; });
-      let unsetTotal = 0, unsetCount = 0;
-      salesCache.forEach(s => {
-        const amt = Number(s.amount);
-        if (s.payment_method && PAYMENT_METHODS_ORDER.includes(s.payment_method)) {
-          totals[s.payment_method] += amt; counts[s.payment_method]++;
-        } else {
-          unsetTotal += amt; unsetCount++;
-        }
-      });
-      let html = PAYMENT_METHODS_ORDER.map(pm => `
-        <div class="pm-box">
-          <div class="pm-label">${PAYMENT_METHOD_LABEL[pm]}</div>
-          <div class="pm-amount">${formatWon(totals[pm])}</div>
-          <div class="pm-count">${counts[pm]}건</div>
-        </div>`).join('');
-      if (unsetCount > 0) {
-        html += `
-        <div class="pm-box">
-          <div class="pm-label">결제수단 미입력</div>
-          <div class="pm-amount">${formatWon(unsetTotal)}</div>
-          <div class="pm-count">${unsetCount}건</div>
-        </div>`;
+      const tbody = document.querySelector('#paymentBreakdownTable tbody');
+      const sumFor = (list, categories) => list
+        .filter(s => categories.includes(s.category))
+        .reduce((sum, s) => sum + Number(s.amount), 0);
+      const rowHtml = (label, list) => {
+        const membership = sumFor(list, CENTER_SALES_BUCKETS.membership);
+        const groupPt = sumFor(list, CENTER_SALES_BUCKETS.group_pt);
+        const etc = sumFor(list, CENTER_SALES_BUCKETS.etc);
+        const pt = sumFor(list, CENTER_SALES_BUCKETS.pt);
+        const total = membership + groupPt + etc + pt;
+        return {
+          membership, groupPt, etc, pt, total, count: list.length,
+          html: `<tr>
+            <td>${label}</td>
+            <td style="text-align:right;">${formatWon(membership)}</td>
+            <td style="text-align:right;">${formatWon(groupPt)}</td>
+            <td style="text-align:right;">${formatWon(etc)}</td>
+            <td style="text-align:right;">${formatWon(pt)}</td>
+            <td style="text-align:right;font-weight:800;">${formatWon(total)}</td>
+            <td style="text-align:right;">${list.length}건</td>
+          </tr>`
+        };
+      };
+
+      let grand = { membership: 0, groupPt: 0, etc: 0, pt: 0, total: 0, count: 0 };
+      let rowsHtml = PAYMENT_METHODS_ORDER.map(pm => {
+        const list = salesCache.filter(s => s.payment_method === pm);
+        const r = rowHtml(PAYMENT_METHOD_LABEL[pm], list);
+        grand.membership += r.membership; grand.groupPt += r.groupPt; grand.etc += r.etc;
+        grand.pt += r.pt; grand.total += r.total; grand.count += r.count;
+        return r.html;
+      }).join('');
+
+      const unsetList = salesCache.filter(s => !s.payment_method || !PAYMENT_METHODS_ORDER.includes(s.payment_method));
+      if (unsetList.length > 0) {
+        const r = rowHtml('결제수단 미입력', unsetList);
+        grand.membership += r.membership; grand.groupPt += r.groupPt; grand.etc += r.etc;
+        grand.pt += r.pt; grand.total += r.total; grand.count += r.count;
+        rowsHtml += r.html;
       }
-      row.innerHTML = html;
+
+      rowsHtml += `<tr class="trainer-total-row">
+        <td>합계</td>
+        <td style="text-align:right;">${formatWon(grand.membership)}</td>
+        <td style="text-align:right;">${formatWon(grand.groupPt)}</td>
+        <td style="text-align:right;">${formatWon(grand.etc)}</td>
+        <td style="text-align:right;">${formatWon(grand.pt)}</td>
+        <td style="text-align:right;">${formatWon(grand.total)}</td>
+        <td style="text-align:right;">${grand.count}건</td>
+      </tr>`;
+
+      tbody.innerHTML = rowsHtml;
     }
 
     function renderTrainerTable() {
