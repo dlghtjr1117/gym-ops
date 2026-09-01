@@ -77,6 +77,11 @@
         <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th><th id="salesDeleteColHeader" style="display:none;"></th></tr></thead>
         <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
+      <div class="report-nav" style="margin-top:10px; justify-content:flex-end;">
+        <button type="button" class="report-nav-arrow" id="salesPrevBtn">◀</button>
+        <div class="muted" id="salesPageLabel">-</div>
+        <button type="button" class="report-nav-arrow" id="salesNextBtn">▶</button>
+      </div>
     </div>
   </div>
 
@@ -144,15 +149,24 @@
       if (saleCategory) document.getElementById('s_category').value = saleCategory;
     });
 
-    async function loadSales() {
+    // ---- 최근 매출 내역 (10건씩 페이지 넘김) ----
+    // 한 번에 넉넉히(100건) 불러온 뒤 화면에서 10건씩 잘라서 보여줌 (페이지 넘길 때마다 서버에 다시 요청할 필요 없게,
+    // 대시보드의 "최근 매출 내역"과 동일한 방식)
+    let salesAll = [];
+    let salesPage = 1;
+    const SALES_PAGE_SIZE = 10;
+
+    function renderSalesPage() {
       const tbody = document.querySelector('#salesTable tbody');
-      try {
-        const sales = await fetchRecentSales(15);
-        if (sales.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 7 : 6}" class="muted" style="padding:16px;">등록된 매출이 없습니다.</td></tr>`;
-          return;
-        }
-        tbody.innerHTML = sales.map(s => `
+      const totalPages = Math.max(1, Math.ceil(salesAll.length / SALES_PAGE_SIZE));
+      salesPage = Math.min(Math.max(1, salesPage), totalPages);
+
+      if (salesAll.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 7 : 6}" class="muted" style="padding:16px;">등록된 매출이 없습니다.</td></tr>`;
+      } else {
+        const startIdx = (salesPage - 1) * SALES_PAGE_SIZE;
+        const pageItems = salesAll.slice(startIdx, startIdx + SALES_PAGE_SIZE);
+        tbody.innerHTML = pageItems.map(s => `
           <tr>
             <td>${s.sale_date}</td>
             <td>${s.member ? s.member.name : '-'}</td>
@@ -176,6 +190,28 @@
             });
           });
         }
+      }
+
+      document.getElementById('salesPageLabel').textContent = `${salesPage} / ${totalPages}`;
+      document.getElementById('salesPrevBtn').disabled = salesPage <= 1;
+      document.getElementById('salesNextBtn').disabled = salesPage >= totalPages;
+    }
+
+    document.getElementById('salesPrevBtn').addEventListener('click', () => {
+      salesPage -= 1;
+      renderSalesPage();
+    });
+    document.getElementById('salesNextBtn').addEventListener('click', () => {
+      salesPage += 1;
+      renderSalesPage();
+    });
+
+    async function loadSales(resetToFirstPage = false) {
+      const tbody = document.querySelector('#salesTable tbody');
+      try {
+        salesAll = await fetchRecentSales(100);
+        if (resetToFirstPage) salesPage = 1;
+        renderSalesPage();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 7 : 6}" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
@@ -243,7 +279,7 @@
         document.getElementById('s_date').value = new Date().toISOString().slice(0, 10);
         document.getElementById('s_time').value = nowTimeStr();
         if (currentUserId) document.getElementById('s_staff').value = currentUserId; // reset()은 담당자를 첫 옵션으로 되돌리므로 다시 본인으로 맞춰줌
-        loadSales();
+        loadSales(true); // 방금 등록한 매출이 바로 보이도록 1페이지로 리셋
       } catch (err) {
         errorBox.textContent = err.message;
         errorBox.style.display = 'block';

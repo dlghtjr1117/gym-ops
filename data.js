@@ -209,9 +209,12 @@ async function addMember(member) {
 }
 
 // ---- 매출(sales) ----
+// 정렬 기준을 sale_date(날짜)만 쓰면, 같은 날짜에 여러 건이 몰릴 때(오늘 하루에 15건 넘게 등록되는 경우 등)
+// 그 안에서의 순서가 보장되지 않아서 방금 등록한 매출이 15건 제한에 밀려 안 보일 수 있음
+// -> created_at(등록된 실제 시각)까지 같이 정렬 기준으로 줘서 "날짜가 같으면 최근에 등록한 순"이 되도록 보장
 async function fetchRecentSales(limit = 10) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/sales?select=*,member:members(name),staff:profiles(name)&order=sale_date.desc&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/sales?select=*,member:members(name),staff:profiles(name)&order=sale_date.desc,created_at.desc&limit=${limit}`,
     { headers: await authHeaders() }
   );
   if (!res.ok) await throwApiError(res, '매출 내역을 불러오지 못했습니다.');
