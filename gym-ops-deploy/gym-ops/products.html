@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 이용권 관리</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="center-sales.html">센터 매출</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html" class="active">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="managerOnlyNotice" class="panel" style="display:none;">
+      <p class="muted" style="margin:0;">이용권 상품을 등록·수정하는 건 지점장만 할 수 있어요. 매출 입력이나 회원 등록 화면에서는 등록된 상품을 그대로 골라 쓰실 수 있어요.</p>
+    </div>
+
+    <div class="panel" id="addPanel" style="display:none;">
+      <h3>상품 등록</h3>
+      <p class="muted" style="margin:-6px 0 12px;">여기서 만든 상품은 매출 입력·회원 등록 화면에서 바로 골라 쓸 수 있고, 가격/만료일/PT 횟수가 자동으로 채워져요.</p>
+      <div id="addErrorBox" class="error-text"></div>
+      <form id="addProductForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field" style="grid-column: span 2;"><label>상품명</label><input type="text" id="p_name" placeholder="예: 헬스 3개월권 / 올바른 운동 그룹PT 10회" required /></div>
+          <div class="field"><label>카테고리</label>
+            <select id="p_category" required>
+              <option value="membership">헬스이용권</option>
+              <option value="group_pt">그룹PT</option>
+              <option value="pt">개인PT</option>
+              <option value="locker">락커</option>
+              <option value="clothes">운동복</option>
+            </select>
+          </div>
+          <div class="field"><label>가격(원)</label><input type="number" id="p_price" min="0" placeholder="선택 입력" /></div>
+          <div class="field"><label>유효기간(일)</label><input type="number" id="p_duration" min="0" placeholder="예: 90 (3개월)" /></div>
+          <div class="field" id="p_sessionsField"><label>PT 횟수</label><input type="number" id="p_sessions" min="0" placeholder="개인PT 상품일 때만" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>이용권 상품 목록</h2>
+      <div id="categoryTabs" class="filter-tabs"></div>
+      <table id="productsTable">
+        <thead><tr><th>상품명</th><th>카테고리</th><th>가격</th><th>유효기간</th><th>PT 횟수</th><th>상태</th><th></th></tr></thead>
+        <tbody><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let isManagerFlag = false;
+    let productsCache = [];
+    let activeCategoryFilter = 'all';
+
+    document.getElementById('p_category').addEventListener('change', (e) => {
+      document.getElementById('p_sessionsField').style.display = e.target.value === 'pt' ? '' : 'none';
+    });
+    document.getElementById('p_sessionsField').style.display = 'none';
+
+    function formatDuration(days) {
+      if (days == null) return '-';
+      if (days % 30 === 0) return `${days}일 (${days / 30}개월)`;
+      return `${days}일`;
+    }
+
+    function renderCategoryTabs() {
+      const counts = {};
+      productsCache.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+      const tabs = [{ key: 'all', label: `전체 (${productsCache.length})` }]
+        .concat(EXPIRY_CATEGORIES.filter(c => counts[c.key]).map(c => ({ key: c.key, label: `${c.label} (${counts[c.key]})` })));
+      document.getElementById('categoryTabs').innerHTML = tabs.map(t =>
+        `<button type="button" class="filter-tab${t.key === activeCategoryFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+      ).join('');
+      document.querySelectorAll('#categoryTabs .filter-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeCategoryFilter = btn.dataset.key;
+          renderCategoryTabs();
+          renderProductsTable();
+        });
+      });
+    }
+
+    function renderProductsTable() {
+      const tbody = document.querySelector('#productsTable tbody');
+      const list = activeCategoryFilter === 'all' ? productsCache : productsCache.filter(p => p.category === activeCategoryFilter);
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="padding:16px;">등록된 상품이 없습니다.</td></tr>';
+        return;
+      }
+      const catLabel = key => (EXPIRY_CATEGORIES.find(c => c.key === key) || {}).label || key;
+      tbody.innerHTML = list.map(p => `
+        <tr style="${p.active ? '' : 'opacity:.55;'}">
+          <td>${p.name}</td>
+          <td>${catLabel(p.category)}</td>
+          <td>${p.price != null ? formatWon(p.price) : '-'}</td>
+          <td>${formatDuration(p.duration_days)}</td>
+          <td>${p.sessions != null ? p.sessions + '회' : '-'}</td>
+          <td><span class="badge ${p.active ? 'badge-green' : 'badge-slate'}">${p.active ? '판매중' : '비활성'}</span></td>
+          <td>${isManagerFlag ? `<button type="button" class="btn-link toggle-active-btn" data-id="${p.id}" data-active="${p.active}">${p.active ? '비활성화' : '다시 활성화'}</button>` : ''}</td>
+        </tr>
+      `).join('');
+      if (isManagerFlag) {
+        tbody.querySelectorAll('.toggle-active-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const nowActive = btn.dataset.active === 'true';
+            try {
+              await updateProduct(btn.dataset.id, { active: !nowActive });
+              loadProducts();
+            } catch (err) { alert(err.message); }
+          });
+        });
+      }
+    }
+
+    async function loadProducts() {
+      const tbody = document.querySelector('#productsTable tbody');
+      try {
+        productsCache = await fetchProducts(false);
+        renderCategoryTabs();
+        renderProductsTable();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addErrorBox');
+      errorBox.style.display = 'none';
+      const val = id => document.getElementById(id).value.trim();
+      try {
+        await addProduct({
+          name: val('p_name'),
+          category: val('p_category'),
+          price: val('p_price') ? Number(val('p_price')) : null,
+          duration_days: val('p_duration') ? Number(val('p_duration')) : null,
+          sessions: val('p_sessions') ? Number(val('p_sessions')) : null,
+          active: true
+        });
+        document.getElementById('addProductForm').reset();
+        document.getElementById('p_sessionsField').style.display = 'none';
+        loadProducts();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+        if (profile.role === 'manager') {
+          isManagerFlag = true;
+          document.getElementById('addPanel').style.display = 'block';
+        } else {
+          document.getElementById('managerOnlyNotice').style.display = 'block';
+        }
+      }
+      loadProducts();
+    })();
+  </script>
+</body>
+</html>

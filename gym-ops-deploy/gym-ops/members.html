@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 회원 관리</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html" class="active">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="center-sales.html">센터 매출</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+      <button type="button" class="btn btn-primary" id="openAddMemberBtn" style="display:none; width:auto; padding:10px 24px;">+ 회원 등록</button>
+    </div>
+
+    <div class="panel" id="uploadPanel" style="display:none;">
+      <h3>엑셀로 회원 일괄 등록 / 업데이트</h3>
+      <p class="muted" style="margin-top:-6px; margin-bottom:12px;">
+        두 가지 형식을 자동으로 인식해요: <b>①</b> 기존에 쓰시던 헬스장 관리 프로그램에서 내보낸 원본 엑셀 (이름·휴대폰번호·이용권정보 컬럼이 있는 시트를 자동으로 찾아서, 회원권/개인PT/그룹PT/락커/운동복 정보를 알아서 나눠 담아요) &nbsp;또는&nbsp; <b>②</b> 아래 간단 양식.<br/>
+        전화번호가 이미 있는 회원이면 정보가 업데이트되고, 없으면 새로 등록돼요. 같은 파일을 최신 상태로 관리하며 계속 다시 올리시면 돼요.
+        <a href="#" id="downloadTemplate">간단 양식 다운로드</a>
+      </p>
+      <input type="file" id="uploadFile" accept=".xlsx,.xls,.csv" />
+      <button type="button" class="btn btn-outline" id="uploadBtn" style="width:auto; padding-left:20px; padding-right:20px; margin-left:10px;">업로드 시작</button>
+      <div id="uploadResult" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="section">
+      <h2>회원 목록</h2>
+      <div class="search-bar">
+        <input type="text" id="memberSearch" placeholder="이름 또는 전화번호 뒷자리로 검색" />
+      </div>
+      <div style="overflow-x:auto;">
+      <table id="membersTable" class="table-fixed" style="min-width:1020px;">
+        <thead><tr>
+          <th style="width:11%;">이름</th><th style="width:13%;">전화번호</th><th style="width:8%;">담당</th>
+          <th style="width:17%;">이용권</th><th style="width:17%;">그룹PT</th><th style="width:17%;">개인PT</th><th style="width:8%;">락커</th><th style="width:8%;">운동복</th><th id="deleteColHeader" style="display:none; width:6%;"></th>
+        </tr></thead>
+        <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+      </div>
+      <div class="report-nav" id="membersPagination" style="justify-content:flex-end; margin-top:10px;"></div>
+      <p class="muted" style="margin-top:8px;">회원을 클릭하면 상세 정보 확인, 이용권 판매(등록), 정보 수정을 할 수 있어요.</p>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="addMemberOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:820px;">
+      <div class="modal-header">
+        <h3>회원 등록</h3>
+        <button type="button" class="modal-close" id="am_closeBtn">&times;</button>
+      </div>
+      <div id="addErrorBox" class="error-text"></div>
+      <form id="addMemberForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>이름</label><input type="text" id="m_name" required /></div>
+          <div class="field"><label>전화번호</label><input type="text" id="m_phone" placeholder="010-0000-0000" /></div>
+          <div class="field"><label>담당 트레이너</label><select id="m_trainer"><option value="">미지정</option></select></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>생년월일</label><input type="date" id="m_birth" /></div>
+          <div class="field"><label>주소</label><input type="text" id="m_address" placeholder="예: 서울시 강남구 ..." /></div>
+        </div>
+        <div class="field" style="margin-bottom:18px;">
+          <label>메모 (특이사항)</label>
+          <textarea id="m_memo" rows="2" placeholder="예: 무릎 부상 있음, 저녁 시간대 선호 등" style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
+        </div>
+        <p class="muted" style="margin:0 0 8px;">상품을 고르면 시작일 기준 만료일과 금액이 자동으로 채워져요. "직접 입력"으로 두고 금액만 적어도(할인 등으로 정가와 다르게 파는 경우) 그 금액 그대로 매출로 기록돼요.</p>
+
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="field"><label>이용권 상품</label><select id="m_product_membership"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>이용권 시작일</label><input type="date" id="m_start" /></div>
+          <div class="field"><label>이용권 만료일</label><input type="date" id="m_end_date" /></div>
+          <div class="field"><label>이용권 금액</label><input type="number" min="0" id="m_amount_membership" placeholder="원" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="field"><label>그룹PT 상품</label><select id="m_product_group_pt"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>그룹PT 시작일</label><input type="date" id="m_gpt_start" /></div>
+          <div class="field"><label>그룹PT 만료일</label><input type="date" id="m_gpt_end" /></div>
+          <div class="field"><label>그룹PT 금액</label><input type="number" min="0" id="m_amount_group_pt" placeholder="원" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="field"><label>개인PT 상품</label><select id="m_product_pt"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>개인PT 시작일</label><input type="date" id="m_pt_start" /></div>
+          <div class="field"><label>개인PT 만료일</label><input type="date" id="m_pt_end" /></div>
+          <div class="field"><label>개인PT 금액</label><input type="number" min="0" id="m_amount_pt" placeholder="원" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="field"><label>락커 상품</label><select id="m_product_locker"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>락커 시작일</label><input type="date" id="m_locker_start" /></div>
+          <div class="field"><label>락커 만료일</label><input type="date" id="m_locker_end" /></div>
+          <div class="field"><label>락커 금액</label><input type="number" min="0" id="m_amount_locker" placeholder="원" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div class="field"><label>운동복 상품</label><select id="m_product_clothes"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>운동복 시작일</label><input type="date" id="m_clothes_start" /></div>
+          <div class="field"><label>운동복 만료일</label><input type="date" id="m_clothes_end" /></div>
+          <div class="field"><label>운동복 금액</label><input type="number" min="0" id="m_amount_clothes" placeholder="원" /></div>
+        </div>
+
+        <div id="m_sale_total" class="sale-total">합계 0원</div>
+
+        <p class="muted" style="margin:14px 0 8px;">위에서 상품을 고르거나 금액을 적은 항목은 등록과 동시에 매출로도 기록돼요. 아래 판매 날짜·시각은 (위 항목별 시작일과 별개로) 실제로 결제한 날짜·시각을 뜻해요 — 예를 들어 오늘 결제받았지만 이용권은 다음 주부터 시작하는 경우처럼, 결제일과 시작일이 다를 때 각각 따로 적어주세요.</p>
+        <div class="form-grid" style="margin-bottom:18px;">
+          <div class="field"><label>판매 담당자</label><select id="m_sale_staff"></select></div>
+          <div class="field"><label>결제 수단</label>
+            <select id="m_sale_payment">
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+              <option value="transfer">계좌이체</option>
+              <option value="kiosk">키오스크</option>
+            </select>
+          </div>
+          <div class="field"><label>판매 날짜</label><input type="date" id="m_sale_date" /></div>
+          <div class="field"><label>판매 시각</label><input type="time" id="m_sale_time" /></div>
+        </div>
+        <!-- 이용권/그룹PT 종목명, 개인PT 잔여횟수는 위 상품 선택으로 자동 계산되고
+             화면에 따로 안 보여줘도 되는 값이라, 입력칸은 숨겨두고 값만 자동으로 채워 넣음 -->
+        <input type="hidden" id="m_type" />
+        <input type="hidden" id="m_gpt_type" />
+        <input type="hidden" id="m_pt_remain" />
+        <button type="submit" class="btn btn-primary" style="width:100%;">등록</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="memberDetailOverlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="md_name">-</h3>
+          <div class="muted" id="md_phone">-</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <button type="button" class="btn-link" id="md_deleteBtn" style="display:none; color:#dc2626;">회원 삭제</button>
+          <button type="button" class="modal-close" id="md_closeBtn">&times;</button>
+        </div>
+      </div>
+
+      <div id="md_errorBox" class="error-text"></div>
+      <div id="md_successBox" class="success-text"></div>
+
+      <div class="modal-section">
+        <h4>기본 정보</h4>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>이름</label><input type="text" id="md_f_name" /></div>
+          <div class="field"><label>전화번호</label><input type="text" id="md_f_phone" placeholder="010-0000-0000" /></div>
+          <div class="field"><label>담당 트레이너</label><select id="md_f_trainer"><option value="">미지정</option></select></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>생년월일</label><input type="date" id="md_f_birth" /></div>
+          <div class="field"><label>주소</label><input type="text" id="md_f_address" placeholder="예: 서울시 강남구 ..." /></div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>메모 (특이사항)</label>
+          <textarea id="md_f_memo" rows="2" placeholder="예: 무릎 부상 있음, 저녁 시간대 선호 등" style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
+        </div>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>이용권 종목</label><input type="text" id="md_f_type" placeholder="예: 회원권 3개월" /></div>
+          <div class="field"><label>이용권 만료일</label><input type="date" id="md_f_end_date" /></div>
+          <div class="field"><label>그룹PT 종목</label><input type="text" id="md_f_gpt_type" placeholder="예: 필라테스" /></div>
+          <div class="field"><label>그룹PT 만료일</label><input type="date" id="md_f_gpt_end" /></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>개인PT 만료일</label><input type="date" id="md_f_pt_end" /></div>
+          <div class="field"><label>개인PT 잔여횟수</label><input type="number" id="md_f_pt_remain" min="0" /></div>
+          <div class="field"><label>락커 만료일</label><input type="date" id="md_f_locker_end" /></div>
+          <div class="field"><label>운동복 만료일</label><input type="date" id="md_f_clothes_end" /></div>
+        </div>
+        <button type="button" class="btn btn-primary" id="md_saveBtn" style="width:auto; padding-left:24px; padding-right:24px;">정보 저장</button>
+      </div>
+
+      <div class="modal-section">
+        <h4>이용권 판매 (등록)</h4>
+
+        <div id="md_sale_cart_view">
+          <p class="muted" style="margin:-4px 0 10px;">상품을 여러 개 담고 "선택 완료"를 누르면, 시작일/가격을 확인하고 등록하는 다음 단계로 넘어가요.</p>
+          <div class="sale-cart-layout">
+            <div class="sale-col">
+              <div class="sale-col-title">① 종류 선택</div>
+              <div id="md_sale_cat_tabs" class="filter-tabs"></div>
+              <div id="md_sale_product_list" class="sale-product-list"></div>
+            </div>
+            <div class="sale-col">
+              <div class="sale-col-title">② 담은 상품</div>
+              <div id="md_sale_cart_list" class="sale-cart-list">
+                <p class="muted" style="padding:10px;">아직 담은 상품이 없습니다.</p>
+              </div>
+            </div>
+            <div class="sale-col">
+              <div class="sale-col-title">③ 확인하고 다음 단계로</div>
+              <div id="md_sale_confirm_list" class="sale-cart-list">
+                <p class="muted" style="padding:10px;">아직 담은 상품이 없습니다.</p>
+              </div>
+              <button type="button" class="btn btn-primary" id="md_goto_checkout_btn" style="width:100%; margin-top:10px;">선택 완료</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="md_sale_checkout_view" style="display:none;">
+          <button type="button" class="btn-link" id="md_checkout_back_btn" style="margin-bottom:12px;">← 다시 선택</button>
+          <p class="muted" style="margin:-4px 0 10px;">시작일을 바꾸면 종료일이 자동으로 다시 계산돼요. 가격을 바꾸려면 "상세설정"을 눌러주세요.</p>
+          <div id="md_checkout_items" class="checkout-items"></div>
+          <div class="form-grid" style="margin:14px 0 10px;">
+            <div class="field"><label>판매 담당자</label><select id="md_sale_staff"></select></div>
+            <div class="field"><label>결제 수단</label>
+              <select id="md_sale_payment">
+                <option value="card">카드</option>
+                <option value="cash">현금</option>
+                <option value="transfer">계좌이체</option>
+                <option value="kiosk">키오스크</option>
+              </select>
+            </div>
+            <div class="field"><label>메모</label><input type="text" id="md_sale_memo" placeholder="선택 입력" /></div>
+          </div>
+          <div id="md_sale_total" class="sale-total">합계 0원</div>
+          <button type="button" class="btn btn-outline" id="md_sellBtn" style="width:100%;">이용권 판매 등록</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="saleDetailOverlay" style="display:none; z-index:200;">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3 id="sd_name">-</h3>
+        <button type="button" class="modal-close" id="sd_closeBtn">&times;</button>
+      </div>
+      <div class="field"><label>판매가(원)</label><input type="number" id="sd_amount" min="0" /></div>
+      <button type="button" class="btn btn-primary" id="sd_saveBtn" style="width:100%;">저장</button>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    // 종목명 + D-day 뱃지를 항상 한 줄로만 보여줌 (페이지를 넘길 때 행 높이가 들쭉날쭉해지지 않도록,
+    // 종목명이 길면 "..."으로 줄이고 title 속성으로 전체 이름을 확인할 수 있게 함)
+    function cell(label, endDate) {
+      const badge = remainingBadge(endDate);
+      if (!label) return `<div class="mcell">${badge}</div>`;
+      return `<div class="mcell"><span class="mcell-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>${badge}</div>`;
+    }
+
+    let isManagerFlag = false;
+    let currentUserId = null;
+    let membersCache = [];
+    let membersPage = 1;
+    const MEMBERS_PAGE_SIZE = 15;
+
+    // 검색창: 이름은 부분 일치, 전화번호는 숫자만 뽑아서 뒷자리 포함 여부로 매칭
+    // (예: "5678" 입력하면 010-1234-5678 회원이 걸리도록)
+    function matchesSearch(m, query) {
+      const q = query.trim();
+      if (!q) return true;
+      const qDigits = q.replace(/[^0-9]/g, '');
+      const nameMatch = m.name && m.name.toLowerCase().includes(q.toLowerCase());
+      const phoneDigits = (m.phone || '').replace(/[^0-9]/g, '');
+      const phoneMatch = qDigits.length > 0 && phoneDigits.includes(qDigits);
+      return nameMatch || phoneMatch;
+    }
+
+    function renderMembersTable() {
+      const tbody = document.querySelector('#membersTable tbody');
+      const paginationEl = document.getElementById('membersPagination');
+      if (membersCache.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 9 : 8}" class="muted" style="padding:16px;">등록된 회원이 없습니다. 위에서 회원을 등록해보세요.</td></tr>`;
+        paginationEl.innerHTML = '';
+        return;
+      }
+      const query = document.getElementById('memberSearch').value;
+      const allMatches = membersCache.filter(m => matchesSearch(m, query));
+      if (allMatches.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 9 : 8}" class="muted" style="padding:16px;">검색 결과가 없습니다.</td></tr>`;
+        paginationEl.innerHTML = '';
+        return;
+      }
+      const totalPages = Math.max(1, Math.ceil(allMatches.length / MEMBERS_PAGE_SIZE));
+      membersPage = Math.min(Math.max(1, membersPage), totalPages);
+      const startIdx = (membersPage - 1) * MEMBERS_PAGE_SIZE;
+      const members = allMatches.slice(startIdx, startIdx + MEMBERS_PAGE_SIZE);
+      renderPagination(paginationEl, membersPage, allMatches.length, MEMBERS_PAGE_SIZE, (newPage) => {
+        membersPage = newPage;
+        renderMembersTable();
+      });
+      tbody.innerHTML = members.map(m => `
+        <tr class="member-row" data-id="${m.id}">
+          <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
+          <td class="cell-1line">${m.phone || '-'}</td>
+          <td class="cell-1line" title="${escapeHtml(m.trainer ? m.trainer.name : '미지정')}">${m.trainer ? escapeHtml(m.trainer.name) : '미지정'}</td>
+          <td>${cell(m.membership_type, m.membership_end_date)}</td>
+          <td>${cell(m.group_pt_type, m.group_pt_end_date)}</td>
+          <td>${cell(m.pt_remaining_sessions != null ? m.pt_remaining_sessions + '회 남음' : null, m.pt_end_date)}</td>
+          <td>${cell(null, m.locker_end_date)}</td>
+          <td>${cell(null, m.workout_clothes_end_date)}</td>
+          ${isManagerFlag ? `<td><button type="button" class="btn-link delete-member-btn" data-id="${m.id}" data-name="${m.name}" style="color:#dc2626;">삭제</button></td>` : ''}
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('tr.member-row').forEach(tr => {
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('button')) return; // 삭제 버튼 클릭은 상세 모달을 열지 않음
+          openMemberDetail(tr.dataset.id);
+        });
+      });
+      if (isManagerFlag) {
+        tbody.querySelectorAll('.delete-member-btn').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm(`'${btn.dataset.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM) 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
+            try {
+              await deleteMember(btn.dataset.id);
+              loadMembers();
+              showToast(`"${btn.dataset.name}" 회원님의 정보가 삭제되었습니다.`, 'danger');
+            } catch (err) {
+              alert(err.message);
+            }
+          });
+        });
+      }
+    }
+
+    async function loadMembers() {
+      const tbody = document.querySelector('#membersTable tbody');
+      try {
+        membersCache = await fetchMembers();
+        renderMembersTable();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 9 : 8}" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    document.getElementById('memberSearch').addEventListener('input', () => {
+      membersPage = 1; // 검색어가 바뀌면 1페이지부터 다시 보여줌
+      renderMembersTable();
+    });
+
+    // ---- 회원 상세 모달 (기본정보 수정 + 이용권 판매) ----
+    let productsCacheForModal = [];
+    let currentDetailMember = null;
+    let saleCart = []; // 장바구니: [{ key, product, amount, startDate }]
+    let saleCartSeq = 0;
+    let activeSaleCategoryFilter = 'all';
+    let saleDetailKey = null; // 상세설정 팝업에서 지금 편집 중인 장바구니 항목의 key
+
+    const todayStr = () => new Date().toISOString().slice(0, 10);
+    // "판매 시각" 입력칸 기본값용: 로컬 시각 기준 "HH:MM" (toISOString은 UTC라 시간대가 어긋나서 직접 계산함)
+    const nowTimeStr = () => {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+
+    function fillTrainerSelect(selectEl, currentTrainerId) {
+      selectEl.innerHTML = '<option value="">미지정</option>';
+      trainersCache.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id; opt.textContent = t.name;
+        if (t.id === currentTrainerId) opt.selected = true;
+        selectEl.appendChild(opt);
+      });
+    }
+
+    async function loadProductsForSaleModal() {
+      try {
+        productsCacheForModal = await fetchProducts(true);
+      } catch (e) {
+        productsCacheForModal = []; // 상품 없어도 모달 자체는 열려있음 (담을 상품이 없다고만 표시됨)
+      }
+      renderSaleCategoryTabs();
+      renderSaleProductList();
+      renderSaleCart();
+    }
+
+    // 판매 담당자 select 채우기 (누가 이 이용권을 판매했는지 기록으로 남기기 위함).
+    // 트레이너 계정은 RLS상 본인 프로필만 조회되므로 자연스럽게 본인만 선택 가능하고,
+    // 지점장 계정은 전체 직원 중에서 담당자를 골라 대신 등록해줄 수 있음
+    async function loadStaffForSaleModal(selectId = 'md_sale_staff') {
+      const sel = document.getElementById(selectId);
+      sel.innerHTML = '';
+      try {
+        const staff = await fetchStaff();
+        staff.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          if (s.id === currentUserId) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        if (!sel.value && currentUserId) {
+          const opt = document.createElement('option');
+          opt.value = currentUserId; opt.textContent = '나';
+          sel.appendChild(opt);
+          sel.value = currentUserId;
+        }
+      } catch (e) {
+        // 목록을 못 불러와도 최소한 본인은 담당자로 선택되어 있도록 함
+        if (currentUserId) {
+          sel.innerHTML = `<option value="${currentUserId}" selected>나</option>`;
+        }
+      }
+    }
+
+    // ① 종류 선택: 카테고리 탭
+    function renderSaleCategoryTabs() {
+      const tabs = [{ key: 'all', label: '전체' }].concat(EXPIRY_CATEGORIES.map(c => ({ key: c.key, label: c.label })));
+      document.getElementById('md_sale_cat_tabs').innerHTML = tabs.map(t =>
+        `<button type="button" class="filter-tab${t.key === activeSaleCategoryFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+      ).join('');
+      document.querySelectorAll('#md_sale_cat_tabs .filter-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeSaleCategoryFilter = btn.dataset.key;
+          renderSaleCategoryTabs();
+          renderSaleProductList();
+        });
+      });
+    }
+
+    // ① 종류 선택: 고른 카테고리의 상품 목록 (클릭하면 ②로 담김)
+    function renderSaleProductList() {
+      const box = document.getElementById('md_sale_product_list');
+      const items = activeSaleCategoryFilter === 'all'
+        ? productsCacheForModal
+        : productsCacheForModal.filter(p => p.category === activeSaleCategoryFilter);
+      if (items.length === 0) {
+        box.innerHTML = '<p class="muted" style="padding:10px;">담을 수 있는 상품이 없습니다. 이용권 관리에서 먼저 상품을 등록해주세요.</p>';
+        return;
+      }
+      box.innerHTML = items.map(p => `
+        <div class="sale-product-row">
+          <div><div class="name">${p.name}</div><div class="price">${p.price != null ? formatWon(p.price) : '금액 미지정'}</div></div>
+          <button type="button" class="btn-link add-to-cart-btn" data-id="${p.id}">담기</button>
+        </div>
+      `).join('');
+      box.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const product = productsCacheForModal.find(p => p.id === btn.dataset.id);
+          if (!product) return;
+          saleCart.push({ key: `c${++saleCartSeq}`, product, amount: product.price != null ? product.price : 0, startDate: todayStr() });
+          renderSaleCart();
+        });
+      });
+    }
+
+    // ② 담은 상품: 장바구니 (금액은 상품 가격으로 미리 채워지고, 직접 수정도 가능)
+    function renderSaleCart() {
+      const box = document.getElementById('md_sale_cart_list');
+      if (saleCart.length === 0) {
+        box.innerHTML = '<p class="muted" style="padding:10px;">아직 담은 상품이 없습니다.</p>';
+      } else {
+        box.innerHTML = saleCart.map(item => `
+          <div class="sale-cart-row">
+            <div class="row-top">
+              <div class="name">${item.product.name}</div>
+              <button type="button" class="btn-link remove-cart-btn" data-key="${item.key}" style="color:#dc2626;">빼기</button>
+            </div>
+            <div style="margin-top:6px;">금액 <input type="number" min="0" class="cart-amount-input" data-key="${item.key}" value="${item.amount}" /></div>
+          </div>
+        `).join('');
+        box.querySelectorAll('.remove-cart-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            saleCart = saleCart.filter(i => i.key !== btn.dataset.key);
+            renderSaleCart();
+          });
+        });
+        box.querySelectorAll('.cart-amount-input').forEach(inp => {
+          inp.addEventListener('input', () => {
+            const item = saleCart.find(i => i.key === inp.dataset.key);
+            if (item) item.amount = Number(inp.value || 0);
+            renderSaleTotal();
+          });
+        });
+      }
+      renderSaleConfirmList();
+      renderSaleTotal();
+    }
+
+    // ③ 담은 상품을 그대로 미리 보여주는 요약 (금액 수정은 ②에서, 다음 단계로 넘어갈 준비만 확인)
+    function renderSaleConfirmList() {
+      const box = document.getElementById('md_sale_confirm_list');
+      if (saleCart.length === 0) {
+        box.innerHTML = '<p class="muted" style="padding:10px;">아직 담은 상품이 없습니다.</p>';
+        return;
+      }
+      box.innerHTML = saleCart.map(item => `
+        <div class="sale-cart-row">
+          <div class="row-top"><div class="name">${item.product.name}</div><div class="price">${formatWon(item.amount)}</div></div>
+        </div>
+      `).join('');
+    }
+
+    // 합계 금액 표시 (장바구니 단계 · 결제 단계 공용)
+    function renderSaleTotal() {
+      const total = saleCart.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+      document.getElementById('md_sale_total').textContent = `합계 ${formatWon(total)}`;
+    }
+
+    // ---- 결제 단계: 시작일 -> 종료일 자동 계산 + 상세설정(가격 수정) ----
+    document.getElementById('md_goto_checkout_btn').addEventListener('click', () => {
+      if (saleCart.length === 0) {
+        const errorBox = document.getElementById('md_errorBox');
+        errorBox.textContent = '담은 상품이 없습니다. 왼쪽에서 판매할 상품을 먼저 담아주세요.';
+        errorBox.style.display = 'block';
+        return;
+      }
+      document.getElementById('md_errorBox').style.display = 'none';
+      document.getElementById('md_sale_cart_view').style.display = 'none';
+      document.getElementById('md_sale_checkout_view').style.display = 'block';
+      renderCheckoutItems();
+    });
+
+    document.getElementById('md_checkout_back_btn').addEventListener('click', () => {
+      document.getElementById('md_sale_checkout_view').style.display = 'none';
+      document.getElementById('md_sale_cart_view').style.display = 'block';
+    });
+
+    // 상품 카테고리의 만료일 필드(EXPIRY_CATEGORIES)를 기준으로, 시작일 + 기간으로 종료일을 계산해서 보여줌
+    // (기간이 없는 횟수제 상품은 종료일 대신 잔여횟수를 보여줌)
+    function computeCheckoutEndLabel(item) {
+      const cat = EXPIRY_CATEGORIES.find(c => c.key === item.product.category);
+      if (!cat) return '-';
+      const fill = computeProductFill(item.product, item.startDate);
+      if (fill[cat.field]) return fill[cat.field];
+      if (item.product.sessions != null) return `${item.product.sessions}회 (기간 없음)`;
+      return '기간 없음';
+    }
+
+    function renderCheckoutItems() {
+      const box = document.getElementById('md_checkout_items');
+      box.innerHTML = saleCart.map(item => `
+        <div class="checkout-item">
+          <div class="checkout-item-head">
+            <div class="name">${item.product.name}</div>
+            <div class="price">${formatWon(item.amount)}</div>
+          </div>
+          <div class="checkout-item-body">
+            <div class="field"><label>시작일</label><input type="date" class="checkout-start-input" data-key="${item.key}" value="${item.startDate}" /></div>
+            <div class="field"><label>종료일 / 횟수</label><input type="text" value="${computeCheckoutEndLabel(item)}" disabled /></div>
+            <button type="button" class="btn-link checkout-detail-btn" data-key="${item.key}">상세설정</button>
+          </div>
+        </div>
+      `).join('');
+      box.querySelectorAll('.checkout-start-input').forEach(inp => {
+        inp.addEventListener('change', () => {
+          const item = saleCart.find(i => i.key === inp.dataset.key);
+          if (item) item.startDate = inp.value || todayStr();
+          renderCheckoutItems(); // 종료일을 새 시작일 기준으로 다시 계산해서 표시
+        });
+      });
+      box.querySelectorAll('.checkout-detail-btn').forEach(btn => {
+        btn.addEventListener('click', () => openSaleDetail(btn.dataset.key));
+      });
+      renderSaleTotal();
+    }
+
+    // 상세설정 팝업: 판매가(금액) 수정
+    function openSaleDetail(key) {
+      const item = saleCart.find(i => i.key === key);
+      if (!item) return;
+      saleDetailKey = key;
+      document.getElementById('sd_name').textContent = item.product.name;
+      document.getElementById('sd_amount').value = item.amount;
+      document.getElementById('saleDetailOverlay').style.display = 'flex';
+    }
+    function closeSaleDetail() {
+      document.getElementById('saleDetailOverlay').style.display = 'none';
+      saleDetailKey = null;
+    }
+    document.getElementById('sd_closeBtn').addEventListener('click', closeSaleDetail);
+    document.getElementById('saleDetailOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'saleDetailOverlay') closeSaleDetail();
+    });
+    document.getElementById('sd_saveBtn').addEventListener('click', () => {
+      const item = saleCart.find(i => i.key === saleDetailKey);
+      if (item) item.amount = Number(document.getElementById('sd_amount').value || 0);
+      closeSaleDetail();
+      renderCheckoutItems();
+    });
+
+    // 상세 화면의 이용권 표시 필드들을 currentDetailMember 최신 값으로 다시 채움
+    function fillDetailMembershipFields(m) {
+      document.getElementById('md_f_type').value = m.membership_type || '';
+      document.getElementById('md_f_end_date').value = m.membership_end_date || '';
+      document.getElementById('md_f_gpt_type').value = m.group_pt_type || '';
+      document.getElementById('md_f_gpt_end').value = m.group_pt_end_date || '';
+      document.getElementById('md_f_pt_end').value = m.pt_end_date || '';
+      document.getElementById('md_f_pt_remain').value = m.pt_remaining_sessions != null ? m.pt_remaining_sessions : '';
+      document.getElementById('md_f_locker_end').value = m.locker_end_date || '';
+      document.getElementById('md_f_clothes_end').value = m.workout_clothes_end_date || '';
+    }
+
+    function openMemberDetail(memberId) {
+      const m = membersCache.find(x => x.id === memberId);
+      if (!m) return;
+      currentDetailMember = m;
+
+      document.getElementById('md_errorBox').style.display = 'none';
+      document.getElementById('md_successBox').style.display = 'none';
+
+      document.getElementById('md_name').textContent = m.name;
+      document.getElementById('md_phone').textContent = m.phone || '전화번호 없음';
+
+      document.getElementById('md_f_name').value = m.name || '';
+      document.getElementById('md_f_phone').value = m.phone || '';
+      document.getElementById('md_f_birth').value = m.birth_date || '';
+      document.getElementById('md_f_address').value = m.address || '';
+      document.getElementById('md_f_memo').value = m.memo || '';
+      fillDetailMembershipFields(m);
+
+      const trainerField = document.getElementById('md_f_trainer');
+      if (isManagerFlag) {
+        trainerField.disabled = false;
+        fillTrainerSelect(trainerField, m.assigned_trainer_id);
+      } else {
+        trainerField.innerHTML = `<option value="${m.assigned_trainer_id || ''}" selected>${m.trainer ? m.trainer.name : '미지정'}</option>`;
+        trainerField.disabled = true;
+      }
+
+      saleCart = [];
+      activeSaleCategoryFilter = 'all';
+      document.getElementById('md_sale_memo').value = '';
+      document.getElementById('md_sale_payment').value = 'card';
+      document.getElementById('md_sale_cart_view').style.display = 'block';
+      document.getElementById('md_sale_checkout_view').style.display = 'none';
+      loadProductsForSaleModal();
+      loadStaffForSaleModal();
+
+      document.getElementById('memberDetailOverlay').style.display = 'flex';
+    }
+
+    function closeMemberDetail() {
+      document.getElementById('memberDetailOverlay').style.display = 'none';
+      currentDetailMember = null;
+    }
+    document.getElementById('md_closeBtn').addEventListener('click', closeMemberDetail);
+    document.getElementById('memberDetailOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'memberDetailOverlay') closeMemberDetail();
+    });
+
+    // 상세 화면에서 바로 삭제 (테스트로 여러 번 등록해본 회원을 지울 때, 표 끝까지 스크롤 안 해도 되도록
+    // 회원을 클릭해서 들어온 이 화면에도 삭제 버튼을 둠 -> 표의 "삭제" 링크와 동작은 동일함)
+    document.getElementById('md_deleteBtn').addEventListener('click', async () => {
+      if (!currentDetailMember) return;
+      if (!confirm(`'${currentDetailMember.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM) 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
+      try {
+        const deletedName = currentDetailMember.name;
+        await deleteMember(currentDetailMember.id);
+        closeMemberDetail();
+        loadMembers();
+        showToast(`"${deletedName}" 회원님의 정보가 삭제되었습니다.`, 'danger');
+      } catch (err) {
+        const errorBox = document.getElementById('md_errorBox');
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    document.getElementById('md_saveBtn').addEventListener('click', async () => {
+      if (!currentDetailMember) return;
+      const errorBox = document.getElementById('md_errorBox');
+      const successBox = document.getElementById('md_successBox');
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      const val = id => document.getElementById(id).value.trim();
+      const patch = {
+        name: val('md_f_name'),
+        phone: normalizePhone(val('md_f_phone')),
+        birth_date: val('md_f_birth') || null,
+        address: val('md_f_address') || null,
+        memo: val('md_f_memo') || null,
+        membership_type: val('md_f_type') || null,
+        membership_end_date: val('md_f_end_date') || null,
+        group_pt_type: val('md_f_gpt_type') || null,
+        group_pt_end_date: val('md_f_gpt_end') || null,
+        pt_end_date: val('md_f_pt_end') || null,
+        pt_remaining_sessions: val('md_f_pt_remain') ? Number(val('md_f_pt_remain')) : null,
+        locker_end_date: val('md_f_locker_end') || null,
+        workout_clothes_end_date: val('md_f_clothes_end') || null
+      };
+      const previousTrainerId = currentDetailMember.assigned_trainer_id || null;
+      if (isManagerFlag) patch.assigned_trainer_id = document.getElementById('md_f_trainer').value || null;
+      try {
+        const rows = await updateMember(currentDetailMember.id, patch);
+        Object.assign(currentDetailMember, rows[0] || patch);
+        successBox.textContent = '회원 정보가 저장되었습니다.';
+        successBox.style.display = 'block';
+        document.getElementById('md_name').textContent = currentDetailMember.name;
+        document.getElementById('md_phone').textContent = currentDetailMember.phone || '전화번호 없음';
+
+        // 담당 트레이너가 바뀌었으면, 이번 달 PT 회원 관리 기록만 새 트레이너 시트로 옮겨줌
+        // (지난 달까지의 기록은 그때 실제로 담당했던 트레이너 이력이라 그대로 둠 - "미지정"으로
+        //  바꾸는 경우는 옮길 곳이 없어서 건드리지 않음)
+        if (isManagerFlag && patch.assigned_trainer_id && patch.assigned_trainer_id !== previousTrainerId) {
+          try {
+            await movePtCareLogToNewTrainer(currentDetailMember.id, patch.assigned_trainer_id);
+          } catch (moveErr) { /* 담당자 변경 자체는 이미 저장됐으니 조용히 넘어감 */ }
+        }
+
+        await loadMembers();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    document.getElementById('md_sellBtn').addEventListener('click', async () => {
+      if (!currentDetailMember) return;
+      const errorBox = document.getElementById('md_errorBox');
+      const successBox = document.getElementById('md_successBox');
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+
+      if (saleCart.length === 0) {
+        errorBox.textContent = '담은 상품이 없습니다. 왼쪽에서 판매할 상품을 먼저 담아주세요.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      const memo = document.getElementById('md_sale_memo').value.trim() || null;
+      const saleStaffId = document.getElementById('md_sale_staff').value || currentUserId;
+      const paymentMethod = document.getElementById('md_sale_payment').value || null;
+
+      const btn = document.getElementById('md_sellBtn');
+      btn.disabled = true;
+      try {
+        // 담은 상품들이 각각 커버하는 만료일/종목/PT횟수를, 상품별로 지정한 시작일 기준으로 계산해서
+        // 한 번에 회원에게 반영 (같은 카테고리 상품이 여러 개 담기면 나중에 담은 것이 우선 적용됨)
+        let mergedFill = {};
+        saleCart.forEach(item => { mergedFill = { ...mergedFill, ...computeProductFill(item.product, item.startDate) }; });
+        if (Object.keys(mergedFill).length > 0) {
+          const rows = await updateMember(currentDetailMember.id, mergedFill);
+          Object.assign(currentDetailMember, rows[0] || mergedFill);
+        }
+        // 담은 상품 개수만큼 매출도 한 번에 기록 (매출일 = 각 상품의 시작일, 담당자/결제수단은 공통 적용)
+        const salesPayload = saleCart.map(item => ({
+          member_id: currentDetailMember.id,
+          staff_id: saleStaffId,
+          category: PRODUCT_CATEGORY_TO_SALE_CATEGORY[item.product.category] || 'membership_renewal',
+          product_id: item.product.id,
+          amount: Number(item.amount) || 0,
+          sale_date: item.startDate,
+          payment_method: paymentMethod,
+          memo
+        }));
+        await addSales(salesPayload);
+
+        const soldNames = saleCart.map(i => i.product.name).join(', ');
+        successBox.textContent = `${soldNames} 이용권이 등록되고 매출로 기록되었습니다.`;
+        successBox.style.display = 'block';
+
+        saleCart = [];
+        document.getElementById('md_sale_checkout_view').style.display = 'none';
+        document.getElementById('md_sale_cart_view').style.display = 'block';
+        renderSaleCart();
+        document.getElementById('md_sale_memo').value = '';
+        fillDetailMembershipFields(currentDetailMember);
+        await loadMembers();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    let trainersCache = [];
+    let productsByCategory = {};
+
+    // 카테고리별 상품 select 채우기 + 고르면 종목/만료일/PT횟수를 자동으로 계산해서 채워 넣음
+    const PRODUCT_SELECT_IDS = {
+      membership: 'm_product_membership', group_pt: 'm_product_group_pt', pt: 'm_product_pt',
+      locker: 'm_product_locker', clothes: 'm_product_clothes'
+    };
+    const START_INPUT_IDS = {
+      membership: 'm_start', group_pt: 'm_gpt_start', pt: 'm_pt_start', locker: 'm_locker_start', clothes: 'm_clothes_start'
+    };
+    // 상품을 고르면 이 금액 입력칸에 상품 가격을 기본값으로 채워줌 (등록과 동시에 매출로 기록되므로 금액이 꼭 필요함)
+    const AMOUNT_INPUT_IDS = {
+      membership: 'm_amount_membership', group_pt: 'm_amount_group_pt', pt: 'm_amount_pt',
+      locker: 'm_amount_locker', clothes: 'm_amount_clothes'
+    };
+    // 신규 회원 등록이므로 이용권/그룹PT/개인PT는 항상 "신규"로 매출 기록 (락커/운동복은 신규·재등록 구분이 따로 없음)
+    const NEW_MEMBER_SALE_CATEGORY = {
+      membership: 'membership_new', group_pt: 'group_pt_new', pt: 'pt_new', locker: 'locker', clothes: 'clothes'
+    };
+    // 이용권/그룹PT/개인PT/락커/운동복 금액 칸 5개를 합쳐서 "합계 ○○원"으로 보여줌
+    function updateAddMemberTotal() {
+      const total = Object.values(AMOUNT_INPUT_IDS).reduce((sum, id) => {
+        const v = Number(document.getElementById(id).value || 0);
+        return sum + (Number.isFinite(v) ? v : 0);
+      }, 0);
+      document.getElementById('m_sale_total').textContent = `합계 ${formatWon(total)}`;
+    }
+    Object.values(AMOUNT_INPUT_IDS).forEach(id => {
+      document.getElementById(id).addEventListener('input', updateAddMemberTotal);
+    });
+    async function loadProductQuickFill() {
+      try {
+        const products = await fetchProducts(true);
+        productsByCategory = {};
+        products.forEach(p => {
+          (productsByCategory[p.category] = productsByCategory[p.category] || []).push(p);
+          const sel = document.getElementById(PRODUCT_SELECT_IDS[p.category]);
+          if (!sel) return;
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.price != null ? `${p.name} (${formatWon(p.price)})` : p.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) { /* 무시: 상품 없어도 직접 입력으로 회원 등록 가능 */ }
+    }
+    // 이 카테고리에 상품이 선택된 상태면, (시작일 입력값 또는 오늘 날짜) 기준으로 만료일 등을 다시 계산해서 채움
+    // -> 상품을 처음 고를 때뿐 아니라, 나중에 시작일을 바꿀 때도 같은 함수로 다시 계산함
+    function recalcCategoryFill(category) {
+      const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
+      const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
+      if (!product) return; // "직접 입력"인 상태면 자동 계산하지 않음
+      const startInputId = START_INPUT_IDS[category];
+      const startVal = startInputId ? (document.getElementById(startInputId).value || todayStr()) : null;
+      const fill = computeProductFill(product, startVal);
+      if (fill.membership_type !== undefined) document.getElementById('m_type').value = fill.membership_type || '';
+      if (fill.membership_end_date !== undefined) document.getElementById('m_end_date').value = fill.membership_end_date || '';
+      if (fill.group_pt_type !== undefined) document.getElementById('m_gpt_type').value = fill.group_pt_type || '';
+      if (fill.group_pt_end_date !== undefined) document.getElementById('m_gpt_end').value = fill.group_pt_end_date || '';
+      if (fill.pt_end_date !== undefined) document.getElementById('m_pt_end').value = fill.pt_end_date || '';
+      if (fill.pt_remaining_sessions !== undefined) document.getElementById('m_pt_remain').value = fill.pt_remaining_sessions ?? '';
+      if (fill.locker_end_date !== undefined) document.getElementById('m_locker_end').value = fill.locker_end_date || '';
+      if (fill.workout_clothes_end_date !== undefined) document.getElementById('m_clothes_end').value = fill.workout_clothes_end_date || '';
+    }
+    Object.keys(PRODUCT_SELECT_IDS).forEach(category => {
+      const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
+      selectEl.addEventListener('change', () => {
+        recalcCategoryFill(category);
+        // 상품을 바꾸면 금액도 그 상품 가격으로 다시 채워줌 (직접 입력으로 돌아가면 금액은 비워둠)
+        const amountInputId = AMOUNT_INPUT_IDS[category];
+        if (amountInputId) {
+          const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
+          document.getElementById(amountInputId).value = (product && product.price != null) ? product.price : '';
+          updateAddMemberTotal();
+        }
+      });
+      const startInputId = START_INPUT_IDS[category];
+      if (startInputId) {
+        document.getElementById(startInputId).addEventListener('change', () => recalcCategoryFill(category));
+      }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+        currentUserId = profile.id;
+        // "+ 회원 등록"은 지점장·트레이너 모두 가능 (트레이너도 신규 회원을 직접 등록할 수 있어야 함)
+        document.getElementById('openAddMemberBtn').style.display = '';
+        if (profile.role === 'manager') {
+          isManagerFlag = true;
+          document.getElementById('deleteColHeader').style.display = '';
+          document.getElementById('md_deleteBtn').style.display = '';
+          document.getElementById('uploadPanel').style.display = 'block';
+          // 트레이너 목록은 "회원 등록" 팝업의 담당 트레이너 select에서만 쓰이므로, 화면의 핵심인
+          // 회원 목록(loadMembers) 로딩을 막지 않도록 기다리지 않고 따로 불러옴
+          fetchTrainers().then(list => {
+            trainersCache = list;
+            const sel = document.getElementById('m_trainer');
+            trainersCache.forEach(t => {
+              const opt = document.createElement('option');
+              opt.value = t.id; opt.textContent = t.name;
+              sel.appendChild(opt);
+            });
+          }).catch(() => { /* 트레이너 목록 못 불러와도 회원 등록 자체는 진행 가능 */ });
+        } else {
+          // 트레이너는 담당 트레이너 목록을 조회할 권한이 없으므로(RLS상 본인만 조회 가능),
+          // "담당 트레이너" 칸은 본인으로 고정해서 보여줌
+          const sel = document.getElementById('m_trainer');
+          sel.innerHTML = `<option value="${profile.id}" selected>${profile.name} (나)</option>`;
+          sel.disabled = true;
+        }
+        loadProductQuickFill();
+        loadStaffForSaleModal('m_sale_staff'); // 회원 등록 팝업의 "판매 담당자" 목록 (기본값: 나)
+      }
+      loadMembers();
+    })();
+
+    // 양식 다운로드 (헤더만 있는 CSV)
+    document.getElementById('downloadTemplate').addEventListener('click', (e) => {
+      e.preventDefault();
+      const csv = '﻿이름,전화번호,담당트레이너,이용권종목,이용권만료일,그룹PT종목,그룹PT만료일,개인PT만료일,개인PT잔여횟수,락커만료일,운동복만료일\n' +
+        '홍길동,010-1234-5678,박선생,회원권 3개월,2026-09-30,필라테스,2026-09-15,2026-10-10,8,2026-09-30,2026-09-30\n';
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = '회원업로드_양식.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    const str = v => (v === undefined || v === null) ? '' : v.toString().trim();
+    const numOrNull = v => { const s = str(v); return s === '' ? null : Number(s); };
+
+    // "(평산)(FC) 헬스이용권 (...) - 2026-08-28~2026-11-27 / 무제한" 같은 한 줄을 분석해서
+    // 회원권/개인PT/그룹PT/락커/운동복 중 어디에 해당하는지 + 만료일 + 횟수를 뽑아냄
+    function parseMembershipInfo(text) {
+      const out = {};
+      if (!text) return out;
+      const lines = text.toString().split('\n').map(l => l.trim()).filter(Boolean);
+
+      const setIfLater = (field, dateStr) => {
+        if (!dateStr) return;
+        if (!out[field] || dateStr > out[field]) out[field] = dateStr;
+      };
+
+      for (const line of lines) {
+        // 체험권(무료/샘플 체험 상품)은 실제 등록이 아니라서 어느 카테고리에도 넣지 않고 건너뜀
+        if (line.includes('체험')) continue;
+
+        const dateMatch = line.match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);
+        if (!dateMatch) continue;
+        const endDate = dateMatch[2];
+        const countMatch = line.match(/\/\s*(\d+)\s*회/);
+        const count = countMatch ? Number(countMatch[1]) : null;
+        const nameMatch = line.match(/\(FC\)\s*([^\(]+?)\s*\(/) || line.match(/\(PT\)\s*([^\(]+?)\s*\(/);
+        const itemName = nameMatch ? nameMatch[1].trim() : null;
+
+        if (line.includes('락커')) {
+          setIfLater('locker_end_date', endDate);
+        } else if (line.includes('운동복')) {
+          setIfLater('workout_clothes_end_date', endDate);
+        } else if (line.includes('그룹PT') || line.includes('그룹 PT') || line.includes('올바른 운동')) {
+          const prevDate = out.group_pt_end_date;
+          setIfLater('group_pt_end_date', endDate);
+          if (out.group_pt_end_date === endDate && (!prevDate || endDate >= prevDate)) out.group_pt_type = itemName || '그룹PT';
+        } else if (line.includes('(PT)')) {
+          const prevDate = out.pt_end_date;
+          setIfLater('pt_end_date', endDate);
+          if (out.pt_end_date === endDate && (!prevDate || endDate >= prevDate) && count !== null) out.pt_remaining_sessions = count;
+        } else {
+          const prevDate = out.membership_end_date;
+          setIfLater('membership_end_date', endDate);
+          if (out.membership_end_date === endDate && (!prevDate || endDate >= prevDate)) out.membership_type = itemName || '이용권';
+        }
+      }
+      return out;
+    }
+
+    // 시트의 첫 줄(헤더)을 보고 어떤 형식인지 자동 판별:
+    // - "실제 프로그램 내보내기" 형식: 이름 + 이용권정보 컬럼이 있음 (휴대폰번호, 이용권정보 텍스트에서 항목별로 자동 추출)
+    // - "간단 양식" 형식: 이름 + 전화번호 + 이용권종목 등 우리 템플릿 컬럼이 있음
+    function detectSheet(workbook) {
+      for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name];
+        const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 })[0] || [];
+        const headers = headerRow.map(h => str(h));
+        if (headers.includes('이름') && headers.includes('이용권정보')) {
+          return { sheet, mode: 'export' };
+        }
+      }
+      for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name];
+        const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 })[0] || [];
+        const headers = headerRow.map(h => str(h));
+        if (headers.includes('이름') && (headers.includes('전화번호') || headers.includes('이용권종목'))) {
+          return { sheet, mode: 'template' };
+        }
+      }
+      return { sheet: workbook.Sheets[workbook.SheetNames[0]], mode: 'template' };
+    }
+
+    function buildPayloadFromExportRow(row) {
+      const info = parseMembershipInfo(row['이용권정보']);
+      // 락커만료일 컬럼에 날짜가 섞여 있는 경우(예: "283번 / 2027-08-26") 보조로 사용
+      if (!info.locker_end_date) {
+        const lockerCell = str(row['락커만료일']);
+        const m = lockerCell.match(/\d{4}-\d{2}-\d{2}/);
+        if (m) info.locker_end_date = m[0];
+      }
+      return {
+        name: str(row['이름']),
+        phone: normalizePhone(row['휴대폰번호']) || normalizePhone(row['전화번호']),
+        birth_date: str(row['생년월일']) || null,
+        gender: str(row['성별']) || null,
+        membership_type: info.membership_type || null,
+        membership_end_date: info.membership_end_date || null,
+        group_pt_type: info.group_pt_type || null,
+        group_pt_end_date: info.group_pt_end_date || null,
+        pt_end_date: info.pt_end_date || null,
+        pt_remaining_sessions: info.pt_remaining_sessions != null ? info.pt_remaining_sessions : null,
+        locker_end_date: info.locker_end_date || null,
+        workout_clothes_end_date: info.workout_clothes_end_date || null
+      };
+    }
+
+    function buildPayloadFromTemplateRow(row) {
+      return {
+        name: str(row['이름']),
+        phone: normalizePhone(row['전화번호']),
+        membership_type: str(row['이용권종목']) || null,
+        membership_end_date: str(row['이용권만료일']) || null,
+        group_pt_type: str(row['그룹PT종목']) || null,
+        group_pt_end_date: str(row['그룹PT만료일']) || null,
+        pt_end_date: str(row['개인PT만료일']) || null,
+        pt_remaining_sessions: numOrNull(row['개인PT잔여횟수']),
+        locker_end_date: str(row['락커만료일']) || null,
+        workout_clothes_end_date: str(row['운동복만료일']) || null
+      };
+    }
+
+    // 엑셀/CSV 업로드 -> 전화번호 기준으로 있으면 업데이트, 없으면 신규 등록
+    // (전체를 try/catch로 감싸서, 파일 읽기/시트 인식 단계에서 오류가 나도
+    //  "처리 중..."에 멈춰있지 않고 실제 오류 내용이 화면에 뜨도록 함)
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+      const fileInput = document.getElementById('uploadFile');
+      const resultBox = document.getElementById('uploadResult');
+      if (!fileInput.files.length) {
+        resultBox.innerHTML = '<div class="error-text" style="display:block;">파일을 먼저 선택해주세요.</div>';
+        return;
+      }
+      resultBox.innerHTML = '<div class="muted">처리 중... (회원 수가 많으면 몇 분 정도 걸릴 수 있어요)</div>';
+
+      try {
+        const file = fileInput.files[0];
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const { sheet, mode } = detectSheet(workbook);
+        const rows = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+
+        if (rows.length === 0) {
+          resultBox.innerHTML = '<div class="error-text" style="display:block;">시트에서 데이터 행을 찾지 못했어요. 파일 형식을 확인해주세요.</div>';
+          return;
+        }
+
+        let created = 0, updated = 0, skipped = 0;
+        const errors = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const name = str(row['이름']);
+          if (!name) { skipped++; continue; } // 정리용 안내 줄 등은 조용히 건너뜀
+
+          if (i % 25 === 0) {
+            resultBox.innerHTML = `<div class="muted">처리 중... ${i} / ${rows.length}행 (신규 ${created}, 업데이트 ${updated})</div>`;
+          }
+
+          const trainerName = str(row['담당트레이너']);
+          let trainerId = null;
+          if (trainerName) {
+            const match = trainersCache.find(t => t.name === trainerName);
+            if (match) trainerId = match.id;
+          }
+
+          let payload;
+          try {
+            payload = mode === 'export' ? buildPayloadFromExportRow(row) : buildPayloadFromTemplateRow(row);
+          } catch (err) {
+            errors.push(`${i + 2}행 (${name}): 데이터 분석 실패 - ${err.message}`);
+            continue;
+          }
+          payload.assigned_trainer_id = trainerId;
+
+          try {
+            const existing = payload.phone ? await findMemberByPhone(payload.phone) : null;
+            if (existing) {
+              await updateMember(existing.id, payload);
+              updated++;
+            } else {
+              await addMember(payload);
+              created++;
+            }
+          } catch (err) {
+            errors.push(`${i + 2}행 (${name}): ${err.message}`);
+          }
+        }
+
+        const shownErrors = errors.slice(0, 30);
+        resultBox.innerHTML = `
+          <div class="success-text" style="display:block;">
+            [${mode === 'export' ? '프로그램 내보내기 형식으로 인식' : '간단 양식으로 인식'}] 신규 ${created}명, 업데이트 ${updated}명 처리 완료
+            ${skipped ? ` (이름 없는 줄 ${skipped}개는 건너뜀)` : ''}
+          </div>
+          ${errors.length ? `<div class="error-text" style="display:block; white-space:pre-line;">실패 ${errors.length}건:\n${shownErrors.join('\n')}${errors.length > shownErrors.length ? `\n...외 ${errors.length - shownErrors.length}건 더` : ''}</div>` : ''}
+        `;
+        fileInput.value = '';
+        loadMembers();
+      } catch (err) {
+        resultBox.innerHTML = `<div class="error-text" style="display:block;">업로드 처리 중 오류가 발생했습니다: ${err.message}</div>`;
+      }
+    });
+
+    // ---- 회원 등록 모달 (비플처럼 "+ 회원 등록" 버튼을 누르면 작은 창으로 뜨게) ----
+    function openAddMemberModal() {
+      document.getElementById('addErrorBox').style.display = 'none';
+      document.getElementById('addMemberForm').reset();
+      // 시작일은 보통 "오늘부터"인 경우가 대부분이라, 열 때마다 오늘 날짜로 미리 채워둠 (필요하면 바꾸면 됨)
+      const today = todayStr();
+      ['m_start', 'm_gpt_start', 'm_pt_start', 'm_locker_start', 'm_clothes_start'].forEach(id => {
+        document.getElementById(id).value = today;
+      });
+      document.getElementById('m_sale_date').value = today; // 판매 날짜(결제일)도 기본은 오늘 (항목별 시작일과는 별개 값)
+      document.getElementById('m_sale_time').value = nowTimeStr(); // 판매 시각도 여는 시점의 현재 시각으로 미리 채워둠
+      updateAddMemberTotal(); // reset()으로 금액 칸들이 비워진 뒤라 합계도 0원으로 다시 표시
+      document.getElementById('addMemberOverlay').style.display = 'flex';
+      document.getElementById('m_name').focus();
+    }
+    function closeAddMemberModal() {
+      document.getElementById('addMemberOverlay').style.display = 'none';
+    }
+    document.getElementById('openAddMemberBtn').addEventListener('click', openAddMemberModal);
+    document.getElementById('am_closeBtn').addEventListener('click', closeAddMemberModal);
+    document.getElementById('addMemberOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'addMemberOverlay') closeAddMemberModal();
+    });
+
+    document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addErrorBox');
+      errorBox.style.display = 'none';
+      const val = id => document.getElementById(id).value.trim();
+      try {
+        const newMemberRows = await addMember({
+          name: val('m_name'),
+          phone: normalizePhone(val('m_phone')),
+          assigned_trainer_id: val('m_trainer') || null,
+          birth_date: val('m_birth') || null,
+          address: val('m_address') || null,
+          memo: val('m_memo') || null,
+          membership_type: val('m_type') || null,
+          membership_end_date: val('m_end_date') || null,
+          group_pt_type: val('m_gpt_type') || null,
+          group_pt_end_date: val('m_gpt_end') || null,
+          pt_end_date: val('m_pt_end') || null,
+          pt_remaining_sessions: val('m_pt_remain') ? Number(val('m_pt_remain')) : null,
+          locker_end_date: val('m_locker_end') || null,
+          workout_clothes_end_date: val('m_clothes_end') || null
+        });
+        const newMember = newMemberRows[0];
+
+        // 상품을 고른 항목뿐 아니라, "직접 입력"이라도 금액을 입력했으면(트레이너쌤 할인 등으로
+        // 정가와 다르게 파는 경우) 그대로 매출로 기록함. 상품을 안 고르고 금액도 안 적은 칸만 건너뜀.
+        // 매출의 날짜/시각은 "판매 날짜"·"판매 시각" 칸 값을 공통으로 씀 (실제 결제 시점).
+        // 항목별 "시작일"은 이용권/PT 등이 언제부터 유효한지를 나타내는 값이라 서로 다른 개념이라서,
+        // 결제일과 시작일이 다른 경우(오늘 결제하고 다음 주부터 시작 등)에도 각각 올바르게 기록됨.
+        const saleStaffId = val('m_sale_staff') || currentUserId;
+        const salePayment = val('m_sale_payment') || null;
+        const saleDateCommon = val('m_sale_date') || todayStr();
+        const saleTime = val('m_sale_time') || null;
+        const salesPayload = [];
+        Object.keys(PRODUCT_SELECT_IDS).forEach(category => {
+          const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
+          const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
+          const amountInputId = AMOUNT_INPUT_IDS[category];
+          const amountRaw = amountInputId ? val(amountInputId) : '';
+          if (!product && amountRaw === '') return; // 상품도 안 고르고 금액도 안 적었으면 매출 안 남김
+          salesPayload.push({
+            member_id: newMember.id,
+            staff_id: saleStaffId,
+            category: NEW_MEMBER_SALE_CATEGORY[category] || 'membership_new',
+            product_id: product ? product.id : null, // 직접 입력이면 연결된 상품 없이 금액만 기록
+            amount: Number(amountRaw || 0),
+            sale_date: saleDateCommon,
+            sale_time: saleTime,
+            payment_method: salePayment,
+            memo: product ? '회원 등록과 함께 자동 기록' : '회원 등록과 함께 자동 기록 (직접 입력·가격 변동)'
+          });
+        });
+        // 회원 정보는 이미 저장된 상태이므로, 매출 기록이 실패하더라도 회원 등록 자체를
+        // "실패"로 처리하면 안 됨 (그대로 두면 화면엔 실패로 보이는데 실제로는 회원이 이미
+        // 생성돼 있어서, 사용자가 다시 등록을 누르면 회원이 중복 생성될 위험이 있음).
+        // 매출만 별도로 실패 처리해서 안내하고, 회원 등록 자체는 정상적으로 마무리함.
+        let saleWarning = null;
+        if (salesPayload.length > 0) {
+          try {
+            await addSales(salesPayload);
+          } catch (saleErr) {
+            saleWarning = saleErr.message;
+          }
+        }
+
+        // 개인PT가 포함되고 담당 트레이너도 지정했으면, 그 트레이너의 PT 관리 > PT 회원 관리 탭에도
+        // 자동으로 연동된 행을 만들어줌 (트레이너가 매번 "+PT 회원 추가"로 직접 찾아 넣지 않아도 됨).
+        // 매출 기록과 마찬가지로 이 부분이 실패해도 회원 등록 자체는 이미 끝난 상태라 실패 처리하지 않고,
+        // 안 되면 트레이너가 PT 회원 관리 탭에서 "회원 연결"로 수동 연동하면 됨
+        const ptSaleIncluded = salesPayload.some(s => s.category === 'pt_new');
+        if (ptSaleIncluded && newMember.assigned_trainer_id) {
+          try {
+            await ensurePtCareLogForMember(newMember.id, newMember.name, newMember.assigned_trainer_id);
+          } catch (careLinkErr) { /* 조용히 넘어감 - 아래 saleWarning과 별개로 치명적이지 않음 */ }
+        }
+
+        document.getElementById('addMemberForm').reset();
+        closeAddMemberModal();
+        loadMembers();
+        if (saleWarning) {
+          // 매출 기록만 실패한 경우는 alert로 바로 원인을 알려줘야 해서, 조용히 사라지는 토스트 대신 그대로 둠
+          alert(`회원("${newMember.name}") 등록은 완료됐지만, 매출 기록에는 실패했습니다.\n\n오류 내용: ${saleWarning}\n\n회원 목록에서 "${newMember.name}"을 클릭한 뒤, "이용권 판매" 항목에서 다시 등록해주세요.`);
+        } else {
+          showToast(`"${newMember.name}" 회원 등록이 완료되었습니다.`);
+        }
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

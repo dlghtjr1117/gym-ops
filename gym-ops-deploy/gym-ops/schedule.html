@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - PT 스케줄</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  .sg-wrap { overflow-x: auto; margin-top: 14px; border-radius: 10px; }
+  .sg-grid {
+    display: grid;
+    grid-template-columns: 62px repeat(7, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--slate-200);
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    overflow: hidden;
+    min-width: 960px;
+  }
+  .sg-corner, .sg-daycol, .sg-timecol { background: var(--slate-50); }
+  .sg-daycol { padding: 8px 4px; font-size: 12px; font-weight: 700; text-align: center; }
+  .sg-daycol.sg-today { color: var(--indigo-600); }
+  .sg-timecol { padding: 6px; font-size: 11px; font-weight: 600; color: var(--slate-500); text-align: center; display:flex; align-items:center; justify-content:center; }
+  .sg-slot { background: var(--white); min-height: 54px; padding: 4px 6px; cursor: pointer; font-size: 11px; line-height: 1.3; }
+  .sg-slot:hover { outline: 2px solid var(--indigo-600); outline-offset: -2px; }
+  .sg-slot.sg-booked { background: #e0e7ff; }
+  .sg-slot.sg-attended { background: #dcfce7; }
+  .sg-slot.sg-absent { background: #fee2e2; }
+  .sg-slot.sg-cancelled { background: var(--slate-100); opacity: 0.65; }
+  .sg-slot.sg-cancelled .sg-name { text-decoration: line-through; }
+  .sg-time { font-weight: 700; font-size: 10.5px; }
+  .sg-name { font-weight: 700; margin-top: 1px; }
+  .sg-remain { color: var(--slate-500); font-size: 10.5px; margin-top: 1px; }
+  .sg-summary { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; }
+  .sg-summary b { font-size:15px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="center-sales.html">센터 매출</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="schedule.html" class="active">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap" style="max-width:1200px;">
+    <div class="report-nav">
+      <select id="trainerSelect" style="display:none; padding:7px 10px; font-size:13px; border:1px solid var(--slate-300); border-radius:8px; font-weight:700;"></select>
+      <span id="trainerNameLabel" style="display:none; font-weight:700; font-size:15px;"></span>
+      <div style="flex:1;"></div>
+      <div class="sg-summary" id="weekSummary" style="margin-right:14px;"></div>
+      <button type="button" class="btn btn-outline" id="todayBtn" style="width:auto; padding:6px 12px; font-size:12px;">오늘</button>
+      <button type="button" class="report-nav-arrow" id="weekPrevBtn">◀</button>
+      <div class="report-period-label" id="weekLabel">-</div>
+      <button type="button" class="report-nav-arrow" id="weekNextBtn">▶</button>
+    </div>
+
+    <p class="muted" style="margin:10px 2px 0;">빈 칸을 누르면 새 예약을 잡을 수 있고, 이미 잡힌 예약을 누르면 출석/결석/취소 처리를 할 수 있어요. 출석 처리하면 그 회원의 개인PT 잔여횟수가 1회 자동으로 차감돼요.</p>
+
+    <div class="sg-wrap">
+      <div class="sg-grid" id="scheduleGrid"></div>
+    </div>
+  </div>
+
+  <!-- 새 예약 모달 -->
+  <div class="modal-overlay" id="newBookingOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:460px;">
+      <div class="modal-header">
+        <h3>새 예약</h3>
+        <button type="button" class="modal-close" id="nb_closeBtn">&times;</button>
+      </div>
+      <div id="nbErrorBox" class="error-text"></div>
+      <form id="newBookingForm">
+        <div class="field"><label id="nb_dateTimeLabel">-</label></div>
+        <div class="field" style="position:relative;">
+          <label>회원 (이름 또는 전화번호 뒷자리로 검색)</label>
+          <input type="text" id="nb_memberSearch" placeholder="예: 8523 또는 홍길동" autocomplete="off" />
+          <div id="nb_memberResults" class="member-search-results" style="display:none;"></div>
+          <input type="hidden" id="nb_member" />
+          <div id="nb_memberSelected" class="member-search-selected"></div>
+        </div>
+        <div class="field" id="nb_infoField" style="display:none;">
+          <label>담당자</label>
+          <div id="nb_trainerInfo" class="card" style="padding:9px 12px; font-size:13px; font-weight:600;"></div>
+          <label style="margin-top:12px;">예약 정보 (개인PT 이용권)</label>
+          <div id="nb_ptInfo" class="card" style="padding:9px 12px; font-size:13px; line-height:1.7;"></div>
+        </div>
+        <div class="field"><label>수업 시간</label>
+          <select id="nb_duration">
+            <option value="25">25분</option>
+            <option value="50" selected>50분</option>
+            <option value="80">80분</option>
+          </select>
+        </div>
+        <div class="field"><label>메모 (선택)</label><input type="text" id="nb_memo" placeholder="예: 어깨 재활 위주" /></div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">예약 등록</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 예약 상태 변경 모달 -->
+  <div class="modal-overlay" id="actionOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3>예약 관리</h3>
+        <button type="button" class="modal-close" id="ac_closeBtn">&times;</button>
+      </div>
+      <div id="ac_summary" class="muted" style="margin-bottom:14px; font-size:13px; line-height:1.6;"></div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button type="button" class="btn btn-primary" id="ac_attendBtn" style="width:100%;">✅ 출석 처리</button>
+        <button type="button" class="btn btn-outline" id="ac_absentBtn" style="width:100%;">❌ 결석 처리</button>
+        <button type="button" class="btn btn-outline" id="ac_cancelBtn" style="width:100%;">🚫 취소 처리</button>
+        <button type="button" class="btn btn-outline" id="ac_deleteBtn" style="width:100%; color:#dc2626;">🗑 예약 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="data.js"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let currentUserId = null;
+    let currentUserRole = null;
+    let isManagerFlag = false;
+    let selectedTrainerId = null;
+    let staffCache = [];
+    let membersCache = [];
+    let bookingsCache = [];
+    let weekAnchor = new Date();
+    let activeBookingId = null;
+    let pendingSlot = null; // { dateStr, hour }
+
+    const START_HOUR = 6, END_HOUR = 22; // 06:00 ~ 22:00 (마지막 칸은 22:00 시작 수업)
+    const SG_WEEKDAY_SHORT = ['일', '월', '화', '수', '목', '금', '토'];
+    const STATUS_LABEL = { booked: '예약', attended: '출석', absent: '결석', cancelled: '취소' };
+    const STATUS_CLASS = { booked: 'sg-booked', attended: 'sg-attended', absent: 'sg-absent', cancelled: 'sg-cancelled' };
+    // 출석/결석은 둘 다 "수업이 진행됨(노쇼 포함)"으로 보고 잔여횟수를 차감함. 취소·삭제는 수업이 아예 없었던 것이므로 차감하지 않고,
+    // 이미 차감된 상태(출석/결석)에서 취소·삭제로 바뀌면 차감했던 1회를 복구함.
+    const DECREMENTING_STATUSES = ['attended', 'absent'];
+    const pad = (n) => String(n).padStart(2, '0');
+
+    function startOfWeekLocal(d) {
+      const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const day = date.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      date.setDate(date.getDate() + diff);
+      return date;
+    }
+    function getWeekRange(anchor) {
+      const start = startOfWeekLocal(anchor);
+      const end = new Date(start); end.setDate(end.getDate() + 7);
+      const days = [];
+      for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(d.getDate() + i); days.push(d); }
+      const last = days[6];
+      const label = `${start.getFullYear()}.${pad(start.getMonth() + 1)}.${pad(start.getDate())} - ${pad(last.getMonth() + 1)}.${pad(last.getDate())}`;
+      return { start, end, days, label };
+    }
+
+    function staffName(id) { const s = staffCache.find(x => x.id === id); return s ? s.name : '-'; }
+
+    function renderBookingCell(b) {
+      const start = new Date(b.start_at), end = new Date(b.end_at);
+      const timeLabel = `${pad(start.getHours())}:${pad(start.getMinutes())}-${pad(end.getHours())}:${pad(end.getMinutes())}`;
+      const remain = (b.member && b.member.pt_remaining_sessions != null) ? `잔여 ${b.member.pt_remaining_sessions}회` : '';
+      return `
+        <div class="sg-slot ${STATUS_CLASS[b.status] || ''}" onclick="openActionModal('${b.id}')">
+          <div class="sg-time">${timeLabel} · ${STATUS_LABEL[b.status] || b.status}</div>
+          <div class="sg-name">${b.member ? b.member.name : '(삭제된 회원)'}</div>
+          <div class="sg-remain">${remain}</div>
+        </div>
+      `;
+    }
+
+    function renderGrid() {
+      const { days } = getWeekRange(weekAnchor);
+      const todayStr = formatDateStr(new Date());
+      let html = '<div class="sg-corner"></div>';
+      days.forEach((d) => {
+        const dStr = formatDateStr(d);
+        html += `<div class="sg-daycol ${dStr === todayStr ? 'sg-today' : ''}">${SG_WEEKDAY_SHORT[d.getDay()]}, ${d.getMonth() + 1}/${d.getDate()}</div>`;
+      });
+      for (let h = START_HOUR; h <= END_HOUR; h++) {
+        html += `<div class="sg-timecol">${pad(h)}:00</div>`;
+        days.forEach((d) => {
+          const dateStr = formatDateStr(d);
+          const booking = bookingsCache.find(b => {
+            const bd = new Date(b.start_at);
+            return formatDateStr(bd) === dateStr && bd.getHours() === h;
+          });
+          if (booking) {
+            html += renderBookingCell(booking);
+          } else {
+            html += `<div class="sg-slot" onclick="openNewBookingModal('${dateStr}', ${h})"></div>`;
+          }
+        });
+      }
+      document.getElementById('scheduleGrid').innerHTML = html;
+    }
+
+    function renderSummary() {
+      const counts = { booked: 0, attended: 0, absent: 0, cancelled: 0 };
+      bookingsCache.forEach(b => { if (counts[b.status] !== undefined) counts[b.status] += 1; });
+      document.getElementById('weekSummary').innerHTML =
+        `<span>예약 <b>${counts.booked}</b></span><span>출석 <b>${counts.attended}</b></span><span>결석 <b>${counts.absent}</b></span><span>취소 <b>${counts.cancelled}</b></span>`;
+    }
+
+    async function reloadBookings() {
+      const { start, end, label } = getWeekRange(weekAnchor);
+      document.getElementById('weekLabel').textContent = label;
+      document.getElementById('scheduleGrid').innerHTML = '<div class="muted" style="padding:16px; grid-column: 1 / -1;">불러오는 중...</div>';
+      try {
+        bookingsCache = await fetchPtBookings(selectedTrainerId, start.toISOString(), end.toISOString());
+      } catch (err) {
+        document.getElementById('scheduleGrid').innerHTML = `<div class="error-text" style="display:block; grid-column: 1 / -1;">${err.message}</div>`;
+        return;
+      }
+      renderGrid();
+      renderSummary();
+    }
+
+    document.getElementById('weekPrevBtn').addEventListener('click', () => { weekAnchor.setDate(weekAnchor.getDate() - 7); weekAnchor = new Date(weekAnchor); reloadBookings(); });
+    document.getElementById('weekNextBtn').addEventListener('click', () => { weekAnchor.setDate(weekAnchor.getDate() + 7); weekAnchor = new Date(weekAnchor); reloadBookings(); });
+    document.getElementById('todayBtn').addEventListener('click', () => { weekAnchor = new Date(); reloadBookings(); });
+    document.getElementById('trainerSelect').addEventListener('change', (e) => { selectedTrainerId = e.target.value; reloadBookings(); });
+
+    // ---- 새 예약 ----
+    // 회원 목록이 많으면 하나씩 스크롤해서 찾기 힘드니까, 회원 관리 화면과 똑같은 방식(이름 또는
+    // 전화번호 뒷자리 일부)으로 검색해서 바로 골라 넣을 수 있게 함 (matchesMemberSearch는 data.js 공용 함수)
+    function memberSubLabel(m) {
+      const parts = [m.phone || '전화번호 없음'];
+      parts.push(m.pt_remaining_sessions != null ? `잔여 ${m.pt_remaining_sessions}회` : '잔여횟수 미기록');
+      if (m.assigned_trainer_id === selectedTrainerId) parts.push('내 담당');
+      return parts.join(' · ');
+    }
+    function renderMemberSearchResults(list) {
+      const box = document.getElementById('nb_memberResults');
+      if (list.length === 0) {
+        box.innerHTML = '<div class="member-search-item muted">일치하는 회원이 없어요</div>';
+      } else {
+        box.innerHTML = list.slice(0, 8).map(m => `
+          <div class="member-search-item" data-id="${m.id}">
+            <div class="msi-name">${m.name}</div>
+            <div class="msi-sub">${memberSubLabel(m)}</div>
+          </div>
+        `).join('');
+        box.querySelectorAll('.member-search-item[data-id]').forEach(item => {
+          item.addEventListener('click', () => selectMemberForBooking(item.dataset.id));
+        });
+      }
+      box.style.display = 'block';
+    }
+    function selectMemberForBooking(id) {
+      const m = membersCache.find(x => x.id === id);
+      if (!m) return;
+      document.getElementById('nb_member').value = id;
+      document.getElementById('nb_memberSearch').value = m.name;
+      document.getElementById('nb_memberResults').style.display = 'none';
+      const selectedEl = document.getElementById('nb_memberSelected');
+      selectedEl.textContent = `✓ 선택됨: ${m.name} (${memberSubLabel(m)})`;
+      selectedEl.style.display = 'block';
+
+      // 회원을 고르면 담당 트레이너와 개인PT 잔여횟수/만료일을 자동으로 보여줌
+      // (지금 보고 있는 스케줄의 트레이너와 회원의 실제 담당 트레이너가 다를 수도 있어서 그 경우 안내 문구를 같이 보여줌)
+      const trainer = staffCache.find(s => s.id === m.assigned_trainer_id);
+      const trainerHtml = trainer
+        ? `${trainer.role === 'manager' ? '지점장' : '트레이너'} ${trainer.name}`
+        : '담당 트레이너 미지정';
+      const mismatchNote = (m.assigned_trainer_id && m.assigned_trainer_id !== selectedTrainerId)
+        ? `<div class="muted" style="font-size:11.5px; margin-top:3px;">⚠️ 지금 보고 있는 ${staffName(selectedTrainerId)} 트레이너의 스케줄과 담당자가 달라요</div>`
+        : '';
+      document.getElementById('nb_trainerInfo').innerHTML = trainerHtml + mismatchNote;
+
+      const remainLabel = m.pt_remaining_sessions != null ? `${m.pt_remaining_sessions}회` : '기록 없음';
+      const expiryLabel = m.pt_end_date || '기록 없음';
+      document.getElementById('nb_ptInfo').innerHTML =
+        `잔여횟수: <b>${remainLabel}</b><br/>만료 예정일: <b>${expiryLabel}</b>`;
+      document.getElementById('nb_infoField').style.display = 'block';
+    }
+    document.getElementById('nb_memberSearch').addEventListener('input', (e) => {
+      document.getElementById('nb_member').value = '';
+      document.getElementById('nb_memberSelected').style.display = 'none';
+      document.getElementById('nb_infoField').style.display = 'none';
+      const query = e.target.value;
+      if (!query.trim()) { document.getElementById('nb_memberResults').style.display = 'none'; return; }
+      renderMemberSearchResults(membersCache.filter(m => matchesMemberSearch(m, query)));
+    });
+    document.getElementById('nb_memberSearch').addEventListener('focus', (e) => {
+      if (e.target.value.trim()) document.getElementById('nb_memberResults').style.display = 'block';
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#nb_memberSearch') && !e.target.closest('#nb_memberResults')) {
+        document.getElementById('nb_memberResults').style.display = 'none';
+      }
+    });
+
+    function openNewBookingModal(dateStr, hour) {
+      pendingSlot = { dateStr, hour };
+      document.getElementById('nbErrorBox').style.display = 'none';
+      document.getElementById('nb_dateTimeLabel').textContent = `${dateStr} ${pad(hour)}:00 · ${staffName(selectedTrainerId)} 트레이너`;
+      document.getElementById('nb_member').value = '';
+      document.getElementById('nb_memberSearch').value = '';
+      document.getElementById('nb_memberResults').style.display = 'none';
+      document.getElementById('nb_memberSelected').style.display = 'none';
+      document.getElementById('nb_infoField').style.display = 'none';
+      document.getElementById('nb_duration').value = '50';
+      document.getElementById('nb_memo').value = '';
+      document.getElementById('newBookingOverlay').style.display = 'flex';
+      setTimeout(() => document.getElementById('nb_memberSearch').focus(), 50);
+    }
+    function closeNewBookingModal() { document.getElementById('newBookingOverlay').style.display = 'none'; }
+    document.getElementById('nb_closeBtn').addEventListener('click', closeNewBookingModal);
+    document.getElementById('newBookingOverlay').addEventListener('click', (e) => { if (e.target.id === 'newBookingOverlay') closeNewBookingModal(); });
+
+    document.getElementById('newBookingForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('nbErrorBox');
+      errorBox.style.display = 'none';
+      if (!document.getElementById('nb_member').value) {
+        errorBox.textContent = '검색해서 회원을 목록에서 선택해주세요.';
+        errorBox.style.display = 'block';
+        document.getElementById('nb_memberSearch').focus();
+        return;
+      }
+      const { dateStr, hour } = pendingSlot;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const start = new Date(y, m - 1, d, hour, 0, 0);
+      const duration = Number(document.getElementById('nb_duration').value);
+      const end = new Date(start.getTime() + duration * 60000);
+      try {
+        await addPtBooking({
+          trainer_id: selectedTrainerId,
+          member_id: document.getElementById('nb_member').value,
+          start_at: start.toISOString(),
+          end_at: end.toISOString(),
+          status: 'booked',
+          memo: document.getElementById('nb_memo').value.trim() || null,
+          created_by: currentUserId
+        });
+        closeNewBookingModal();
+        reloadBookings();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    // ---- 예약 상태 변경 ----
+    function openActionModal(id) {
+      activeBookingId = id;
+      const b = bookingsCache.find(x => x.id === id);
+      if (!b) return;
+      const start = new Date(b.start_at), end = new Date(b.end_at);
+      const remain = (b.member && b.member.pt_remaining_sessions != null) ? `${b.member.pt_remaining_sessions}회` : '기록 없음';
+      document.getElementById('ac_summary').innerHTML =
+        `${formatDateStr(start)} ${pad(start.getHours())}:${pad(start.getMinutes())}-${pad(end.getHours())}:${pad(end.getMinutes())}<br/>` +
+        `<b>${b.member ? b.member.name : '(삭제된 회원)'}</b> · 현재 상태: ${STATUS_LABEL[b.status] || b.status}<br/>` +
+        `개인PT 잔여횟수: ${remain}`;
+      document.getElementById('actionOverlay').style.display = 'flex';
+    }
+    function closeActionModal() { document.getElementById('actionOverlay').style.display = 'none'; }
+    document.getElementById('ac_closeBtn').addEventListener('click', closeActionModal);
+    document.getElementById('actionOverlay').addEventListener('click', (e) => { if (e.target.id === 'actionOverlay') closeActionModal(); });
+
+    async function setBookingStatus(status) {
+      const b = bookingsCache.find(x => x.id === activeBookingId);
+      if (!b) return;
+      try {
+        const wasDecrementing = DECREMENTING_STATUSES.includes(b.status);
+        const willDecrement = DECREMENTING_STATUSES.includes(status);
+        const hasRemainInfo = !!(b.member && b.member.pt_remaining_sessions != null);
+
+        if (willDecrement && !wasDecrementing) {
+          // 예약/취소 -> 출석 또는 결석: 수업이 진행된 것(노쇼 포함)으로 보고 1회 차감
+          const remain = hasRemainInfo ? b.member.pt_remaining_sessions : null;
+          const msg = remain != null
+            ? `"${STATUS_LABEL[status]}" 처리하면 ${b.member.name} 회원의 개인PT 잔여횟수가 ${remain}회 → ${remain - 1}회로 차감돼요. 계속할까요?`
+            : `"${STATUS_LABEL[status]}" 처리할까요? (이 회원은 개인PT 잔여횟수가 기록되어 있지 않아 차감은 되지 않아요)`;
+          if (!confirm(msg)) return;
+          await updatePtBooking(b.id, { status });
+          if (remain != null) {
+            await updateMember(b.member.id, { pt_remaining_sessions: remain - 1 });
+            const mc = membersCache.find(x => x.id === b.member.id);
+            if (mc) mc.pt_remaining_sessions = remain - 1;
+          }
+        } else if (!willDecrement && wasDecrementing && hasRemainInfo) {
+          // 출석/결석(이미 차감됨) -> 취소: 수업이 없었던 것으로 되므로 차감했던 1회를 복구
+          const remain = b.member.pt_remaining_sessions;
+          const restored = remain + 1;
+          const msg = `이 예약은 이미 "${STATUS_LABEL[b.status]}" 처리되어 잔여횟수가 차감된 상태예요. "${STATUS_LABEL[status]}"(으)로 바꾸면 ${b.member.name} 회원의 잔여횟수가 ${remain}회 → ${restored}회로 복구돼요. 계속할까요?`;
+          if (!confirm(msg)) return;
+          await updatePtBooking(b.id, { status });
+          await updateMember(b.member.id, { pt_remaining_sessions: restored });
+          const mc = membersCache.find(x => x.id === b.member.id);
+          if (mc) mc.pt_remaining_sessions = restored;
+        } else {
+          // 그 외 (예: 출석 ↔ 결석 서로 전환, 예약 ↔ 취소): 이미 차감/복구 상태가 같으므로 잔여횟수는 건드리지 않고 상태만 변경
+          await updatePtBooking(b.id, { status });
+        }
+        closeActionModal();
+        reloadBookings();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+    document.getElementById('ac_attendBtn').addEventListener('click', () => setBookingStatus('attended'));
+    document.getElementById('ac_absentBtn').addEventListener('click', () => setBookingStatus('absent'));
+    document.getElementById('ac_cancelBtn').addEventListener('click', () => setBookingStatus('cancelled'));
+    document.getElementById('ac_deleteBtn').addEventListener('click', async () => {
+      const b = bookingsCache.find(x => x.id === activeBookingId);
+      const wasDecrementing = !!(b && DECREMENTING_STATUSES.includes(b.status) && b.member && b.member.pt_remaining_sessions != null);
+      const confirmMsg = wasDecrementing
+        ? `이 예약은 "${STATUS_LABEL[b.status]}" 처리되어 있어요. 삭제하면 ${b.member.name} 회원의 개인PT 잔여횟수가 ${b.member.pt_remaining_sessions}회 → ${b.member.pt_remaining_sessions + 1}회로 복구돼요. 계속 삭제할까요?`
+        : '이 예약을 완전히 삭제할까요?';
+      if (!confirm(confirmMsg)) return;
+      try {
+        await deletePtBooking(activeBookingId);
+        if (wasDecrementing) {
+          const restored = b.member.pt_remaining_sessions + 1;
+          await updateMember(b.member.id, { pt_remaining_sessions: restored });
+          const mc = membersCache.find(x => x.id === b.member.id);
+          if (mc) mc.pt_remaining_sessions = restored;
+        }
+        closeActionModal();
+        reloadBookings();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (!profile) return;
+      document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+      applyRoleNav(profile);
+      currentUserId = profile.id;
+      currentUserRole = profile.role;
+      isManagerFlag = profile.role === 'manager';
+
+      // 서로 무관한 두 요청이니 동시에 보냄 (하나씩 기다리면 그만큼 초기 로딩이 느려짐)
+      const [staffResult, membersResult] = await Promise.allSettled([fetchStaff(), fetchMembers()]);
+      staffCache = staffResult.status === 'fulfilled' ? staffResult.value : [];
+      membersCache = membersResult.status === 'fulfilled' ? membersResult.value : [];
+
+      if (isManagerFlag) {
+        const sel = document.getElementById('trainerSelect');
+        const trainers = staffCache.filter(s => s.role === 'trainer').concat(staffCache.filter(s => s.role === 'manager'));
+        trainers.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          sel.appendChild(opt);
+        });
+        sel.style.display = '';
+        selectedTrainerId = trainers.length > 0 ? trainers[0].id : currentUserId;
+        sel.value = selectedTrainerId;
+      } else {
+        selectedTrainerId = currentUserId;
+        document.getElementById('trainerNameLabel').style.display = '';
+        document.getElementById('trainerNameLabel').textContent = `${profile.name} 트레이너`;
+      }
+
+      reloadBookings();
+    })();
+  </script>
+</body>
+</html>
