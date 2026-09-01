@@ -22,7 +22,8 @@ const CATEGORY_LABEL = {
   locker: '락커',
   clothes: '운동복',
   day_pass: '일일권',
-  membership_transfer: '양도'
+  membership_transfer: '양도',
+  uncategorized: '미분류(확인필요)'
 };
 
 // 센터 매출(center-sales.html)에서 매출을 4갈래(PT/회원권/올바른(그룹PT)/기타)로 나눌 때 쓰는 기준.
@@ -32,7 +33,7 @@ const CENTER_SALES_BUCKETS = {
   pt: ['pt_new', 'pt_renewal'],
   membership: ['membership_new', 'membership_renewal'],
   group_pt: ['group_pt_new', 'group_pt_renewal'],
-  etc: ['locker', 'clothes', 'day_pass', 'membership_transfer']
+  etc: ['locker', 'clothes', 'day_pass', 'membership_transfer', 'uncategorized']
 };
 
 // 매출을 FC(헬스이용권·그룹PT·운동복·락커)/PT(개인PT)로 나눌 때 쓰는 기준.

@@ -38,7 +38,7 @@
     <div class="panel" id="uploadPanel" style="display:none;">
       <h3>엑셀로 회원 일괄 등록 / 업데이트</h3>
       <p class="muted" style="margin-top:-6px; margin-bottom:12px;">
-        두 가지 형식을 자동으로 인식해요: <b>①</b> 기존에 쓰시던 헬스장 관리 프로그램에서 내보낸 원본 엑셀 (이름·휴대폰번호·이용권정보 컬럼이 있는 시트를 자동으로 찾아서, 회원권/개인PT/그룹PT/락커/운동복 정보를 알아서 나눠 담아요) &nbsp;또는&nbsp; <b>②</b> 아래 간단 양식.<br/>
+        세 가지 형식을 자동으로 인식해요: <b>①</b> 기존에 쓰시던 헬스장 관리 프로그램에서 내보낸 원본 엑셀 (이름·휴대폰번호·이용권정보 컬럼이 있는 시트를 자동으로 찾아서, 회원권/개인PT/그룹PT/락커/운동복 정보를 알아서 나눠 담아요) &nbsp;<b>②</b> 아래 간단 양식 &nbsp;<b>③</b> POS "판매내역" 원본 엑셀(결제일시·판매상품·회원명 컬럼이 있는 거래 로그) — 이건 매출 기록을 통째로 채워넣고 회원 현재 상태(만료일·PT잔여횟수)도 같이 최신화해줘요. 여러 상품이 한 번에 묶여 결제된 건(외 N건)은 "미분류(확인필요)"로 일단 등록되니, 매출 입력 화면에서 항목만 다시 골라주시면 돼요.<br/>
         전화번호가 이미 있는 회원이면 정보가 업데이트되고, 없으면 새로 등록돼요. 같은 파일을 최신 상태로 관리하며 계속 다시 올리시면 돼요.
         <a href="#" id="downloadTemplate">간단 양식 다운로드</a>
       </p>
@@ -971,6 +971,16 @@
     // - "실제 프로그램 내보내기" 형식: 이름 + 이용권정보 컬럼이 있음 (휴대폰번호, 이용권정보 텍스트에서 항목별로 자동 추출)
     // - "간단 양식" 형식: 이름 + 전화번호 + 이용권종목 등 우리 템플릿 컬럼이 있음
     function detectSheet(workbook) {
+      // POS "판매내역" 원본 내보내기(결제일시+판매상품+회원명 컬럼이 있는 거래 단위 로그) - 가장 특징적인
+      // 헤더 조합이라 먼저 확인함. 이 형식은 "이름"/"이용권정보" 같은 컬럼이 아예 없어서 다른 두 형식과 안 겹침
+      for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name];
+        const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 })[0] || [];
+        const headers = headerRow.map(h => str(h));
+        if (headers.includes('결제일시') && headers.includes('판매상품') && headers.includes('회원명')) {
+          return { sheet, mode: 'pos_sales' };
+        }
+      }
       for (const name of workbook.SheetNames) {
         const sheet = workbook.Sheets[name];
         const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 })[0] || [];
@@ -1029,6 +1039,220 @@
       };
     }
 
+    // ---- POS "판매내역" 엑셀 일괄 가져오기 (2026-09-01 추가) ----
+    // 기존 두 형식(내보내기/간단양식)은 "회원 현재 이용권 현황"을 위한 것이고, 이건 완전히 다른
+    // 용도: 실제 POS에서 뽑은 "이번 달 판매내역" 원본을 그대로 넣으면, 매출 기록을 과거분까지
+    // 한 번에 채워넣고 + 회원 현재 상태(만료일/PT잔여횟수)도 같이 최신화해줌.
+
+    // "2026. 8.31 (월) 오후 9:44" -> "2026-08-31" (요일/시간 부분은 안 씀 - sale_date는 date 타입이라 날짜만 필요)
+    function parseKoreanDateTime(text) {
+      const t = str(text);
+      const m = t.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+      if (!m) return null;
+      return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    }
+
+    // 'YYYY-MM-DD' + 개월수 -> 그만큼 뒤의 날짜 ('YYYY-MM-DD'). 판매내역에는 만료일이 따로 없고
+    // "구매일 + 이용기간(개월)"만 있어서, 만료일을 이렇게 역산해서 채워넣음
+    function monthsLaterDateStr(dateStr, months) {
+      if (!dateStr || !months) return null;
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setMonth(d.getMonth() + Number(months));
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    // "(평산)(FC) 헬스이용권 12개월 외 2건", "(평산)(PT) 1:1 PT 20회", "(평산)(FC) 올바른 운동 무제한 개월권 12개월",
+    // "(평산) 일일입장권 1일" 같은 POS 상품명 텍스트를 분석해서 카테고리/개월수/PT횟수/묶음여부를 뽑아냄.
+    // "외 N건"이 붙은 건 여러 상품이 한 결제에 묶여서 금액이 항목별로 안 쪼개지는 경우라 bundled=true로 표시
+    function parsePosProductText(text) {
+      const t = str(text);
+      const bundled = /외\s*\d+\s*건/.test(t);
+      const monthsMatch = t.match(/(\d+)\s*개월/);
+      const months = monthsMatch ? Number(monthsMatch[1]) : null;
+      const sessionsMatch = t.match(/(\d+)\s*회/);
+      const sessions = sessionsMatch ? Number(sessionsMatch[1]) : null;
+      let bucket = null;
+      if (t.includes('일일입장권')) bucket = 'day_pass';
+      else if (t.includes('락커')) bucket = 'locker';
+      else if (t.includes('운동복')) bucket = 'clothes';
+      else if (t.includes('올바른') || t.includes('그룹PT') || t.includes('그룹 PT')) bucket = 'group_pt';
+      else if (t.includes('(PT)') || t.includes('1:1 PT')) bucket = 'pt';
+      else if (t.includes('헬스이용권') || t.includes('(FC)')) bucket = 'membership';
+      const itemName = t
+        .replace(/^\(평산\)/, '')
+        .replace(/\((FC|PT)\)/, '')
+        .replace(/외\s*\d+\s*건/, '')
+        .replace(/\d+\s*개월/, '')
+        .replace(/\d+\s*회/, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return { bundled, months, sessions, bucket, itemName };
+    }
+
+    // 카테고리 없는(bucket=null) 상품명이거나 묶음결제(bundled)면 '미분류(확인필요)'로 일단 다 등록해두고,
+    // 나중에 매출 입력 화면에서 담당자가 직접 항목별로 재분류하도록 함 (건너뛰면 매출 총액이 실제보다 적게 잡히니까)
+    function categoryForBucket(bucket, isNew) {
+      if (bucket === 'membership') return isNew ? 'membership_new' : 'membership_renewal';
+      if (bucket === 'pt') return isNew ? 'pt_new' : 'pt_renewal';
+      if (bucket === 'group_pt') return isNew ? 'group_pt_new' : 'group_pt_renewal';
+      if (bucket === 'locker') return 'locker';
+      if (bucket === 'clothes') return 'clothes';
+      if (bucket === 'day_pass') return 'day_pass';
+      return 'uncategorized';
+    }
+
+    function mapPosPaymentMethod(text) {
+      const t = str(text);
+      if (t.includes('카드')) return 'card';
+      if (t.includes('현금')) return 'cash';
+      if (t.includes('이체')) return 'transfer';
+      return null;
+    }
+
+    // 판매내역 원본을 그대로 처리: 결제/미수금 행은 "결제금액"을(실제 그 거래에서 걷힌 금액,
+    // 분할결제여도 이미 정확함), 환불 행은 "환불지급액"을(이미 음수) 매출 금액으로 그대로 씀.
+    // 신규/재등록 구분: 이번 업로드에서 새로 만들어진 회원의 "그 항목 첫 구매"만 신규로 보고,
+    // 그 외(이미 있던 회원이거나 같은 회원의 두 번째 이후 구매)는 전부 재등록으로 처리함
+    // (파일이 최신순 정렬이라 오름차순으로 다시 정렬해서 "첫 구매"를 정확히 판별함)
+    async function processPosSalesUpload(rows, resultBox) {
+      const staffList = await fetchStaff();
+      const staffByName = new Map(staffList.map(s => [s.name, s.id]));
+
+      const valid = rows
+        .map(row => ({ row, name: str(row['회원명']), dateStr: parseKoreanDateTime(row['결제일시']) }))
+        .filter(x => x.name && x.dateStr);
+      valid.sort((a, b) => (a.dateStr < b.dateStr ? -1 : a.dateStr > b.dateStr ? 1 : 0));
+
+      let newMembers = 0, salesCreated = 0, uncategorizedCount = 0, refundCount = 0, memberStatusUpdated = 0, skipped = 0;
+      const errors = [];
+      const memberIdCache = new Map(); // phone -> member id (이번 업로드 내에서 재조회 줄임)
+      const newBucketAssigned = new Set(); // `${memberId 또는 name}:${bucket}` 신규 태그를 이미 부여했는지
+      const saleNumberTag = new Map(); // 판매번호 -> 그 판매번호로 처음 정해진 신규/재등록 여부(분할결제 후속건이 물려받음)
+
+      for (let i = 0; i < valid.length; i++) {
+        const { row, name, dateStr } = valid[i];
+        if (i % 25 === 0) {
+          resultBox.innerHTML = `<div class="muted">처리 중... ${i} / ${valid.length}행</div>`;
+        }
+        const status = str(row['결제분류']); // 결제 / 환불 / 미수금
+        if (!['결제', '환불', '미수금'].includes(status)) { skipped++; continue; }
+
+        const phone = normalizePhone(row['연락처']);
+        const productText = str(row['판매상품']);
+        const parsed = parsePosProductText(productText);
+
+        let memberId = null, isNewMember = false;
+        if (phone) {
+          if (memberIdCache.has(phone)) {
+            memberId = memberIdCache.get(phone).id;
+            isNewMember = memberIdCache.get(phone).isNew;
+          } else {
+            try {
+              const existing = await findMemberByPhone(phone);
+              if (existing) {
+                memberId = existing.id;
+              } else {
+                const created = await addMember({ name, phone });
+                memberId = created[0].id;
+                isNewMember = true;
+                newMembers++;
+              }
+              memberIdCache.set(phone, { id: memberId, isNew: isNewMember });
+            } catch (err) {
+              errors.push(`${name} (판매번호 ${row['판매번호'] || '-'}): 회원 조회/생성 실패 - ${err.message}`);
+              continue;
+            }
+          }
+        }
+        // 전화번호가 없는 행은 회원을 특정할 수 없어서 회원 연결 없이 매출만 등록함(member_id는 nullable)
+
+        let amount, category, paymentMethod;
+        if (status === '환불') {
+          const refundAmt = Number(row['환불지급액']);
+          if (!Number.isFinite(refundAmt)) { skipped++; continue; }
+          amount = refundAmt; // 원본에 이미 음수로 들어있음
+          category = (parsed.bundled || !parsed.bucket) ? 'uncategorized' : categoryForBucket(parsed.bucket, false);
+          if (category !== 'uncategorized') refundCount++;
+          const refundMethodText = str(row['환불수단']);
+          paymentMethod = refundMethodText.includes('현금') ? 'cash'
+            : refundMethodText.includes('카드') ? 'card'
+            : refundMethodText.includes('이체') ? 'transfer'
+            : mapPosPaymentMethod(row['결제수단']);
+        } else {
+          const paidAmt = Number(row['결제금액']);
+          if (!Number.isFinite(paidAmt)) { skipped++; continue; }
+          amount = paidAmt;
+          if (parsed.bundled || !parsed.bucket) {
+            category = 'uncategorized';
+          } else {
+            // 분할결제(같은 판매번호가 "결제"+"미수금"으로 두 번 나오는 경우) 후속 건은 별개의
+            // 재등록이 아니라 같은 구매의 나머지 대금이라서, 첫 건에서 정한 신규/재등록을 그대로 물려받게 함
+            const saleNumber = str(row['판매번호']);
+            let isNewForBucket;
+            if (saleNumber && saleNumberTag.has(saleNumber)) {
+              isNewForBucket = saleNumberTag.get(saleNumber);
+            } else {
+              const bucketKey = `${memberId || name}:${parsed.bucket}`;
+              isNewForBucket = isNewMember && !newBucketAssigned.has(bucketKey);
+              if (isNewForBucket) newBucketAssigned.add(bucketKey);
+              if (saleNumber) saleNumberTag.set(saleNumber, isNewForBucket);
+            }
+            category = categoryForBucket(parsed.bucket, isNewForBucket);
+          }
+          paymentMethod = mapPosPaymentMethod(row['결제수단']);
+        }
+        if (category === 'uncategorized') uncategorizedCount++;
+
+        const staffId = staffByName.get(str(row['판매담당자'])) || null;
+
+        try {
+          await addSales([{
+            member_id: memberId,
+            staff_id: staffId,
+            category,
+            amount,
+            payment_method: paymentMethod,
+            sale_date: dateStr,
+            memo: `[엑셀 가져오기] ${productText}${status !== '결제' ? ` (${status})` : ''}${row['판매번호'] ? ` · 판매번호 ${row['판매번호']}` : ''}`
+          }]);
+          salesCreated++;
+        } catch (err) {
+          errors.push(`${name} ${dateStr}: 매출 등록 실패 - ${err.message}`);
+          continue;
+        }
+
+        // 회원 현재 상태(만료일/PT잔여횟수) 업데이트: 묶음결제·환불·못 알아본 상품은 건드리지 않음.
+        // 날짜 오름차순으로 처리하므로, 같은 회원이 여러 건 있으면 가장 최근 구매 값이 마지막에 덮어써서 남음
+        if (memberId && status !== '환불' && !parsed.bundled && parsed.bucket) {
+          const patch = {};
+          if (parsed.bucket === 'membership' && parsed.months) {
+            patch.membership_end_date = monthsLaterDateStr(dateStr, parsed.months);
+            patch.membership_type = parsed.itemName || '이용권';
+          } else if (parsed.bucket === 'group_pt' && parsed.months) {
+            patch.group_pt_end_date = monthsLaterDateStr(dateStr, parsed.months);
+            patch.group_pt_type = parsed.itemName || '그룹PT';
+          } else if (parsed.bucket === 'locker' && parsed.months) {
+            patch.locker_end_date = monthsLaterDateStr(dateStr, parsed.months);
+          } else if (parsed.bucket === 'clothes' && parsed.months) {
+            patch.workout_clothes_end_date = monthsLaterDateStr(dateStr, parsed.months);
+          } else if (parsed.bucket === 'pt') {
+            if (parsed.sessions != null) patch.pt_remaining_sessions = parsed.sessions;
+            if (parsed.months) patch.pt_end_date = monthsLaterDateStr(dateStr, parsed.months);
+          }
+          if (Object.keys(patch).length > 0) {
+            try {
+              await updateMember(memberId, patch);
+              memberStatusUpdated++;
+            } catch (err) {
+              errors.push(`${name}: 회원 상태 업데이트 실패 - ${err.message}`);
+            }
+          }
+        }
+      }
+
+      return { total: valid.length, newMembers, salesCreated, uncategorizedCount, refundCount, memberStatusUpdated, skipped, errors };
+    }
+
     // 엑셀/CSV 업로드 -> 전화번호 기준으로 있으면 업데이트, 없으면 신규 등록
     // (전체를 try/catch로 감싸서, 파일 읽기/시트 인식 단계에서 오류가 나도
     //  "처리 중..."에 멈춰있지 않고 실제 오류 내용이 화면에 뜨도록 함)
@@ -1050,6 +1274,23 @@
 
         if (rows.length === 0) {
           resultBox.innerHTML = '<div class="error-text" style="display:block;">시트에서 데이터 행을 찾지 못했어요. 파일 형식을 확인해주세요.</div>';
+          return;
+        }
+
+        if (mode === 'pos_sales') {
+          const r = await processPosSalesUpload(rows, resultBox);
+          const shownErrors2 = r.errors.slice(0, 30);
+          resultBox.innerHTML = `
+            <div class="success-text" style="display:block;">
+              [POS 판매내역 형식으로 인식] 매출 ${r.salesCreated}건 등록 (신규 회원 ${r.newMembers}명 포함) · 회원 현재 상태 업데이트 ${r.memberStatusUpdated}건
+              ${r.refundCount ? ` · 환불 ${r.refundCount}건` : ''}
+              ${r.uncategorizedCount ? ` · 미분류(확인필요) ${r.uncategorizedCount}건 - 매출 입력에서 항목을 다시 골라주세요` : ''}
+              ${r.skipped ? ` · 건너뜀 ${r.skipped}건(결제분류가 결제/환불/미수금이 아니거나 날짜·회원명 인식 실패)` : ''}
+            </div>
+            ${r.errors.length ? `<div class="error-text" style="display:block; white-space:pre-line;">실패 ${r.errors.length}건:\n${shownErrors2.join('\n')}${r.errors.length > shownErrors2.length ? `\n...외 ${r.errors.length - shownErrors2.length}건 더` : ''}</div>` : ''}
+          `;
+          fileInput.value = '';
+          loadMembers();
           return;
         }
 
