@@ -491,7 +491,9 @@ async function fetchExpiringItems(daysAhead = 14) {
   limitDate.setDate(limitDate.getDate() + daysAhead);
   const limitStr = limitDate.toISOString().slice(0, 10);
 
-  const orClause = EXPIRY_CATEGORIES.map(c => `${c.field}.lte.${limitStr}`).join(',');
+  // field가 없는 카테고리(예: "기타" - 회원 만료일 컬럼과 연결 안 됨)는 만료 추적 대상이 아니므로 제외.
+  // 안 걸러내면 존재하지 않는 컬럼("null")을 기준으로 필터링하게 되어 이 쿼리 자체가 HTTP 400으로 실패함
+  const orClause = EXPIRY_CATEGORIES.filter(c => c.field).map(c => `${c.field}.lte.${limitStr}`).join(',');
 
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name),tm_logs(id,status,contact_date,memo,created_at)` +
@@ -507,6 +509,7 @@ async function fetchExpiringItems(daysAhead = 14) {
     const logs = (m.tm_logs || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const latestTm = logs[0] || null;
     for (const cat of EXPIRY_CATEGORIES) {
+      if (!cat.field) continue;
       const endDate = m[cat.field];
       if (!endDate || endDate > limitStr) continue;
       const productLabel =
