@@ -332,7 +332,7 @@
         tbody.querySelectorAll('.delete-member-btn').forEach(btn => {
           btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            if (!confirm(`'${btn.dataset.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM) 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
+            if (!confirm(`'${btn.dataset.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM)/PT 회원 관리/PT 스케줄 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
             try {
               await deleteMember(btn.dataset.id);
               loadMembers();
@@ -665,7 +665,7 @@
     // 회원을 클릭해서 들어온 이 화면에도 삭제 버튼을 둠 -> 표의 "삭제" 링크와 동작은 동일함)
     document.getElementById('md_deleteBtn').addEventListener('click', async () => {
       if (!currentDetailMember) return;
-      if (!confirm(`'${currentDetailMember.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM) 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
+      if (!confirm(`'${currentDetailMember.name}' 회원을 삭제할까요?\n이 회원에 연결된 매출/연락(TM)/PT 회원 관리/PT 스케줄 기록도 함께 삭제되며, 되돌릴 수 없습니다.`)) return;
       try {
         const deletedName = currentDetailMember.name;
         await deleteMember(currentDetailMember.id);

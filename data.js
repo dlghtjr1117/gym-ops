@@ -96,10 +96,41 @@ async function fetchTrainers() {
   return res.json();
 }
 
-// 회원 삭제: 그 회원에 매출/TM 기록이 이미 걸려있으면(외래키 제약) 회원만 단독으로는
-// 못 지우기 때문에, 먼저 딸린 tm_logs/sales 기록을 지우고 나서 회원을 지움.
-// (연락 기록/매출까지 같이 지워진다는 걸 호출하는 쪽에서 사용자에게 미리 안내해야 함)
+// 회원 삭제: 그 회원을 참조하는 다른 테이블 행이 있으면(외래키 제약) 회원만 단독으로는
+// 못 지우기 때문에, 회원을 지우기 전에 딸린 기록들을 먼저 정리함.
+// - pt_leads(PT 리드): 이 회원으로 "등록전환"된 리드가 있으면 매출/회원을 참조 중이라 못 지움
+//   → 리드 자체는 남기고 연결(converted_member_id/converted_sale_id)만 풀어줌
+// - pt_care_logs(PT 회원 관리), pt_bookings(PT 스케줄), tm_logs(연락 기록), sales(매출):
+//   이 회원의 기록이라 매출/TM처럼 회원과 함께 지움
+// - tasks(업무 리스트): 업무 자체는 지우지 않고 회원 연결만 풀어줌(단순히 참고용 태그였을 뿐이라)
+// (연락 기록/매출/PT 관리·스케줄 기록까지 같이 지워진다는 걸 호출하는 쪽에서 사용자에게 미리 안내해야 함)
 async function deleteMember(id) {
+  const leadRes = await fetch(`${SUPABASE_URL}/rest/v1/pt_leads?converted_member_id=eq.${id}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify({ converted_member_id: null, converted_sale_id: null })
+  });
+  if (!leadRes.ok) await throwApiError(leadRes, '회원 삭제에 실패했습니다. (PT 리드 연결 해제 실패)');
+
+  const careRes = await fetch(`${SUPABASE_URL}/rest/v1/pt_care_logs?member_id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!careRes.ok) await throwApiError(careRes, '회원 삭제에 실패했습니다. (PT 회원 관리 기록 삭제 실패)');
+
+  const bookingRes = await fetch(`${SUPABASE_URL}/rest/v1/pt_bookings?member_id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!bookingRes.ok) await throwApiError(bookingRes, '회원 삭제에 실패했습니다. (PT 스케줄 기록 삭제 실패)');
+
+  const taskRes = await fetch(`${SUPABASE_URL}/rest/v1/tasks?member_id=eq.${id}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify({ member_id: null })
+  });
+  if (!taskRes.ok) await throwApiError(taskRes, '회원 삭제에 실패했습니다. (업무 연결 해제 실패)');
+
   const tmRes = await fetch(`${SUPABASE_URL}/rest/v1/tm_logs?member_id=eq.${id}`, {
     method: 'DELETE',
     headers: await authHeaders()
