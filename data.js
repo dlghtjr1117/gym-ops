@@ -23,7 +23,8 @@ const CATEGORY_LABEL = {
   clothes: '운동복',
   day_pass: '일일권',
   membership_transfer: '양도',
-  uncategorized: '미분류(확인필요)'
+  uncategorized: '미분류(확인필요)',
+  etc: '기타'
 };
 
 // 매출 한 건을 화면에 보여줄 때 쓸 "종목" 이름을 가장 구체적인 걸로 뽑아줌.
@@ -56,7 +57,7 @@ const CENTER_SALES_BUCKETS = {
   pt: ['pt_new', 'pt_renewal'],
   membership: ['membership_new', 'membership_renewal'],
   group_pt: ['group_pt_new', 'group_pt_renewal'],
-  etc: ['locker', 'clothes', 'day_pass', 'membership_transfer', 'uncategorized']
+  etc: ['locker', 'clothes', 'day_pass', 'membership_transfer', 'uncategorized', 'etc']
 };
 
 // 매출을 FC(헬스이용권·그룹PT·운동복·락커)/PT(개인PT)로 나눌 때 쓰는 기준.
@@ -416,13 +417,16 @@ async function fetchExpiringMembers(daysAhead = 14) {
   });
 }
 
-// 만료 예정/만료 항목이 될 수 있는 5가지 카테고리 (만료회원·TM 페이지의 상품 필터 탭에서 사용)
+// 만료 예정/만료 항목이 될 수 있는 카테고리 (만료회원·TM 페이지의 상품 필터 탭 + 상품 관리/매출 입력의
+// 카테고리 탭·라벨에서 공용으로 사용). "기타"는 회원 만료일과 연결되지 않는 1회성 상품(양도비 등)이라
+// field가 없음 - field가 없으면 만료 추적/재등록 통계에서는 자동으로 제외되고, 라벨 표시용으로만 쓰임
 const EXPIRY_CATEGORIES = [
   { key: 'membership', field: 'membership_end_date', label: '헬스이용권' },
   { key: 'group_pt', field: 'group_pt_end_date', label: '그룹PT' },
   { key: 'pt', field: 'pt_end_date', label: '개인PT' },
   { key: 'locker', field: 'locker_end_date', label: '락커' },
-  { key: 'clothes', field: 'workout_clothes_end_date', label: '운동복' }
+  { key: 'clothes', field: 'workout_clothes_end_date', label: '운동복' },
+  { key: 'etc', field: null, label: '기타' }
 ];
 
 // ---- 이용권(상품) 관리 ----
@@ -460,7 +464,7 @@ async function updateProduct(id, patch) {
 // 상품 카테고리 -> 매출 "항목" 매핑 (상품을 팔 때 매출 카테고리를 자동으로 맞춰줌.
 // 재등록으로 기본값을 잡아두고, 신규로 파는 거면 화면에서 직접 "신규 ○○"로 바꾸면 됨)
 const PRODUCT_CATEGORY_TO_SALE_CATEGORY = {
-  membership: 'membership_renewal', group_pt: 'group_pt_renewal', pt: 'pt_renewal', locker: 'locker', clothes: 'clothes'
+  membership: 'membership_renewal', group_pt: 'group_pt_renewal', pt: 'pt_renewal', locker: 'locker', clothes: 'clothes', etc: 'etc'
 };
 
 // 상품을 하나 골랐을 때, 회원 등록/수정 폼에 채워 넣을 필드값들을 계산 (종목명 + 만료일 + PT 횟수)
@@ -469,7 +473,7 @@ function computeProductFill(product, baseDateStr) {
   const cat = EXPIRY_CATEGORIES.find(c => c.key === product.category);
   if (!cat) return {};
   const out = {};
-  if (product.duration_days != null) {
+  if (cat.field && product.duration_days != null) {
     const base = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : new Date();
     base.setDate(base.getDate() + Number(product.duration_days));
     out[cat.field] = base.toISOString().slice(0, 10);
