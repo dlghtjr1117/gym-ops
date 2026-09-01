@@ -759,20 +759,28 @@
           Object.assign(currentDetailMember, rows[0] || mergedFill);
         }
         // 담은 상품 개수만큼 매출도 한 번에 기록 (매출일 = 각 상품의 시작일, 담당자/결제수단은 공통 적용)
-        const salesPayload = saleCart.map(item => ({
-          member_id: currentDetailMember.id,
-          staff_id: saleStaffId,
-          category: PRODUCT_CATEGORY_TO_SALE_CATEGORY[item.product.category] || 'membership_renewal',
-          product_id: item.product.id,
-          amount: Number(item.amount) || 0,
-          sale_date: item.startDate,
-          payment_method: paymentMethod,
-          memo
-        }));
-        await addSales(salesPayload);
+        // 금액이 0원인 항목(락커/운동복처럼 별도로 안 받고 끼워주는 경우 등)은 매출로는 남기지 않음 -
+        // 회원의 만료일 등은 위 mergedFill로 이미 전부 반영됐으므로, 매출 기록만 건너뜀
+        const paidItems = saleCart.filter(item => Number(item.amount) > 0);
+        const freeItems = saleCart.filter(item => Number(item.amount) <= 0);
+        if (paidItems.length > 0) {
+          const salesPayload = paidItems.map(item => ({
+            member_id: currentDetailMember.id,
+            staff_id: saleStaffId,
+            category: PRODUCT_CATEGORY_TO_SALE_CATEGORY[item.product.category] || 'membership_renewal',
+            product_id: item.product.id,
+            amount: Number(item.amount),
+            sale_date: item.startDate,
+            payment_method: paymentMethod,
+            memo
+          }));
+          await addSales(salesPayload);
+        }
 
         const soldNames = saleCart.map(i => i.product.name).join(', ');
-        successBox.textContent = `${soldNames} 이용권이 등록되고 매출로 기록되었습니다.`;
+        successBox.textContent = freeItems.length > 0
+          ? `${soldNames} 이용권이 등록되었습니다. (${freeItems.map(i => i.product.name).join(', ')}은 0원이라 매출에는 남기지 않았습니다)`
+          : `${soldNames} 이용권이 등록되고 매출로 기록되었습니다.`;
         successBox.style.display = 'block';
 
         saleCart = [];
@@ -1416,7 +1424,10 @@
         const newMember = newMemberRows[0];
 
         // 상품을 고른 항목뿐 아니라, "직접 입력"이라도 금액을 입력했으면(트레이너쌤 할인 등으로
-        // 정가와 다르게 파는 경우) 그대로 매출로 기록함. 상품을 안 고르고 금액도 안 적은 칸만 건너뜀.
+        // 정가와 다르게 파는 경우) 그대로 매출로 기록함. 금액이 0원(칸을 비워두거나 0을 입력한 경우)인
+        // 항목은 매출로 남기지 않음 - 락커/운동복처럼 별도로 돈 받지 않고 같이 끼워주는 항목까지
+        // 전부 "0원 매출"로 잡혀서 매출 내역에 실제 매출이 아닌 줄이 계속 쌓이는 걸 막기 위함.
+        // (회원의 만료일 등은 매출 기록 여부와 무관하게 위 addMember()에서 이미 정상적으로 반영됨)
         // 매출의 날짜/시각은 "판매 날짜"·"판매 시각" 칸 값을 공통으로 씀 (실제 결제 시점).
         // 항목별 "시작일"은 이용권/PT 등이 언제부터 유효한지를 나타내는 값이라 서로 다른 개념이라서,
         // 결제일과 시작일이 다른 경우(오늘 결제하고 다음 주부터 시작 등)에도 각각 올바르게 기록됨.
@@ -1425,18 +1436,21 @@
         const saleDateCommon = val('m_sale_date') || todayStr();
         const saleTime = val('m_sale_time') || null;
         const salesPayload = [];
+        let freeItemNames = [];
         Object.keys(PRODUCT_SELECT_IDS).forEach(category => {
           const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
           const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
           const amountInputId = AMOUNT_INPUT_IDS[category];
           const amountRaw = amountInputId ? val(amountInputId) : '';
           if (!product && amountRaw === '') return; // 상품도 안 고르고 금액도 안 적었으면 매출 안 남김
+          const amount = Number(amountRaw || 0);
+          if (amount === 0) { if (product) freeItemNames.push(product.name); return; } // 0원이면 매출로 안 남김(회원 정보 반영은 위에서 이미 됨)
           salesPayload.push({
             member_id: newMember.id,
             staff_id: saleStaffId,
             category: NEW_MEMBER_SALE_CATEGORY[category] || 'membership_new',
             product_id: product ? product.id : null, // 직접 입력이면 연결된 상품 없이 금액만 기록
-            amount: Number(amountRaw || 0),
+            amount,
             sale_date: saleDateCommon,
             sale_time: saleTime,
             payment_method: salePayment,
@@ -1458,10 +1472,12 @@
 
         // 개인PT가 포함되고 담당 트레이너도 지정했으면, 그 트레이너의 PT 관리 > PT 회원 관리 탭에도
         // 자동으로 연동된 행을 만들어줌 (트레이너가 매번 "+PT 회원 추가"로 직접 찾아 넣지 않아도 됨).
+        // (0원 무료 체험 PT처럼 매출로는 안 남긴 경우에도 PT 상품 자체는 선택된 거라 그대로 연동함 ->
+        //  salesPayload가 아니라 "개인PT 상품을 실제로 골랐는지"를 직접 봐야 함)
         // 매출 기록과 마찬가지로 이 부분이 실패해도 회원 등록 자체는 이미 끝난 상태라 실패 처리하지 않고,
         // 안 되면 트레이너가 PT 회원 관리 탭에서 "회원 연결"로 수동 연동하면 됨
-        const ptSaleIncluded = salesPayload.some(s => s.category === 'pt_new');
-        if (ptSaleIncluded && newMember.assigned_trainer_id) {
+        const ptProductSelected = !!(productsByCategory.pt || []).find(p => p.id === document.getElementById(PRODUCT_SELECT_IDS.pt).value);
+        if (ptProductSelected && newMember.assigned_trainer_id) {
           try {
             await ensurePtCareLogForMember(newMember.id, newMember.name, newMember.assigned_trainer_id);
           } catch (careLinkErr) { /* 조용히 넘어감 - 아래 saleWarning과 별개로 치명적이지 않음 */ }
@@ -1473,6 +1489,8 @@
         if (saleWarning) {
           // 매출 기록만 실패한 경우는 alert로 바로 원인을 알려줘야 해서, 조용히 사라지는 토스트 대신 그대로 둠
           alert(`회원("${newMember.name}") 등록은 완료됐지만, 매출 기록에는 실패했습니다.\n\n오류 내용: ${saleWarning}\n\n회원 목록에서 "${newMember.name}"을 클릭한 뒤, "이용권 판매" 항목에서 다시 등록해주세요.`);
+        } else if (freeItemNames.length > 0) {
+          showToast(`"${newMember.name}" 회원 등록이 완료되었습니다. (${freeItemNames.join(', ')}은 0원이라 매출에는 남기지 않았습니다)`);
         } else {
           showToast(`"${newMember.name}" 회원 등록이 완료되었습니다.`);
         }
