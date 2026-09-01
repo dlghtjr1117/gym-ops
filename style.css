@@ -281,7 +281,9 @@ tr.member-row:hover td { background: var(--slate-50); }
 .sale-product-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   background: var(--white); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+  cursor: pointer;
 }
+.sale-product-row:hover { background: var(--slate-50); border-color: var(--slate-300); }
 .sale-product-row .name { font-weight: 600; }
 .sale-product-row .price { color: var(--slate-500); margin-top: 2px; }
 .sale-cart-row { background: var(--white); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px; }

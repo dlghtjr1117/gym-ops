@@ -450,15 +450,18 @@
         box.innerHTML = '<p class="muted" style="padding:10px;">담을 수 있는 상품이 없습니다. 이용권 관리에서 먼저 상품을 등록해주세요.</p>';
         return;
       }
+      // 상품 이름/가격뿐 아니라 옆의 "담기" 글자까지 포함한 줄 전체가 클릭 영역이 되도록,
+      // 클릭 이벤트를 작은 버튼이 아니라 행(.sale-product-row) 자체에 붙임 (버튼은 눌러도 같은 행의
+      // 클릭으로 그대로 버블링돼서 한 번만 담김 - 버튼에 별도 리스너를 또 달지 않음)
       box.innerHTML = items.map(p => `
-        <div class="sale-product-row">
+        <div class="sale-product-row" data-id="${p.id}">
           <div><div class="name">${p.name}</div><div class="price">${p.price != null ? formatWon(p.price) : '금액 미지정'}</div></div>
-          <button type="button" class="btn-link add-to-cart-btn" data-id="${p.id}">담기</button>
+          <button type="button" class="btn-link add-to-cart-btn" tabindex="-1" data-id="${p.id}">담기</button>
         </div>
       `).join('');
-      box.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const product = productsCacheForModal.find(p => p.id === btn.dataset.id);
+      box.querySelectorAll('.sale-product-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const product = productsCacheForModal.find(p => p.id === row.dataset.id);
           if (!product) return;
           saleCart.push({ key: `c${++saleCartSeq}`, product, amount: product.price != null ? product.price : 0, startDate: todayStr() });
           renderSaleCart();
@@ -921,6 +924,14 @@
 
     const str = v => (v === undefined || v === null) ? '' : v.toString().trim();
     const numOrNull = v => { const s = str(v); return s === '' ? null : Number(s); };
+    // 엑셀 업로드는 { raw: false }로 읽어서, "1,234원"처럼 셀 표시형식(천단위 콤마 등)이 그대로
+    // 문자열로 들어옴 -> Number()에 그냥 넣으면 NaN이 되므로, 콤마/원 등을 지우고 숫자만 남겨서 변환함
+    // (POS 판매내역의 "결제금액"·"환불지급액" 컬럼이 전부 "#,##0" 서식이라 이게 없으면 전부 NaN이 됨)
+    const numFromFormatted = v => {
+      const s = str(v).replace(/,/g, '').replace(/원/g, '').trim();
+      if (s === '' || s === '-') return NaN;
+      return Number(s);
+    };
 
     // "(평산)(FC) 헬스이용권 (...) - 2026-08-28~2026-11-27 / 무제한" 같은 한 줄을 분석해서
     // 회원권/개인PT/그룹PT/락커/운동복 중 어디에 해당하는지 + 만료일 + 횟수를 뽑아냄
@@ -1168,7 +1179,7 @@
 
         let amount, category, paymentMethod;
         if (status === '환불') {
-          const refundAmt = Number(row['환불지급액']);
+          const refundAmt = numFromFormatted(row['환불지급액']);
           if (!Number.isFinite(refundAmt)) { skipped++; continue; }
           amount = refundAmt; // 원본에 이미 음수로 들어있음
           category = (parsed.bundled || !parsed.bucket) ? 'uncategorized' : categoryForBucket(parsed.bucket, false);
@@ -1179,7 +1190,7 @@
             : refundMethodText.includes('이체') ? 'transfer'
             : mapPosPaymentMethod(row['결제수단']);
         } else {
-          const paidAmt = Number(row['결제금액']);
+          const paidAmt = numFromFormatted(row['결제금액']);
           if (!Number.isFinite(paidAmt)) { skipped++; continue; }
           amount = paidAmt;
           if (parsed.bundled || !parsed.bucket) {
@@ -1264,6 +1275,9 @@
         return;
       }
       resultBox.innerHTML = '<div class="muted">처리 중... (회원 수가 많으면 몇 분 정도 걸릴 수 있어요)</div>';
+      // 처리 중에 또 누르면 같은 업로드가 두 번 겹쳐 돌면서 회원이 중복 생성될 수 있어서, 끝날 때까지 버튼을 막아둠
+      const uploadBtnEl = document.getElementById('uploadBtn');
+      uploadBtnEl.disabled = true;
 
       try {
         const file = fileInput.files[0];
@@ -1348,6 +1362,8 @@
         loadMembers();
       } catch (err) {
         resultBox.innerHTML = `<div class="error-text" style="display:block;">업로드 처리 중 오류가 발생했습니다: ${err.message}</div>`;
+      } finally {
+        uploadBtnEl.disabled = false;
       }
     });
 

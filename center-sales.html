@@ -326,7 +326,7 @@
 
     // ---- 정산표(탭 4개) ----
     function saleItemLabel(s) {
-      return (s.product && s.product.name) ? s.product.name : (CATEGORY_LABEL[s.category] || s.category);
+      return saleDisplayItemName(s);
     }
     function saleNewRenewalLabel(s) {
       if (s.category.endsWith('_new')) return '신규';

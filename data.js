@@ -26,6 +26,29 @@ const CATEGORY_LABEL = {
   uncategorized: '미분류(확인필요)'
 };
 
+// 매출 한 건을 화면에 보여줄 때 쓸 "종목" 이름을 가장 구체적인 걸로 뽑아줌.
+// 1) products.html 카탈로그 상품이 연결돼 있으면(수기 매출 입력 시 상품을 골라 등록한 경우) 그 이름을 그대로,
+// 2) 연결된 상품이 없어도 POS 판매내역 엑셀 가져오기로 등록된 매출이면 메모에 남겨둔 원본 상품명(예:
+//    "헬스이용권 6개월", "락커 3개월")을 정리해서 보여줌 - 이런 매출은 카테고리만 보면 "신규 회원권"처럼
+//    뭉뚱그려져서 몇 개월짜리인지 안 보이는데, 메모의 원문에는 그 정보가 남아있어서 다시 뽑아낼 수 있음,
+// 3) 그것도 없으면 마지막으로 카테고리 이름(예: "신규 회원권")을 보여줌
+function saleDisplayItemName(sale) {
+  if (sale.product && sale.product.name) return sale.product.name;
+  if (sale.memo && sale.memo.includes('[엑셀 가져오기]')) {
+    let text = sale.memo.replace('[엑셀 가져오기]', '').trim();
+    text = text.split('· 판매번호')[0].trim();
+    text = text
+      .replace(/\s*\((환불|미수금)\)\s*$/, '')
+      .replace(/^\([^)]+\)/, '')       // 맨 앞 지점명 태그, 예: (평산)
+      .replace(/\((FC|PT)\)/, '')      // (FC)/(PT) 태그
+      .replace(/외\s*\d+\s*건/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (text) return text;
+  }
+  return CATEGORY_LABEL[sale.category] || sale.category;
+}
+
 // 센터 매출(center-sales.html)에서 매출을 4갈래(PT/회원권/올바른(그룹PT)/기타)로 나눌 때 쓰는 기준.
 // "올바른"은 지점장님이 쓰시는 그룹PT 상품 이름이라, 그룹PT 매출 카테고리를 그대로 그 항목으로 씀.
 // 기타는 신규/재등록 구분이 없는 항목들(락커·운동복·일일권·양도)을 한데 모음.
