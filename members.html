@@ -1027,6 +1027,23 @@
       return { sheet: workbook.Sheets[workbook.SheetNames[0]], mode: 'template' };
     }
 
+    // 바디코디 실제 내보내기 파일에는 이름 칸 맨 앞에 "PT", "그룹PT", "체험단", "PT환불" 같은
+    // 상품 분류 태그가 그대로 붙어서 들어오는 경우가 있음(예: "PT그룹PT 최지인", "그룹PT김지현",
+    // "체험단 김수정"). 실제 이름이 아니라서 그대로 등록하면 회원 목록에서 이름이 이상하게 보이고
+    // (가나다순 정렬에서도 엉뚱한 위치로 밀려나 찾기 어려움) 검색은 되지만 알아보기 힘들어짐 ->
+    // 맨 앞에 붙은 태그를 반복해서 다 떼어내고 실제 이름만 남김
+    function cleanMemberName(name) {
+      const tagRe = /^(PT환불|PT|그룹|환불|체험단|체험)\s*/i;
+      let n = str(name);
+      while (true) {
+        const m = n.match(tagRe);
+        if (!m) break;
+        n = n.slice(m[0].length);
+      }
+      n = n.trim();
+      return n || str(name); // 다 떼어냈는데 남는 게 없으면(실제로는 없었음) 원본 그대로 사용
+    }
+
     function buildPayloadFromExportRow(row) {
       const info = parseMembershipInfo(row['이용권정보']);
       // 락커만료일 컬럼에 날짜가 섞여 있는 경우(예: "283번 / 2027-08-26") 보조로 사용
@@ -1043,7 +1060,7 @@
       const regDate = str(row['등록일']);
       const birthDate = (birthRaw && birthRaw !== regDate) ? birthRaw : null;
       return {
-        name: str(row['이름']),
+        name: cleanMemberName(row['이름']),
         phone: normalizePhone(row['휴대폰번호']) || normalizePhone(row['전화번호']),
         birth_date: birthDate,
         gender: str(row['성별']) || null,
