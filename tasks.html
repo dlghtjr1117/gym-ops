@@ -32,7 +32,7 @@
   <div class="wrap">
     <div class="panel">
       <h3>업무 추가</h3>
-      <p class="muted" style="margin:-6px 0 12px;">지점장은 아무에게나 업무를 배정할 수 있고, 트레이너는 본인 앞으로만 업무를 추가할 수 있어요. "매일"/"매주"로 등록하면 마이크로소프트 투두처럼 체크한 업무가 다음 주기에 자동으로 다시 미체크 상태로 돌아와요.</p>
+      <p class="muted" style="margin:-6px 0 12px;">지점장은 아무에게나 업무를 배정할 수 있고, 트레이너는 본인 앞으로만 업무를 추가할 수 있어요. "매일"/"매주"로 등록하면 마이크로소프트 투두처럼 체크한 업무가 다음 주기에 자동으로 다시 미체크 상태로 돌아와요. "10시 회의", "오후 3시 OO쌤 미팅"처럼 특정 시각이 있는 일정은 "시간"까지 같이 넣어주면 목록에서 시간순으로 정렬돼요.</p>
       <div id="addErrorBox" class="error-text"></div>
       <div id="addSuccessBox" class="success-text"></div>
       <form id="addTaskForm">
@@ -45,6 +45,17 @@
               <option value="none">반복 없음</option>
               <option value="daily">매일</option>
               <option value="weekly">매주</option>
+              <option value="monthly">매월</option>
+            </select>
+          </div>
+          <div class="field" id="t_weekOrdinalField" style="display:none;">
+            <label>몇째 주</label>
+            <select id="t_week_ordinal">
+              <option value="1">첫째 주</option>
+              <option value="2">둘째 주</option>
+              <option value="3">셋째 주</option>
+              <option value="4">넷째 주</option>
+              <option value="-1">마지막 주</option>
             </select>
           </div>
           <div class="field" id="t_weekdayField" style="display:none;">
@@ -59,6 +70,7 @@
               <option value="6">토요일</option>
             </select>
           </div>
+          <div class="field"><label>시간 (선택)</label><input type="time" id="t_time" /></div>
           <div class="field" id="t_dueField"><label>마감일 (선택)</label><input type="date" id="t_due" /></div>
         </div>
         <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
@@ -91,6 +103,17 @@
               <option value="none">반복 없음</option>
               <option value="daily">매일</option>
               <option value="weekly">매주</option>
+              <option value="monthly">매월</option>
+            </select>
+          </div>
+          <div class="field" id="et_weekOrdinalField" style="display:none;">
+            <label>몇째 주</label>
+            <select id="et_week_ordinal">
+              <option value="1">첫째 주</option>
+              <option value="2">둘째 주</option>
+              <option value="3">셋째 주</option>
+              <option value="4">넷째 주</option>
+              <option value="-1">마지막 주</option>
             </select>
           </div>
           <div class="field" id="et_weekdayField" style="display:none;">
@@ -105,6 +128,7 @@
               <option value="6">토요일</option>
             </select>
           </div>
+          <div class="field"><label>시간 (선택)</label><input type="time" id="et_time" /></div>
           <div class="field" id="et_dueField"><label>마감일 (선택)</label><input type="date" id="et_due" /></div>
         </div>
         <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">저장</button>
@@ -125,21 +149,25 @@
     let trainersCache = [];
     let activeAssigneeFilter = 'all';
 
-    // 업무를 "일일 업무 / ○요일 주간업무 / 개인 업무"로 묶어 보여줄 때, 어떤 묶음이 펼쳐져 있는지
+    // 업무를 "일일 업무 / ○요일 주간업무 / 월간 업무 / 개인 업무"로 묶어 보여줄 때, 어떤 묶음이 펼쳐져 있는지
     // (마이크로소프트 투두처럼 목록 제목만 쭉 나오고 눌러야 펼쳐지는 방식 - 업무가 많아져도 화면이 안 길어짐)
-    // 처음 열 때는 "일일 업무" · "개인 업무" · 오늘 요일에 해당하는 주간업무만 기본으로 펼쳐두고,
-    // 그 외 요일(당장 안 봐도 되는 것들)은 접어둠. 이후로는 사용자가 누른 상태 그대로 유지됨(다시 접기 전까지)
-    let expandedGroupKeys = new Set(['daily', 'none', 'weekly-' + new Date().getDay()]);
+    // 처음 열 때는 "일일 업무" · "개인 업무" · "월간 업무"(한 달에 한 번뿐이라 놓치면 아쉬우니 항상 펼쳐둠) ·
+    // 오늘 요일에 해당하는 주간업무만 기본으로 펼쳐두고, 그 외 요일(당장 안 봐도 되는 것들)은 접어둠.
+    // 이후로는 사용자가 누른 상태 그대로 유지됨(다시 접기 전까지)
+    let expandedGroupKeys = new Set(['daily', 'none', 'monthly', 'weekly-' + new Date().getDay()]);
 
     document.getElementById('t_repeat').addEventListener('change', (e) => {
       const isRepeating = e.target.value !== 'none';
-      document.getElementById('t_weekdayField').style.display = e.target.value === 'weekly' ? '' : 'none';
+      // 요일 선택은 "매주"·"매월" 둘 다 필요 (매월은 "○째 주 ○요일"이라 요일도 골라야 함)
+      document.getElementById('t_weekdayField').style.display = (e.target.value === 'weekly' || e.target.value === 'monthly') ? '' : 'none';
+      document.getElementById('t_weekOrdinalField').style.display = e.target.value === 'monthly' ? '' : 'none';
       document.getElementById('t_dueField').style.display = isRepeating ? 'none' : '';
     });
 
     document.getElementById('et_repeat').addEventListener('change', (e) => {
       const isRepeating = e.target.value !== 'none';
-      document.getElementById('et_weekdayField').style.display = e.target.value === 'weekly' ? '' : 'none';
+      document.getElementById('et_weekdayField').style.display = (e.target.value === 'weekly' || e.target.value === 'monthly') ? '' : 'none';
+      document.getElementById('et_weekOrdinalField').style.display = e.target.value === 'monthly' ? '' : 'none';
       document.getElementById('et_dueField').style.display = isRepeating ? 'none' : '';
     });
 
@@ -174,12 +202,17 @@
 
       const repeatType = t.repeat_type || 'none';
       document.getElementById('et_repeat').value = repeatType;
-      document.getElementById('et_weekdayField').style.display = repeatType === 'weekly' ? '' : 'none';
+      document.getElementById('et_weekdayField').style.display = (repeatType === 'weekly' || repeatType === 'monthly') ? '' : 'none';
+      document.getElementById('et_weekOrdinalField').style.display = repeatType === 'monthly' ? '' : 'none';
       document.getElementById('et_dueField').style.display = repeatType === 'none' ? '' : 'none';
-      if (repeatType === 'weekly') {
+      if (repeatType === 'weekly' || repeatType === 'monthly') {
         document.getElementById('et_weekday').value = t.repeat_weekday != null ? String(t.repeat_weekday) : '1';
       }
+      if (repeatType === 'monthly') {
+        document.getElementById('et_week_ordinal').value = t.repeat_week_ordinal != null ? String(t.repeat_week_ordinal) : '1';
+      }
       document.getElementById('et_due').value = t.due_date || '';
+      document.getElementById('et_time').value = t.due_time ? t.due_time.slice(0, 5) : '';
 
       document.getElementById('editTaskOverlay').style.display = 'flex';
     }
@@ -201,7 +234,9 @@
         title: document.getElementById('et_title').value.trim(),
         due_date: repeatType === 'none' ? (document.getElementById('et_due').value || null) : null,
         repeat_type: repeatType,
-        repeat_weekday: repeatType === 'weekly' ? Number(document.getElementById('et_weekday').value) : null
+        repeat_weekday: (repeatType === 'weekly' || repeatType === 'monthly') ? Number(document.getElementById('et_weekday').value) : null,
+        repeat_week_ordinal: repeatType === 'monthly' ? Number(document.getElementById('et_week_ordinal').value) : null,
+        due_time: document.getElementById('et_time').value || null
       };
       if (currentUserRole === 'manager') {
         patch.assignee_id = document.getElementById('et_assignee').value;
@@ -295,6 +330,12 @@
       if (currentUserRole === 'manager') metaParts.push(t.assignee ? t.assignee.name : '미지정');
       if (t.member) metaParts.push(t.member.name);
       metaParts.push(dueLabel);
+      // 반복 업무만 "마지막 체크" 이력을 보여줌 (담당 선생님이 누락하고 있는지 파악하기 위한 용도라
+      // 반복 없는 개인 업무는 체크박스 상태만으로 충분함)
+      if (t.repeat_type && t.repeat_type !== 'none') {
+        const lastChecked = taskLastCheckedLabel(t);
+        metaParts.push(lastChecked ? `마지막 체크 ${lastChecked}` : `<span style="color:var(--red-600);">체크 기록 없음</span>`);
+      }
       return `
         <div class="checklist-row ${done ? 'row-done' : ''}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--slate-200);">
           <input type="checkbox" ${done ? 'checked' : ''} ${checkboxAttrs} style="width:18px; height:18px; cursor:${canEdit ? 'pointer' : 'default'};" />
@@ -307,7 +348,8 @@
       `;
     }
 
-    // 업무를 반복 설정 기준으로 묶음 지어서 반환: 일일 업무 -> 월~일 순서의 요일별 주간업무 -> 개인 업무(반복 없음).
+    // 업무를 반복 설정 기준으로 묶음 지어서 반환:
+    // 일일 업무 -> 월~일 순서의 요일별 주간업무 -> 월간 업무(매월 ○째 주 ○요일) -> 개인 업무(반복 없음).
     // 완료/미완료 둘 다 포함해서 묶기 때문에(마이크로소프트 투두처럼, 체크한 항목도 그 목록 안에 취소선으로 계속 보임),
     // 묶음 제목 옆에 "완료/전체" 진행 상황을 바로 알 수 있음. 업무가 하나도 없는 묶음은 아예 안 보여줌
     function buildTaskGroups(list) {
@@ -318,6 +360,10 @@
         const weekly = list.filter(t => t.repeat_type === 'weekly' && t.repeat_weekday === wd);
         if (weekly.length > 0) groups.push({ key: 'weekly-' + wd, label: `${WEEKDAY_LABELS[wd]} 주간업무`, tasks: weekly });
       });
+      // 매월 반복 업무는 (요일별 주간업무처럼 잘게 쪼개면 항목이 몇 개 안 되는데도 묶음만 많아지므로)
+      // "월간 업무" 하나로 묶고, 그 안에서 "○째 주 ○요일"은 각 업무 행의 마감 라벨(taskDueLabel)로 구분함
+      const monthly = list.filter(t => t.repeat_type === 'monthly');
+      if (monthly.length > 0) groups.push({ key: 'monthly', label: '월간 업무', tasks: monthly });
       const personal = list.filter(t => !t.repeat_type || t.repeat_type === 'none');
       if (personal.length > 0) groups.push({ key: 'none', label: '개인 업무', tasks: personal });
       return groups;
@@ -329,7 +375,16 @@
       const allDone = total > 0 && done === total;
       const expanded = expandedGroupKeys.has(group.key);
       // 펼쳤을 때는 아직 안 한 업무를 위에, 완료된 업무를 아래로 (그날그날 뭘 더 해야 하는지 한눈에 보이도록)
-      const sortedTasks = group.tasks.slice().sort((a, b) => (isTaskDone(a) ? 1 : 0) - (isTaskDone(b) ? 1 : 0));
+      // 같은 완료 상태 안에서는 "시간"이 있는 업무끼리 시간순으로 정렬(10시 회의, 오후 3시 미팅 순서대로 보이게).
+      // 시간이 없는 업무는 뒤로 보냄
+      const sortedTasks = group.tasks.slice().sort((a, b) => {
+        const doneDiff = (isTaskDone(a) ? 1 : 0) - (isTaskDone(b) ? 1 : 0);
+        if (doneDiff !== 0) return doneDiff;
+        if (!a.due_time && !b.due_time) return 0;
+        if (!a.due_time) return 1;
+        if (!b.due_time) return -1;
+        return a.due_time.localeCompare(b.due_time);
+      });
       return `
         <div class="card task-group-card" style="padding:0; overflow:hidden; margin-bottom:10px;">
           <div class="task-group-header" data-key="${group.key}">
@@ -373,6 +428,7 @@
         if (t) {
           t.status = checked ? 'done' : 'todo';
           t.last_completed_at = checked ? new Date().toISOString() : null;
+          if (checked) t.last_checked_at = new Date().toISOString();
         }
         renderTaskBody();
       } catch (err) {
@@ -407,15 +463,19 @@
           due_date: repeatType === 'none' ? (document.getElementById('t_due').value || null) : null,
           status: 'todo',
           repeat_type: repeatType,
-          repeat_weekday: repeatType === 'weekly' ? Number(document.getElementById('t_weekday').value) : null
+          repeat_weekday: (repeatType === 'weekly' || repeatType === 'monthly') ? Number(document.getElementById('t_weekday').value) : null,
+          repeat_week_ordinal: repeatType === 'monthly' ? Number(document.getElementById('t_week_ordinal').value) : null,
+          due_time: document.getElementById('t_time').value || null
         });
         successBox.textContent = '업무가 등록되었습니다.';
         successBox.style.display = 'block';
         document.getElementById('t_title').value = '';
         document.getElementById('t_due').value = '';
+        document.getElementById('t_time').value = '';
         document.getElementById('t_member').value = '';
         document.getElementById('t_repeat').value = 'none';
         document.getElementById('t_weekdayField').style.display = 'none';
+        document.getElementById('t_weekOrdinalField').style.display = 'none';
         document.getElementById('t_dueField').style.display = '';
         loadTasks();
       } catch (err) {

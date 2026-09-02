@@ -650,18 +650,27 @@ async function updateTaskStatus(id, status) {
 
 // ---- 업무 리스트 반복 기능 (마이크로소프트 투두 스타일) ----
 // tasks 테이블에 repeat_type/repeat_weekday/last_completed_at 컬럼을 추가해서 지원함.
-// "매일"/"매주 ○요일" 반복 업무는 실제로 서버에서 리셋해주는 게 아니라, 화면에서
-// last_completed_at이 "이번 주기(오늘/이번 주)" 안에 있는지를 계산해서 보여주는 방식
+// "매일"/"매주 ○요일"/"매월 ○째 주 ○요일" 반복 업무는 실제로 서버에서 리셋해주는 게 아니라, 화면에서
+// last_completed_at이 "이번 주기(오늘/이번 주/이번 달)" 안에 있는지를 계산해서 보여주는 방식
 // -> 주기가 지나면 DB값은 그대로여도 자동으로 다시 미체크 상태로 보임
-const REPEAT_TYPE_LABEL = { none: '반복 없음', daily: '매일', weekly: '매주' };
+const REPEAT_TYPE_LABEL = { none: '반복 없음', daily: '매일', weekly: '매주', monthly: '매월' };
 const WEEKDAY_LABELS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 const WEEKDAY_SHORT = ['일', '월', '화', '수', '목', '금', '토'];
+// 매월 반복에서 "몇째 주"인지 - 마지막 주는 매달 4주/5주가 왔다갔다 하므로 숫자(5)가 아니라
+// -1로 저장해서 "그 달의 마지막 ○요일"을 항상 정확히 가리키도록 함
+const WEEK_ORDINAL_LABELS = { 1: '첫째 주', 2: '둘째 주', 3: '셋째 주', 4: '넷째 주', '-1': '마지막 주' };
 
 // 업무 완료 체크: 체크하면 status를 done으로, last_completed_at을 지금 시각으로 저장.
 // 해제하면 둘 다 초기화(todo/null). 반복 업무는 last_completed_at 기준으로 "이번 주기 완료 여부"를
 // 다시 계산하기 때문에, 체크 시점의 status 값 자체는 반복 업무에서는 참고용일 뿐임
+//
+// last_checked_at은 별도로 관리하는 "실제로 마지막에 체크한 시각" 기록임. last_completed_at은
+// 체크 해제하면 바로 null로 지워지기 때문에(이번 주기 미완료 상태로 되돌리려고), 그것만으로는
+// "선생님이 마지막으로 언제 체크했었는지"를 알 수 없음 -> 그래서 체크할 때만 채우고, 해제해도
+// 지우지 않는 last_checked_at을 따로 둬서 "누락되고 있는지" 파악할 수 있게 함
 async function toggleTaskDone(id, done) {
   const patch = { status: done ? 'done' : 'todo', last_completed_at: done ? new Date().toISOString() : null };
+  if (done) patch.last_checked_at = new Date().toISOString();
   const res = await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
@@ -688,7 +697,24 @@ function isSameWeek(a, b) {
   return startOfWeek(a).getTime() === startOfWeek(b).getTime();
 }
 
-// 이 업무가 "이번 주기(반복 없음=한 번 완료하면 계속 완료 / 매일=오늘 / 매주=이번 주)" 기준으로
+function isSameMonth(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+// year/month(0=1월)의 그 달에서 ordinal번째 weekday의 날짜를 구함 (ordinal이 -1이면 "마지막 ○요일")
+function nthWeekdayOfMonth(year, month, weekday, ordinal) {
+  if (ordinal === -1) {
+    const last = new Date(year, month + 1, 0); // 그 달의 마지막 날
+    const diff = (last.getDay() - weekday + 7) % 7;
+    last.setDate(last.getDate() - diff);
+    return last;
+  }
+  const first = new Date(year, month, 1);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  return new Date(year, month, 1 + offset + (ordinal - 1) * 7);
+}
+
+// 이 업무가 "이번 주기(반복 없음=한 번 완료하면 계속 완료 / 매일=오늘 / 매주=이번 주 / 매월=이번 달)" 기준으로
 // 완료 처리됐는지 계산. 반복 업무는 주기가 지나면 DB값은 그대로여도 여기서 자동으로 false가 됨
 function isTaskDone(item, refDate = new Date()) {
   if (item.repeat_type === 'none' || !item.repeat_type) {
@@ -699,21 +725,48 @@ function isTaskDone(item, refDate = new Date()) {
   const completed = new Date(item.last_completed_at);
   if (item.repeat_type === 'daily') return isSameLocalDate(completed, refDate);
   if (item.repeat_type === 'weekly') return isSameWeek(completed, refDate);
+  if (item.repeat_type === 'monthly') return isSameMonth(completed, refDate);
   return false;
 }
 
-// 다음(또는 이번) 마감일 라벨 - 반복 없음이면 등록할 때 지정한 마감일을 그대로 보여줌
+// "15:00:00" / "15:00" 같은 DB의 time 값을 "오후 3:00" 형태로 변환.
+// due_time이 없는(시간 지정 안 한) 업무가 대부분이라 null이면 그냥 null을 돌려줘서 호출부에서 생략하게 함
+function formatTimeLabel(timeStr) {
+  if (!timeStr) return null;
+  const [hh, mm] = timeStr.split(':').map(Number);
+  const period = hh < 12 ? '오전' : '오후';
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return `${period} ${h12}:${String(mm).padStart(2, '0')}`;
+}
+
+// 다음(또는 이번) 마감일 라벨 - 반복 없음이면 등록할 때 지정한 마감일을 그대로 보여줌.
+// due_time이 같이 등록돼 있으면("10시 회의", "오후 3시 OO쌤 미팅" 등) 맨 뒤에 시간까지 붙여줌
 function taskDueLabel(item, refDate = new Date()) {
+  const timeLabel = formatTimeLabel(item.due_time);
+  const withTime = (label) => timeLabel ? `${label} · ${timeLabel}` : label;
   if (item.repeat_type === 'daily') {
-    return `매일 · ${refDate.getMonth() + 1}월 ${refDate.getDate()}일 (${WEEKDAY_SHORT[refDate.getDay()]})`;
+    return withTime(`매일 · ${refDate.getMonth() + 1}월 ${refDate.getDate()}일 (${WEEKDAY_SHORT[refDate.getDay()]})`);
   }
   if (item.repeat_type === 'weekly' && item.repeat_weekday !== null && item.repeat_weekday !== undefined) {
     const date = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
     const diff = (item.repeat_weekday - date.getDay() + 7) % 7;
     date.setDate(date.getDate() + diff);
-    return `매주 ${WEEKDAY_LABELS[item.repeat_weekday]} · ${date.getMonth() + 1}월 ${date.getDate()}일 (${WEEKDAY_SHORT[date.getDay()]})`;
+    return withTime(`매주 ${WEEKDAY_LABELS[item.repeat_weekday]} · ${date.getMonth() + 1}월 ${date.getDate()}일 (${WEEKDAY_SHORT[date.getDay()]})`);
   }
-  return item.due_date ? `마감 ${item.due_date}` : '마감일 없음';
+  if (item.repeat_type === 'monthly' && item.repeat_weekday !== null && item.repeat_weekday !== undefined && item.repeat_week_ordinal !== null && item.repeat_week_ordinal !== undefined) {
+    const date = nthWeekdayOfMonth(refDate.getFullYear(), refDate.getMonth(), item.repeat_weekday, item.repeat_week_ordinal);
+    const ordinalLabel = WEEK_ORDINAL_LABELS[item.repeat_week_ordinal];
+    return withTime(`매월 ${ordinalLabel} ${WEEKDAY_LABELS[item.repeat_weekday]} · ${date.getMonth() + 1}월 ${date.getDate()}일 (${WEEKDAY_SHORT[date.getDay()]})`);
+  }
+  return withTime(item.due_date ? `마감 ${item.due_date}` : '마감일 없음');
+}
+
+// 반복 업무를 담당자가 마지막으로 체크한 날짜 라벨. last_checked_at은 체크 해제해도 지워지지
+// 않으므로(위 toggleTaskDone 주석 참고), "이번 주기 완료 여부"와 별개로 실제 체크 이력을 보여줌
+function taskLastCheckedLabel(item) {
+  if (!item.last_checked_at) return null;
+  const d = new Date(item.last_checked_at);
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_SHORT[d.getDay()]})`;
 }
 
 async function addTmLog(log) {
