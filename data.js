@@ -88,14 +88,32 @@ async function throwApiError(res, fallbackMsg) {
   throw new Error(`${fallbackMsg} (HTTP ${res.status}${detail ? ': ' + detail : ''})`);
 }
 
+// Supabase(PostgREST)는 요청에 limit/offset을 안 주면 서버 기본 설정상 최대 반환 행수(보통 1000행)에서
+// "에러 없이 조용히" 잘려서 돌아옴. 회원 수가 적을 땐 문제가 안 되다가, 어느 시점부터 전체 행수가
+// 그 기준을 넘으면 뒤쪽 데이터(예: 새로 대량 등록한 회원들 중 일부)가 화면에서 통째로 안 보이게 됨 -
+// 실제로 바디코디 회원 1,734명을 일괄 등록한 뒤 이 문제가 발생해서(회원 검색에 안 뜨는 회원 존재) 추가함.
+// 결과가 빈 배열로 끝날 때까지 반복 조회해서 실제 전체 행을 다 가져옴.
+async function fetchAllRows(pathWithQuery, headers) {
+  const pageSize = 1000;
+  let offset = 0;
+  let all = [];
+  const sep = pathWithQuery.includes('?') ? '&' : '?';
+  while (true) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathWithQuery}${sep}limit=${pageSize}&offset=${offset}`, { headers });
+    if (!res.ok) return { error: res };
+    const page = await res.json();
+    all = all.concat(page);
+    if (page.length === 0) break;
+    offset += page.length;
+  }
+  return { rows: all };
+}
+
 // ---- 회원(members) ----
 async function fetchMembers() {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name)&order=created_at.desc`,
-    { headers: await authHeaders() }
-  );
-  if (!res.ok) await throwApiError(res, '회원 목록을 불러오지 못했습니다.');
-  return res.json();
+  const { rows, error } = await fetchAllRows('members?select=*,trainer:profiles(name)&order=created_at.desc', await authHeaders());
+  if (error) await throwApiError(error, '회원 목록을 불러오지 못했습니다.');
+  return rows;
 }
 
 // 이름 또는 전화번호 뒷자리 일부로 회원을 찾는 공용 검색 매칭 함수 (검색어가 없으면 false —
@@ -797,9 +815,11 @@ function normalizePhone(phone) {
 async function fetchAllDataForBackup() {
   const headers = await authHeaders();
   async function getRows(path, fallbackMsg) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers });
-    if (!res.ok) await throwApiError(res, fallbackMsg);
-    return res.json();
+    // 백업 대상 테이블(특히 회원)도 행 수가 많아지면 서버 기본 반환 행수 제한에 걸릴 수 있어서
+    // fetchAllRows로 전체를 다 받아옴 (위 fetchMembers()와 같은 이유)
+    const { rows, error } = await fetchAllRows(path, headers);
+    if (error) await throwApiError(error, fallbackMsg);
+    return rows;
   }
 
   const [members, sales, tmLogs, tasks, products, staff] = await Promise.all([
