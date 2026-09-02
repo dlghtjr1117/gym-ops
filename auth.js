@@ -125,12 +125,12 @@ async function getMyProfile() {
   return null;
 }
 
-// 트레이너는 상단 메뉴에서 "매출 입력"/"만료회원 · TM"/"이용권 관리"/"센터 매출"을 안 보이게 함
-// (매출 입력·만료회원 관리·센터 매출은 FC 담당 업무라 트레이너는 대시보드/회원관리/PT관리/업무리스트/직원관리만 쓰면 됨)
+// 트레이너는 상단 메뉴에서 "대시보드"/"매출 입력"/"만료회원 · TM"/"이용권 관리"/"직원 관리"를 안 보이게 함
+// -> 트레이너에게는 홈/회원 관리/센터 매출/PT 관리/PT 스케줄/업무 리스트/미팅 기록만 남음
 // 지점장은 그대로 전체 메뉴가 다 보임. 각 페이지에서 getMyProfile() 이후에 호출.
 function applyRoleNav(profile) {
   if (!profile || profile.role === 'manager') return;
-  const hideHrefs = ['sales.html', 'expiry.html', 'products.html', 'center-sales.html'];
+  const hideHrefs = ['dashboard.html', 'sales.html', 'expiry.html', 'products.html', 'staff.html'];
   // 상단 메뉴(.topnav) 말고도 홈 화면의 바로가기 타일(home.html)이나 대시보드의
   // "+ 매출 등록하기" 같은 인라인 링크(dashboard.html)에도 같은 href가 쓰이고 있어서,
   // .topnav 안쪽만 가리면 트레이너가 그 링크들을 타고 들어가 매출 입력/만료회원/이용권
