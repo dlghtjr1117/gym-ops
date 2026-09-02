@@ -72,7 +72,6 @@
       <div id="taskBody">
         <p class="muted" style="padding:16px;">불러오는 중...</p>
       </div>
-      <div class="report-nav" id="tasksPagination" style="justify-content:flex-end; margin-top:10px;"></div>
     </div>
   </div>
 
@@ -125,9 +124,12 @@
     let tasksCache = [];
     let trainersCache = [];
     let activeAssigneeFilter = 'all';
-    let showCompleted = false;
-    let tasksPage = 1;
-    const TASKS_PAGE_SIZE = 15;
+
+    // 업무를 "일일 업무 / ○요일 주간업무 / 개인 업무"로 묶어 보여줄 때, 어떤 묶음이 펼쳐져 있는지
+    // (마이크로소프트 투두처럼 목록 제목만 쭉 나오고 눌러야 펼쳐지는 방식 - 업무가 많아져도 화면이 안 길어짐)
+    // 처음 열 때는 "일일 업무" · "개인 업무" · 오늘 요일에 해당하는 주간업무만 기본으로 펼쳐두고,
+    // 그 외 요일(당장 안 봐도 되는 것들)은 접어둠. 이후로는 사용자가 누른 상태 그대로 유지됨(다시 접기 전까지)
+    let expandedGroupKeys = new Set(['daily', 'none', 'weekly-' + new Date().getDay()]);
 
     document.getElementById('t_repeat').addEventListener('change', (e) => {
       const isRepeating = e.target.value !== 'none';
@@ -276,7 +278,6 @@
       container.querySelectorAll('.filter-tab').forEach(btn => {
         btn.addEventListener('click', () => {
           activeAssigneeFilter = btn.dataset.key;
-          tasksPage = 1; // 담당자 필터를 바꾸면 1페이지부터 다시 보여줌
           renderTrainerTabs();
           renderTaskBody();
         });
@@ -306,50 +307,62 @@
       `;
     }
 
+    // 업무를 반복 설정 기준으로 묶음 지어서 반환: 일일 업무 -> 월~일 순서의 요일별 주간업무 -> 개인 업무(반복 없음).
+    // 완료/미완료 둘 다 포함해서 묶기 때문에(마이크로소프트 투두처럼, 체크한 항목도 그 목록 안에 취소선으로 계속 보임),
+    // 묶음 제목 옆에 "완료/전체" 진행 상황을 바로 알 수 있음. 업무가 하나도 없는 묶음은 아예 안 보여줌
+    function buildTaskGroups(list) {
+      const groups = [];
+      const daily = list.filter(t => t.repeat_type === 'daily');
+      if (daily.length > 0) groups.push({ key: 'daily', label: '일일 업무', tasks: daily });
+      [1, 2, 3, 4, 5, 6, 0].forEach(wd => { // 월,화,수,목,금,토,일 순서
+        const weekly = list.filter(t => t.repeat_type === 'weekly' && t.repeat_weekday === wd);
+        if (weekly.length > 0) groups.push({ key: 'weekly-' + wd, label: `${WEEKDAY_LABELS[wd]} 주간업무`, tasks: weekly });
+      });
+      const personal = list.filter(t => !t.repeat_type || t.repeat_type === 'none');
+      if (personal.length > 0) groups.push({ key: 'none', label: '개인 업무', tasks: personal });
+      return groups;
+    }
+
+    function renderTaskGroup(group) {
+      const done = group.tasks.filter(t => isTaskDone(t)).length;
+      const total = group.tasks.length;
+      const allDone = total > 0 && done === total;
+      const expanded = expandedGroupKeys.has(group.key);
+      // 펼쳤을 때는 아직 안 한 업무를 위에, 완료된 업무를 아래로 (그날그날 뭘 더 해야 하는지 한눈에 보이도록)
+      const sortedTasks = group.tasks.slice().sort((a, b) => (isTaskDone(a) ? 1 : 0) - (isTaskDone(b) ? 1 : 0));
+      return `
+        <div class="card task-group-card" style="padding:0; overflow:hidden; margin-bottom:10px;">
+          <div class="task-group-header" data-key="${group.key}">
+            <div>
+              <div style="font-size:14px; font-weight:600;">${allDone ? '✅ ' : ''}${group.label}</div>
+              <div class="muted" style="font-size:12px; margin-top:2px;">${done} / ${total} 완료</div>
+            </div>
+            <span class="muted" style="font-size:12px;">${expanded ? '▲' : '▼'}</span>
+          </div>
+          <div class="task-group-body" style="${expanded ? '' : 'display:none;'}">
+            ${sortedTasks.map(renderTaskRow).join('')}
+          </div>
+        </div>
+      `;
+    }
+
     function renderTaskBody() {
       const container = document.getElementById('taskBody');
-      const paginationEl = document.getElementById('tasksPagination');
       const list = visibleTasks();
       if (list.length === 0) {
         container.innerHTML = '<p class="muted" style="padding:16px;">해당하는 업무가 없습니다.</p>';
-        paginationEl.innerHTML = '';
         renderProgress();
         return;
       }
-      const pendingAll = list.filter(t => !isTaskDone(t));
-      const completed = list.filter(t => isTaskDone(t));
-
-      // 미완료 업무가 많아질 수 있으니 15건씩 페이지로 나눠서 보여줌 (완료된 업무는 기본으로 접혀있어 별도 페이지 없이 전부 보여줌)
-      const totalPages = Math.max(1, Math.ceil(pendingAll.length / TASKS_PAGE_SIZE));
-      tasksPage = Math.min(Math.max(1, tasksPage), totalPages);
-      const startIdx = (tasksPage - 1) * TASKS_PAGE_SIZE;
-      const pending = pendingAll.slice(startIdx, startIdx + TASKS_PAGE_SIZE);
-
-      let html = '<div class="card" style="padding:0; overflow:hidden;">';
-      html += pending.length > 0 ? pending.map(renderTaskRow).join('') : '<p class="muted" style="padding:16px;">지금 남은 업무가 없어요 🎉</p>';
-      html += '</div>';
-
-      if (completed.length > 0) {
-        html += `
-          <button type="button" id="toggleCompletedBtn" class="btn-link" style="margin-top:12px;">${showCompleted ? '▲' : '▼'} 완료됨 ${completed.length}</button>
-          <div class="card" style="padding:0; overflow:hidden; margin-top:8px; ${showCompleted ? '' : 'display:none;'}" id="completedList">
-            ${completed.map(renderTaskRow).join('')}
-          </div>
-        `;
-      }
-      container.innerHTML = html;
-      const toggleBtn = document.getElementById('toggleCompletedBtn');
-      if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => { showCompleted = !showCompleted; renderTaskBody(); });
-      }
-      if (pendingAll.length > TASKS_PAGE_SIZE) {
-        renderPagination(paginationEl, tasksPage, pendingAll.length, TASKS_PAGE_SIZE, (newPage) => {
-          tasksPage = newPage;
+      const groups = buildTaskGroups(list);
+      container.innerHTML = groups.map(renderTaskGroup).join('');
+      container.querySelectorAll('.task-group-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const key = header.dataset.key;
+          if (expandedGroupKeys.has(key)) expandedGroupKeys.delete(key); else expandedGroupKeys.add(key);
           renderTaskBody();
         });
-      } else {
-        paginationEl.innerHTML = '';
-      }
+      });
       renderProgress();
     }
 
