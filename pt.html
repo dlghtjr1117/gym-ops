@@ -1104,12 +1104,18 @@
           <td><input class="sheet-input" type="date" value="${r.contact_date || ''}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'contact_date',false)" /></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(r.name)}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'name',false)" /></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(r.memo || '')}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
-          <td><input class="sheet-input" type="date" data-id="${r.id}" title="날짜를 정하면 OT1로 자동 이동돼요" onchange="handlePromoteToOt1(this)" /></td>
+          <td><input class="sheet-input" type="date" data-id="${r.id}" title="날짜를 정하면 OT1로 자동 이동돼요" onblur="handlePromoteToOt1(this)" /></td>
           <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleDeleteOtNoResponse('${r.id}')">삭제</button></td>
         </tr>`).join('');
     }
 
     // 연락이 닿아서 OT1 날짜가 확정되면: pt_leads에 새 리드로 등록(OT1 표에 나타남) + 미응답 목록에서는 삭제
+    //
+    // onchange가 아니라 onblur에 연결한 이유: 아이폰(iOS Safari)에서는 날짜 달력(휠피커)을
+    // 스크롤하는 도중에도 change 이벤트가 계속 발생해서(최종 선택 전인데도), 예전에 onchange로
+    // 연결했을 때는 날짜를 고르는 중간중간 계속 confirm 팝업이 뜨는 문제가 있었음.
+    // onblur는 사용자가 날짜 선택을 끝내고 다른 곳을 탭했을 때(포커스를 벗어났을 때) 딱 한 번만
+    // 실행되므로, 날짜 고르는 도중에는 아무 일도 일어나지 않고 다 고른 뒤에만 확인 팝업이 뜸
     async function handlePromoteToOt1(inputEl) {
       const id = inputEl.dataset.id;
       const otDate = inputEl.value;
