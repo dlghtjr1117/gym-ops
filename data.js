@@ -1000,6 +1000,32 @@ async function upsertMarketingInquiry({ inquiry_date, category, channel, count, 
   return res.json();
 }
 
+// ---- 상담 워크인 / 미스 (대시보드 "상담 워크인 / 미스" 섹션) ----
+// 문의 경로와 같은 방식(이름 없이 그날짜 건수만 집계, 센터 공용)인데, 채널이 아니라 "성공/실패" 결과만 셈
+async function fetchWorkinResults(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const endDate = new Date(y, m, 1); // m은 이미 1~12라 그대로 넣으면 다음 달 1일이 됨
+  const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-01`;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/workin_results?result_date=gte.${start}&result_date=lt.${end}`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '상담 워크인 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 같은 (날짜, 결과) 조합이면 덮어쓰기(upsert) - migration_39의 unique 제약을 이용
+async function upsertWorkinResult({ result_date, result, count, updated_by }) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/workin_results?on_conflict=result_date,result`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify({ result_date, result, count, updated_by: updated_by || null, updated_at: new Date().toISOString() })
+  });
+  if (!res.ok) await throwApiError(res, '상담 워크인 기록 저장에 실패했습니다.');
+  return res.json();
+}
+
 // PT 잔여횟수가 적어 재등록 케어(상담)가 필요한 회원 목록 (기본: 잔여 3회 이하, 재원중인 회원만)
 // + 잔여횟수와 상관없이 트레이너가 직접 "PT 회원 관리" 시트에 추가한(pt_care_pinned=true) 회원도 함께 포함
 async function fetchPtCareMembers(threshold = 3) {

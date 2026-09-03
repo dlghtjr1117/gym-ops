@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="style.css?v=1788419175" />
 </head>
 <body>
   <div class="topbar">
@@ -161,11 +161,41 @@
         </div>
       </div>
     </div>
+
+    <div class="section">
+      <h2>상담 워크인 / 미스 <span class="muted" style="font-weight:400;font-size:12px;">(이번 달, 주차별)</span></h2>
+      <p class="muted" style="margin:-6px 0 12px;font-size:13px;">그날그날 상담(워크인) 결과를 성공/실패로 세는 표예요. 월요일 시작 기준 실제 달력 주차로 나뉘고, 이번 달에 해당하지 않는 칸은 회색으로 비활성 처리돼요. 칸을 클릭해서 숫자만 입력하면 자동 저장돼요.</p>
+
+      <div style="overflow-x:auto;">
+        <table id="workinTable" class="table-fixed sheet-table" style="min-width:620px;">
+          <thead><tr>
+            <th style="width:10%;">주차</th><th style="width:10%;">결과</th>
+            <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th style="width:10%;">주간 합계</th>
+          </tr></thead>
+          <tbody id="workinBody"><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="grid-3" style="margin-top:16px;">
+        <div class="stat-card">
+          <div class="label">이번 달 총 성공</div>
+          <div class="value" id="workinTotalSuccess">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">이번 달 총 실패</div>
+          <div class="value" id="workinTotalFail">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">성공률</div>
+          <div class="value" id="workinSuccessRate">-</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="auth.js"></script>
-  <script src="data.js"></script>
+  <script src="config.js?v=1788419175"></script>
+  <script src="auth.js?v=1788419175"></script>
+  <script src="data.js?v=1788419175"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -559,6 +589,133 @@
       renderInquiryTodayRow();
       renderInquiryTable();
     })();
+
+    // ---- 상담 워크인 / 미스 (센터 전체 공용, 이번 달 주차별 - 원래 엑셀 시트를 그대로 옮김) ----
+    // 문의 경로와 달리 "오늘 칸만" 방식이 아니라, 원래 엑셀처럼 이번 달 전체를 주차 x 요일(월~금)
+    // 격자로 한 표에서 바로 입력·조회함. 실제 달력 기준으로 월요일에 새 주가 시작하고(그 달 1일이
+    // 월요일이 아니면 1주차는 며칠만 있음, 마지막 주도 달이 끝나면 며칠만 있음), 그 달에 해당하지
+    // 않는 요일 칸은 회색으로 비활성 처리함.
+    let workinCache = [];
+    const WORKIN_WEEKDAYS = [
+      { dow: 1, label: '월' }, { dow: 2, label: '화' }, { dow: 3, label: '수' },
+      { dow: 4, label: '목' }, { dow: 5, label: '금' }
+    ];
+
+    // 이번 달을 월요일 시작 기준 주차로 쪼갬 - 각 주차는 { weekNo, dates: { 1:'YYYY-MM-DD', 2:..., ... } }
+    // (dates의 키는 요일 번호: 0=일 ... 6=토, 월~금인 1~5만 실제로 씀)
+    function weekBucketsForMonth(year, month) {
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const buckets = [];
+      let current = null;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(year, month, d);
+        const dow = date.getDay();
+        if (dow === 1 || current === null) {
+          if (current) buckets.push(current);
+          current = { weekNo: buckets.length + 1, dates: {} };
+        }
+        current.dates[dow] = toDateStr(date);
+      }
+      if (current) buckets.push(current);
+      return buckets;
+    }
+
+    function renderWorkinTable() {
+      const tbody = document.getElementById('workinBody');
+      const today = new Date();
+      const buckets = weekBucketsForMonth(today.getFullYear(), today.getMonth());
+
+      let grandSuccess = 0, grandFail = 0;
+      let html = '';
+      buckets.forEach(week => {
+        const weekDates = WORKIN_WEEKDAYS.map(wd => week.dates[wd.dow] || null);
+        const validDates = weekDates.filter(Boolean);
+        const rangeLabel = validDates.length
+          ? `${Number(validDates[0].slice(5, 7))}/${Number(validDates[0].slice(8, 10))}~${Number(validDates[validDates.length - 1].slice(5, 7))}/${Number(validDates[validDates.length - 1].slice(8, 10))}`
+          : '';
+        ['success', 'fail'].forEach((result, idx) => {
+          let weekTotal = 0;
+          const cellsHtml = WORKIN_WEEKDAYS.map((wd, i) => {
+            const dateStr = weekDates[i];
+            if (!dateStr) return `<td class="wi-disabled" style="background:var(--slate-50); color:#cbd5e1; text-align:center;">-</td>`;
+            const rec = workinCache.find(r => r.result_date === dateStr && r.result === result);
+            const val = rec ? rec.count : 0;
+            weekTotal += val;
+            return `<td><input class="sheet-input" type="number" min="0" style="width:48px;" value="${val || ''}" placeholder="0"
+              data-date="${dateStr}" data-result="${result}" onchange="handleWorkinCellSave(this)" /></td>`;
+          }).join('');
+          if (result === 'success') grandSuccess += weekTotal; else grandFail += weekTotal;
+          const weekCell = idx === 0
+            ? `<td rowspan="2" style="font-weight:700; background:var(--slate-50); vertical-align:middle; text-align:center;">${week.weekNo}주차<br /><span class="muted" style="font-weight:400; font-size:11px;">${rangeLabel}</span></td>`
+            : '';
+          const resultLabel = result === 'success' ? '✅ 성공' : '❌ 실패';
+          html += `<tr>${weekCell}<td>${resultLabel}</td>${cellsHtml}<td class="muted" style="text-align:center; font-weight:700;">${weekTotal || ''}</td></tr>`;
+        });
+      });
+      tbody.innerHTML = html || '<tr><td colspan="8" class="muted" style="padding:16px;">표시할 주차가 없어요.</td></tr>';
+
+      document.getElementById('workinTotalSuccess').textContent = `${grandSuccess}건`;
+      document.getElementById('workinTotalFail').textContent = `${grandFail}건`;
+      const workinTotal = grandSuccess + grandFail;
+      document.getElementById('workinSuccessRate').textContent = workinTotal > 0 ? `${(grandSuccess / workinTotal * 100).toFixed(1)}%` : '-';
+    }
+
+    async function handleWorkinCellSave(inputEl) {
+      const date = inputEl.dataset.date;
+      const result = inputEl.dataset.result;
+      const count = inputEl.value === '' ? 0 : Math.max(0, Math.round(Number(inputEl.value)));
+      inputEl.value = count || '';
+      inputEl.disabled = true;
+      try {
+        await upsertWorkinResult({ result_date: date, result, count, updated_by: currentUserId });
+        const existing = workinCache.find(r => r.result_date === date && r.result === result);
+        if (existing) existing.count = count;
+        else workinCache.push({ result_date: date, result, count });
+        renderWorkinTable();
+      } catch (err) {
+        alert(err.message);
+      }
+      inputEl.disabled = false;
+    }
+
+    (async () => {
+      try {
+        workinCache = await fetchWorkinResults(currentMonthStr());
+      } catch (err) {
+        workinCache = [];
+        document.getElementById('workinBody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+      renderWorkinTable();
+    })();
+
+    // "오늘" 칸은 날짜가 바뀌면 자동으로 새로 비워져야 하는데, 페이지를 새로고침하지 않고 브라우저
+    // 탭을 밤새 그대로 켜놓고 있으면(사무실 컴퓨터에서 흔한 경우) 자정이 지나도 이 화면이 다시 그려질
+    // 계기가 없어서 어제 날짜 그대로 남아있는 문제가 있었음 — 1분마다, 그리고 탭을 다시 보게 될 때마다
+    // 날짜가 바뀌었는지 확인해서 바뀌었으면 서버에서 다시 불러와 새로 그리도록 고침. 상담 워크인 표는
+    // "오늘 칸"은 아니지만 달이 바뀌면 이번 달 주차 구성 자체가 바뀌어야 하므로 같이 새로고침함.
+    let inquiryLastCheckedDate = toDateStr(new Date());
+    async function refreshInquiryIfDateChanged() {
+      const nowStr = toDateStr(new Date());
+      if (nowStr === inquiryLastCheckedDate) return;
+      inquiryLastCheckedDate = nowStr;
+      try {
+        inquiryCache = await fetchMarketingInquiries(currentMonthStr());
+        renderInquiryTodayRow();
+        renderInquiryTable();
+      } catch (err) {
+        // 실패하면 다음 체크 때 다시 시도 (기존 캐시는 그대로 둠)
+      }
+      try {
+        workinCache = await fetchWorkinResults(currentMonthStr());
+        renderWorkinTable();
+      } catch (err) {
+        // 마찬가지로 실패하면 다음 체크 때 재시도
+      }
+    }
+    setInterval(refreshInquiryIfDateChanged, 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') refreshInquiryIfDateChanged();
+    });
 
   </script>
 </body>
