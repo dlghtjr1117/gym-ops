@@ -1026,6 +1026,54 @@ async function upsertWorkinResult({ result_date, result, count, updated_by }) {
   return res.json();
 }
 
+// ---- 매출 보고 공유 링크(dashboard.html "🔗 공유 링크 만들기" -> report.html) ----
+// "캡쳐해서 일일이 보내지 말고 링크로 보여줄 수 있게" 요청으로 추가. 공유 버튼을 누른 시점의 숫자를
+// 그대로 jsonb 스냅샷으로 저장해두고, report.html이 로그인 없이 그 한 건만 읽어서 보여줌(실시간 X).
+async function createReportShare(snapshot, created_by) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/report_shares`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ snapshot, created_by: created_by || null })
+  });
+  if (!res.ok) await throwApiError(res, '공유 링크 생성에 실패했습니다.');
+  return res.json();
+}
+
+// 내가 만든 공유 링크 목록(관리/삭제용 - RLS로 본인 것만 보임)
+async function fetchMyReportShares() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/report_shares?select=id,created_at&order=created_at.desc&limit=20`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '공유 링크 목록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function deleteReportShare(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/report_shares?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '공유 링크 삭제에 실패했습니다.');
+}
+
+// report.html(로그인 없이 보는 공개 페이지) 전용 - authHeaders()(로그인 토큰 필요) 대신 공개 anon
+// 키만으로 요청함. get_report_share()가 정확히 일치하는 id 하나만 돌려주는 SECURITY DEFINER 함수라
+// 이 요청만으로는 다른 사람의 공유 링크를 목록으로 볼 수 없음 - id를 모르면 아무것도 못 봄.
+async function fetchPublicReportShare(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_report_share`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ share_id: id })
+  });
+  if (!res.ok) await throwApiError(res, '공유된 보고서를 불러오지 못했습니다.');
+  return res.json(); // 없거나 삭제된 링크면 null
+}
+
 // ---- 계정 관리(accounts.html) ----
 // 네이버/네이버플레이스/노션/구글 등 센터에서 같이 쓰는 서비스 계정을 모아두는 곳.
 // 문의 경로/워크인과 마찬가지로 이름(트레이너) 구분 없이 센터 전체가 공용으로 보고 쓰는 표.
