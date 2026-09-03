@@ -973,6 +973,33 @@ async function upsertCenterTarget(monthStr, fcTargetAmount) {
   return res.json();
 }
 
+// ---- 마케팅 문의 경로 일지(pt.html "문의 경로" 탭) ----
+// 예전엔 엑셀로 손으로 적던 "날짜별 문의 채널(전화/네이버톡톡/네이버예약/인스타/카카오/당근) 건수"를
+// 앱으로 옮긴 것. 이름 없이 그날의 채널별 건수만 세는 방식이라 트레이너별 구분이 없는 센터 공용 집계임.
+async function fetchMarketingInquiries(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const endDate = new Date(y, m, 1); // m은 이미 1~12라 그대로 넣으면 다음 달 1일이 됨
+  const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-01`;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/marketing_inquiries?inquiry_date=gte.${start}&inquiry_date=lt.${end}`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '문의 경로 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 같은 (날짜, 카테고리, 채널) 조합이면 덮어쓰기(upsert) - migration_38의 unique 제약을 이용
+async function upsertMarketingInquiry({ inquiry_date, category, channel, count, updated_by }) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/marketing_inquiries?on_conflict=inquiry_date,category,channel`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify({ inquiry_date, category, channel, count, updated_by: updated_by || null, updated_at: new Date().toISOString() })
+  });
+  if (!res.ok) await throwApiError(res, '문의 경로 기록 저장에 실패했습니다.');
+  return res.json();
+}
+
 // PT 잔여횟수가 적어 재등록 케어(상담)가 필요한 회원 목록 (기본: 잔여 3회 이하, 재원중인 회원만)
 // + 잔여횟수와 상관없이 트레이너가 직접 "PT 회원 관리" 시트에 추가한(pt_care_pinned=true) 회원도 함께 포함
 async function fetchPtCareMembers(threshold = 3) {

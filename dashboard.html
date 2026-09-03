@@ -64,6 +64,29 @@
           <div class="hero-sub" id="reportPtCount">불러오는 중...</div>
         </div>
       </div>
+
+      <p class="muted" style="margin:18px 0 8px;font-size:13px;font-weight:600;">📅 이번 달 매출 (항상 이번 달 고정)</p>
+      <div class="hero-grid" id="monthSummaryGrid">
+        <div class="hero-card hero-blue">
+          <div class="hero-icon">💰</div>
+          <div class="hero-label">월간 총매출 (FC+PT)</div>
+          <div class="hero-value hero-value-money" id="monthTotalAmount">-</div>
+          <div class="hero-sub" id="monthTotalCount">불러오는 중...</div>
+        </div>
+        <div class="hero-card hero-purple">
+          <div class="hero-icon">🏋️</div>
+          <div class="hero-label">FC 월간 총매출 <span style="font-weight:400;">(헬스이용권·그룹PT·운동복·락커)</span></div>
+          <div class="hero-value hero-value-money" id="monthFcAmount">-</div>
+          <div class="hero-sub" id="monthFcCount">불러오는 중...</div>
+        </div>
+        <div class="hero-card hero-teal">
+          <div class="hero-icon">🤸</div>
+          <div class="hero-label">PT 월간 총매출 <span style="font-weight:400;">(개인PT)</span></div>
+          <div class="hero-value hero-value-money" id="monthPtAmount">-</div>
+          <div class="hero-sub" id="monthPtCount">불러오는 중...</div>
+        </div>
+      </div>
+
       <table id="reportSalesTable" style="margin-top:14px;">
         <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
         <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
@@ -103,6 +126,41 @@
         <button type="button" class="report-nav-arrow" id="recentSalesNextBtn">▶</button>
       </div>
     </div>
+
+    <div class="section">
+      <h2>문의 경로 <span class="muted" style="font-weight:400;font-size:12px;">(센터 전체 공용 - 오늘)</span></h2>
+      <p class="muted" style="margin:-6px 0 12px;font-size:13px;">전화·톡톡 등으로 온 문의 건수를 이름 없이 오늘 날짜에 바로 세는 카운터예요. 헬스/올바른운동 그룹PT 두 줄이 한 화면에 같이 보여서 바로 비교돼요. 칸을 클릭해서 숫자만 입력하면 자동 저장되고, 날짜가 바뀌면 어제 기록은 그대로 저장된 채 오늘 칸이 새로 비워져요.</p>
+
+      <div style="overflow-x:auto;">
+        <table id="inquiryTodayTable" class="table-fixed sheet-table" style="min-width:680px;">
+          <thead><tr>
+            <th style="width:16%;">구분</th><th>전화</th><th>네이버톡톡</th><th>네이버예약</th><th>인스타</th><th>카카오</th><th>당근</th><th style="width:8%;">합계</th>
+          </tr></thead>
+          <tbody id="inquiryTodayBody"><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+
+      <button type="button" class="btn-link" id="inquiryHistoryToggleBtn" style="margin-top:12px;">지난 기록 보기 ▾</button>
+
+      <div id="inquiryHistoryWrap" style="display:none; margin-top:12px;">
+        <p class="muted" style="margin:0 0 10px;font-size:12.5px;">이번 달 날짜별 기록이에요. 예전 날짜 숫자를 잘못 입력했으면 여기서 바로 고칠 수 있어요.</p>
+
+        <div class="filter-tabs" id="inquiryCategoryTabs" style="margin-bottom:12px;">
+          <button type="button" class="filter-tab active" data-cat="gym" onclick="switchInquiryCategory('gym')">🏋️ 헬스 (이용권·1:1PT)</button>
+          <button type="button" class="filter-tab" data-cat="group_pt" onclick="switchInquiryCategory('group_pt')">🤸 올바른운동 그룹PT</button>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table id="inquiryTable" class="table-fixed sheet-table" style="min-width:760px;">
+            <thead><tr>
+              <th style="width:10%;">날짜</th><th>전화</th><th>네이버톡톡</th><th>네이버예약</th><th>인스타</th><th>카카오</th><th>당근</th><th style="width:8%;">합계</th>
+            </tr></thead>
+            <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+            <tfoot><tr id="inquiryTotalRow"></tr></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="config.js"></script>
@@ -114,6 +172,8 @@
 
     document.getElementById('logoutBtn').addEventListener('click', signOut);
 
+    let currentUserId = null; // 문의 경로 기록 시 updated_by 값으로 씀
+
     (async () => {
       const profile = await getMyProfile();
       if (!profile) {
@@ -121,6 +181,7 @@
         document.getElementById('roleBadge').textContent = '프로필을 불러오지 못했어요';
         return;
       }
+      currentUserId = profile.id;
       const roleLabel = profile.role === 'manager' ? '지점장' : '트레이너';
       document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;
       applyRoleNav(profile);
@@ -326,6 +387,177 @@
         document.getElementById('categoryRenewalGrid').innerHTML =
           `<div class="error-text" style="display:block; grid-column:1/-1;">${err.message}</div>`;
       }
+    })();
+
+    // ---- 이번 달 매출 요약 (대표님 보고용 - 항상 "이번 달" 고정, 날짜 이동 없음) ----
+    // 위 매출 보고(일간/주간/월간) 탭이 기본으로 "일간"(=오늘)을 보여주므로 오늘 매출은 거기서 이미 보임.
+    // 여기서는 굳이 탭을 "월간"으로 옮기지 않아도 이번 달 총액이 바로 같이 보이도록 고정 카드만 하나 더 둠.
+    async function computeSalesBucket(startStr, endStr) {
+      const sales = await fetchSalesInRange(startStr, endStr);
+      let totalAmount = 0, fcAmount = 0, ptAmount = 0, fcCount = 0, ptCount = 0;
+      sales.forEach(s => {
+        const amt = Number(s.amount);
+        totalAmount += amt;
+        if (s.category && PT_SALE_CATEGORIES.includes(s.category)) { ptAmount += amt; ptCount++; }
+        else { fcAmount += amt; fcCount++; }
+      });
+      return { totalAmount, fcAmount, ptAmount, fcCount, ptCount, count: sales.length };
+    }
+
+    function fillSummaryCards(prefix, bucket) {
+      document.getElementById(`${prefix}TotalAmount`).textContent = formatWon(bucket.totalAmount);
+      document.getElementById(`${prefix}TotalCount`).textContent = `${bucket.count}건`;
+      document.getElementById(`${prefix}FcAmount`).textContent = formatWon(bucket.fcAmount);
+      document.getElementById(`${prefix}FcCount`).textContent = `${bucket.fcCount}건`;
+      document.getElementById(`${prefix}PtAmount`).textContent = formatWon(bucket.ptAmount);
+      document.getElementById(`${prefix}PtCount`).textContent = `${bucket.ptCount}건`;
+    }
+
+    async function loadMonthSummary() {
+      const today = new Date();
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      try {
+        const monthBucket = await computeSalesBucket(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
+        fillSummaryCards('month', monthBucket);
+      } catch (err) {
+        document.getElementById('monthTotalAmount').textContent = '오류';
+        document.getElementById('monthTotalCount').textContent = err.message;
+      }
+    }
+    loadMonthSummary();
+
+    // ---- 문의 경로 (센터 전체 공용, 오늘 칸만 기본 노출 - 원래 PT 관리 페이지에 있던 걸 대표님 보고
+    // 화면인 이 페이지로 옮겼는데, "표가 너무 길다"는 피드백을 받아서 기본은 오늘 한 줄만 보이게 바꿈.
+    // 트레이너 개인 기록이 아니라 다 같이 보고 적는 표라 트레이너 선택과 무관함) ----
+    const INQUIRY_CHANNELS = [
+      { key: 'phone', label: '전화' },
+      { key: 'naver_talk', label: '네이버톡톡' },
+      { key: 'naver_booking', label: '네이버예약' },
+      { key: 'instagram', label: '인스타' },
+      { key: 'kakao', label: '카카오' },
+      { key: 'carrot', label: '당근' }
+    ];
+    let inquiryCache = [];
+    let activeInquiryCategory = 'gym';
+
+    // "YYYY-MM" 문자열이 가진 달의 일수(28~31)
+    function daysInMonthStr(monthStr) {
+      const [y, m] = monthStr.split('-').map(Number);
+      return new Date(y, m, 0).getDate();
+    }
+    function currentMonthStr() { return toDateStr(new Date()).slice(0, 7); }
+
+    // 지난 기록 표(카테고리 탭)에서만 쓰는 상태 - 오늘 칸은 두 카테고리를 항상 같이 보여주므로 이 값과 무관함
+    function switchInquiryCategory(cat) {
+      activeInquiryCategory = cat;
+      document.querySelectorAll('#inquiryCategoryTabs .filter-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.cat === cat));
+      renderInquiryTable();
+    }
+
+    // 오늘 칸: 예전엔 탭을 눌러야 헬스/올바른운동 그룹PT를 번갈아 봤는데, "한눈에 비교하고 싶다"는
+    // 요청으로 두 카테고리를 항상 같이(두 줄로) 보여주도록 바꿈. 날짜가 바뀌면 이 함수가 자동으로 새
+    // 날짜를 읽어서 그리므로 어제 기록은 DB에 그대로 남아있고(지난 기록 보기에서 확인 가능) 오늘 칸은
+    // 자동으로 빈 채로 시작함.
+    const INQUIRY_CATEGORIES = [
+      { key: 'gym', label: '🏋️ 헬스 (이용권·1:1PT)' },
+      { key: 'group_pt', label: '🤸 올바른운동 그룹PT' }
+    ];
+    function renderInquiryTodayRow() {
+      const tbody = document.getElementById('inquiryTodayBody');
+      const todayStr = toDateStr(new Date());
+
+      const rowsHtml = INQUIRY_CATEGORIES.map(cat => {
+        let rowTotal = 0;
+        const cellsHtml = INQUIRY_CHANNELS.map(c => {
+          const rec = inquiryCache.find(r => r.category === cat.key && r.inquiry_date === todayStr && r.channel === c.key);
+          const val = rec ? rec.count : 0;
+          rowTotal += val;
+          return `<td><input class="sheet-input" type="number" min="0" value="${val || ''}" placeholder="0"
+            data-date="${todayStr}" data-channel="${c.key}" data-category="${cat.key}" onchange="handleInquiryCellSave(this)" /></td>`;
+        }).join('');
+        return `<tr><td style="white-space:nowrap;">${cat.label}</td>${cellsHtml}<td class="muted" style="text-align:center; font-weight:700;">${rowTotal || ''}</td></tr>`;
+      }).join('');
+      tbody.innerHTML = rowsHtml;
+    }
+
+    // "지난 기록 보기"를 눌렀을 때만 쓰이는 이번 달 전체 표(예전 방식 그대로 - 날짜별로 다 펼쳐서 수정 가능)
+    function renderInquiryTable() {
+      const tbody = document.querySelector('#inquiryTable tbody');
+      const monthStr = currentMonthStr();
+      const totalDays = daysInMonthStr(monthStr);
+      const monthNum = Number(monthStr.slice(5, 7));
+
+      const byKey = {};
+      inquiryCache.filter(r => r.category === activeInquiryCategory).forEach(r => { byKey[`${r.inquiry_date}|${r.channel}`] = r.count; });
+
+      const channelTotals = {};
+      INQUIRY_CHANNELS.forEach(c => { channelTotals[c.key] = 0; });
+      let grandTotal = 0;
+
+      let html = '';
+      for (let d = 1; d <= totalDays; d++) {
+        const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+        let rowTotal = 0;
+        const cellsHtml = INQUIRY_CHANNELS.map(c => {
+          const val = byKey[`${dateStr}|${c.key}`] || 0;
+          rowTotal += val;
+          channelTotals[c.key] += val;
+          return `<td><input class="sheet-input" type="number" min="0" value="${val || ''}" placeholder="0"
+            data-date="${dateStr}" data-channel="${c.key}" data-category="${activeInquiryCategory}" onchange="handleInquiryCellSave(this)" /></td>`;
+        }).join('');
+        grandTotal += rowTotal;
+        html += `<tr><td>${monthNum}/${d}</td>${cellsHtml}<td class="muted" style="text-align:center;">${rowTotal || ''}</td></tr>`;
+      }
+      tbody.innerHTML = html || '<tr><td colspan="8" class="muted" style="padding:16px;">표시할 날짜가 없어요.</td></tr>';
+
+      document.getElementById('inquiryTotalRow').innerHTML =
+        `<td style="text-align:right; font-weight:700;">합계</td>` +
+        INQUIRY_CHANNELS.map(c => `<td style="font-weight:700;">${channelTotals[c.key] || ''}</td>`).join('') +
+        `<td style="font-weight:700;">${grandTotal || ''}</td>`;
+    }
+
+    async function handleInquiryCellSave(inputEl) {
+      const date = inputEl.dataset.date;
+      const channel = inputEl.dataset.channel;
+      // 오늘 칸(카테고리 2줄 동시 표시)은 각 칸에 카테고리가 직접 박혀있고, 지난 기록 표(탭 전환)는
+      // 렌더링 시점의 activeInquiryCategory를 그대로 같이 박아두므로 둘 다 이 값 하나로 처리됨
+      const category = inputEl.dataset.category;
+      const count = inputEl.value === '' ? 0 : Math.max(0, Math.round(Number(inputEl.value)));
+      inputEl.value = count || '';
+      inputEl.disabled = true;
+      try {
+        await upsertMarketingInquiry({ inquiry_date: date, category, channel, count, updated_by: currentUserId });
+        const existing = inquiryCache.find(r => r.inquiry_date === date && r.category === category && r.channel === channel);
+        if (existing) existing.count = count;
+        else inquiryCache.push({ inquiry_date: date, category, channel, count });
+        // 오늘 칸/지난 기록 표 둘 다 이 캐시를 같이 쓰므로 둘 다 다시 그려서 합계를 맞춰줌
+        // (입력 중이던 칸 자체는 그대로 살아있어서 포커스가 끊기지 않음)
+        renderInquiryTodayRow();
+        renderInquiryTable();
+      } catch (err) {
+        alert(err.message);
+      }
+      inputEl.disabled = false;
+    }
+
+    document.getElementById('inquiryHistoryToggleBtn').addEventListener('click', () => {
+      const wrap = document.getElementById('inquiryHistoryWrap');
+      const btn = document.getElementById('inquiryHistoryToggleBtn');
+      const show = wrap.style.display === 'none';
+      wrap.style.display = show ? '' : 'none';
+      btn.textContent = show ? '지난 기록 접기 ▴' : '지난 기록 보기 ▾';
+    });
+
+    (async () => {
+      try {
+        inquiryCache = await fetchMarketingInquiries(currentMonthStr());
+      } catch (err) {
+        inquiryCache = [];
+        document.getElementById('inquiryTodayBody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        document.querySelector('#inquiryTable tbody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+      renderInquiryTodayRow();
+      renderInquiryTable();
     })();
 
   </script>

@@ -208,6 +208,7 @@
         </table>
       </div>
     </div>
+
   </div>
 
   <!-- OT 연락 미응답 기록 추가 모달 -->
@@ -584,6 +585,40 @@
         alert('다음 달로 이월하는 중 문제가 생겼어요: ' + err.message);
       }
     }
+    // 주차별 매출 기록에서 확률을 "등록"으로 바꾸면, 그 상담 건을 PT 회원 관리(이번 달 보고 있는 달 기준)에도
+    // 자동으로 추가해줌 - 실제 등록된 회원이니 이제부터 PT 회원 관리에서 잔여횟수/재등록 계획을 같이 챙길 수 있게.
+    // 이미 같은 트레이너+같은 달에 같은 이름으로 등록된 PT 회원 관리 기록이 있으면(예: 확률을 등록으로
+    // 바꿨다가 되돌렸다가 다시 등록으로 바꾼 경우, 또는 이미 수동으로 추가해둔 경우) 중복으로 만들지 않음.
+    async function addLeadToCareManagement(lead) {
+      try {
+        const { monthStr } = getMonthRange();
+        const all = await fetchPtCareLogs();
+        const dup = all.find(x => x.trainer_id === lead.trainer_id && x.period_month === monthStr && x.name === lead.name);
+        if (dup) {
+          showToast(`PT 회원 관리에 이미 같은 이름의 기록이 있어서 새로 만들지 않았어요.`);
+          return;
+        }
+        await addPtCareLog({
+          trainer_id: lead.trainer_id,
+          period_month: monthStr,
+          member_id: lead.converted_member_id || null,
+          name: lead.name,
+          pt_expected_renewal_month: null,
+          pt_remaining_sessions: lead.sessions != null ? lead.sessions : null,
+          pt_session_focus: null,
+          pt_short_term_plan: 'X',
+          pt_long_term_plan: null,
+          pt_expected_sessions: null,
+          pt_expected_amount: null,
+          renewal_stage: 'in_progress',
+          pt_expected_probability: null
+        });
+        showToast('등록 처리됐어요. PT 회원 관리 목록에도 자동으로 추가됐어요.');
+        if (lead.trainer_id === selectedTrainerId) await reloadCareLogsOnly();
+      } catch (err) {
+        alert('PT 회원 관리에 자동으로 추가하는 중 문제가 생겼어요: ' + err.message);
+      }
+    }
     async function handleProbChange(selectEl) {
       const id = selectEl.dataset.leadId;
       const val = selectEl.value;
@@ -594,6 +629,9 @@
         await updatePtLead(id, patch);
         if (val === 'rolled_over' && lead) {
           await carryOverLeadToNextMonth(lead);
+        }
+        if (val === 'registered' && lead) {
+          await addLeadToCareManagement(lead);
         }
         await reloadLeadsOnly();
       } catch (err) { alert(err.message); selectEl.disabled = false; }
