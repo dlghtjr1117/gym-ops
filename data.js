@@ -1026,6 +1026,46 @@ async function upsertWorkinResult({ result_date, result, count, updated_by }) {
   return res.json();
 }
 
+// ---- 계정 관리(accounts.html) ----
+// 네이버/네이버플레이스/노션/구글 등 센터에서 같이 쓰는 서비스 계정을 모아두는 곳.
+// 문의 경로/워크인과 마찬가지로 이름(트레이너) 구분 없이 센터 전체가 공용으로 보고 쓰는 표.
+async function fetchServiceAccounts() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/service_accounts?select=*&order=service_name.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '계정 목록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addServiceAccount({ service_name, login_id, password, updated_by }) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/service_accounts`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ service_name, login_id: login_id || null, password: password || null, updated_by: updated_by || null })
+  });
+  if (!res.ok) await throwApiError(res, '계정 등록에 실패했습니다.');
+  return res.json();
+}
+
+async function updateServiceAccount(id, fields) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/service_accounts?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ ...fields, updated_at: new Date().toISOString() })
+  });
+  if (!res.ok) await throwApiError(res, '계정 정보 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deleteServiceAccount(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/service_accounts?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '계정 삭제에 실패했습니다.');
+}
+
 // PT 잔여횟수가 적어 재등록 케어(상담)가 필요한 회원 목록 (기본: 잔여 3회 이하, 재원중인 회원만)
 // + 잔여횟수와 상관없이 트레이너가 직접 "PT 회원 관리" 시트에 추가한(pt_care_pinned=true) 회원도 함께 포함
 async function fetchPtCareMembers(threshold = 3) {

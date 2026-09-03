@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 계정 관리</title>
+<link rel="stylesheet" href="style.css?v=1788428766" />
+<style>
+  /* 이 페이지 전용 - 비밀번호 칸을 점(dot)으로 가려서 보여줄 때 쓰는 스타일 */
+  .pw-text { font-family: 'Courier New', monospace; letter-spacing: 1px; }
+  #accountsTable input[type="text"] { padding: 6px 8px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; width: 100%; box-sizing: border-box; }
+  #accountsTable td { vertical-align: middle; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="center-sales.html">센터 매출</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html" class="active">계정 관리</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="panel" id="addPanel">
+      <h3>계정 등록</h3>
+      <p class="muted" style="margin:-6px 0 12px;">네이버, 네이버플레이스, 노션, 구글 등 센터에서 같이 쓰는 서비스 계정을 등록해두면 직원 누구나 여기서 바로 확인할 수 있어요.</p>
+      <div id="addErrorBox" class="error-text"></div>
+      <form id="addAccountForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>서비스명</label><input type="text" id="acc_name" placeholder="예: 네이버플레이스" required /></div>
+          <div class="field"><label>아이디</label><input type="text" id="acc_id" placeholder="로그인 아이디" /></div>
+          <div class="field"><label>비밀번호</label><input type="text" id="acc_pw" placeholder="비밀번호" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>등록된 계정 목록</h2>
+      <p class="muted" style="margin:-4px 0 12px;">비밀번호는 기본적으로 가려져 있어요. "보기"를 누르면 그 자리에서 바로 보여요.</p>
+      <table id="accountsTable">
+        <thead><tr><th>서비스명</th><th>아이디</th><th>비밀번호</th><th>수정일</th><th></th></tr></thead>
+        <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="config.js?v=1788428766"></script>
+  <script src="auth.js?v=1788428766"></script>
+  <script src="data.js?v=1788428766"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let myId = null;
+    let accountsCache = [];
+
+    function maskDots(pw) {
+      return '•'.repeat(Math.max(6, Math.min(pw.length, 14)));
+    }
+
+    function formatUpdatedAt(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function renderAccountsTable() {
+      const tbody = document.querySelector('#accountsTable tbody');
+      if (accountsCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">등록된 계정이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = accountsCache.map(a => `
+        <tr data-id="${a.id}">
+          <td>${escapeHtml(a.service_name)}</td>
+          <td>${a.login_id ? escapeHtml(a.login_id) : '<span class="muted">-</span>'}</td>
+          <td class="acc-pw" data-pw="${escapeHtml(a.password || '')}" data-revealed="false">
+            ${a.password
+              ? `<span class="pw-text">${maskDots(a.password)}</span> <button type="button" class="btn-link reveal-btn">보기</button>`
+              : '<span class="muted">-</span>'}
+          </td>
+          <td class="muted" style="font-size:12px;">${formatUpdatedAt(a.updated_at)}</td>
+          <td style="white-space:nowrap;">
+            <button type="button" class="btn-link edit-btn">수정</button>
+            <button type="button" class="btn-link delete-btn" style="color:#dc2626;">삭제</button>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('.reveal-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const td = btn.closest('.acc-pw');
+          const revealed = td.dataset.revealed === 'true';
+          const pw = td.dataset.pw;
+          const span = td.querySelector('.pw-text');
+          if (revealed) {
+            span.textContent = maskDots(pw);
+            btn.textContent = '보기';
+            td.dataset.revealed = 'false';
+          } else {
+            span.textContent = pw;
+            btn.textContent = '숨기기';
+            td.dataset.revealed = 'true';
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => enterEditMode(btn.closest('tr')));
+      });
+
+      tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleDeleteAccount(btn.closest('tr').dataset.id));
+      });
+    }
+
+    function enterEditMode(tr) {
+      const id = tr.dataset.id;
+      const acc = accountsCache.find(a => a.id === id);
+      if (!acc) return;
+      tr.innerHTML = `
+        <td><input type="text" class="edit-name" value="${escapeHtml(acc.service_name)}" /></td>
+        <td><input type="text" class="edit-id" value="${escapeHtml(acc.login_id || '')}" /></td>
+        <td><input type="text" class="edit-pw" value="${escapeHtml(acc.password || '')}" /></td>
+        <td class="muted" style="font-size:12px;">${formatUpdatedAt(acc.updated_at)}</td>
+        <td style="white-space:nowrap;">
+          <button type="button" class="btn-link save-edit-btn">저장</button>
+          <button type="button" class="btn-link cancel-edit-btn">취소</button>
+        </td>
+      `;
+      tr.querySelector('.save-edit-btn').addEventListener('click', () => saveEdit(tr, id));
+      tr.querySelector('.cancel-edit-btn').addEventListener('click', renderAccountsTable);
+    }
+
+    async function saveEdit(tr, id) {
+      const name = tr.querySelector('.edit-name').value.trim();
+      const loginId = tr.querySelector('.edit-id').value.trim();
+      const pw = tr.querySelector('.edit-pw').value.trim();
+      if (!name) { alert('서비스명을 입력해주세요.'); return; }
+      try {
+        await updateServiceAccount(id, { service_name: name, login_id: loginId || null, password: pw || null, updated_by: myId });
+        showToast('계정 정보가 수정되었습니다.');
+        loadAccounts();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function handleDeleteAccount(id) {
+      const acc = accountsCache.find(a => a.id === id);
+      if (!confirm(`'${acc ? acc.service_name : ''}' 계정 정보를 삭제할까요?`)) return;
+      try {
+        await deleteServiceAccount(id);
+        showToast('계정 정보가 삭제되었습니다.', 'danger');
+        loadAccounts();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function loadAccounts() {
+      const tbody = document.querySelector('#accountsTable tbody');
+      try {
+        accountsCache = await fetchServiceAccounts();
+        renderAccountsTable();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    document.getElementById('addAccountForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addErrorBox');
+      errorBox.style.display = 'none';
+      const val = id => document.getElementById(id).value.trim();
+      try {
+        await addServiceAccount({
+          service_name: val('acc_name'),
+          login_id: val('acc_id') || null,
+          password: val('acc_pw') || null,
+          updated_by: myId
+        });
+        document.getElementById('addAccountForm').reset();
+        showToast('계정이 등록되었습니다.');
+        loadAccounts();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        myId = profile.id;
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+      }
+      loadAccounts();
+    })();
+  </script>
+</body>
+</html>
