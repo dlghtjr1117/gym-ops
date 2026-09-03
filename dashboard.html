@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788433012" />
+<link rel="stylesheet" href="style.css?v=1788433762" />
 </head>
 <body>
   <div class="topbar">
@@ -211,9 +211,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788433012"></script>
-  <script src="auth.js?v=1788433012"></script>
-  <script src="data.js?v=1788433012"></script>
+  <script src="config.js?v=1788433762"></script>
+  <script src="auth.js?v=1788433762"></script>
+  <script src="data.js?v=1788433762"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -709,22 +709,10 @@
     })();
 
     // ---- 매출 보고 공유 링크 ("캡쳐해서 보내지 말고 링크로 보여줄 수 있게" 요청으로 추가) ----
-    // 공유 버튼을 누르면 지금 이 순간의 일간/주간/월간 매출 + 오늘 문의 경로 + 이번 달 워크인 표를
-    // 통째로 jsonb 스냅샷 하나로 저장하고, report.html이 로그인 없이 그 스냅샷만 읽어서 보여줌.
-    // (반드시 "오늘/이번 주/이번 달" 기준으로 찍음 - 위 매출 보고 탭에서 다른 날짜로 이동해놨어도
-    // 공유 링크는 그거와 무관하게 항상 현재 시점 기준 세 기간을 다 담음)
-    function periodLabelFor(mode, start, end) {
-      if (mode === 'daily') return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일 (${WEEKDAY_KR[start.getDay()]})`;
-      if (mode === 'weekly') {
-        const lastDay = addDays(end, -1);
-        const sameMonth = start.getMonth() === lastDay.getMonth();
-        const startLabel = `${start.getMonth() + 1}월 ${start.getDate()}일`;
-        const endLabel = sameMonth ? `${lastDay.getDate()}일` : `${lastDay.getMonth() + 1}월 ${lastDay.getDate()}일`;
-        return `${start.getFullYear()}년 ${startLabel} ~ ${endLabel}`;
-      }
-      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
-    }
-
+    // 처음엔 일간/주간/월간을 다 한 번에 펼쳐서 보여주는 식으로 만들었는데, "그렇게 말고 그냥 저
+    // 대시보드 페이지만 보이게 해달라"는 피드백을 받아서, 지금 화면에 실제로 떠 있는 그대로(지금
+    // 선택된 탭 하나 + 이번 달 매출 + 상품별 재등록 현황 + 최근 매출 내역 + 문의 경로 + 워크인,
+    // 대시보드와 똑같은 순서)를 그대로 스냅샷 떠서 report.html로 보여주도록 다시 만듦.
     async function computeReportBucketWithSales(startStr, endStr) {
       const sales = await fetchSalesInRange(startStr, endStr);
       let totalAmount = 0, fcAmount = 0, ptAmount = 0, fcCount = 0, ptCount = 0;
@@ -745,17 +733,32 @@
       return { totalAmount, fcAmount, ptAmount, fcCount, ptCount, count: sales.length, rows };
     }
 
-    async function buildReportSnapshot() {
-      const today = new Date();
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const weekStart = startOfWeek(today);
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const REPORT_MODE_TITLE = { daily: '일간 매출 보고', weekly: '주간 매출 보고', monthly: '월간 매출 보고' };
 
-      const [daily, weekly, monthly] = await Promise.all([
-        computeReportBucketWithSales(toDateStr(todayStart), toDateStr(addDays(todayStart, 1))),
-        computeReportBucketWithSales(toDateStr(weekStart), toDateStr(addDays(weekStart, 7))),
-        computeReportBucketWithSales(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)))
-      ]);
+    async function buildReportSnapshot() {
+      // 지금 화면에 떠 있는 매출 보고 탭(일간/주간/월간 중 지금 선택된 것) + 그 날짜 그대로 찍음
+      const { start, end } = getReportRange();
+      const report = await computeReportBucketWithSales(toDateStr(start), toDateStr(end));
+      report.title = REPORT_MODE_TITLE[reportMode];
+      report.periodLabel = getReportPeriodLabel(start, end);
+
+      // 이번 달 매출(항상 이번 달 고정 카드) - 매출 보고 탭과 별개로 대시보드에 항상 같이 떠 있는 것
+      const today = new Date();
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthSummary = await computeSalesBucket(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
+
+      // 이번 달 상품별 재등록 현황
+      let categoryRenewal = null;
+      try { categoryRenewal = await fetchCategoryRenewalStats(); } catch (err) { categoryRenewal = null; }
+
+      // 최근 매출 내역 - 화면에 이미 불러와둔 캐시를 그대로 씀(대시보드에 보이는 것과 같은 데이터)
+      const recentSales = recentSalesAll.map(s => ({
+        date: s.sale_date,
+        member: s.member ? s.member.name : '-',
+        item: CATEGORY_LABEL[s.category] || s.category,
+        staff: s.staff ? s.staff.name : '-',
+        amount: Number(s.amount)
+      }));
 
       const todayStr = toDateStr(today);
       const inquiryRows = INQUIRY_CATEGORIES.map(cat => {
@@ -795,9 +798,10 @@
       return {
         generated_at: new Date().toISOString(),
         generated_by: currentUserName || null,
-        daily: { periodLabel: periodLabelFor('daily', todayStart, addDays(todayStart, 1)), ...daily },
-        weekly: { periodLabel: periodLabelFor('weekly', weekStart, addDays(weekStart, 7)), ...weekly },
-        monthly: { periodLabel: periodLabelFor('monthly', monthStart, addMonths(monthStart, 1)), ...monthly },
+        report,
+        monthSummary,
+        categoryRenewal,
+        recentSales,
         inquiry: { dateStr: todayStr, rows: inquiryRows },
         workin: { monthLabel: `${today.getFullYear()}년 ${today.getMonth() + 1}월`, weeks: workinWeeks, totalSuccess: grandSuccess, totalFail: grandFail }
       };
