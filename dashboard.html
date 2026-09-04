@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788484241" />
+<link rel="stylesheet" href="style.css?v=1788484880" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -123,6 +123,11 @@
         <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
         <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
+      <div class="report-nav" style="margin-top:10px; justify-content:flex-end;">
+        <button type="button" class="report-nav-arrow" id="reportSalesPrevBtn">◀</button>
+        <div class="muted" id="reportSalesPageLabel">-</div>
+        <button type="button" class="report-nav-arrow" id="reportSalesNextBtn">▶</button>
+      </div>
     </div>
 
     <div class="section">
@@ -230,9 +235,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788484241"></script>
-  <script src="auth.js?v=1788484241"></script>
-  <script src="data.js?v=1788484241"></script>
+  <script src="config.js?v=1788484880"></script>
+  <script src="auth.js?v=1788484880"></script>
+  <script src="data.js?v=1788484880"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -305,6 +310,50 @@
       return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
     }
 
+    // 매출 보고 표(reportSalesTable) - 예전엔 기간 전체 매출을 한 표에 다 쭉 이어서 보여줬는데, 월간
+    // 탭처럼 기간이 길면 표가 너무 길어져서("이미지 복사"로 캡쳐할 때 스크롤을 너무 많이 내려야 함)
+    // 피드백을 받고 날짜 하나씩 페이지를 넘겨보는 방식으로 바꿈 - 1페이지 = 그 기간 안에서 매출이 있던
+    // 날짜 하나(예: 9/3), 화살표로 다른 날짜 페이지로 넘김. 날짜별 매출 리스트라 각 날짜의 매출 건수와
+    // 무관하게(예: 9/3에 20건이 있어도 한 페이지에 다 나옴) 딱 하루치씩만 보여줌.
+    let reportSalesByDate = [];
+    let reportSalesPage = 1;
+
+    function renderReportSalesPage() {
+      const tbody = document.querySelector('#reportSalesTable tbody');
+      const totalPages = Math.max(1, reportSalesByDate.length);
+      reportSalesPage = Math.min(Math.max(1, reportSalesPage), totalPages);
+
+      if (reportSalesByDate.length === 0) {
+        const periodLabel = reportMode === 'daily' ? '이 날짜에' : reportMode === 'weekly' ? '이번 주에' : '이번 달에';
+        tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">${periodLabel} 등록된 매출이 없습니다.</td></tr>`;
+        document.getElementById('reportSalesPageLabel').textContent = '-';
+      } else {
+        const dayGroup = reportSalesByDate[reportSalesPage - 1];
+        tbody.innerHTML = dayGroup.rows.map(s => `
+          <tr>
+            <td>${s.sale_date}</td>
+            <td>${s.member ? s.member.name : '-'}</td>
+            <td>${saleDisplayItemName(s)}</td>
+            <td>${s.staff ? s.staff.name : '-'}</td>
+            <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
+            <td style="text-align:right;">${formatWon(s.amount)}</td>
+          </tr>
+        `).join('');
+        document.getElementById('reportSalesPageLabel').textContent = `${dayGroup.date} (${reportSalesPage}/${totalPages}, ${dayGroup.rows.length}건)`;
+      }
+      document.getElementById('reportSalesPrevBtn').disabled = reportSalesPage <= 1;
+      document.getElementById('reportSalesNextBtn').disabled = reportSalesPage >= totalPages;
+    }
+
+    document.getElementById('reportSalesPrevBtn').addEventListener('click', () => {
+      reportSalesPage -= 1;
+      renderReportSalesPage();
+    });
+    document.getElementById('reportSalesNextBtn').addEventListener('click', () => {
+      reportSalesPage += 1;
+      renderReportSalesPage();
+    });
+
     async function loadReport() {
       const { start, end } = getReportRange();
       document.getElementById('reportPeriodLabel').textContent = getReportPeriodLabel(start, end);
@@ -330,21 +379,17 @@
         document.getElementById('reportPtAmount').textContent = formatWon(ptAmount);
         document.getElementById('reportPtCount').textContent = `${ptCount}건`;
 
-        if (sales.length === 0) {
-          const periodLabel = reportMode === 'daily' ? '이 날짜에' : reportMode === 'weekly' ? '이번 주에' : '이번 달에';
-          tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">${periodLabel} 등록된 매출이 없습니다.</td></tr>`;
-        } else {
-          tbody.innerHTML = sales.map(s => `
-            <tr>
-              <td>${s.sale_date}</td>
-              <td>${s.member ? s.member.name : '-'}</td>
-              <td>${saleDisplayItemName(s)}</td>
-              <td>${s.staff ? s.staff.name : '-'}</td>
-              <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
-              <td style="text-align:right;">${formatWon(s.amount)}</td>
-            </tr>
-          `).join('');
-        }
+        // 날짜별로 묶음 - sales는 이미 서버에서 sale_date 내림차순으로 오므로(fetchSalesInRange),
+        // 같은 날짜끼리는 항상 붙어서 나옴. 문자열 키라 숫자처럼 자동 재정렬되지 않게 배열로 순서를 따로 유지함.
+        const dateOrder = [];
+        const byDate = {};
+        sales.forEach(s => {
+          if (!byDate[s.sale_date]) { byDate[s.sale_date] = []; dateOrder.push(s.sale_date); }
+          byDate[s.sale_date].push(s);
+        });
+        reportSalesByDate = dateOrder.map(d => ({ date: d, rows: byDate[d] }));
+        reportSalesPage = 1; // 날짜/기간을 옮길 때마다 1페이지부터 다시 보여줌
+        renderReportSalesPage();
       } catch (err) {
         document.getElementById('reportTotalAmount').textContent = '오류';
         tbody.innerHTML = `<tr><td colspan="6" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
