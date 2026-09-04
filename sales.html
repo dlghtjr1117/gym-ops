@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 매출 입력</title>
-<link rel="stylesheet" href="style.css?v=1788498010" />
+<link rel="stylesheet" href="style.css?v=1788500937" />
 </head>
 <body>
   <div class="topbar">
@@ -87,9 +87,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788498010"></script>
-  <script src="auth.js?v=1788498010"></script>
-  <script src="data.js?v=1788498010"></script>
+  <script src="config.js?v=1788500937"></script>
+  <script src="auth.js?v=1788500937"></script>
+  <script src="data.js?v=1788500937"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -172,7 +172,7 @@
           <tr>
             <td>${s.sale_date}</td>
             <td>${s.member ? s.member.name : '-'}</td>
-            <td>${CATEGORY_LABEL[s.category] || s.category}</td>
+            <td>${saleDisplayItemWithCategory(s)}</td>
             <td>${s.staff ? s.staff.name : '-'}</td>
             <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
             <td style="text-align:right;">${formatWon(s.amount)}</td>

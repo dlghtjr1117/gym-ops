@@ -50,6 +50,18 @@ function saleDisplayItemName(sale) {
   return CATEGORY_LABEL[sale.category] || sale.category;
 }
 
+// "매출 입력"·대시보드의 "최근 매출 내역" 표에서 쓰는 "항목" 표시용 - 카테고리만 보여주면(예: "회원권 재등록")
+// 일일입장권인지 12개월권인지 구체적으로 뭘 팔았는지 안 보여서, saleDisplayItemName()으로 구체적인 상품명을
+// 알 수 있으면 "상품명(카테고리)" 형태로(예: "일일입장권(회원권 재등록)") 같이 보여줌. 구체적인 이름을
+// 못 찾아서 결국 카테고리 이름으로 떨어지는 경우(saleDisplayItemName의 3번째 폴백)는 괄호를 중복으로
+// 안 붙이고 카테고리 이름만 그대로 보여줌.
+function saleDisplayItemWithCategory(sale) {
+  const itemName = saleDisplayItemName(sale);
+  const categoryLabel = CATEGORY_LABEL[sale.category] || sale.category;
+  if (itemName && itemName !== categoryLabel) return `${itemName}(${categoryLabel})`;
+  return categoryLabel;
+}
+
 // 센터 매출(center-sales.html)에서 매출을 4갈래(PT/회원권/올바른(그룹PT)/기타)로 나눌 때 쓰는 기준.
 // "올바른"은 지점장님이 쓰시는 그룹PT 상품 이름이라, 그룹PT 매출 카테고리를 그대로 그 항목으로 씀.
 // 기타는 신규/재등록 구분이 없는 항목들(락커·운동복·일일권·양도)을 한데 모음.
@@ -231,8 +243,10 @@ async function addMember(member) {
 // 그 안에서의 순서가 보장되지 않아서 방금 등록한 매출이 15건 제한에 밀려 안 보일 수 있음
 // -> created_at(등록된 실제 시각)까지 같이 정렬 기준으로 줘서 "날짜가 같으면 최근에 등록한 순"이 되도록 보장
 async function fetchRecentSales(limit = 10) {
+  // product:products(name)까지 같이 가져와야 "항목" 칸에 saleDisplayItemWithCategory()로 "일일입장권(회원권
+  // 재등록)"처럼 구체적인 상품명을 같이 보여줄 수 있음(상품 연결 없이 직접 입력한 매출은 그냥 null로 옴)
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/sales?select=*,member:members(name),staff:profiles(name)&order=sale_date.desc,created_at.desc&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/sales?select=*,member:members(name),staff:profiles(name),product:products(name)&order=sale_date.desc,created_at.desc&limit=${limit}`,
     { headers: await authHeaders() }
   );
   if (!res.ok) await throwApiError(res, '매출 내역을 불러오지 못했습니다.');
