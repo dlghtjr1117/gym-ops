@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>센터 매출 관리 - 지표 분석</title>
+<link rel="stylesheet" href="style.css?v=1788489098" />
+<style>
+  /* 이 페이지 전용 - 지표 카드 5개를 한 줄에(좁은 화면에선 2줄/1줄로) */
+  .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  @media (max-width: 980px) { .grid-5 { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 620px) { .grid-5 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 420px) { .grid-5 { grid-template-columns: 1fr; } }
+
+  .metric-card { background: var(--white); border: 1px solid var(--slate-200); border-radius: 14px; padding: 14px; }
+  .metric-card .label { font-size: 12px; color: var(--slate-500); margin-bottom: 6px; }
+  .metric-card .value { font-size: 20px; font-weight: 700; }
+  .metric-card .delta { font-size: 11.5px; margin-top: 4px; display: block; }
+  .metric-card .spark { margin-top: 8px; }
+
+  .rec-card { border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid transparent; }
+  .rec-card:last-child { margin-bottom: 0; }
+  .rec-card .rec-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .rec-card .rec-detail { font-size: 13px; line-height: 1.5; }
+  .rec-critical { background: #fef2f2; border-color: #fecaca; }
+  .rec-critical .rec-title { color: var(--red-600); }
+  .rec-critical .rec-detail { color: #7f1d1d; }
+  .rec-warning { background: #fffbeb; border-color: #fde68a; }
+  .rec-warning .rec-title { color: #92400e; }
+  .rec-warning .rec-detail { color: #78350f; }
+  .rec-good { background: #f0fdf4; border-color: #bbf7d0; }
+  .rec-good .rec-title { color: var(--green-600); }
+  .rec-good .rec-detail { color: #14532d; }
+
+  #trendTable td, #trendTable th { text-align: right; white-space: nowrap; }
+  #trendTable td:first-child, #trendTable th:first-child { text-align: left; }
+
+  .plan-table td, .plan-table th { text-align: right; white-space: nowrap; }
+  .plan-table td:first-child, .plan-table th:first-child { text-align: left; white-space: normal; }
+  .plan-table tr.unlinked-row td { color: var(--slate-500); font-size: 12.5px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="center-sales.html">센터 매출</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html" class="active">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="section" style="margin-top:0;">
+      <h2>지표 분석</h2>
+      <p class="muted" style="margin:-6px 0 12px;font-size:13px;">
+        총 회원수·신규 등록·재등록률·이탈률·객단가를 매달 추적해서, 지금 우리 센터에 신규 유치·재등록 유도·이탈 방지 이벤트 중 뭐가 더 필요한지 보여드려요.
+      </p>
+      <div class="report-nav">
+        <button type="button" class="report-nav-arrow" id="metricsPrevBtn">◀</button>
+        <div class="report-period-label" id="metricsPeriodLabel">-</div>
+        <button type="button" class="report-nav-arrow" id="metricsNextBtn">▶</button>
+        <button type="button" class="btn-link" id="metricsTodayBtn">이번 달</button>
+      </div>
+      <div id="metricsLoadingNote" class="muted" style="font-size:12px;">불러오는 중...</div>
+    </div>
+
+    <div class="section">
+      <h2>📌 이번 달 추천 이벤트</h2>
+      <div id="recommendationsWrap">
+        <p class="muted" style="padding:12px 0;">불러오는 중...</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>핵심 지표</h2>
+      <div class="grid-5" id="metricCardsGrid">
+        <div class="metric-card">
+          <div class="label">👥 총 회원수</div>
+          <div class="value" id="mcTotal">-</div>
+          <span class="delta" id="mcTotalDelta"></span>
+          <div class="spark" id="mcTotalSpark"></div>
+        </div>
+        <div class="metric-card">
+          <div class="label">🆕 신규 등록</div>
+          <div class="value" id="mcNew">-</div>
+          <span class="delta" id="mcNewDelta"></span>
+          <div class="spark" id="mcNewSpark"></div>
+        </div>
+        <div class="metric-card">
+          <div class="label">🔁 재등록률</div>
+          <div class="value" id="mcRenewal">-</div>
+          <span class="delta" id="mcRenewalDelta"></span>
+          <div class="spark" id="mcRenewalSpark"></div>
+        </div>
+        <div class="metric-card">
+          <div class="label">📉 이탈률</div>
+          <div class="value" id="mcChurn">-</div>
+          <span class="delta" id="mcChurnDelta"></span>
+          <div class="spark" id="mcChurnSpark"></div>
+        </div>
+        <div class="metric-card">
+          <div class="label">💳 객단가</div>
+          <div class="value" id="mcArpu">-</div>
+          <span class="delta" id="mcArpuDelta"></span>
+          <div class="spark" id="mcArpuSpark"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>상품(플랜)별 등록 현황</h2>
+      <p class="muted" style="margin:-6px 0 12px;font-size:13px;">
+        3개월권·6개월권·12개월권, PT 10·20·30·50·100회처럼 구체적인 상품 단위로 이번 달 등록 건수를 보여드려요. 특정 플랜을 대상으로 이벤트를 하셨다면, 그 플랜 등록이 실제로 늘었는지 여기서 확인하시면 돼요.
+      </p>
+      <div id="planStatsWrap">
+        <p class="muted" style="padding:12px 0;">불러오는 중...</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>최근 6개월 추이</h2>
+      <div style="overflow-x:auto;">
+        <table id="trendTable">
+          <thead><tr>
+            <th>월</th><th>총 회원수</th><th>신규 등록</th><th>재등록률</th><th>이탈률</th><th>객단가</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6" class="muted" style="padding:16px; text-align:center;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>이 지표는 이렇게 계산돼요</h2>
+      <div class="panel" style="margin-top:0;">
+        <p class="muted" style="margin:0 0 8px; font-size:12.5px; line-height:1.6;">
+          <b>총 회원수</b>: 그 달 말일 기준, 헬스이용권·그룹PT·개인PT 중 하나라도 만료되지 않은 회원 수(중복 제거). 락커·운동복만 있는 경우는 부가 서비스로 보고 제외해요.
+        </p>
+        <p class="muted" style="margin:0 0 8px; font-size:12.5px; line-height:1.6;">
+          <b>신규 등록</b>: 그 달 매출 중 "신규 회원권/PT/그룹PT"로 등록된 회원 수 ÷ 총 회원수.
+        </p>
+        <p class="muted" style="margin:0 0 8px; font-size:12.5px; line-height:1.6;">
+          <b>재등록률 · 이탈률</b>: 그 달에 만료 "예정"이었던 회원·상품 건수를 분모로 잡아요(TM 상담을 실제로 진행했는지는 안 따짐 - 대시보드의 "상품별 재등록 현황"과 다른 점이에요, TM 콜을 안 돌린 만료 회원도 그대로 분모에 남아요). 만료일 전후로 실제 재등록 매출이 있거나 TM 기록이 '재등록'으로 처리돼 있으면 재등록, 만료 후 30일이 지나도록 둘 다 없으면 이탈로 셈해요. 이번 달처럼 아직 30일이 안 지난 건은 "집계중"이라 재등록률·이탈률 어디에도 안 잡혀요.
+        </p>
+        <p class="muted" style="margin:0 0 8px; font-size:12.5px; line-height:1.6;">
+          <b>객단가</b>: 그 달 총매출 ÷ 그 달에 실제 결제한 회원 수(중복 제거).
+        </p>
+        <p class="muted" style="margin:0; font-size:12.5px; line-height:1.6;">
+          <b>상품(플랜)별 등록 현황</b>: 매출 입력 시 상품을 직접 골라서 등록한 건은 그 상품(예: "헬스이용권 12개월") 기준으로, 상품을 안 고르고 직접 입력한 건(주로 엑셀 가져오기)은 "상품 미연결"로 따로 모아서 보여줘요. 매출 입력할 때 상품을 꼭 선택해주셔야 여기 숫자가 정확해져요.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1788489098"></script>
+  <script src="auth.js?v=1788489098"></script>
+  <script src="data.js?v=1788489098"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+    function toDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+    function monthStrOf(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; }
+    function addMonthsToMonthStr(monthStr, n) {
+      const [y, m] = monthStr.split('-').map(Number);
+      const d = new Date(y, m - 1 + n, 1);
+      return monthStrOf(d);
+    }
+    function monthLabel(monthStr) {
+      const [y, m] = monthStr.split('-').map(Number);
+      return `${y}년 ${m}월`;
+    }
+    function formatPct(v) { return v === null || v === undefined ? '-' : `${(v * 100).toFixed(1)}%`; }
+    function formatWonShort(v) { return v === null || v === undefined ? '-' : `${Math.round(v).toLocaleString()}원`; }
+
+    let refMonthStr = monthStrOf(new Date());
+    let metricsRaw = null; // fetchMetricsRawData() 결과 캐시 - 달을 옮길 때마다 새로 안 부르고 재사용
+    let metricsRawEarliestMonth = null; // 캐시가 커버하는 가장 이른 달(이보다 더 과거로 가면 다시 불러와야 함)
+
+    const TREND_MONTHS = 6; // "최근 6개월 추이"에 보여줄 개월 수
+
+    function trendMonthList(endMonthStr) {
+      const list = [];
+      for (let i = TREND_MONTHS - 1; i >= 0; i--) list.push(addMonthsToMonthStr(endMonthStr, -i));
+      return list;
+    }
+
+    // 스파크라인(추세선) - 외부 라이브러리 없이 순수 SVG로 그림. 단일 색(인디고)만 쓰고, 값 자체는
+    // 아래 "최근 6개월 추이" 표에도 그대로 다 나오니 이 미니 그래프는 한눈에 방향만 보는 용도
+    function renderSparkline(values) {
+      const width = 100, height = 28;
+      const pts = values.map((v, i) => ({ v, i })).filter(p => p.v !== null && p.v !== undefined);
+      if (pts.length < 2) return '';
+      const vals = pts.map(p => p.v);
+      const min = Math.min(...vals), max = Math.max(...vals);
+      const range = (max - min) || 1;
+      const stepX = width / (values.length - 1 || 1);
+      const coords = pts.map(p => {
+        const x = p.i * stepX;
+        const y = height - 3 - ((p.v - min) / range) * (height - 6);
+        return [x, y];
+      });
+      const d = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c[0].toFixed(1)},${c[1].toFixed(1)}`).join(' ');
+      const last = coords[coords.length - 1];
+      return `
+        <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">
+          <title>최근 ${values.length}개월 추이: ${vals.map(v => Math.round(v * 100) / 100).join(' → ')}</title>
+          <path d="${d}" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3" fill="#4f46e5" />
+        </svg>`;
+    }
+
+    // 전월 대비 변화율(%) 배지 - higherIsBetter가 false인 지표(이탈률)는 색을 뒤집음(오르면 빨강)
+    function pctChangeBadge(cur, prev, { higherIsBetter = true, isRate = false } = {}) {
+      if (cur === null || cur === undefined || prev === null || prev === undefined) {
+        return '<span class="muted">전월 데이터 없음</span>';
+      }
+      const diff = isRate ? (cur - prev) * 100 : (prev !== 0 ? (cur - prev) / prev * 100 : null);
+      if (diff === null) return '<span class="muted">-</span>';
+      const good = higherIsBetter ? diff > 0 : diff < 0;
+      const arrow = diff > 0.05 ? '▲' : diff < -0.05 ? '▼' : '-';
+      const cls = Math.abs(diff) < 0.05 ? 'muted' : (good ? 'up' : 'down');
+      const unit = isRate ? '%p' : '%';
+      return `<span class="delta ${cls}">${arrow} 전월 대비 ${Math.abs(diff).toFixed(1)}${unit}</span>`;
+    }
+
+    function updateNavLabel() {
+      document.getElementById('metricsPeriodLabel').textContent = monthLabel(refMonthStr);
+      document.getElementById('metricsNextBtn').disabled = refMonthStr >= monthStrOf(new Date());
+    }
+
+    async function ensureRawDataCovers(monthStr) {
+      // 6개월 추이까지 감안해서 필요한 가장 이른 달까지 캐시가 이미 커버하면 재사용, 아니면 새로 불러옴
+      const neededEarliest = trendMonthList(monthStr)[0];
+      if (metricsRaw && metricsRawEarliestMonth && neededEarliest >= metricsRawEarliestMonth) return;
+      metricsRawEarliestMonth = neededEarliest;
+      metricsRaw = await fetchMetricsRawData(neededEarliest);
+    }
+
+    async function loadMetrics() {
+      updateNavLabel();
+      const loadingNote = document.getElementById('metricsLoadingNote');
+      loadingNote.style.display = '';
+      loadingNote.textContent = '불러오는 중...';
+      try {
+        await ensureRawDataCovers(refMonthStr);
+        loadingNote.style.display = 'none';
+
+        const months = trendMonthList(refMonthStr);
+        const series = months.map(m => computeMonthlyMetrics(m, metricsRaw));
+        const cur = series[series.length - 1];
+        const prev = series.length >= 2 ? series[series.length - 2] : null;
+
+        renderRecommendations(getEventRecommendations(cur, prev));
+        renderMetricCards(cur, prev, series);
+        renderTrendTable(series);
+
+        const curPlanStats = computeProductPlanStats(refMonthStr, metricsRaw);
+        const prevMonthStr = months.length >= 2 ? months[months.length - 2] : null;
+        const prevPlanStats = prevMonthStr ? computeProductPlanStats(prevMonthStr, metricsRaw) : null;
+        renderProductPlanStats(curPlanStats, prevPlanStats);
+      } catch (err) {
+        loadingNote.style.display = '';
+        loadingNote.textContent = err.message;
+        loadingNote.className = 'error-text';
+        loadingNote.style.display = 'block';
+      }
+    }
+
+    function renderRecommendations(recs) {
+      document.getElementById('recommendationsWrap').innerHTML = recs.map(r => `
+        <div class="rec-card rec-${r.level}">
+          <div class="rec-title">${r.level === 'critical' ? '🚨' : r.level === 'warning' ? '⚠️' : '✅'} ${escapeHtml(r.title)}</div>
+          <div class="rec-detail">${escapeHtml(r.detail)}</div>
+        </div>
+      `).join('');
+    }
+
+    // 플랜별 등록 건수의 전월 대비 배지 - pctChangeBadge와 달리 "전월 0건 -> 이번 달 N건"(=신규로 팔리기
+    // 시작함)을 나눗셈 에러 없이 "신규"로 자연스럽게 표시하도록 별도로 둠
+    function planCountDeltaBadge(cur, prev) {
+      if (prev === null || prev === undefined) return '<span class="muted">전월 데이터 없음</span>';
+      if (prev === 0) return cur > 0 ? '<span class="delta up">▲ 신규(전월 0건)</span>' : '<span class="muted">-</span>';
+      const diff = (cur - prev) / prev * 100;
+      if (Math.abs(diff) < 0.5) return '<span class="muted">- 전월과 동일</span>';
+      const arrow = diff > 0 ? '▲' : '▼';
+      const cls = diff > 0 ? 'up' : 'down';
+      return `<span class="delta ${cls}">${arrow} 전월 대비 ${Math.abs(diff).toFixed(0)}%</span>`;
+    }
+
+    // curStats/prevStats: computeProductPlanStats()가 돌려주는 배열(헬스이용권/그룹PT/개인PT 순서 고정)
+    function renderProductPlanStats(curStats, prevStats) {
+      const prevByCategory = {};
+      (prevStats || []).forEach(c => { prevByCategory[c.categoryKey] = c; });
+
+      const html = curStats.map(cat => {
+        const prevCat = prevByCategory[cat.categoryKey] || null;
+        const findPrevCount = (productId) => {
+          if (!prevCat) return null;
+          const p = prevCat.plans.find(pp => pp.productId === productId);
+          return p ? p.count : 0;
+        };
+
+        const planRows = cat.plans.map(p => {
+          const share = cat.totalCount > 0 ? (p.count / cat.totalCount * 100) : 0;
+          return `
+            <tr>
+              <td>${escapeHtml(p.name)}</td>
+              <td>${p.count}건</td>
+              <td>${share.toFixed(0)}%</td>
+              <td>${planCountDeltaBadge(p.count, findPrevCount(p.productId))}</td>
+            </tr>`;
+        }).join('');
+
+        const unlinkedShare = cat.totalCount > 0 ? (cat.unlinkedCount / cat.totalCount * 100) : 0;
+        const unlinkedRow = cat.unlinkedCount > 0 ? `
+            <tr class="unlinked-row">
+              <td>상품 미연결(직접 입력 등)</td>
+              <td>${cat.unlinkedCount}건</td>
+              <td>${unlinkedShare.toFixed(0)}%</td>
+              <td>${prevCat ? planCountDeltaBadge(cat.unlinkedCount, prevCat.unlinkedCount) : '<span class="muted">전월 데이터 없음</span>'}</td>
+            </tr>` : '';
+
+        if (!planRows && !unlinkedRow) {
+          return `
+            <div class="panel" style="margin-top:12px;">
+              <h3 style="margin:0 0 8px; font-size:14px;">${escapeHtml(cat.categoryLabel)}</h3>
+              <p class="muted" style="font-size:12.5px; margin:0;">이번 달 등록 없음</p>
+            </div>`;
+        }
+
+        return `
+          <div class="panel" style="margin-top:12px;">
+            <h3 style="margin:0 0 8px; font-size:14px;">${escapeHtml(cat.categoryLabel)} <span class="muted" style="font-weight:400; font-size:12px;">(이번 달 총 ${cat.totalCount}건)</span></h3>
+            <div style="overflow-x:auto;">
+              <table class="plan-table">
+                <thead><tr><th>플랜</th><th>건수</th><th>비중</th><th>전월 대비</th></tr></thead>
+                <tbody>${planRows}${unlinkedRow}</tbody>
+              </table>
+            </div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('planStatsWrap').innerHTML = html;
+    }
+
+    function renderMetricCards(cur, prev, series) {
+      document.getElementById('mcTotal').textContent = `${cur.activeMemberCount}명`;
+      document.getElementById('mcTotalDelta').innerHTML = pctChangeBadge(cur.activeMemberCount, prev ? prev.activeMemberCount : null);
+      document.getElementById('mcTotalSpark').innerHTML = renderSparkline(series.map(s => s.activeMemberCount));
+
+      document.getElementById('mcNew').textContent = `${cur.newMemberCount}명${cur.newRate !== null ? ` (${formatPct(cur.newRate)})` : ''}`;
+      document.getElementById('mcNewDelta').innerHTML = pctChangeBadge(cur.newMemberCount, prev ? prev.newMemberCount : null);
+      document.getElementById('mcNewSpark').innerHTML = renderSparkline(series.map(s => s.newMemberCount));
+
+      document.getElementById('mcRenewal').textContent = formatPct(cur.renewalRate);
+      document.getElementById('mcRenewalDelta').innerHTML = pctChangeBadge(cur.renewalRate, prev ? prev.renewalRate : null, { isRate: true });
+      document.getElementById('mcRenewalSpark').innerHTML = renderSparkline(series.map(s => s.renewalRate));
+
+      document.getElementById('mcChurn').textContent = formatPct(cur.churnRate);
+      document.getElementById('mcChurnDelta').innerHTML = pctChangeBadge(cur.churnRate, prev ? prev.churnRate : null, { isRate: true, higherIsBetter: false });
+      document.getElementById('mcChurnSpark').innerHTML = renderSparkline(series.map(s => s.churnRate));
+
+      document.getElementById('mcArpu').textContent = formatWonShort(cur.arpu);
+      document.getElementById('mcArpuDelta').innerHTML = pctChangeBadge(cur.arpu, prev ? prev.arpu : null);
+      document.getElementById('mcArpuSpark').innerHTML = renderSparkline(series.map(s => s.arpu));
+    }
+
+    function renderTrendTable(series) {
+      const tbody = document.querySelector('#trendTable tbody');
+      tbody.innerHTML = series.slice().reverse().map(s => `
+        <tr>
+          <td>${escapeHtml(monthLabel(s.monthStr))}</td>
+          <td>${s.activeMemberCount}명</td>
+          <td>${s.newMemberCount}명</td>
+          <td>${formatPct(s.renewalRate)}${s.pending > 0 ? ` <span class="muted">(집계중 ${s.pending})</span>` : ''}</td>
+          <td>${formatPct(s.churnRate)}</td>
+          <td>${formatWonShort(s.arpu)}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('metricsPrevBtn').addEventListener('click', () => {
+      refMonthStr = addMonthsToMonthStr(refMonthStr, -1);
+      loadMetrics();
+    });
+    document.getElementById('metricsNextBtn').addEventListener('click', () => {
+      if (refMonthStr >= monthStrOf(new Date())) return;
+      refMonthStr = addMonthsToMonthStr(refMonthStr, 1);
+      loadMetrics();
+    });
+    document.getElementById('metricsTodayBtn').addEventListener('click', () => {
+      refMonthStr = monthStrOf(new Date());
+      loadMetrics();
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+      }
+      loadMetrics();
+    })();
+  </script>
+</body>
+</html>

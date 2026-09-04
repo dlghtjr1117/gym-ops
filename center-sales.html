@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 센터 매출</title>
-<link rel="stylesheet" href="style.css?v=1788484880" />
+<link rel="stylesheet" href="style.css?v=1788489098" />
 <style>
   /* 매출 카드가 4개(FC/PT/올바른/총매출)라 pt.html과 동일한 4열 그리드를 씀 */
   #salesHeroGrid { grid-template-columns: repeat(4, 1fr); }
@@ -36,6 +36,7 @@
       <a href="products.html">이용권 관리</a>
       <a href="staff.html">직원 관리</a>
       <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
       <div class="user-badge" id="roleBadge">로딩 중...</div>
@@ -145,9 +146,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788484880"></script>
-  <script src="auth.js?v=1788484880"></script>
-  <script src="data.js?v=1788484880"></script>
+  <script src="config.js?v=1788489098"></script>
+  <script src="auth.js?v=1788489098"></script>
+  <script src="data.js?v=1788489098"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

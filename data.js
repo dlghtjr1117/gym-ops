@@ -1395,3 +1395,275 @@ async function deletePtBooking(id) {
   });
   if (!res.ok) await throwApiError(res, '예약 삭제에 실패했습니다.');
 }
+
+// ---- 지표 분석 (metrics.html) ----
+// "우리 센터 총 인원수/재등록률/신규 등록률/이탈률/객단가를 보고 이번 달엔 어떤 이벤트가 필요한지
+// 알려주는 페이지"를 만들어달라는 요청으로 추가. 계산 로직은 순수 함수(computeMonthlyMetrics,
+// getEventRecommendations)로 여기 data.js에 두고, metrics.html은 필요한 원본 데이터(회원/매출/TM기록)를
+// fetch로 가져와서 이 함수들에 넘기기만 함 - 매달 하나씩 서버에 다시 물어보는 대신 넉넉한 기간을 한 번에
+// 불러와서 클라이언트에서 여러 달을 한꺼번에 계산함(대시보드의 recentSalesAll 캐시 패턴과 동일한 방식).
+
+// 만료 추적 카테고리(EXPIRY_CATEGORIES) 중 "핵심 회원권"만 - 락커/운동복은 부가 서비스라 이 페이지의
+// 총 회원수·재등록률·이탈률 계산에서는 제외함(그것만 있고 헬스이용권/PT/그룹PT가 하나도 없는 사람을
+// "회원"으로 보기엔 애매해서). 자세한 이유는 README 참고.
+const METRICS_CORE_CATEGORIES = EXPIRY_CATEGORIES.filter(c => ['membership', 'group_pt', 'pt'].includes(c.key));
+const METRICS_RENEWAL_SALE_CATEGORY = { membership: 'membership_renewal', group_pt: 'group_pt_renewal', pt: 'pt_renewal' };
+const METRICS_NEW_SALE_CATEGORIES = ['membership_new', 'pt_new', 'group_pt_new'];
+// 만료 후 이 기간(일) 안에 재등록 신호가 없으면 "이탈"로 봄 - 사용자가 직접 정한 기준
+const METRICS_CHURN_GRACE_DAYS = 30;
+// TM콜은 만료되기 전에 미리 하는 경우가 많아서, 만료일보다 이만큼 이전 날짜까지도 "그 만료 건에 대한
+// 재등록 시도"로 인정해줌(너무 옛날 TM기록까지 엮이지 않도록 60일로 제한)
+const METRICS_TM_LOOKBACK_DAYS = 60;
+
+function metricsAddDaysStr(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// 지표 계산에 필요한 원본 데이터를 한 번에 불러옴 - members는 전체, sales/tm_logs는 넉넉한 기간
+// (분석 시작월의 TM_LOOKBACK만큼 이전 ~ 오늘+CHURN_GRACE만큼 이후)만 가져와서 과호출을 피함
+async function fetchMetricsRawData(earliestMonthStr) {
+  const [ey, em] = earliestMonthStr.split('-').map(Number);
+  const rangeStart = metricsAddDaysStr(`${ey}-${String(em).padStart(2, '0')}-01`, -METRICS_TM_LOOKBACK_DAYS);
+  const rangeEnd = metricsAddDaysStr(toDateStrPlain(new Date()), METRICS_CHURN_GRACE_DAYS + 31);
+
+  const [membersRes, salesRes, tmRes] = await Promise.all([
+    fetchAllRows('members?select=id,name,membership_end_date,group_pt_end_date,pt_end_date,status', await authHeaders()),
+    // product_id로 연결된 상품이 있으면 그 상품의 이름/카테고리/기간(일)/횟수까지 같이 받아옴 -
+    // "상품(플랜)별 등록 현황"(computeProductPlanStats)에서 "3개월권/6개월권/12개월권", "PT 10/20/30회" 같은
+    // 구체적인 플랜 단위로 집계할 때 씀. 매출 입력 화면에서 상품을 안 고르고 직접 입력한 매출(주로 옛날 엑셀
+    // 가져오기 건)은 product_id가 비어있어서 product가 null로 옴 - 이런 건 "상품 미연결"로 따로 집계함.
+    fetchAllRows(`sales?select=id,member_id,category,amount,sale_date,product_id,product:products(id,name,category,duration_days,sessions)&sale_date=gte.${rangeStart}&sale_date=lte.${rangeEnd}`, await authHeaders()),
+    fetchAllRows(`tm_logs?select=id,member_id,status,category,contact_date&contact_date=gte.${rangeStart}&contact_date=lte.${rangeEnd}`, await authHeaders())
+  ]);
+  if (membersRes.error) await throwApiError(membersRes.error, '회원 목록을 불러오지 못했습니다.');
+  if (salesRes.error) await throwApiError(salesRes.error, '매출 내역을 불러오지 못했습니다.');
+  if (tmRes.error) await throwApiError(tmRes.error, 'TM 상담 기록을 불러오지 못했습니다.');
+
+  return {
+    members: membersRes.rows.filter(m => m.status !== 'left'),
+    sales: salesRes.rows,
+    tmLogs: tmRes.rows
+  };
+}
+
+// data.js 안에서만 쓰는 순수 날짜 포맷 함수 - 각 페이지가 이미 인라인으로 갖고 있는 toDateStr와
+// 이름이 겹치지 않도록 별도 이름을 씀(둘 다 구현은 같음)
+function toDateStrPlain(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// monthStr('YYYY-MM') 한 달의 지표를 계산 - fetchMetricsRawData()로 가져온 원본을 그대로 넘기면 됨.
+// (1) activeMemberCount: 그 달 말일 기준, 헬스이용권/그룹PT/개인PT 중 하나라도 만료 전인 회원 수(중복 제거)
+// (2) newMemberCount/newRate: 그 달 매출 중 *_new 카테고리 매출을 낸 회원 수 / 총 회원수
+// (3) 재등록률/이탈률: 그 달에 만료 "예정"이었던 (회원,카테고리) 쌍을 분모로 잡고, 그 각각에 대해
+//     ①만료일 기준 -14일~+30일 사이 재등록 매출이 있거나 ②관련 TM기록 status가 'renewed'면 "재등록",
+//     둘 다 없이 만료 후 30일이 지났으면 "이탈", 아직 30일이 안 지났으면 "집계중"(대기)으로 셈.
+//     TM콜을 안 돌린 사람도 분모에 그대로 남기 때문에(기존 대시보드의 "상품별 재등록 현황"과 다른 점),
+//     TM 진행 여부와 무관하게 "실제로 몇 명이 재등록했는지"를 보여줌 - 자세한 설명은 README 참고
+// (4) arpu(객단가): 그 달 총매출 / 그 달에 실제 결제한(distinct member_id) 회원 수
+function computeMonthlyMetrics(monthStr, raw) {
+  const [y, m] = monthStr.split('-').map(Number);
+  const monthStart = `${monthStr}-01`;
+  const monthEnd = toDateStrPlain(new Date(y, m, 0));
+  const monthSales = raw.sales.filter(s => s.sale_date >= monthStart && s.sale_date <= monthEnd);
+
+  const activeMembers = raw.members.filter(mem =>
+    METRICS_CORE_CATEGORIES.some(c => mem[c.field] && mem[c.field] >= monthEnd)
+  );
+
+  const newMemberIds = new Set(
+    monthSales.filter(s => METRICS_NEW_SALE_CATEGORIES.includes(s.category) && s.member_id).map(s => s.member_id)
+  );
+
+  const expiringItems = [];
+  raw.members.forEach(mem => {
+    METRICS_CORE_CATEGORIES.forEach(c => {
+      const endDate = mem[c.field];
+      if (endDate && endDate >= monthStart && endDate <= monthEnd) {
+        expiringItems.push({ member: mem, categoryKey: c.key, endDate });
+      }
+    });
+  });
+
+  const today = toDateStrPlain(new Date());
+  let renewed = 0, churned = 0, pending = 0;
+  expiringItems.forEach(item => {
+    const graceEnd = metricsAddDaysStr(item.endDate, METRICS_CHURN_GRACE_DAYS);
+    const tmLookbackStart = metricsAddDaysStr(item.endDate, -METRICS_TM_LOOKBACK_DAYS);
+    const renewalSaleCategory = METRICS_RENEWAL_SALE_CATEGORY[item.categoryKey];
+
+    const hasRenewalSale = raw.sales.some(s =>
+      s.member_id === item.member.id && s.category === renewalSaleCategory &&
+      s.sale_date >= metricsAddDaysStr(item.endDate, -14) && s.sale_date <= graceEnd
+    );
+    const hasRenewedTm = raw.tmLogs.some(log =>
+      log.member_id === item.member.id && log.status === 'renewed' &&
+      (!log.category || log.category === item.categoryKey) &&
+      log.contact_date >= tmLookbackStart && log.contact_date <= graceEnd
+    );
+
+    if (hasRenewalSale || hasRenewedTm) renewed++;
+    else if (today > graceEnd) churned++;
+    else pending++;
+  });
+
+  const totalCohort = expiringItems.length;
+  const totalRevenue = monthSales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const payingMemberIds = new Set(monthSales.filter(s => s.member_id).map(s => s.member_id));
+
+  return {
+    monthStr,
+    activeMemberCount: activeMembers.length,
+    newMemberCount: newMemberIds.size,
+    newRate: activeMembers.length > 0 ? newMemberIds.size / activeMembers.length : null,
+    totalCohort, renewed, churned, pending,
+    renewalRate: totalCohort > 0 ? renewed / totalCohort : null,
+    churnRate: totalCohort > 0 ? churned / totalCohort : null,
+    totalRevenue,
+    payingMemberCount: payingMemberIds.size,
+    arpu: payingMemberIds.size > 0 ? totalRevenue / payingMemberIds.size : null
+  };
+}
+
+// "3개월권/6개월권/12개월권", "개인PT 10/20/30/50/100회"처럼 구체적인 상품(플랜) 단위로 그 달 등록
+// 건수를 보고 싶다는 요청으로 추가. "12개월권 대상 이벤트를 기획했으면 12개월권 등록이 실제로 늘어야
+// 한다"처럼, 이벤트가 의도한 플랜에 실제로 효과가 있었는지 확인하는 용도.
+// 상품 목록(products)은 지점장이 이용권 관리 화면에서 직접 추가/수정하므로, "3개월/6개월/12개월"을
+// 코드에 미리 못박아두지 않고 실제로 팔린 상품(product_id로 연결된 상품)을 그대로 집계함.
+const METRICS_PLAN_CATEGORIES = ['membership', 'group_pt', 'pt']; // 락커/운동복/기타는 "플랜"이 아니라서 제외
+const METRICS_PLAN_CATEGORY_LABELS = { membership: '헬스이용권', group_pt: '그룹PT', pt: '개인PT' };
+
+// 매출 한 건이 어느 플랜 카테고리에 속하는지 판단 - product 조인이 있으면 그 상품의 category를 그대로
+// 쓰고(가장 정확함), 상품 연결이 없는 매출(주로 상품 선택 없이 직접 입력했거나 옛날 엑셀 가져오기 건)은
+// sales.category 값(예: membership_renewal)의 앞부분으로 대략 판단함
+function saleCategoryGroup(sale) {
+  if (sale.product && sale.product.category) return sale.product.category;
+  const cat = sale.category || '';
+  if (cat.startsWith('membership') && cat !== 'membership_transfer') return 'membership';
+  if (cat.startsWith('group_pt')) return 'group_pt';
+  if (cat.startsWith('pt')) return 'pt';
+  return cat;
+}
+
+// monthStr 한 달의 상품(플랜)별 등록 건수를 집계. METRICS_PLAN_CATEGORIES 각각에 대해
+// { categoryKey, categoryLabel, plans: [{productId, name, sortKey, count, revenue}], unlinkedCount,
+//   unlinkedRevenue, totalCount } 를 돌려줌 - plans는 duration_days(기간제) 또는 sessions(회차제) 오름차순 정렬.
+// unlinkedCount/unlinkedRevenue는 product_id가 없어서 어떤 구체적 플랜인지 알 수 없는 매출 건수 - 이게
+// 0이 아니면 "매출 입력할 때 상품을 안 고르고 직접 입력한 건"이 있다는 뜻이라, 그대로 화면에 보여줘서
+// 지점장이 데이터 연동이 잘 안 된 건이 있는지 바로 확인할 수 있게 함.
+function computeProductPlanStats(monthStr, raw) {
+  const monthStart = `${monthStr}-01`;
+  const [y, m] = monthStr.split('-').map(Number);
+  const monthEnd = toDateStrPlain(new Date(y, m, 0));
+  const monthSales = raw.sales.filter(s => s.sale_date >= monthStart && s.sale_date <= monthEnd);
+
+  const groups = {};
+  METRICS_PLAN_CATEGORIES.forEach(key => {
+    groups[key] = { categoryKey: key, categoryLabel: METRICS_PLAN_CATEGORY_LABELS[key], plans: new Map(), unlinkedCount: 0, unlinkedRevenue: 0, totalCount: 0 };
+  });
+
+  monthSales.forEach(s => {
+    const groupKey = saleCategoryGroup(s);
+    const g = groups[groupKey];
+    if (!g) return; // 락커/운동복/일일입장권/양도비/미분류 등은 "플랜" 집계 대상이 아님
+    g.totalCount++;
+    if (s.product_id && s.product) {
+      if (!g.plans.has(s.product_id)) {
+        g.plans.set(s.product_id, {
+          productId: s.product_id,
+          name: s.product.name,
+          sortKey: s.product.duration_days != null ? s.product.duration_days : (s.product.sessions != null ? s.product.sessions : 0),
+          count: 0,
+          revenue: 0
+        });
+      }
+      const p = g.plans.get(s.product_id);
+      p.count++;
+      p.revenue += Number(s.amount) || 0;
+    } else {
+      g.unlinkedCount++;
+      g.unlinkedRevenue += Number(s.amount) || 0;
+    }
+  });
+
+  return METRICS_PLAN_CATEGORIES.map(key => {
+    const g = groups[key];
+    return {
+      categoryKey: g.categoryKey,
+      categoryLabel: g.categoryLabel,
+      plans: Array.from(g.plans.values()).sort((a, b) => a.sortKey - b.sortKey),
+      unlinkedCount: g.unlinkedCount,
+      unlinkedRevenue: g.unlinkedRevenue,
+      totalCount: g.totalCount
+    };
+  });
+}
+
+// 이번 달 숫자(cur)와 전월 숫자(prev, 없을 수 있음)를 보고 어떤 이벤트가 필요한지 규칙 기반으로 추천.
+// 사용자가 설명한 로직 그대로 구현: 총 회원수 적으면 신규 이벤트, 총 회원수 많으면(=안정적이면) 재등록
+// 이벤트, 이탈률 높으면 이탈 방지 이벤트, 객단가 떨어지면 객단가를 높이는 이벤트. 임계값은 코드에 상수로
+// 뽑아뒀으니 실제 운영해보면서 사용자 피드백에 맞춰 조정하면 됨.
+const METRICS_THRESHOLDS = {
+  lowRenewalRate: 0.5,      // 재등록률 50% 미만이면 "낮다"
+  highChurnRate: 0.3,       // 이탈률 30% 이상이면 "높다"
+  memberDeclinePct: -0.02,  // 총 회원수가 전월 대비 2% 넘게 줄면 "저조"
+  arpuDeclinePct: -0.05     // 객단가가 전월 대비 5% 넘게 떨어지면 "하락"
+};
+
+function metricsPctChange(cur, prev) {
+  if (prev === null || prev === undefined || prev === 0 || cur === null || cur === undefined) return null;
+  return (cur - prev) / prev;
+}
+
+function getEventRecommendations(cur, prev) {
+  const recs = [];
+  const memberChange = prev ? metricsPctChange(cur.activeMemberCount, prev.activeMemberCount) : null;
+  const arpuChange = prev ? metricsPctChange(cur.arpu, prev.arpu) : null;
+
+  if (memberChange !== null && memberChange <= METRICS_THRESHOLDS.memberDeclinePct) {
+    recs.push({
+      level: 'critical',
+      title: '신규 회원 유치 이벤트 추천',
+      detail: `총 회원수가 전월 대비 ${(memberChange * 100).toFixed(1)}% 줄었어요(${prev.activeMemberCount}명 → ${cur.activeMemberCount}명). 체험 이벤트, 지인 추천 이벤트 등 신규 유입을 늘리는 이벤트가 필요해 보여요.`
+    });
+  }
+
+  if (cur.totalCohort > 0 && cur.renewalRate !== null && cur.renewalRate < METRICS_THRESHOLDS.lowRenewalRate) {
+    const pendingNote = cur.pending > 0 ? ` (그 중 ${cur.pending}건은 아직 만료 후 30일이 안 지나서 집계중이에요)` : '';
+    recs.push({
+      level: 'warning',
+      title: '재등록 유도 이벤트 추천',
+      detail: `이번 달 만료 예정 ${cur.totalCohort}건 중 재등록은 ${cur.renewed}건(${(cur.renewalRate * 100).toFixed(1)}%)에 그쳤어요.${pendingNote} 조기 재등록 할인, 장기 회원 혜택 같은 재등록 유도 이벤트가 필요해 보여요.`
+    });
+  }
+
+  if (cur.totalCohort > 0 && cur.churnRate !== null && cur.churnRate >= METRICS_THRESHOLDS.highChurnRate) {
+    recs.push({
+      level: 'critical',
+      title: '이탈 방지 · 컴백 이벤트 추천',
+      detail: `이번 달 만료 예정 ${cur.totalCohort}건 중 ${cur.churned}건(${(cur.churnRate * 100).toFixed(1)}%)이 만료 후 30일이 지나도록 재등록하지 않았어요. 이탈 회원 대상 컴백 프로모션이 필요해 보여요.`
+    });
+  }
+
+  if (arpuChange !== null && arpuChange <= METRICS_THRESHOLDS.arpuDeclinePct) {
+    recs.push({
+      level: 'warning',
+      title: '객단가를 높이는 이벤트 추천',
+      detail: `1인당 평균 결제 금액(객단가)이 전월 대비 ${(arpuChange * 100).toFixed(1)}% 떨어졌어요(${Math.round(prev.arpu).toLocaleString()}원 → ${Math.round(cur.arpu).toLocaleString()}원). PT 연계, 상품 업그레이드 같은 객단가를 높이는 프로모션이 필요해 보여요.`
+    });
+  }
+
+  // 딱히 위 네 가지에 안 걸리면(=전반적으로 안정적) 총 회원수 기준으로 기본 추천을 하나 보여줌
+  // (사용자가 설명한 "총 인원수가 많으면 재등록 이벤트를 해야 한다"는 기본 방향)
+  if (recs.length === 0) {
+    recs.push({
+      level: 'good',
+      title: '전반적으로 안정적이에요',
+      detail: `총 회원수 ${cur.activeMemberCount}명, 재등록률 ${cur.renewalRate !== null ? (cur.renewalRate * 100).toFixed(1) + '%' : '-'}, 이탈률 ${cur.churnRate !== null ? (cur.churnRate * 100).toFixed(1) + '%' : '-'}로 특별히 위험 신호는 없어요. 이 상태를 유지하면서 기존 회원 대상 재등록·업셀 이벤트를 꾸준히 이어가는 걸 추천해요.`
+    });
+  }
+
+  return recs;
+}
