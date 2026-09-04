@@ -349,6 +349,68 @@ async function deleteSale(id) {
   if (!res.ok) await throwApiError(res, '매출 삭제에 실패했습니다.');
 }
 
+// ---- 미수금(분할 결제) ----
+// "정상가로 등록은 하되, 오늘은 계약금만 받고 잔금은 나중에 받는" 경우를 위한 기능. sales 테이블
+// 자체는 항상 "그날 실제로 받은 금액"만 기록하도록 그대로 두고(카드/현금 매출 집계가 항상 실제 입금액과
+// 일치하도록), 아직 못 받은 나머지 금액만 receivables 테이블에 따로 남겨둠. 나중에 잔금을 받으면 그
+// 시점에 새 매출(sales)이 하나 더 생기고(그날의 실제 매출로 잡힘), receivables의 paid_amount가 그만큼
+// 올라가서 다 받으면 자동으로 완결(settled) 처리됨. 회원 관리(members.html)의 신규 등록·재등록 화면
+// 양쪽에서 공통으로 씀.
+
+async function fetchOpenReceivablesByMember(memberId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/receivables?member_id=eq.${memberId}&status=eq.open&order=created_at.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '미수금 내역을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 회원 목록 화면에서 "미수금 있음" 뱃지를 보여주기 위한 가벼운 조회 - member_id만 받아서 Set으로 씀
+async function fetchOpenReceivableMemberIds() {
+  const { rows, error } = await fetchAllRows('receivables?select=member_id&status=eq.open', await authHeaders());
+  if (error) return new Set(); // 뱃지 하나 못 띄운다고 회원 목록 전체가 깨지면 안 되므로 조용히 빈 Set 반환
+  return new Set(rows.map(r => r.member_id));
+}
+
+async function addReceivable(payload) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/receivables`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) await throwApiError(res, '미수금 등록에 실패했습니다.');
+  return res.json();
+}
+
+// 미수금 잔금을 지금 받음 - 오늘 매출로 새 sales 건을 하나 만들고(실제로 돈이 들어온 시점 기준),
+// receivables의 paid_amount를 그만큼 올림. 다 받으면(paid_amount >= total_amount) status를 'settled'로 바꿈.
+// amount가 남은 잔금보다 적으면(또 한 번 나눠 받는 경우) receivables는 그대로 'open'으로 남아있음.
+async function collectReceivablePayment(receivable, { amount, paymentMethod, staffId, saleDate, memo }) {
+  const saleRows = await addSale({
+    member_id: receivable.member_id,
+    staff_id: staffId,
+    category: receivable.category || 'membership_renewal',
+    product_id: receivable.product_id || null,
+    amount,
+    sale_date: saleDate,
+    payment_method: paymentMethod,
+    memo: memo || `미수금 잔금 결제 (${receivable.item_name})`
+  });
+  const newPaid = Number(receivable.paid_amount) + Number(amount);
+  const settled = newPaid >= Number(receivable.total_amount);
+  const patch = { paid_amount: newPaid, status: settled ? 'settled' : 'open' };
+  if (settled) patch.settled_at = new Date().toISOString();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/receivables?id=eq.${receivable.id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '미수금 상태 업데이트에 실패했습니다.');
+  const updatedRows = await res.json();
+  return { sale: saleRows[0], receivable: updatedRows[0] };
+}
+
 // 공용 페이지네이션: containerEl 안에 "◀ N / M ▶"을 그려주고, 버튼을 누르면 onChange(새페이지)를 호출함
 // (회원 목록, 만료회원·TM 목록처럼 길어질 수 있는 표에서 한 번에 15개씩만 보여줄 때 공통으로 사용)
 function renderPagination(containerEl, currentPage, totalItems, pageSize, onChange) {
