@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 지표 분석</title>
-<link rel="stylesheet" href="style.css?v=1788495086" />
+<link rel="stylesheet" href="style.css?v=1788498010" />
 <style>
   /* 이 페이지 전용 - 지표 카드 5개를 한 줄에(좁은 화면에선 2줄/1줄로) */
   .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
@@ -115,7 +115,7 @@
           <div class="spark" id="mcChurnSpark"></div>
         </div>
         <div class="metric-card">
-          <div class="label">💳 객단가</div>
+          <div class="label">💳 객단가 (FC)</div>
           <div class="value" id="mcArpu">-</div>
           <span class="delta" id="mcArpuDelta"></span>
           <div class="spark" id="mcArpuSpark"></div>
@@ -138,7 +138,7 @@
       <div style="overflow-x:auto;">
         <table id="trendTable">
           <thead><tr>
-            <th>월</th><th>총 회원수</th><th>신규 등록</th><th>재등록률</th><th>이탈률</th><th>객단가</th>
+            <th>월</th><th>총 회원수</th><th>신규 등록</th><th>재등록률</th><th>이탈률</th><th>객단가(FC)</th>
           </tr></thead>
           <tbody><tr><td colspan="6" class="muted" style="padding:16px; text-align:center;">불러오는 중...</td></tr></tbody>
         </table>
@@ -158,7 +158,7 @@
           <b>재등록률 · 이탈률</b>: 그 달에 만료 "예정"이었던 회원·상품 건수를 분모로 잡아요(TM 상담을 실제로 진행했는지는 안 따짐 - 대시보드의 "상품별 재등록 현황"과 다른 점이에요, TM 콜을 안 돌린 만료 회원도 그대로 분모에 남아요). 만료일 전후로 실제 재등록 매출이 있거나 TM 기록이 '재등록'으로 처리돼 있으면 재등록, 만료 후 30일이 지나도록 둘 다 없으면 이탈로 셈해요. 이번 달처럼 아직 30일이 안 지난 건은 "집계중"이라 재등록률·이탈률 어디에도 안 잡혀요.
         </p>
         <p class="muted" style="margin:0 0 8px; font-size:12.5px; line-height:1.6;">
-          <b>객단가</b>: 그 달 총매출 ÷ 그 달에 실제 결제한 회원 수(중복 제거).
+          <b>객단가 (FC)</b>: 헬스이용권·그룹PT(올바른 운동 무제한)·락커·운동복 매출만 더한 값 ÷ 그 매출을 낸(실제 결제한) 회원 수(중복 제거). 개인PT는 가격대가 워낙 크고(수십만~수백만원) 별도 사업으로 취급하기 때문에 객단가 계산에서 빼서, 순수 FC(헬스장) 이용권 판매 감각에 맞게 봐요. 양도비 등 "기타" 항목도 제외해요.
         </p>
         <p class="muted" style="margin:0; font-size:12.5px; line-height:1.6;">
           <b>상품(플랜)별 등록 현황</b>: 매출 입력 시 상품을 직접 골라서 등록한 건은 그 상품(예: "헬스이용권 12개월") 기준으로, 상품을 안 고르고 직접 입력한 건(주로 엑셀 가져오기)은 "상품 미연결"로 따로 모아서 보여줘요. 매출 입력할 때 상품을 꼭 선택해주셔야 여기 숫자가 정확해져요.
@@ -167,9 +167,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788495086"></script>
-  <script src="auth.js?v=1788495086"></script>
-  <script src="data.js?v=1788495086"></script>
+  <script src="config.js?v=1788498010"></script>
+  <script src="auth.js?v=1788498010"></script>
+  <script src="data.js?v=1788498010"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

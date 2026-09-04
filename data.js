@@ -1476,6 +1476,10 @@ const METRICS_CHURN_GRACE_DAYS = 30;
 // TM콜은 만료되기 전에 미리 하는 경우가 많아서, 만료일보다 이만큼 이전 날짜까지도 "그 만료 건에 대한
 // 재등록 시도"로 인정해줌(너무 옛날 TM기록까지 엮이지 않도록 60일로 제한)
 const METRICS_TM_LOOKBACK_DAYS = 60;
+// 객단가(ARPU) 계산에 포함할 "FC"(헬스장 자체 상품) 카테고리 - "PT는 아예 별도라서 금액 차이도 너무
+// 크게 발생하니 객단가는 헬스이용권·운동복·락커·(올바른 운동 무제한) 그룹PT만 보고 싶다"는 요청으로,
+// 개인PT(가격대가 수십만~수백만원으로 완전히 다름)와 기타(양도비 등 일회성 항목)는 객단가 계산에서 뺌.
+const METRICS_ARPU_CATEGORIES = ['membership', 'group_pt', 'locker', 'clothes'];
 
 function metricsAddDaysStr(dateStr, days) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -1524,7 +1528,8 @@ function toDateStrPlain(d) {
 //     둘 다 없이 만료 후 30일이 지났으면 "이탈", 아직 30일이 안 지났으면 "집계중"(대기)으로 셈.
 //     TM콜을 안 돌린 사람도 분모에 그대로 남기 때문에(기존 대시보드의 "상품별 재등록 현황"과 다른 점),
 //     TM 진행 여부와 무관하게 "실제로 몇 명이 재등록했는지"를 보여줌 - 자세한 설명은 README 참고
-// (4) arpu(객단가): 그 달 총매출 / 그 달에 실제 결제한(distinct member_id) 회원 수
+// (4) arpu(객단가): 그 달 "FC" 매출(헬스이용권·그룹PT·락커·운동복만, 개인PT·기타 제외) /
+//     그 매출 기준으로 실제 결제한(distinct member_id) 회원 수 - METRICS_ARPU_CATEGORIES 참고
 function computeMonthlyMetrics(monthStr, raw) {
   const [y, m] = monthStr.split('-').map(Number);
   const monthStart = `${monthStr}-01`;
@@ -1572,8 +1577,11 @@ function computeMonthlyMetrics(monthStr, raw) {
   });
 
   const totalCohort = expiringItems.length;
-  const totalRevenue = monthSales.reduce((sum, s) => sum + Number(s.amount), 0);
-  const payingMemberIds = new Set(monthSales.filter(s => s.member_id).map(s => s.member_id));
+  // 객단가는 "FC" 매출(헬스이용권·그룹PT·락커·운동복)만 기준으로 계산 - 개인PT는 가격대가 워낙 커서
+  // (수십만~수백만원) 섞으면 객단가가 실제 이용권 판매 감각과 안 맞게 튀어서 뺐음
+  const arpuSales = monthSales.filter(s => METRICS_ARPU_CATEGORIES.includes(saleCategoryGroup(s)));
+  const arpuRevenue = arpuSales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const arpuPayingMemberIds = new Set(arpuSales.filter(s => s.member_id).map(s => s.member_id));
 
   return {
     monthStr,
@@ -1583,9 +1591,9 @@ function computeMonthlyMetrics(monthStr, raw) {
     totalCohort, renewed, churned, pending,
     renewalRate: totalCohort > 0 ? renewed / totalCohort : null,
     churnRate: totalCohort > 0 ? churned / totalCohort : null,
-    totalRevenue,
-    payingMemberCount: payingMemberIds.size,
-    arpu: payingMemberIds.size > 0 ? totalRevenue / payingMemberIds.size : null
+    arpuRevenue,
+    payingMemberCount: arpuPayingMemberIds.size,
+    arpu: arpuPayingMemberIds.size > 0 ? arpuRevenue / arpuPayingMemberIds.size : null
   };
 }
 
@@ -1712,8 +1720,8 @@ function getEventRecommendations(cur, prev) {
   if (arpuChange !== null && arpuChange <= METRICS_THRESHOLDS.arpuDeclinePct) {
     recs.push({
       level: 'warning',
-      title: '객단가를 높이는 이벤트 추천',
-      detail: `1인당 평균 결제 금액(객단가)이 전월 대비 ${(arpuChange * 100).toFixed(1)}% 떨어졌어요(${Math.round(prev.arpu).toLocaleString()}원 → ${Math.round(cur.arpu).toLocaleString()}원). PT 연계, 상품 업그레이드 같은 객단가를 높이는 프로모션이 필요해 보여요.`
+      title: '객단가(FC)를 높이는 이벤트 추천',
+      detail: `FC(헬스이용권·그룹PT·락커·운동복) 1인당 평균 결제 금액이 전월 대비 ${(arpuChange * 100).toFixed(1)}% 떨어졌어요(${Math.round(prev.arpu).toLocaleString()}원 → ${Math.round(cur.arpu).toLocaleString()}원). 장기권(6·12개월) 업그레이드, 그룹PT(올바른 운동 무제한) 연계 같은 FC 객단가를 높이는 프로모션이 필요해 보여요.`
     });
   }
 
