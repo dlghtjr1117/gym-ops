@@ -4,7 +4,18 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788435542" />
+<link rel="stylesheet" href="style.css?v=1788481372" />
+<style>
+  /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
+     스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
+     보이고 있었음 - "이미지 복사"로 캡쳐했을 때 숫자가 위아래로 잘려 보이는 문제를 고치면서 같이 맞춤 */
+  .sheet-input {
+    width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid transparent;
+    border-radius: 6px; background: transparent; box-sizing: border-box;
+  }
+  .sheet-input:hover { border-color: var(--slate-300); }
+  .sheet-input:focus { border-color: var(--indigo-600); background: var(--white); outline: none; }
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -33,7 +44,7 @@
   <div class="wrap">
     <div class="section" style="margin-top:0;">
       <h2>매출 보고
-        <button type="button" class="btn-link no-capture" id="saveImageBtn" style="font-weight:400; font-size:12px;">🖼️ 이미지로 저장</button>
+        <button type="button" class="btn-link no-capture" id="saveImageBtn" style="font-weight:400; font-size:12px;">🖼️ 이미지 복사</button>
         <button type="button" class="btn-link no-capture" id="createShareBtn" style="font-weight:400; font-size:12px;">🔗 공유 링크 만들기</button>
       </h2>
 
@@ -214,14 +225,14 @@
     </div>
   </div>
 
-  <!-- "이미지로 저장" 버튼 전용 - 화면에 보이는 걸 그대로 캡쳐해서 PNG로 만들어주는 외부 라이브러리.
+  <!-- "이미지 복사" 버튼 전용 - 화면에 보이는 걸 그대로 캡쳐해서 PNG로 만들어주는 외부 라이브러리.
        이 프로젝트는 원래 외부 CDN 없이 순수 CSS/JS만 쓰는 걸 원칙으로 했는데, 화면을 그대로 이미지로
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788435542"></script>
-  <script src="auth.js?v=1788435542"></script>
-  <script src="data.js?v=1788435542"></script>
+  <script src="config.js?v=1788481372"></script>
+  <script src="auth.js?v=1788481372"></script>
+  <script src="data.js?v=1788481372"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -875,14 +886,16 @@
       }
     });
 
-    // ---- "이미지로 저장" (링크 대신 캡쳐 이미지 그대로 보내고 싶다는 피드백으로 추가) ----
-    // 지금 화면에 보이는 매출 보고(선택된 탭) ~ 워크인/미스까지를 그대로 캡쳐해서 PNG 파일로
-    // 다운로드해줌 - 카카오톡 등에 캡쳐 이미지 보내던 걸 그대로 버튼 하나로 대신함.
+    // ---- "이미지 복사" (링크 대신 캡쳐 이미지 그대로 보내고 싶다는 피드백으로 추가, 이후 "저장한 걸
+    // 다시 열어서 복사하는 게 번거롭다"는 피드백으로 파일 저장 대신 클립보드로 바로 복사하도록 수정) ----
+    // 지금 화면에 보이는 매출 보고(선택된 탭) ~ 워크인/미스까지를 그대로 캡쳐해서 이미지를 만든 뒤,
+    // 파일로 저장하지 않고 바로 클립보드에 복사함 - 카카오톡 단톡방 등에서 Ctrl+V(붙여넣기)만 하면 됨.
+    // 클립보드 복사가 안 되는 구형 브라우저·권한 거부 상황에서는 예전처럼 파일 다운로드로 대신함.
     // 공유 링크 관련 버튼/패널(no-capture 클래스)은 이미지에는 안 나오게 뺌.
     document.getElementById('saveImageBtn').addEventListener('click', async () => {
       const btn = document.getElementById('saveImageBtn');
       if (typeof html2canvas !== 'function') {
-        alert('이미지 저장 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.');
+        alert('이미지 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.');
         return;
       }
       btn.disabled = true;
@@ -893,17 +906,50 @@
           backgroundColor: '#f8fafc',
           scale: 2,
           useCORS: true,
-          ignoreElements: (el) => el.classList && el.classList.contains('no-capture')
+          ignoreElements: (el) => el.classList && el.classList.contains('no-capture'),
+          // html2canvas는 <input> 안의 글자를 캔버스에 직접 그리는데, 이 계산이 부정확해서 문의
+          // 경로/워크인 칸의 숫자가 위아래로 살짝 잘려 보이는 문제가 있었음("복사해서 붙여넣기하면
+          // 숫자가 반만 잘려 나온다"는 피드백). 그래서 캡쳐용으로 복제된 문서(onclone, 실제 화면에는
+          // 영향 없음)에서만 입력칸을 일반 텍스트 칸으로 바꿔치기해서 글자가 온전히 다 보이게 함.
+          onclone: (clonedDoc) => {
+            clonedDoc.querySelectorAll('input.sheet-input').forEach((inp) => {
+              const val = inp.value;
+              const div = clonedDoc.createElement('div');
+              div.textContent = val !== '' ? val : (inp.placeholder || '');
+              div.style.cssText =
+                'width:100%; box-sizing:border-box; padding:5px 6px; font-size:12px; ' +
+                'border:1px solid #e2e8f0; border-radius:6px; background:#ffffff; ' +
+                `color:${val !== '' ? '#0f172a' : '#94a3b8'}; font-family:inherit; line-height:1.4;`;
+              inp.replaceWith(div);
+            });
+          }
         });
-        const today = new Date();
-        const fname = `매출보고_${today.getFullYear()}${pad2(today.getMonth() + 1)}${pad2(today.getDate())}.png`;
-        const link = document.createElement('a');
-        link.download = fname;
-        link.href = canvas.toDataURL('image/png');
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        showToast('이미지가 저장됐어요.');
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('이미지를 만들지 못했어요.');
+
+        let copied = false;
+        if (navigator.clipboard && window.ClipboardItem) {
+          try {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            copied = true;
+          } catch (clipErr) {
+            copied = false; // 권한 거부 등 - 아래에서 파일 다운로드로 대체
+          }
+        }
+
+        if (copied) {
+          showToast('이미지가 복사됐어요. 채팅창에서 Ctrl+V로 붙여넣으면 돼요.');
+        } else {
+          const today = new Date();
+          const fname = `매출보고_${today.getFullYear()}${pad2(today.getMonth() + 1)}${pad2(today.getDate())}.png`;
+          const link = document.createElement('a');
+          link.download = fname;
+          link.href = URL.createObjectURL(blob);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          showToast('이 브라우저에서는 복사가 안 돼서 파일로 대신 저장했어요.');
+        }
       } catch (err) {
         alert('이미지를 만드는 중 문제가 생겼어요: ' + err.message);
       }
