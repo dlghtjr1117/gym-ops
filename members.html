@@ -4,13 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1788493797" />
+<link rel="stylesheet" href="style.css?v=1788495086" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
   .partial-toggle { display: flex; align-items: center; gap: 5px; margin-top: 5px; font-size: 11.5px; font-weight: 400; color: var(--slate-500); cursor: pointer; }
   .partial-toggle input[type="checkbox"] { width: auto; margin: 0; }
   .partial-paid-input { margin-top: 5px; }
+  .field-sublabel { display: block; margin-top: 6px; font-size: 11.5px; font-weight: 400; color: var(--slate-500); }
   .partial-shortfall-note { font-size: 11.5px; color: var(--red-600); margin-top: 4px; display: block; }
   .receivable-card { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
   .receivable-card:last-child { margin-bottom: 0; }
@@ -101,16 +102,16 @@
           <label>메모 (특이사항)</label>
           <textarea id="m_memo" rows="2" placeholder="예: 무릎 부상 있음, 저녁 시간대 선호 등" style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
         </div>
-        <p class="muted" style="margin:0 0 8px;">상품을 고르면 시작일 기준 만료일과 금액이 자동으로 채워져요. "직접 입력"으로 두고 금액만 적어도(할인 등으로 정가와 다르게 파는 경우) 그 금액 그대로 매출로 기록돼요. 오늘 전액을 못 받으면 "오늘 일부만 결제"를 체크해서 계약금만 받고 나머지는 미수금으로 남겨두세요 — 잔금은 나중에 이 회원님 상세 화면에서 받을 수 있어요.</p>
+        <p class="muted" style="margin:0 0 8px;">상품을 고르면 시작일 기준 만료일과 정상가·오늘 결제 금액이 자동으로 채워져요(정상가만큼 오늘 다 받는 걸로 가정). "직접 입력"으로 두고 정상가만 적어도(할인 등으로 정가와 다르게 파는 경우) 그 금액 그대로 매출로 기록돼요. 오늘 전액을 못 받으면 "오늘 결제 금액"만 실제로 받은 금액으로 고쳐 적으세요 — 상품(이용권·PT 등)은 정상가 기준으로 바로 등록되고, 못 받은 나머지는 자동으로 미수금으로 남아서 나중에 이 회원님 상세 화면에서 받을 수 있어요.</p>
 
         <div class="form-grid" style="margin-bottom:10px;">
           <div class="field"><label>이용권 상품</label><select id="m_product_membership"><option value="">직접 입력</option></select></div>
           <div class="field"><label>이용권 시작일</label><input type="date" id="m_start" /></div>
           <div class="field"><label>이용권 만료일</label><input type="date" id="m_end_date" /></div>
           <div class="field">
-            <label>이용권 금액</label><input type="number" min="0" id="m_amount_membership" placeholder="원" />
-            <label class="partial-toggle"><input type="checkbox" id="m_partial_membership" /> 오늘 일부만 결제(미수금)</label>
-            <input type="number" min="0" id="m_paid_membership" placeholder="오늘 결제 금액" class="partial-paid-input" style="display:none;" />
+            <label>이용권 정상가</label><input type="number" min="0" id="m_amount_membership" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_membership" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <p class="partial-shortfall-note" id="m_shortfall_membership" style="display:none;"></p>
           </div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;">
@@ -118,9 +119,9 @@
           <div class="field"><label>그룹PT 시작일</label><input type="date" id="m_gpt_start" /></div>
           <div class="field"><label>그룹PT 만료일</label><input type="date" id="m_gpt_end" /></div>
           <div class="field">
-            <label>그룹PT 금액</label><input type="number" min="0" id="m_amount_group_pt" placeholder="원" />
-            <label class="partial-toggle"><input type="checkbox" id="m_partial_group_pt" /> 오늘 일부만 결제(미수금)</label>
-            <input type="number" min="0" id="m_paid_group_pt" placeholder="오늘 결제 금액" class="partial-paid-input" style="display:none;" />
+            <label>그룹PT 정상가</label><input type="number" min="0" id="m_amount_group_pt" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_group_pt" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <p class="partial-shortfall-note" id="m_shortfall_group_pt" style="display:none;"></p>
           </div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;">
@@ -128,9 +129,9 @@
           <div class="field"><label>개인PT 시작일</label><input type="date" id="m_pt_start" /></div>
           <div class="field"><label>개인PT 만료일</label><input type="date" id="m_pt_end" /></div>
           <div class="field">
-            <label>개인PT 금액</label><input type="number" min="0" id="m_amount_pt" placeholder="원" />
-            <label class="partial-toggle"><input type="checkbox" id="m_partial_pt" /> 오늘 일부만 결제(미수금)</label>
-            <input type="number" min="0" id="m_paid_pt" placeholder="오늘 결제 금액" class="partial-paid-input" style="display:none;" />
+            <label>개인PT 정상가</label><input type="number" min="0" id="m_amount_pt" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_pt" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <p class="partial-shortfall-note" id="m_shortfall_pt" style="display:none;"></p>
           </div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;">
@@ -138,9 +139,9 @@
           <div class="field"><label>락커 시작일</label><input type="date" id="m_locker_start" /></div>
           <div class="field"><label>락커 만료일</label><input type="date" id="m_locker_end" /></div>
           <div class="field">
-            <label>락커 금액</label><input type="number" min="0" id="m_amount_locker" placeholder="원" />
-            <label class="partial-toggle"><input type="checkbox" id="m_partial_locker" /> 오늘 일부만 결제(미수금)</label>
-            <input type="number" min="0" id="m_paid_locker" placeholder="오늘 결제 금액" class="partial-paid-input" style="display:none;" />
+            <label>락커 정상가</label><input type="number" min="0" id="m_amount_locker" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_locker" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <p class="partial-shortfall-note" id="m_shortfall_locker" style="display:none;"></p>
           </div>
         </div>
         <div class="form-grid" style="margin-bottom:14px;">
@@ -148,9 +149,9 @@
           <div class="field"><label>운동복 시작일</label><input type="date" id="m_clothes_start" /></div>
           <div class="field"><label>운동복 만료일</label><input type="date" id="m_clothes_end" /></div>
           <div class="field">
-            <label>운동복 금액</label><input type="number" min="0" id="m_amount_clothes" placeholder="원" />
-            <label class="partial-toggle"><input type="checkbox" id="m_partial_clothes" /> 오늘 일부만 결제(미수금)</label>
-            <input type="number" min="0" id="m_paid_clothes" placeholder="오늘 결제 금액" class="partial-paid-input" style="display:none;" />
+            <label>운동복 정상가</label><input type="number" min="0" id="m_amount_clothes" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_clothes" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <p class="partial-shortfall-note" id="m_shortfall_clothes" style="display:none;"></p>
           </div>
         </div>
 
@@ -318,9 +319,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788493797"></script>
-  <script src="auth.js?v=1788493797"></script>
-  <script src="data.js?v=1788493797"></script>
+  <script src="config.js?v=1788495086"></script>
+  <script src="auth.js?v=1788495086"></script>
+  <script src="data.js?v=1788495086"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -1091,52 +1092,47 @@
     const NEW_MEMBER_SALE_CATEGORY = {
       membership: 'membership_new', group_pt: 'group_pt_new', pt: 'pt_new', locker: 'locker', clothes: 'clothes'
     };
-    // 미수금(분할 결제) 체크박스/오늘 결제 금액 입력칸 - "정상가로 등록은 하되 오늘은 일부만 받는" 경우에 씀
-    const PARTIAL_CHECKBOX_IDS = {
-      membership: 'm_partial_membership', group_pt: 'm_partial_group_pt', pt: 'm_partial_pt',
-      locker: 'm_partial_locker', clothes: 'm_partial_clothes'
-    };
+    // 미수금(분할 결제) "오늘 결제 금액" 입력칸 - "정상가로 등록은 하되 오늘은 일부만 받는" 경우에 씀.
+    // 비워두면 정상가와 같은 걸로(=전액 결제) 취급함.
     const PAID_INPUT_IDS = {
       membership: 'm_paid_membership', group_pt: 'm_paid_group_pt', pt: 'm_paid_pt',
       locker: 'm_paid_locker', clothes: 'm_paid_clothes'
     };
+    const SHORTFALL_NOTE_IDS = {
+      membership: 'm_shortfall_membership', group_pt: 'm_shortfall_group_pt', pt: 'm_shortfall_pt',
+      locker: 'm_shortfall_locker', clothes: 'm_shortfall_clothes'
+    };
     const CATEGORY_KOREAN_LABEL = { membership: '이용권', group_pt: '그룹PT', pt: '개인PT', locker: '락커', clothes: '운동복' };
 
-    // 카테고리 하나의 "오늘 결제 금액"을 계산 - 미수금 체크를 안 했으면 금액칸 값 그대로(전액 결제),
-    // 체크했으면 별도 입력칸 값(정상가보다 많이는 못 받게 정상가로 눌러줌)
+    // 카테고리 하나의 "오늘 결제 금액"을 계산 - 오늘 결제 금액 칸을 비워뒀으면 정상가와 같은 것(전액 결제)으로 취급,
+    // 적었으면 그 값 그대로(정상가보다 많이는 못 받게 정상가로 눌러줌)
     function paidAmountFor(category) {
       const amount = Number(document.getElementById(AMOUNT_INPUT_IDS[category]).value || 0);
-      const checkbox = document.getElementById(PARTIAL_CHECKBOX_IDS[category]);
-      if (!checkbox || !checkbox.checked) return amount;
       const paidRaw = document.getElementById(PAID_INPUT_IDS[category]).value;
-      let paid = paidRaw === '' ? 0 : Number(paidRaw);
+      if (paidRaw === '') return amount;
+      let paid = Number(paidRaw);
       if (!Number.isFinite(paid) || paid < 0) paid = 0;
       if (paid > amount) paid = amount;
       return paid;
     }
 
-    // 미수금 체크박스를 토글하면 "오늘 결제 금액" 칸을 보였다 숨겼다 함 (체크 해제하면 항상 전액 결제로 취급)
-    Object.keys(PARTIAL_CHECKBOX_IDS).forEach(category => {
-      const checkbox = document.getElementById(PARTIAL_CHECKBOX_IDS[category]);
-      const paidInput = document.getElementById(PAID_INPUT_IDS[category]);
-      checkbox.addEventListener('change', () => {
-        paidInput.style.display = checkbox.checked ? '' : 'none';
-        if (checkbox.checked && paidInput.value === '') {
-          paidInput.value = document.getElementById(AMOUNT_INPUT_IDS[category]).value || '';
-        }
-        updateAddMemberTotal();
-      });
-      paidInput.addEventListener('input', updateAddMemberTotal);
-    });
-
-    // 이용권/그룹PT/개인PT/락커/운동복 금액 칸 5개를 합쳐서 "합계 ○○원"으로 보여줌 - 미수금(분할 결제)
-    // 체크가 하나라도 있으면 "오늘 실제로 받을 합계"와 "정상가 합계·미수금 합계"를 따로 보여줌
+    // 이용권/그룹PT/개인PT/락커/운동복 금액 칸 5개를 합쳐서 "합계 ○○원"으로 보여줌 - "오늘 결제 금액"이
+    // 정상가보다 하나라도 적으면 "오늘 실제로 받을 합계"와 "정상가 합계·미수금 합계"를 따로 보여주고,
+    // 카테고리별로도 "미수금 ○○원" 안내 문구를 바로 아래에 띄워줌
     function updateAddMemberTotal() {
       let totalContract = 0, totalPaid = 0;
       Object.keys(AMOUNT_INPUT_IDS).forEach(category => {
         const amount = Number(document.getElementById(AMOUNT_INPUT_IDS[category]).value || 0);
+        const paid = paidAmountFor(category);
         totalContract += Number.isFinite(amount) ? amount : 0;
-        totalPaid += paidAmountFor(category);
+        totalPaid += paid;
+        const note = document.getElementById(SHORTFALL_NOTE_IDS[category]);
+        if (amount > 0 && paid < amount) {
+          note.textContent = `미수금 ${formatWon(amount - paid)}`;
+          note.style.display = 'block';
+        } else {
+          note.style.display = 'none';
+        }
       });
       const el = document.getElementById('m_sale_total');
       if (totalPaid < totalContract) {
@@ -1145,8 +1141,9 @@
         el.textContent = `합계 ${formatWon(totalContract)}`;
       }
     }
-    Object.values(AMOUNT_INPUT_IDS).forEach(id => {
-      document.getElementById(id).addEventListener('input', updateAddMemberTotal);
+    Object.keys(AMOUNT_INPUT_IDS).forEach(category => {
+      document.getElementById(AMOUNT_INPUT_IDS[category]).addEventListener('input', updateAddMemberTotal);
+      document.getElementById(PAID_INPUT_IDS[category]).addEventListener('input', updateAddMemberTotal);
     });
     async function loadProductQuickFill() {
       try {
@@ -1186,10 +1183,12 @@
       selectEl.addEventListener('change', () => {
         recalcCategoryFill(category);
         // 상품을 바꾸면 금액도 그 상품 가격으로 다시 채워줌 (직접 입력으로 돌아가면 금액은 비워둠)
+        // "오늘 결제 금액"도 같이 비워서 일단 전액 결제로 가정함 (필요하면 그 아래 칸에서 일부만 받은 걸로 고치면 됨)
         const amountInputId = AMOUNT_INPUT_IDS[category];
         if (amountInputId) {
           const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
           document.getElementById(amountInputId).value = (product && product.price != null) ? product.price : '';
+          document.getElementById(PAID_INPUT_IDS[category]).value = '';
           updateAddMemberTotal();
         }
       });
@@ -1737,10 +1736,7 @@
       });
       document.getElementById('m_sale_date').value = today; // 판매 날짜(결제일)도 기본은 오늘 (항목별 시작일과는 별개 값)
       document.getElementById('m_sale_time').value = nowTimeStr(); // 판매 시각도 여는 시점의 현재 시각으로 미리 채워둠
-      // form.reset()은 체크박스는 기본값(해제)으로 되돌리지만, JS로 토글해둔 "오늘 결제 금액" 칸의
-      // display 스타일까지는 안 건드려서 그대로 보일 수 있음 - 직접 다시 숨겨줌
-      Object.values(PAID_INPUT_IDS).forEach(id => { document.getElementById(id).style.display = 'none'; });
-      updateAddMemberTotal(); // reset()으로 금액 칸들이 비워진 뒤라 합계도 0원으로 다시 표시
+      updateAddMemberTotal(); // reset()으로 금액 칸들이 비워진 뒤라 합계·미수금 안내 문구도 다시 정리해서 표시
       document.getElementById('addMemberOverlay').style.display = 'flex';
       document.getElementById('m_name').focus();
     }
