@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 매출 입력</title>
-<link rel="stylesheet" href="style.css?v=1788500937" />
+<link rel="stylesheet" href="style.css?v=1788501536" />
 </head>
 <body>
   <div class="topbar">
@@ -87,9 +87,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788500937"></script>
-  <script src="auth.js?v=1788500937"></script>
-  <script src="data.js?v=1788500937"></script>
+  <script src="config.js?v=1788501536"></script>
+  <script src="auth.js?v=1788501536"></script>
+  <script src="data.js?v=1788501536"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -277,8 +277,13 @@
         });
         successBox.textContent = '매출이 등록되었습니다.';
         successBox.style.display = 'block';
+        // 날짜 칸은 방금 등록에 쓴 값을 그대로 유지함(오늘 날짜로 강제로 되돌리지 않음) - 예를 들어 어제(9/3)
+        // 날짜로 여러 명을 몰아서 등록할 때, 한 번 9/3으로 바꾸고 나면 계속 9/3이 유지돼서 매번 다시
+        // 바꿀 필요가 없음. (전에는 등록할 때마다 오늘 날짜로 리셋돼서, 두 번째 사람부터 날짜를 다시
+        // 안 바꾸면 실수로 오늘 날짜로 등록되는 문제가 있었음)
+        const usedDate = document.getElementById('s_date').value;
         document.getElementById('addSaleForm').reset();
-        document.getElementById('s_date').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('s_date').value = usedDate || new Date().toISOString().slice(0, 10);
         document.getElementById('s_time').value = nowTimeStr();
         if (currentUserId) document.getElementById('s_staff').value = currentUserId; // reset()은 담당자를 첫 옵션으로 되돌리므로 다시 본인으로 맞춰줌
         loadSales(true); // 방금 등록한 매출이 바로 보이도록 1페이지로 리셋
