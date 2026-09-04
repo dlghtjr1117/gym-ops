@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 지표 분석</title>
-<link rel="stylesheet" href="style.css?v=1788503076" />
+<link rel="stylesheet" href="style.css?v=1788514144" />
 <style>
   /* 이 페이지 전용 - 지표 카드 5개를 한 줄에(좁은 화면에선 2줄/1줄로) */
   .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
@@ -24,13 +24,13 @@
   .rec-card .rec-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
   .rec-card .rec-detail { font-size: 13px; line-height: 1.5; }
   .rec-critical { background: #fef2f2; border-color: #fecaca; }
-  .rec-critical .rec-title { color: var(--red-600); }
+  .rec-critical .rec-title { color: #dc2626; }
   .rec-critical .rec-detail { color: #7f1d1d; }
   .rec-warning { background: #fffbeb; border-color: #fde68a; }
   .rec-warning .rec-title { color: #92400e; }
   .rec-warning .rec-detail { color: #78350f; }
   .rec-good { background: #f0fdf4; border-color: #bbf7d0; }
-  .rec-good .rec-title { color: var(--green-600); }
+  .rec-good .rec-title { color: #16a34a; }
   .rec-good .rec-detail { color: #14532d; }
 
   #trendTable td, #trendTable th { text-align: right; white-space: nowrap; }
@@ -168,9 +168,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788503076"></script>
-  <script src="auth.js?v=1788503076"></script>
-  <script src="data.js?v=1788503076"></script>
+  <script src="config.js?v=1788514144"></script>
+  <script src="auth.js?v=1788514144"></script>
+  <script src="data.js?v=1788514144"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
