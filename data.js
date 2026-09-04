@@ -590,11 +590,23 @@ async function registerRenewal({ memberId, staffId, category, newEndDate, ptRema
 // 이번 달 상품별(헬스이용권/그룹PT/개인PT) 재등록 현황 - 만료회원·TM 페이지에서 상품별로
 // 남긴 TM 기록(category 컬럼)을 기준으로 실제 재등록률을 계산함.
 // category 없이 저장된 옛날 기록(이 기능 추가 이전 기록)은 어느 상품인지 알 수 없어서 집계에서 제외됨.
-async function fetchCategoryRenewalStats() {
-  const now = new Date();
-  const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+// monthStr('YYYY-MM')을 넘기면 그 달만, 안 넘기면 실제 오늘이 속한 달을 기준으로 함
+// (원래는 gte만 있고 상한이 없어서 "이번 달 이후 전부"를 가져오는 셈이었는데, 대시보드에서 매출 보고
+// 화살표로 지난 달을 돌아볼 때 그 달 하나만 정확히 집계되도록 lt(다음 달 1일)도 같이 넣음)
+async function fetchCategoryRenewalStats(monthStr) {
+  let y, m;
+  if (monthStr) {
+    [y, m] = monthStr.split('-').map(Number);
+  } else {
+    const now = new Date();
+    y = now.getFullYear();
+    m = now.getMonth() + 1;
+  }
+  const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
+  const nextMonthDate = new Date(y, m, 1); // m은 1~12라 그대로 넣으면 다음 달 1일이 됨
+  const nextMonthFirstDay = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/tm_logs?select=status,category&contact_date=gte.${firstDay}&category=not.is.null`,
+    `${SUPABASE_URL}/rest/v1/tm_logs?select=status,category&contact_date=gte.${firstDay}&contact_date=lt.${nextMonthFirstDay}&category=not.is.null`,
     { headers: await authHeaders() }
   );
   if (!res.ok) await throwApiError(res, '상품별 재등록 현황을 불러오지 못했습니다.');

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788481372" />
+<link rel="stylesheet" href="style.css?v=1788483294" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -97,7 +97,7 @@
         </div>
       </div>
 
-      <p class="muted" style="margin:18px 0 8px;font-size:13px;font-weight:600;">📅 이번 달 매출 (항상 이번 달 고정)</p>
+      <p class="muted" style="margin:18px 0 8px;font-size:13px;font-weight:600;" id="monthSummaryLabel">📅 이번 달 매출</p>
       <div class="hero-grid" id="monthSummaryGrid">
         <div class="hero-card hero-blue">
           <div class="hero-icon">💰</div>
@@ -126,7 +126,7 @@
     </div>
 
     <div class="section">
-      <h2>이번 달 상품별 재등록 현황 <span class="muted" style="font-weight:400;font-size:12px;">(만료회원·TM 상태 기준)</span></h2>
+      <h2><span id="categoryRenewalMonthLabel">이번 달 상품별 재등록 현황</span> <span class="muted" style="font-weight:400;font-size:12px;">(만료회원·TM 상태 기준)</span></h2>
       <div class="grid-3" id="categoryRenewalGrid">
         <div class="stat-card">
           <div class="label">헬스이용권 (FC)</div>
@@ -195,7 +195,7 @@
     </div>
 
     <div class="section">
-      <h2>상담 워크인 / 미스 <span class="muted" style="font-weight:400;font-size:12px;">(이번 달, 주차별)</span></h2>
+      <h2>상담 워크인 / 미스 <span class="muted" style="font-weight:400;font-size:12px;" id="workinMonthLabel">(이번 달, 주차별)</span></h2>
       <p class="muted" style="margin:-6px 0 12px;font-size:13px;">그날그날 상담(워크인) 결과를 성공/실패로 세는 표예요. 월요일 시작 기준 실제 달력 주차로 나뉘고, 이번 달에 해당하지 않는 칸은 회색으로 비활성 처리돼요. 칸을 클릭해서 숫자만 입력하면 자동 저장돼요.</p>
 
       <div style="overflow-x:auto;">
@@ -230,9 +230,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788481372"></script>
-  <script src="auth.js?v=1788481372"></script>
-  <script src="data.js?v=1788481372"></script>
+  <script src="config.js?v=1788483294"></script>
+  <script src="auth.js?v=1788483294"></script>
+  <script src="data.js?v=1788483294"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -351,36 +351,45 @@
       }
     }
 
+    // 매출 보고 탭/화살표로 기준 날짜가 바뀔 때마다 "매출 보고" 카드 하나만이 아니라, 그 날짜가 속한
+    // 달을 같이 보는 이번 달 매출/상품별 재등록 현황/워크인·미스까지 같이 새로고침함 ("월간매출로 10월로
+    // 넘겨도 다른 숫자는 그대로다"라는 피드백으로 추가 - 이제는 화살표로 다른 달을 보면 이 셋도 그 달
+    // 기준으로 같이 바뀜)
+    function onReportNav() {
+      loadReport();
+      refreshMonthPinnedSections();
+    }
+
     document.querySelectorAll('.report-tab').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.report-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         reportMode = btn.dataset.mode;
-        loadReport();
+        onReportNav();
       });
     });
     document.getElementById('reportPrevBtn').addEventListener('click', () => {
       reportRefDate = reportMode === 'daily' ? addDays(reportRefDate, -1)
         : reportMode === 'weekly' ? addDays(reportRefDate, -7)
         : addMonths(reportRefDate, -1);
-      loadReport();
+      onReportNav();
     });
     document.getElementById('reportNextBtn').addEventListener('click', () => {
       reportRefDate = reportMode === 'daily' ? addDays(reportRefDate, 1)
         : reportMode === 'weekly' ? addDays(reportRefDate, 7)
         : addMonths(reportRefDate, 1);
-      loadReport();
+      onReportNav();
     });
     document.getElementById('reportTodayBtn').addEventListener('click', () => {
       reportRefDate = new Date();
-      loadReport();
+      onReportNav();
     });
     document.getElementById('reportDatePicker').addEventListener('change', (e) => {
       if (!e.target.value) return;
       reportRefDate = parseDateStr(e.target.value);
-      loadReport();
+      onReportNav();
     });
-    loadReport();
+    onReportNav();
 
     // ---- 최근 매출 내역 (5건씩 페이지 넘김) ----
     // 한 번에 넉넉히 불러온 뒤 화면에서 5건씩 잘라서 보여줌 (매번 서버에 다시 요청할 필요 없게)
@@ -439,28 +448,19 @@
       const subEl = document.getElementById(`renewal${suffix}Sub`);
       if (!stat || stat.total === 0) {
         valueEl.textContent = '-';
-        subEl.textContent = '이번 달 TM 기록 없음';
+        subEl.textContent = '이 달 TM 기록 없음';
         return;
       }
       valueEl.textContent = `${stat.rate}%`;
       subEl.textContent = `${stat.total}건 중 재등록 ${stat.renewed}건`;
     }
 
-    (async () => {
-      try {
-        const stats = await fetchCategoryRenewalStats();
-        fillCategoryRenewalCard('Membership', stats.membership);
-        fillCategoryRenewalCard('GroupPt', stats.group_pt);
-        fillCategoryRenewalCard('Pt', stats.pt);
-      } catch (err) {
-        document.getElementById('categoryRenewalGrid').innerHTML =
-          `<div class="error-text" style="display:block; grid-column:1/-1;">${err.message}</div>`;
-      }
-    })();
-
-    // ---- 이번 달 매출 요약 (대표님 보고용 - 항상 "이번 달" 고정, 날짜 이동 없음) ----
-    // 위 매출 보고(일간/주간/월간) 탭이 기본으로 "일간"(=오늘)을 보여주므로 오늘 매출은 거기서 이미 보임.
-    // 여기서는 굳이 탭을 "월간"으로 옮기지 않아도 이번 달 총액이 바로 같이 보이도록 고정 카드만 하나 더 둠.
+    // ---- 이번 달 매출 요약 / 상품별 재등록 현황 / 워크인·미스 (매출 보고 화살표로 보는 기준월을 그대로 따라감) ----
+    // 원래는 셋 다 "항상 실제 오늘 날짜의 이번 달"에 고정이었는데, "매출 보고 탭에서 화살표로 7월,8월
+    // 데이터를 보고 싶은데 왜 이 카드들은 그대로냐"는 피드백을 받고, 화살표(일간/주간/월간 어떤 모드든)로
+    // 지금 보고 있는 날짜(reportRefDate)가 속한 달을 그대로 따라가도록 바꿈 - 즉 위 매출 보고 탭에서
+    // 8월로 이동하면 이 카드들도 전부 "2026년 8월" 기준으로 같이 바뀜. (문의 경로/최근 매출 내역은 그대로
+    // "오늘"/"가장 최근"을 보여주는 별개 위젯이라 안 건드림 - 자세한 이유는 README 참고)
     async function computeSalesBucket(startStr, endStr) {
       const sales = await fetchSalesInRange(startStr, endStr);
       let totalAmount = 0, fcAmount = 0, ptAmount = 0, fcCount = 0, ptCount = 0;
@@ -482,9 +482,27 @@
       document.getElementById(`${prefix}PtCount`).textContent = `${bucket.ptCount}건`;
     }
 
-    async function loadMonthSummary() {
-      const today = new Date();
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    // 매출 보고 화살표로 지금 보고 있는 기준월(reportRefDate가 속한 달)을 문자열로 반환
+    function refMonthStr() {
+      return `${reportRefDate.getFullYear()}-${String(reportRefDate.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    // 이번 달 매출 카드 + 상품별 재등록 현황 + 워크인/미스 표를 전부 지금 보고 있는 기준월로 새로고침.
+    // 매출 보고 화살표(◀▶)로 날짜/주/달을 옮길 때마다(어떤 모드든 - 일간 화살표로 달을 넘어가도 포함)
+    // 호출됨. 세 군데 제목에 몇 년 몇 월인지 항상 숫자로 같이 보여줘서, 지금 보고 있는 게 실제 오늘인지
+    // 다른 달인지 헷갈리지 않게 함.
+    async function refreshMonthPinnedSections() {
+      const y = reportRefDate.getFullYear();
+      const m = reportRefDate.getMonth();
+      const monthLabel = `${y}년 ${m + 1}월`;
+      const monthStr = refMonthStr();
+      const monthStart = new Date(y, m, 1);
+      const isCurrentRealMonth = monthStr === currentMonthStr();
+      const suffix = isCurrentRealMonth ? ' (이번 달)' : '';
+
+      document.getElementById('monthSummaryLabel').textContent = `📅 ${monthLabel} 매출${suffix}`;
+      document.getElementById('categoryRenewalMonthLabel').textContent = `${monthLabel} 상품별 재등록 현황${suffix}`;
+
       try {
         const monthBucket = await computeSalesBucket(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
         fillSummaryCards('month', monthBucket);
@@ -492,8 +510,25 @@
         document.getElementById('monthTotalAmount').textContent = '오류';
         document.getElementById('monthTotalCount').textContent = err.message;
       }
+
+      try {
+        const stats = await fetchCategoryRenewalStats(monthStr);
+        fillCategoryRenewalCard('Membership', stats.membership);
+        fillCategoryRenewalCard('GroupPt', stats.group_pt);
+        fillCategoryRenewalCard('Pt', stats.pt);
+      } catch (err) {
+        document.getElementById('categoryRenewalGrid').innerHTML =
+          `<div class="error-text" style="display:block; grid-column:1/-1;">${err.message}</div>`;
+      }
+
+      try {
+        workinCache = await fetchWorkinResults(monthStr);
+      } catch (err) {
+        workinCache = [];
+        document.getElementById('workinBody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+      renderWorkinTable();
     }
-    loadMonthSummary();
 
     // ---- 문의 경로 (센터 전체 공용, 오늘 칸만 기본 노출 - 원래 PT 관리 페이지에 있던 걸 대표님 보고
     // 화면인 이 페이지로 옮겼는데, "표가 너무 길다"는 피드백을 받아서 기본은 오늘 한 줄만 보이게 바꿈.
@@ -661,8 +696,17 @@
 
     function renderWorkinTable() {
       const tbody = document.getElementById('workinBody');
-      const today = new Date();
-      const buckets = weekBucketsForMonth(today.getFullYear(), today.getMonth());
+      // 매출 보고 화살표로 지금 보고 있는 기준월(reportRefDate)을 그대로 따라감 - "이번 달"이 아니라
+      // 지금 화면에서 보고 있는 달의 워크인/미스 기록을 그리는 것 (refreshMonthPinnedSections에서
+      // workinCache를 이미 이 달 기준으로 불러온 상태에서 호출됨)
+      const refYear = reportRefDate.getFullYear();
+      const refMonth = reportRefDate.getMonth();
+      const buckets = weekBucketsForMonth(refYear, refMonth);
+      // 달이 바뀌어도 "이번 달"이라는 문구만 그대로 있으면 실제로 갱신된 건지 눈으로 확인이 안 돼서
+      // 몇 년 몇 월인지 숫자로 같이 보여줌 (9월->10월로 안 넘어가는 것처럼 보인다는 피드백 때문에 추가)
+      const workinMonthLabelEl = document.getElementById('workinMonthLabel');
+      const isCurrentRealMonth = `${refYear}-${String(refMonth + 1).padStart(2, '0')}` === currentMonthStr();
+      if (workinMonthLabelEl) workinMonthLabelEl.textContent = `(${refYear}년 ${refMonth + 1}월, 주차별${isCurrentRealMonth ? ' · 이번 달' : ''})`;
 
       let grandSuccess = 0, grandFail = 0;
       let html = '';
@@ -717,15 +761,8 @@
       inputEl.disabled = false;
     }
 
-    (async () => {
-      try {
-        workinCache = await fetchWorkinResults(currentMonthStr());
-      } catch (err) {
-        workinCache = [];
-        document.getElementById('workinBody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
-      }
-      renderWorkinTable();
-    })();
+    // 워크인/미스 표의 최초 데이터 로딩은 매출 보고 화살표와 같은 기준월을 쓰는 refreshMonthPinnedSections()
+    // 쪽에서 한 번에 처리함(중복 호출 방지) - 아래 loadReport()/refreshMonthPinnedSections() 최초 호출 참고.
 
     // ---- 매출 보고 공유 링크 ("캡쳐해서 보내지 말고 링크로 보여줄 수 있게" 요청으로 추가) ----
     // 처음엔 일간/주간/월간을 다 한 번에 펼쳐서 보여주는 식으로 만들었는데, "그렇게 말고 그냥 저
@@ -761,14 +798,18 @@
       report.title = REPORT_MODE_TITLE[reportMode];
       report.periodLabel = getReportPeriodLabel(start, end);
 
-      // 이번 달 매출(항상 이번 달 고정 카드) - 매출 보고 탭과 별개로 대시보드에 항상 같이 떠 있는 것
+      // 이번 달 매출 카드 - 지금 화면에서 보고 있는 기준월(reportRefDate가 속한 달, 화살표로 옮긴 경우
+      // 그 달)을 그대로 씀. 문의 경로만 실제 오늘(today) 기준으로 따로 찍음(문의 경로는 화살표 이동 대상이
+      // 아니라 항상 "오늘 칸"만 보여주는 별개 위젯이라서)
       const today = new Date();
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const refYear = reportRefDate.getFullYear();
+      const refMonth = reportRefDate.getMonth();
+      const monthStart = new Date(refYear, refMonth, 1);
       const monthSummary = await computeSalesBucket(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
 
-      // 이번 달 상품별 재등록 현황
+      // 상품별 재등록 현황 (지금 보고 있는 기준월)
       let categoryRenewal = null;
-      try { categoryRenewal = await fetchCategoryRenewalStats(); } catch (err) { categoryRenewal = null; }
+      try { categoryRenewal = await fetchCategoryRenewalStats(refMonthStr()); } catch (err) { categoryRenewal = null; }
 
       // 최근 매출 내역 - 화면에 이미 불러와둔 캐시를 그대로 씀(대시보드에 보이는 것과 같은 데이터)
       const recentSales = recentSalesAll.map(s => ({
@@ -789,7 +830,9 @@
         return { label: cat.label, channels, total };
       });
 
-      const buckets = weekBucketsForMonth(today.getFullYear(), today.getMonth());
+      // 워크인/미스 - workinCache는 이미 refreshMonthPinnedSections()에서 reportRefDate 기준월로
+      // 불러와둔 상태라 화면에 보이는 것과 그대로 같은 데이터를 씀
+      const buckets = weekBucketsForMonth(refYear, refMonth);
       let grandSuccess = 0, grandFail = 0;
       const workinWeeks = buckets.map(week => {
         const weekDates = WORKIN_WEEKDAYS.map(wd => week.dates[wd.dow] || null);
@@ -822,7 +865,7 @@
         categoryRenewal,
         recentSales,
         inquiry: { dateStr: todayStr, rows: inquiryRows },
-        workin: { monthLabel: `${today.getFullYear()}년 ${today.getMonth() + 1}월`, weeks: workinWeeks, totalSuccess: grandSuccess, totalFail: grandFail }
+        workin: { monthLabel: `${refYear}년 ${refMonth + 1}월`, weeks: workinWeeks, totalSuccess: grandSuccess, totalFail: grandFail }
       };
     }
 
@@ -996,12 +1039,15 @@
     // "오늘" 칸은 날짜가 바뀌면 자동으로 새로 비워져야 하는데, 페이지를 새로고침하지 않고 브라우저
     // 탭을 밤새 그대로 켜놓고 있으면(사무실 컴퓨터에서 흔한 경우) 자정이 지나도 이 화면이 다시 그려질
     // 계기가 없어서 어제 날짜 그대로 남아있는 문제가 있었음 — 1분마다, 그리고 탭을 다시 보게 될 때마다
-    // 날짜가 바뀌었는지 확인해서 바뀌었으면 서버에서 다시 불러와 새로 그리도록 고침. 상담 워크인 표는
-    // "오늘 칸"은 아니지만 달이 바뀌면 이번 달 주차 구성 자체가 바뀌어야 하므로 같이 새로고침함.
+    // 날짜가 바뀌었는지 확인해서 바뀌었으면 서버에서 다시 불러와 새로 그리도록 고침.
     let inquiryLastCheckedDate = toDateStr(new Date());
     async function refreshInquiryIfDateChanged() {
       const nowStr = toDateStr(new Date());
       if (nowStr === inquiryLastCheckedDate) return;
+      // 워크인/이번 달 매출 등은 매출 보고 화살표로 보고 있는 기준일(reportRefDate)이 자정 직전까지
+      // "오늘"과 같았을 때만 자동으로 새 오늘을 따라가게 함 - 만약 사용자가 화살표로 지난달 등 다른
+      // 시점을 보고 있는 중이었다면, 자정이 지났다고 화면이 갑자기 오늘로 바뀌어버리면 안 되니까 그대로 둠.
+      const wasViewingToday = toDateStr(reportRefDate) === inquiryLastCheckedDate;
       inquiryLastCheckedDate = nowStr;
       try {
         inquiryCache = await fetchMarketingInquiries(currentMonthStr());
@@ -1010,11 +1056,9 @@
       } catch (err) {
         // 실패하면 다음 체크 때 다시 시도 (기존 캐시는 그대로 둠)
       }
-      try {
-        workinCache = await fetchWorkinResults(currentMonthStr());
-        renderWorkinTable();
-      } catch (err) {
-        // 마찬가지로 실패하면 다음 체크 때 재시도
+      if (wasViewingToday) {
+        reportRefDate = new Date();
+        onReportNav();
       }
     }
     setInterval(refreshInquiryIfDateChanged, 60 * 1000);
