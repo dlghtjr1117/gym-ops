@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788483294" />
+<link rel="stylesheet" href="style.css?v=1788484241" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -175,7 +175,7 @@
       <button type="button" class="btn-link" id="inquiryHistoryToggleBtn" style="margin-top:12px;">지난 기록 보기 ▾</button>
 
       <div id="inquiryHistoryWrap" style="display:none; margin-top:12px;">
-        <p class="muted" style="margin:0 0 10px;font-size:12.5px;">이번 달 날짜별 기록이에요. 예전 날짜 숫자를 잘못 입력했으면 여기서 바로 고칠 수 있어요.</p>
+        <p class="muted" style="margin:0 0 10px;font-size:12.5px;" id="inquiryHistoryLabel">날짜별 기록이에요. 예전 날짜 숫자를 잘못 입력했으면 여기서 바로 고칠 수 있어요.</p>
 
         <div class="filter-tabs" id="inquiryCategoryTabs" style="margin-bottom:12px;">
           <button type="button" class="filter-tab active" data-cat="gym" onclick="switchInquiryCategory('gym')">🏋️ 헬스 (이용권·1:1PT)</button>
@@ -230,9 +230,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788483294"></script>
-  <script src="auth.js?v=1788483294"></script>
-  <script src="data.js?v=1788483294"></script>
+  <script src="config.js?v=1788484241"></script>
+  <script src="auth.js?v=1788484241"></script>
+  <script src="data.js?v=1788484241"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -456,11 +456,13 @@
     }
 
     // ---- 이번 달 매출 요약 / 상품별 재등록 현황 / 워크인·미스 (매출 보고 화살표로 보는 기준월을 그대로 따라감) ----
-    // 원래는 셋 다 "항상 실제 오늘 날짜의 이번 달"에 고정이었는데, "매출 보고 탭에서 화살표로 7월,8월
+    // 원래는 넷 다 "항상 실제 오늘 날짜의 이번 달"에 고정이었는데, "매출 보고 탭에서 화살표로 7월,8월
     // 데이터를 보고 싶은데 왜 이 카드들은 그대로냐"는 피드백을 받고, 화살표(일간/주간/월간 어떤 모드든)로
     // 지금 보고 있는 날짜(reportRefDate)가 속한 달을 그대로 따라가도록 바꿈 - 즉 위 매출 보고 탭에서
-    // 8월로 이동하면 이 카드들도 전부 "2026년 8월" 기준으로 같이 바뀜. (문의 경로/최근 매출 내역은 그대로
-    // "오늘"/"가장 최근"을 보여주는 별개 위젯이라 안 건드림 - 자세한 이유는 README 참고)
+    // 8월로 이동하면 이 카드들도 전부 "2026년 8월" 기준으로 같이 바뀜. 문의 경로의 "지난 기록 보기" 표도
+    // 나중에 데이터 추적/분석에 쓸 거라며 같이 따라가게 해달라는 요청을 받아서 포함시킴(단, "오늘 칸"은
+    // 그 성격상 실제 오늘 날짜에만 입력하는 게 맞아서 계속 실제 오늘 기준 - 아래 refreshInquiryHistory
+    // 참고). 최근 매출 내역만 "가장 최근 활동"이라는 별개 용도라 그대로 둠 - 자세한 이유는 README 참고.
     async function computeSalesBucket(startStr, endStr) {
       const sales = await fetchSalesInRange(startStr, endStr);
       let totalAmount = 0, fcAmount = 0, ptAmount = 0, fcCount = 0, ptCount = 0;
@@ -528,6 +530,8 @@
         document.getElementById('workinBody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
       renderWorkinTable();
+
+      await refreshInquiryHistory();
     }
 
     // ---- 문의 경로 (센터 전체 공용, 오늘 칸만 기본 노출 - 원래 PT 관리 페이지에 있던 걸 대표님 보고
@@ -541,7 +545,11 @@
       { key: 'kakao', label: '카카오' },
       { key: 'carrot', label: '당근' }
     ];
-    let inquiryCache = [];
+    let inquiryCache = []; // "오늘 칸" 전용 - 항상 실제 오늘이 속한 달의 기록(날짜가 바뀌면 자동 새로고침)
+    // "지난 기록 보기" 표 전용 - 매출 보고 화살표로 지금 보고 있는 기준월(reportRefDate)을 따라감
+    // ("워크인처럼 문의 경로도 지난 달을 같이 볼 수 있게 해달라"는 요청으로 추가)
+    let inquiryHistoryCache = [];
+    let inquiryHistoryMonthStr = null;
     let activeInquiryCategory = 'gym';
 
     // "YYYY-MM" 문자열이 가진 달의 일수(28~31)
@@ -584,15 +592,21 @@
       tbody.innerHTML = rowsHtml;
     }
 
-    // "지난 기록 보기"를 눌렀을 때만 쓰이는 이번 달 전체 표(예전 방식 그대로 - 날짜별로 다 펼쳐서 수정 가능)
+    // "지난 기록 보기"를 눌렀을 때만 쓰이는 표(날짜별로 다 펼쳐서 수정 가능) - 매출 보고 화살표로 지금
+    // 보고 있는 기준월(inquiryHistoryMonthStr)을 그대로 따라감(refreshInquiryHistory()가 채워둔 캐시)
     function renderInquiryTable() {
       const tbody = document.querySelector('#inquiryTable tbody');
-      const monthStr = currentMonthStr();
+      const monthStr = inquiryHistoryMonthStr || currentMonthStr();
       const totalDays = daysInMonthStr(monthStr);
       const monthNum = Number(monthStr.slice(5, 7));
+      const isCurrentRealMonth = monthStr === currentMonthStr();
+      const labelEl = document.getElementById('inquiryHistoryLabel');
+      if (labelEl) {
+        labelEl.textContent = `${monthStr.slice(0, 4)}년 ${monthNum}월 날짜별 기록이에요${isCurrentRealMonth ? ' (이번 달)' : ''}. 예전 날짜 숫자를 잘못 입력했으면 여기서 바로 고칠 수 있어요.`;
+      }
 
       const byKey = {};
-      inquiryCache.filter(r => r.category === activeInquiryCategory).forEach(r => { byKey[`${r.inquiry_date}|${r.channel}`] = r.count; });
+      inquiryHistoryCache.filter(r => r.category === activeInquiryCategory).forEach(r => { byKey[`${r.inquiry_date}|${r.channel}`] = r.count; });
 
       const channelTotals = {};
       INQUIRY_CHANNELS.forEach(c => { channelTotals[c.key] = 0; });
@@ -620,6 +634,30 @@
         `<td style="font-weight:700;">${grandTotal || ''}</td>`;
     }
 
+    // 지금 보고 있는 매출 보고 기준월(refMonthStr())의 문의 경로 기록을 불러와서 "지난 기록 보기" 표에
+    // 채움 - 실제 오늘이 속한 달과 같으면 이미 불러와둔 inquiryCache를 그대로 재사용(같은 데이터를 두 번
+    // 안 불러옴), 다른 달이면 새로 불러옴. ("워크인처럼 문의 경로도 지난 달을 같이 볼 수 있게 해달라"는
+    // 요청으로 추가 - refreshMonthPinnedSections()에서 다른 세 섹션과 같이 호출됨)
+    async function refreshInquiryHistory() {
+      const monthStr = refMonthStr();
+      try {
+        inquiryHistoryCache = (monthStr === currentMonthStr()) ? inquiryCache : await fetchMarketingInquiries(monthStr);
+        inquiryHistoryMonthStr = monthStr;
+      } catch (err) {
+        inquiryHistoryCache = [];
+        inquiryHistoryMonthStr = monthStr;
+        document.querySelector('#inquiryTable tbody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        return;
+      }
+      renderInquiryTable();
+    }
+
+    function updateInquiryCacheEntry(cache, date, category, channel, count) {
+      const existing = cache.find(r => r.inquiry_date === date && r.category === category && r.channel === channel);
+      if (existing) existing.count = count;
+      else cache.push({ inquiry_date: date, category, channel, count });
+    }
+
     async function handleInquiryCellSave(inputEl) {
       const date = inputEl.dataset.date;
       const channel = inputEl.dataset.channel;
@@ -631,11 +669,14 @@
       inputEl.disabled = true;
       try {
         await upsertMarketingInquiry({ inquiry_date: date, category, channel, count, updated_by: currentUserId });
-        const existing = inquiryCache.find(r => r.inquiry_date === date && r.category === category && r.channel === channel);
-        if (existing) existing.count = count;
-        else inquiryCache.push({ inquiry_date: date, category, channel, count });
-        // 오늘 칸/지난 기록 표 둘 다 이 캐시를 같이 쓰므로 둘 다 다시 그려서 합계를 맞춰줌
-        // (입력 중이던 칸 자체는 그대로 살아있어서 포커스가 끊기지 않음)
+        // 수정한 날짜가 어느 캐시(오늘 칸용 실제 이번 달 / 지난 기록용 보고 있는 기준월)에 속하는지에
+        // 맞춰 해당 캐시(들)만 갱신함 - 지금 보고 있는 기준월이 실제 이번 달과 같으면 두 캐시가 같은
+        // 달이라 둘 다 갱신됨
+        const cellMonthStr = date.slice(0, 7);
+        if (cellMonthStr === currentMonthStr()) updateInquiryCacheEntry(inquiryCache, date, category, channel, count);
+        if (cellMonthStr === inquiryHistoryMonthStr) updateInquiryCacheEntry(inquiryHistoryCache, date, category, channel, count);
+        // 오늘 칸/지난 기록 표 둘 다 다시 그려서 합계를 맞춰줌(입력 중이던 칸 자체는 그대로 살아있어서
+        // 포커스가 끊기지 않음)
         renderInquiryTodayRow();
         renderInquiryTable();
       } catch (err) {
@@ -658,10 +699,9 @@
       } catch (err) {
         inquiryCache = [];
         document.getElementById('inquiryTodayBody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
-        document.querySelector('#inquiryTable tbody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
       renderInquiryTodayRow();
-      renderInquiryTable();
+      refreshInquiryHistory();
     })();
 
     // ---- 상담 워크인 / 미스 (센터 전체 공용, 이번 달 주차별 - 원래 엑셀 시트를 그대로 옮김) ----
@@ -677,6 +717,11 @@
 
     // 이번 달을 월요일 시작 기준 주차로 쪼갬 - 각 주차는 { weekNo, dates: { 1:'YYYY-MM-DD', 2:..., ... } }
     // (dates의 키는 요일 번호: 0=일 ... 6=토, 월~금인 1~5만 실제로 씀)
+    // 버그 수정(2026-09-04): 이 달의 1일이 토/일요일인 달(예: 2026년 8월 1일 = 토요일)에서, 예전 코드는
+    // "1일부터 무조건 새 주차를 시작"해버려서 월/화/수/목/금이 하나도 없는 주말 이틀짜리 "1주차"가
+    // 만들어지고, 정작 그 달의 진짜 첫 평일 주(예: 8/3~8/7)가 "2주차"로 밀려서 표시됐음("1주차가
+    // 통째로 씹힌 것처럼 보인다"는 피드백으로 발견). 토/일요일은 이 표에 아예 안 쓰이니(월~금만 표시)
+    // 주차를 셀 때부터 건너뛰고, 그 달의 첫 평일을 만났을 때 비로소 1주차를 시작하도록 고침.
     function weekBucketsForMonth(year, month) {
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const buckets = [];
@@ -684,6 +729,7 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month, d);
         const dow = date.getDay();
+        if (dow === 0 || dow === 6) continue; // 주말은 표에 안 쓰이므로 주차 경계 계산에서도 건너뜀
         if (dow === 1 || current === null) {
           if (current) buckets.push(current);
           current = { weekNo: buckets.length + 1, dates: {} };
