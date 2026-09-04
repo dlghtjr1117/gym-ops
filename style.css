@@ -10,9 +10,43 @@
   --slate-700: #334155;
   --slate-900: #0f172a;
   --white: #ffffff;
+  /* "카드/표/모달 등 바탕면" 전용 변수 - --white와 분리한 이유는 --white가 동시에 "색깔 있는
+     배경 위의 흰 글씨"(버튼/뱃지/히어로 카드 등) 용도로도 쓰이는데, 다크 모드에서는 바탕면은
+     어두운색으로 바뀌어야 하지만 그 위의 흰 글씨는 계속 흰색이어야 해서 서로 다르게 취급해야 함 */
+  --surface: var(--white);
   --green-600: #16a34a;
   --red-600: #dc2626;
   --amber-500: #f59e0b;
+}
+
+/* ---- 다크 모드 ----
+   화면 우측 상단 "🌙 다크" 버튼(auth.js에서 자동으로 삽입)으로 켜고 끌 수 있음. <html>에
+   data-theme="dark"가 붙으면 아래 값들로 바뀌는데, 대부분의 색이 위 :root 변수를 그대로 쓰고
+   있어서 이 블록 하나로 전체 화면(카드/표/버튼/입력칸/모달 등)이 자동으로 다크 모드가 됨.
+   상태 뱃지(빨강/노랑/초록 등)나 히어로 카드 그라데이션처럼 색 자체가 의미를 담고 있는 작은
+   요소들은 일부러 안 건드렸음 - 어두운 배경 위에 밝은 색 칩으로 그대로 떠 있어도 잘 보이고,
+   구분도 여전히 잘 되기 때문(색을 다 빼는 무채색 모드가 아니라 다크 모드라서 이렇게 결정함) */
+:root[data-theme="dark"] {
+  --indigo-600: #6366f1;
+  --indigo-700: #818cf8;
+  --slate-50: #1e293b;
+  --slate-100: #263449;
+  --slate-200: #334155;
+  --slate-300: #475569;
+  --slate-400: #94a3b8;
+  --slate-500: #94a3b8;
+  --slate-700: #cbd5e1;
+  --slate-900: #f1f5f9;
+  --surface: #111c30;
+  --green-600: #4ade80;
+  --red-600: #f87171;
+  --amber-500: #fbbf24;
+}
+/* 날짜/시각 입력칸의 달력·시계 아이콘은 브라우저가 고정된 어두운색으로 그리는데, 다크 모드
+   바탕에서는 안 보여서 색을 뒤집어줌 */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
 }
 
 * { box-sizing: border-box; }
@@ -23,11 +57,18 @@ body {
   color: var(--slate-900);
 }
 
+/* 입력칸/셀렉트/텍스트영역은 페이지마다 배경색을 따로 안 정해준 곳이 많아서(브라우저 기본값인
+   흰 배경을 그대로 썼음), 다크 모드에서도 흰 박스로 남지 않도록 여기서 한 번에 정해줌 */
+input, select, textarea {
+  background: var(--surface);
+  color: var(--slate-900);
+}
+
 .container { max-width: 400px; margin: 0 auto; padding: 24px; }
 .center-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
 
 .card {
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--slate-200);
   border-radius: 16px;
   padding: 24px;
@@ -60,7 +101,7 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 }
 .btn-primary { background: var(--indigo-600); color: var(--white); }
 .btn-primary:hover { background: var(--indigo-700); }
-.btn-outline { background: var(--white); color: var(--slate-700); border: 1px solid var(--slate-300); }
+.btn-outline { background: var(--surface); color: var(--slate-700); border: 1px solid var(--slate-300); }
 .btn-outline:hover { background: var(--slate-50); }
 
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -94,8 +135,16 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 .toast-danger { background: var(--red-600); }
 .btn-link { background: none; border: none; padding: 0; font-size: 12px; color: var(--slate-500); cursor: pointer; text-decoration: underline; }
 
+/* 우측 상단 다크 모드 전환 버튼 (auth.js가 자동으로 삽입) */
+.theme-toggle-btn {
+  font-size: 12px; font-weight: 600; color: var(--slate-700);
+  background: var(--surface); border: 1px solid var(--slate-300); border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; white-space: nowrap;
+}
+.theme-toggle-btn:hover { background: var(--slate-50); }
+
 /* 대시보드용 */
-.topbar { background: var(--white); border-bottom: 1px solid var(--slate-200); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--slate-200); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .topbar .brand { font-weight: 700; font-size: 15px; display:flex; align-items:center; gap:8px; }
 .topbar .user-badge { font-size: 12px; color: var(--slate-500); background: var(--slate-50); padding: 4px 10px; border-radius: 999px; }
 .topnav { display: flex; gap: 4px; }
@@ -110,7 +159,7 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
   .topnav::-webkit-scrollbar { display: none; }
   .topnav a { flex: 0 0 auto; white-space: nowrap; }
 }
-.panel { background: var(--white); border: 1px solid var(--slate-200); border-radius: 14px; padding: 18px; margin-top: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 18px; margin-top: 16px; }
 .panel h3 { font-size: 14px; margin: 0 0 14px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 12px; align-items: end; }
 .form-grid .field { margin-bottom: 0; }
@@ -119,7 +168,7 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 @media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }
-.stat-card { background: var(--white); border: 1px solid var(--slate-200); border-radius: 14px; padding: 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 16px; }
 .stat-card .label { font-size: 12px; color: var(--slate-500); margin-bottom: 6px; }
 .stat-card .value { font-size: 22px; font-weight: 700; }
 .stat-card .delta { font-size: 12px; margin-top: 4px; }
@@ -127,7 +176,7 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 .delta.down { color: var(--red-600); }
 .section { margin-top: 24px; }
 .section h2 { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
-table { width: 100%; border-collapse: collapse; background: var(--white); border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; }
 th, td { text-align: left; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--slate-200); }
 th { color: var(--slate-500); font-weight: 600; background: var(--slate-50); }
 tr:last-child td { border-bottom: none; }
@@ -144,7 +193,7 @@ tr:last-child td { border-bottom: none; }
 /* 회원 검색 드롭다운(이름/전화번호 뒷자리로 검색해서 목록에서 클릭해 고르는 UI) - PT 스케줄, PT 회원 관리 등에서 공용으로 씀 */
 .member-search-results {
   position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 20;
-  background: var(--white); border: 1px solid var(--slate-200); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--slate-200); border-radius: 10px;
   box-shadow: 0 8px 20px rgba(0,0,0,0.08); max-height: 220px; overflow-y: auto;
 }
 .member-search-item { padding: 9px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--slate-100); }
@@ -218,7 +267,7 @@ tr.row-checked .tm-status-select { opacity: .75; }
 /* 만료회원 · TM 페이지 상품 필터 탭 */
 .filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .filter-tab {
-  border: 1px solid var(--slate-300); background: var(--white); color: var(--slate-700);
+  border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700);
   font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 999px; cursor: pointer;
 }
 .filter-tab:hover { background: var(--slate-50); }
@@ -265,7 +314,7 @@ tr.member-row:hover td { background: var(--slate-50); }
   padding: 40px 16px; overflow-y: auto; z-index: 100;
 }
 .modal-box {
-  background: var(--white); border-radius: 16px; padding: 24px;
+  background: var(--surface); border-radius: 16px; padding: 24px;
   width: 100%; max-width: 1040px; box-shadow: 0 20px 50px -12px rgba(15,23,42,0.35);
 }
 .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; gap: 12px; }
@@ -288,13 +337,13 @@ tr.member-row:hover td { background: var(--slate-50); }
 .sale-product-list, .sale-cart-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .sale-product-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  background: var(--white); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+  background: var(--surface); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px;
   cursor: pointer;
 }
 .sale-product-row:hover { background: var(--slate-50); border-color: var(--slate-300); }
 .sale-product-row .name { font-weight: 600; }
 .sale-product-row .price { color: var(--slate-500); margin-top: 2px; }
-.sale-cart-row { background: var(--white); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+.sale-cart-row { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
 .sale-cart-row .row-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .sale-cart-row .name { font-weight: 600; }
 .sale-cart-row input[type=number] {
@@ -328,7 +377,7 @@ tr.member-row:hover td { background: var(--slate-50); }
 }
 @media (max-width: 720px) { .home-grid { grid-template-columns: repeat(2, 1fr); } }
 .home-tile {
-  background: var(--white); border: 1px solid var(--slate-200); border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--slate-200); border-radius: 16px;
   padding: 26px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px;
   text-decoration: none; color: var(--slate-900); cursor: pointer;
   transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
@@ -348,8 +397,10 @@ tr.member-row:hover td { background: var(--slate-50); }
   padding: 2px 8px; border-radius: 999px;
 }
 
-/* 대시보드 매출 보고(일간/주간/월간 탭) */
-.report-tabs { display: flex; background: var(--slate-900); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+/* 대시보드 매출 보고(일간/주간/월간 탭) - 이 탭 바는 항상 어두운 배경 고정이라(다크 모드에서도 바뀌면
+   안 됨) var(--slate-900) 대신 원래 라이트 모드 값(#0f172a)을 직접 써서, --slate-900이 다크 모드에서
+   글자색(밝은색)으로 바뀌어도 이 배경은 영향을 안 받게 함 */
+.report-tabs { display: flex; background: #0f172a; border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
 .report-tab {
   flex: 1; border: none; background: transparent; color: rgba(255,255,255,0.65);
   font-size: 13px; font-weight: 700; padding: 12px 10px; cursor: pointer;
@@ -358,12 +409,12 @@ tr.member-row:hover td { background: var(--slate-50); }
 .report-tab.active { background: var(--indigo-600); color: var(--white); }
 .report-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
 .report-nav-arrow {
-  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--slate-300); background: var(--white);
+  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--slate-300); background: var(--surface);
   color: var(--slate-700); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .report-nav-arrow:hover { background: var(--slate-50); }
 .report-nav-arrow[disabled] { opacity: .4; cursor: not-allowed; }
-.report-nav-arrow[disabled]:hover { background: var(--white); }
+.report-nav-arrow[disabled]:hover { background: var(--surface); }
 
 /* 페이지를 넘겨도 표의 칸 너비·행 높이가 그대로 유지되도록 하는 표 (회원 목록, 만료회원·TM 등).
    table-layout:fixed로 칸 너비를 내용 길이와 무관하게 고정하고, 행 높이도 내용과 무관하게 항상

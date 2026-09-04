@@ -125,6 +125,51 @@ async function getMyProfile() {
   return null;
 }
 
+// ---- 다크 모드 토글 버튼 ----
+// 화면 우측 상단(로그인 정보 뱃지 옆)에 "🌙 다크"/"☀️ 라이트" 버튼을 자동으로 넣어줌.
+// auth.js는 로그인이 필요한 페이지(id="roleBadge"가 있는 페이지) 전체에서 공통으로 불러오기 때문에,
+// 각 html 파일마다 버튼 마크업을 일일이 추가할 필요 없이 여기 한 군데에서만 처리하면 됨.
+// 실제 켜고/끄는 상태는 localStorage(THEME_STORAGE_KEY)에 저장해서, 브라우저를 새로고침하거나
+// 다른 페이지로 이동해도(로그아웃 전까지는) 계속 유지됨. index.html 맨 위쪽에 있는 별도의 작은
+// 스크립트가 이 값을 읽어서 style.css가 로드되기도 전에 미리 data-theme을 적용해주기 때문에,
+// 페이지를 열 때 잠깐 밝은 화면이 번쩍였다가 다크로 바뀌는 현상(FOUC)도 없음.
+const THEME_STORAGE_KEY = 'gymops_theme';
+
+function applyThemeButtonLabel(btn) {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  btn.textContent = isDark ? '☀️ 라이트' : '🌙 다크';
+}
+
+function initThemeToggle() {
+  const roleBadge = document.getElementById('roleBadge');
+  if (!roleBadge || !roleBadge.parentElement) return; // roleBadge가 없는 페이지(공유 보고서 등)는 건너뜀
+  if (document.getElementById('themeToggleBtn')) return; // 이미 있으면 중복 삽입 방지
+
+  const btn = document.createElement('button');
+  btn.id = 'themeToggleBtn';
+  btn.type = 'button';
+  btn.className = 'theme-toggle-btn';
+  applyThemeButtonLabel(btn);
+  btn.addEventListener('click', () => {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    }
+    applyThemeButtonLabel(btn);
+  });
+  roleBadge.parentElement.insertBefore(btn, roleBadge);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initThemeToggle);
+} else {
+  initThemeToggle();
+}
+
 // 트레이너는 상단 메뉴에서 "대시보드"/"매출 입력"/"만료회원 · TM"/"이용권 관리"/"직원 관리"/"지표 분석"을 안 보이게 함
 // -> 트레이너에게는 홈/회원 관리/센터 매출/PT 관리/PT 스케줄/업무 리스트/미팅 기록만 남음
 // 지점장은 그대로 전체 메뉴가 다 보임. 각 페이지에서 getMyProfile() 이후에 호출.
