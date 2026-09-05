@@ -70,16 +70,19 @@
 [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.85);
 }
-/* 다크 모드 전용 - 히어로 카드 그라데이션(hero-blue/purple/teal)을 라이트 모드의 파랑/보라/청록
-   대신 레드 계열로 통일함(2026-09-05, "레드톤으로 세련되게" 요청). 처음엔 3개 카드가 구분되도록
-   크림슨/로즈/코랄로 색조를 나눴었는데, "헷갈려도 상관없으니 그냥 다 빨간색으로 통일해달라"는
-   후속 요청을 받아 세 클래스 모두 완전히 같은 빨강 그라데이션으로 맞춤(2026-09-05) - hero-green
-   (성공/확정 의미)은 이 요청과 무관해서 그대로 초록 유지. 홈 배너도 원래 hero-blue와 같은 인디고
-   그라데이션을 하드코딩해서 썼던 곳이라 같이 맞춰줌. 기본 버튼과 필터·리포트 탭의 "선택됨" 상태도
-   밋밋한 단색 대신 같은 그라데이션으로 */
+/* 다크 모드 전용 - 히어로 카드 그라데이션을 라이트 모드의 파랑/보라/청록/초록/주황 대신 전부 같은
+   빨강 계열로 통일함(2026-09-05, "레드톤으로 세련되게" → "헷갈려도 상관없으니 그냥 다 빨간색으로
+   통일해달라" → PT 관리의 hero-amber(목표까지 남은 매출)·hero-green(확정 매출)처럼 아직 안 바뀐
+   카드가 더 있다는 피드백까지 받고서 hero-*로 시작하는 모든 그라데이션 클래스를 전부 이 한 색으로
+   맞춤). hero-amber는 원래 style.css가 아니라 pt.html 자체 <style>에만 정의돼 있던 클래스라
+   처음엔 빠져 있었음 - 여기 공용 파일에 다크 모드 재정의를 추가해서 값을 덮어씀.
+   홈 배너도 원래 hero-blue와 같은 인디고 그라데이션을 하드코딩해서 썼던 곳이라 같이 맞춰줌.
+   기본 버튼과 필터·리포트 탭의 "선택됨" 상태도 밋밋한 단색 대신 같은 그라데이션으로 */
 :root[data-theme="dark"] .hero-blue,
 :root[data-theme="dark"] .hero-purple,
 :root[data-theme="dark"] .hero-teal,
+:root[data-theme="dark"] .hero-green,
+:root[data-theme="dark"] .hero-amber,
 :root[data-theme="dark"] .home-banner { background: linear-gradient(135deg, #7f1d1d, #dc2626 55%, #f87171); }
 :root[data-theme="dark"] .btn-primary { background: linear-gradient(135deg, #7f1d1d, #dc2626 60%, #f87171); box-shadow: 0 6px 16px -4px rgba(220,38,38,0.5); }
 :root[data-theme="dark"] .btn-primary:hover { background: linear-gradient(135deg, #991b1b, #ef4444 60%, #fca5a5); }
