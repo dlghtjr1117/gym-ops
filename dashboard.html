@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788578733" />
+<link rel="stylesheet" href="style.css?v=1788619963" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -154,7 +154,7 @@
     </div>
 
     <div class="section">
-      <h2>최근 매출 내역 <a href="sales.html" style="font-weight:400;font-size:12px;">+ 매출 등록하기</a></h2>
+      <h2>최근 매출 내역 <a href="sales.html" style="font-weight:400;font-size:12px;color:var(--indigo-600);">+ 매출 등록하기</a></h2>
       <table id="recentSalesTable">
         <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th style="text-align:right;">금액</th></tr></thead>
         <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
@@ -206,12 +206,12 @@
       <p class="muted" style="margin:-6px 0 12px;font-size:13px;">그날그날 상담(워크인) 결과를 성공/실패로 세는 표예요. 월요일 시작 기준 실제 달력 주차로 나뉘고, 이번 달에 해당하지 않는 칸은 회색으로 비활성 처리돼요. 칸을 클릭해서 숫자만 입력하면 자동 저장돼요.</p>
 
       <div style="overflow-x:auto;">
-        <table id="workinTable" class="table-fixed sheet-table" style="min-width:620px;">
+        <table id="workinTable" class="table-fixed sheet-table" style="min-width:820px;">
           <thead><tr>
-            <th style="width:10%;">주차</th><th style="width:10%;">결과</th>
-            <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th style="width:10%;">주간 합계</th>
+            <th style="width:9%;">주차</th><th style="width:9%;">결과</th>
+            <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th><th style="width:9%;">주간 합계</th>
           </tr></thead>
-          <tbody id="workinBody"><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tbody id="workinBody"><tr><td colspan="10" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
 
@@ -237,9 +237,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788578733"></script>
-  <script src="auth.js?v=1788578733"></script>
-  <script src="data.js?v=1788578733"></script>
+  <script src="config.js?v=1788619963"></script>
+  <script src="auth.js?v=1788619963"></script>
+  <script src="data.js?v=1788619963"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -574,7 +574,7 @@
         workinCache = await fetchWorkinResults(monthStr);
       } catch (err) {
         workinCache = [];
-        document.getElementById('workinBody').innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        document.getElementById('workinBody').innerHTML = `<tr><td colspan="10" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
       renderWorkinTable();
 
@@ -752,23 +752,26 @@
     })();
 
     // ---- 상담 워크인 / 미스 (센터 전체 공용, 이번 달 주차별 - 원래 엑셀 시트를 그대로 옮김) ----
-    // 문의 경로와 달리 "오늘 칸만" 방식이 아니라, 원래 엑셀처럼 이번 달 전체를 주차 x 요일(월~금)
+    // 문의 경로와 달리 "오늘 칸만" 방식이 아니라, 원래 엑셀처럼 이번 달 전체를 주차 x 요일(월~일)
     // 격자로 한 표에서 바로 입력·조회함. 실제 달력 기준으로 월요일에 새 주가 시작하고(그 달 1일이
     // 월요일이 아니면 1주차는 며칠만 있음, 마지막 주도 달이 끝나면 며칠만 있음), 그 달에 해당하지
     // 않는 요일 칸은 회색으로 비활성 처리함.
+    // 주말(토·일)도 상담을 조사해야 한다는 요청으로 추가함(2026-09-05) - 원래는 월~금만 있었음.
     let workinCache = [];
     const WORKIN_WEEKDAYS = [
       { dow: 1, label: '월' }, { dow: 2, label: '화' }, { dow: 3, label: '수' },
-      { dow: 4, label: '목' }, { dow: 5, label: '금' }
+      { dow: 4, label: '목' }, { dow: 5, label: '금' }, { dow: 6, label: '토' }, { dow: 0, label: '일' }
     ];
 
     // 이번 달을 월요일 시작 기준 주차로 쪼갬 - 각 주차는 { weekNo, dates: { 1:'YYYY-MM-DD', 2:..., ... } }
-    // (dates의 키는 요일 번호: 0=일 ... 6=토, 월~금인 1~5만 실제로 씀)
-    // 버그 수정(2026-09-04): 이 달의 1일이 토/일요일인 달(예: 2026년 8월 1일 = 토요일)에서, 예전 코드는
-    // "1일부터 무조건 새 주차를 시작"해버려서 월/화/수/목/금이 하나도 없는 주말 이틀짜리 "1주차"가
-    // 만들어지고, 정작 그 달의 진짜 첫 평일 주(예: 8/3~8/7)가 "2주차"로 밀려서 표시됐음("1주차가
-    // 통째로 씹힌 것처럼 보인다"는 피드백으로 발견). 토/일요일은 이 표에 아예 안 쓰이니(월~금만 표시)
-    // 주차를 셀 때부터 건너뛰고, 그 달의 첫 평일을 만났을 때 비로소 1주차를 시작하도록 고침.
+    // (dates의 키는 요일 번호: 0=일 ... 6=토, 월~일 다 씀)
+    // 버그 수정(2026-09-04): 이 달의 1일이 일요일인 달에서, 예전 코드는 "1일부터 무조건 새 주차를
+    // 시작"해버려서 월~금이 하나도 없는 "1주차"가 만들어지고, 정작 그 달의 진짜 첫 평일 주가 "2주차"로
+    // 밀려서 표시됐음("1주차가 통째로 씹힌 것처럼 보인다"는 피드백으로 발견) - 그 달의 첫 요일을
+    // 만났을 때 비로소 1주차를 시작하도록 고침(현재는 주말도 표에 쓰이므로 그 달 1일이 곧 그 시작).
+    // 일요일(dow=0)은 그 앞의 월~토와 같은 주(그 주의 마지막 날)로 묶여야 하는데, dow===1(월요일)일
+    // 때만 새 주차를 시작하므로 일요일은 자동으로 직전에 시작된 현재 버킷에 들어감 - 그 달이 일요일로
+    // 끝나는 경우도 이 규칙 그대로 마지막 주에 자연스럽게 포함됨.
     function weekBucketsForMonth(year, month) {
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const buckets = [];
@@ -776,7 +779,6 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month, d);
         const dow = date.getDay();
-        if (dow === 0 || dow === 6) continue; // 주말은 표에 안 쓰이므로 주차 경계 계산에서도 건너뜀
         if (dow === 1 || current === null) {
           if (current) buckets.push(current);
           current = { weekNo: buckets.length + 1, dates: {} };
@@ -828,7 +830,7 @@
           html += `<tr>${weekCell}<td>${resultLabel}</td>${cellsHtml}<td class="muted" style="text-align:center; font-weight:700;">${weekTotal || ''}</td></tr>`;
         });
       });
-      tbody.innerHTML = html || '<tr><td colspan="8" class="muted" style="padding:16px;">표시할 주차가 없어요.</td></tr>';
+      tbody.innerHTML = html || '<tr><td colspan="10" class="muted" style="padding:16px;">표시할 주차가 없어요.</td></tr>';
 
       document.getElementById('workinTotalSuccess').textContent = `${grandSuccess}건`;
       document.getElementById('workinTotalFail').textContent = `${grandFail}건`;
@@ -992,7 +994,7 @@
       tbody.innerHTML = list.map(s => `
         <tr data-id="${s.id}">
           <td class="muted" style="font-size:12px;">${formatShareDate(s.created_at)}</td>
-          <td><a href="${shareUrlFor(s.id)}" target="_blank" rel="noopener" style="font-size:12px;">${shareUrlFor(s.id)}</a></td>
+          <td><a href="${shareUrlFor(s.id)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--indigo-600);">${shareUrlFor(s.id)}</a></td>
           <td><button type="button" class="btn-link revoke-share-btn" style="color:var(--red-600);">삭제</button></td>
         </tr>
       `).join('');

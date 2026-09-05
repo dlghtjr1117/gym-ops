@@ -220,6 +220,7 @@ tr:last-child td { border-bottom: none; }
 .badge-orange { background: #ffedd5; color: #c2410c; }
 .badge-yellow { background: #fef9c3; color: #854d0e; }
 .badge-purple { background: #f3e8ff; color: #7e22ce; }
+.badge-teal { background: #ccfbf1; color: #0f766e; }
 
 /* 회원 검색 드롭다운(이름/전화번호 뒷자리로 검색해서 목록에서 클릭해 고르는 UI) - PT 스케줄, PT 회원 관리 등에서 공용으로 씀 */
 .member-search-results {

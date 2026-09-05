@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1788578733" />
+<link rel="stylesheet" href="style.css?v=1788619963" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -56,7 +56,7 @@
       <p class="muted" style="margin-top:-6px; margin-bottom:12px;">
         세 가지 형식을 자동으로 인식해요: <b>①</b> 기존에 쓰시던 헬스장 관리 프로그램에서 내보낸 원본 엑셀 (이름·휴대폰번호·이용권정보 컬럼이 있는 시트를 자동으로 찾아서, 회원권/개인PT/그룹PT/락커/운동복 정보를 알아서 나눠 담아요) &nbsp;<b>②</b> 아래 간단 양식 &nbsp;<b>③</b> POS "판매내역" 원본 엑셀(결제일시·판매상품·회원명 컬럼이 있는 거래 로그) — 이건 매출 기록을 통째로 채워넣고 회원 현재 상태(만료일·PT잔여횟수)도 같이 최신화해줘요. 여러 상품이 한 번에 묶여 결제된 건(외 N건)은 "미분류(확인필요)"로 일단 등록되니, 매출 입력 화면에서 항목만 다시 골라주시면 돼요.<br/>
         전화번호가 이미 있는 회원이면 정보가 업데이트되고, 없으면 새로 등록돼요. 같은 파일을 최신 상태로 관리하며 계속 다시 올리시면 돼요.
-        <a href="#" id="downloadTemplate">간단 양식 다운로드</a>
+        <a href="#" id="downloadTemplate" style="color:var(--indigo-600);">간단 양식 다운로드</a>
       </p>
       <input type="file" id="uploadFile" accept=".xlsx,.xls,.csv" />
       <button type="button" class="btn btn-outline" id="uploadBtn" style="width:auto; padding-left:20px; padding-right:20px; margin-left:10px;">업로드 시작</button>
@@ -320,9 +320,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788578733"></script>
-  <script src="auth.js?v=1788578733"></script>
-  <script src="data.js?v=1788578733"></script>
+  <script src="config.js?v=1788619963"></script>
+  <script src="auth.js?v=1788619963"></script>
+  <script src="data.js?v=1788619963"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

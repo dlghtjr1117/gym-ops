@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1788578733" />
+<link rel="stylesheet" href="style.css?v=1788619963" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -15,6 +15,20 @@
   .sheet-input:hover { border-color: var(--slate-300); }
   .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
   select.sheet-input { cursor: pointer; }
+  /* 확률/상태/유형처럼 .badge-* 색을 입힌 select는 위 .sheet-input 규칙의 background:transparent에
+     가려져서(같은 선택자 우선순위에서 이 파일이 style.css보다 뒤에 로드되다 보니) 뱃지 알약(pill)
+     배경이 아예 안 보이던 문제가 있었음. "유형" 색이 행 배경(재등록확률에 따라 달라지는 연한 색)과
+     겹치면 거의 안 보이는 경우가 생겨서(예: 노란 행 위의 노란 글자) 발견 - 각 배지가 자기 자신의
+     고정 배경을 다시 갖도록 우선순위를 높여서, 어느 행에 있든 상관없이 항상 또렷하게 보이게 함
+     (2026-09-05) */
+  select.sheet-input.badge-red { background: #fee2e2; }
+  select.sheet-input.badge-amber { background: #fef3c7; }
+  select.sheet-input.badge-green { background: #dcfce7; }
+  select.sheet-input.badge-blue { background: #e0e7ff; }
+  select.sheet-input.badge-orange { background: #ffedd5; }
+  select.sheet-input.badge-yellow { background: #fef9c3; }
+  select.sheet-input.badge-purple { background: #f3e8ff; }
+  select.sheet-input.badge-teal { background: #ccfbf1; }
   .toggle-ox {
     width: 30px; height: 26px; border-radius: 6px; border: 1px solid var(--slate-300); background: var(--surface);
     font-size: 12px; font-weight: 700; cursor: pointer;
@@ -254,7 +268,7 @@
           <div class="field"><label>유형</label>
             <select id="l_source">
               <option value="">선택 안 함</option>
-              <option value="재등록">재등록</option><option value="오티">오티</option><option value="워크인">워크인</option>
+              <option value="재등록">재등록</option><option value="오티">오티</option><option value="워크인">워크인</option><option value="무료체험">무료체험</option>
               <option value="지인소개">지인소개</option><option value="필드">필드</option><option value="당근">당근</option><option value="블로그">블로그</option>
             </select>
           </div>
@@ -344,9 +358,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788578733"></script>
-  <script src="auth.js?v=1788578733"></script>
-  <script src="data.js?v=1788578733"></script>
+  <script src="config.js?v=1788619963"></script>
+  <script src="auth.js?v=1788619963"></script>
+  <script src="data.js?v=1788619963"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -512,7 +526,16 @@
     });
 
     // ---- 섹션 A: 주차별 매출 기록 ----
-    const SOURCE_OPTIONS = ['재등록', '오티', '워크인', '지인소개', '필드', '당근', '블로그'];
+    // "무료체험" 추가 (2026-09-05) - 유형이 죽 나열만 되어있고 색 구분이 없어서 한눈에 잘 안 들어온다는
+    // 피드백으로, 확률/상태 select처럼 유형별로도 뱃지 색을 따로 줌(SOURCE_BADGE)
+    const SOURCE_OPTIONS = ['재등록', '오티', '워크인', '무료체험', '지인소개', '필드', '당근', '블로그'];
+    // badge-slate는 글자색이 var(--slate-700)이라 배경(연한 회색)까지 테마에 따라 거의 투명해져서,
+    // 다른 행(예: 노란 확률 행) 위에서는 글자가 잘 안 보일 수 있음 - 그래서 여기선 배경·글자색이 둘 다
+    // 고정값인 색만 골라 씀(badge-teal 추가해서 8개 유형 모두 서로 다른 고정 색으로 구분되게 함)
+    const SOURCE_BADGE = {
+      '재등록': 'badge-green', '오티': 'badge-blue', '워크인': 'badge-amber', '무료체험': 'badge-red',
+      '지인소개': 'badge-purple', '필드': 'badge-orange', '당근': 'badge-yellow', '블로그': 'badge-teal'
+    };
     function renderSourceSelect(lead) {
       const cur = lead.source || '';
       const opts = SOURCE_OPTIONS.slice();
@@ -520,7 +543,19 @@
       const optionsHtml = ['<option value="">선택</option>'].concat(
         opts.map(o => `<option value="${escapeHtml(o)}" ${o === cur ? 'selected' : ''}>${escapeHtml(o)}</option>`)
       ).join('');
-      return `<select class="sheet-input" data-lead-id="${lead.id}" onchange="handleLeadFieldSave(this,'source',false)">${optionsHtml}</select>`;
+      return `<select class="sheet-input badge ${SOURCE_BADGE[cur] || ''}" data-lead-id="${lead.id}" onchange="handleSourceChange(this)">${optionsHtml}</select>`;
+    }
+    // 유형(source)이 바뀌면 값 저장과 함께 뱃지 색도 바로 바꿔줌 (확률/상태 select와 같은 방식 -
+    // handleOtProbSave 등 참고). 표 전체를 다시 불러오지 않고 이 select 하나만 가볍게 갱신함
+    async function handleSourceChange(selectEl) {
+      const id = selectEl.dataset.leadId;
+      const value = selectEl.value || null;
+      try {
+        await updatePtLead(id, { source: value });
+        const lead = leadsCache.find(l => l.id === id);
+        if (lead) lead.source = value;
+        selectEl.className = 'sheet-input badge ' + (SOURCE_BADGE[value] || '');
+      } catch (err) { alert(err.message); }
     }
     // 상담일(contact_date)이 이번 달이면 그 날짜로, 상담일은 지난 달인데 OT일(ot_date)만 이번 달이면
     // OT일 기준으로 주차를 계산 (예: 8/31에 연락해서 9/2 OT를 잡은 경우, 9월 화면에서는 9/2 기준 주차로 보여줌)
