@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788632475" />
+<link rel="stylesheet" href="style.css?v=1788633365" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -224,36 +224,37 @@
     </div>
 
     <div class="section">
-      <h2><span id="categoryRenewalMonthLabel">이번 달 상품별 재등록 현황</span> <span class="muted" style="font-weight:400;font-size:12px;">(만료회원·TM 상태 기준)</span></h2>
-      <div class="grid-3" id="categoryRenewalGrid">
+      <h2>💪 임직원 성과 지표 <span class="muted" style="font-weight:400;font-size:12px;" id="staffPerfMonthLabel">(이번 달)</span></h2>
+      <p class="muted" style="margin:-6px 0 12px;font-size:13px;">이번 달 매출을 담당자별로 모아서, 누가 총매출·PT매출을 얼마나 올렸는지 순위와 표로 보여드려요. (신규/재등록 매출 건수 기준 - 매출 입력 시 담당자를 지정해야 정확히 잡혀요)</p>
+
+      <div class="grid-3" id="staffPerfSummaryGrid" style="margin-bottom:14px;">
         <div class="stat-card">
-          <div class="label">헬스이용권 (FC)</div>
-          <div class="value" id="renewalMembershipValue">-</div>
-          <div class="delta muted" id="renewalMembershipSub">불러오는 중...</div>
+          <div class="label">👥 총 임직원</div>
+          <div class="value" id="staffPerfHeadcount">-</div>
         </div>
         <div class="stat-card">
-          <div class="label">그룹PT</div>
-          <div class="value" id="renewalGroupPtValue">-</div>
-          <div class="delta muted" id="renewalGroupPtSub">불러오는 중...</div>
+          <div class="label">💰 1인당 평균 총매출</div>
+          <div class="value" id="staffPerfAvgTotal">-</div>
         </div>
         <div class="stat-card">
-          <div class="label">개인PT</div>
-          <div class="value" id="renewalPtValue">-</div>
-          <div class="delta muted" id="renewalPtSub">불러오는 중...</div>
+          <div class="label">🤸 1인당 평균 PT매출</div>
+          <div class="value" id="staffPerfAvgPt">-</div>
         </div>
       </div>
-    </div>
 
-    <div class="section">
-      <h2>최근 매출 내역 <a href="sales.html" style="font-weight:400;font-size:12px;color:var(--indigo-600);">+ 매출 등록하기</a></h2>
-      <table id="recentSalesTable">
-        <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th style="text-align:right;">금액</th></tr></thead>
-        <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-      </table>
-      <div class="report-nav" style="margin-top:10px; justify-content:flex-end;">
-        <button type="button" class="report-nav-arrow" id="recentSalesPrevBtn">◀</button>
-        <div class="muted" id="recentSalesPageLabel">-</div>
-        <button type="button" class="report-nav-arrow" id="recentSalesNextBtn">▶</button>
+      <p class="muted" style="margin:0 0 8px;font-size:12px;font-weight:600;">🏆 TOP 3 (총매출 기준)</p>
+      <div class="grid-3" id="staffPerfTop3Grid" style="margin-bottom:18px;">
+        <p class="muted" style="padding:8px 0;">불러오는 중...</p>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table id="staffPerfTable" class="table-fixed">
+          <thead><tr>
+            <th style="width:8%;">순위</th><th>이름</th><th style="text-align:right;">총매출</th><th style="text-align:right;">매출건수</th>
+            <th style="text-align:right;">PT매출</th><th style="text-align:right;">PT건수</th><th style="text-align:right;">신규</th><th style="text-align:right;">재등록</th>
+          </tr></thead>
+          <tbody id="staffPerfTableBody"><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
       </div>
     </div>
 
@@ -328,9 +329,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788632475"></script>
-  <script src="auth.js?v=1788632475"></script>
-  <script src="data.js?v=1788632475"></script>
+  <script src="config.js?v=1788633365"></script>
+  <script src="auth.js?v=1788633365"></script>
+  <script src="data.js?v=1788633365"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -529,68 +530,117 @@
     });
     onReportNav();
 
-    // ---- 최근 매출 내역 (5건씩 페이지 넘김) ----
-    // 한 번에 넉넉히 불러온 뒤 화면에서 5건씩 잘라서 보여줌 (매번 서버에 다시 요청할 필요 없게)
+    // ---- 최근 매출 내역 캐시 ----
+    // 2026-09-05: 화면에 직접 보여주던 "최근 매출 내역" 표는 지우고 "임직원 성과 지표" 섹션으로
+    // 교체했지만(아래), 공유 링크(공유 리포트) 스냅샷(buildReportSnapshot)에는 여전히 최근 매출 목록이
+    // 필요해서 캐시(recentSalesAll)는 그대로 불러와둠 - 화면에는 안 보이고 내부적으로만 씀
     let recentSalesAll = [];
-    let recentSalesPage = 1;
-    const RECENT_SALES_PAGE_SIZE = 5;
-
-    function renderRecentSalesPage() {
-      const tbody = document.querySelector('#recentSalesTable tbody');
-      const totalPages = Math.max(1, Math.ceil(recentSalesAll.length / RECENT_SALES_PAGE_SIZE));
-      recentSalesPage = Math.min(Math.max(1, recentSalesPage), totalPages);
-
-      if (recentSalesAll.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">등록된 매출이 없습니다. 매출 등록 페이지에서 첫 매출을 입력해보세요.</td></tr>';
-      } else {
-        const startIdx = (recentSalesPage - 1) * RECENT_SALES_PAGE_SIZE;
-        const pageItems = recentSalesAll.slice(startIdx, startIdx + RECENT_SALES_PAGE_SIZE);
-        tbody.innerHTML = pageItems.map(s => `
-          <tr>
-            <td>${s.sale_date}</td>
-            <td>${s.member ? s.member.name : '-'}</td>
-            <td>${saleDisplayItemWithCategory(s)}</td>
-            <td>${s.staff ? s.staff.name : '-'}</td>
-            <td style="text-align:right;">${formatWon(s.amount)}</td>
-          </tr>
-        `).join('');
-      }
-
-      document.getElementById('recentSalesPageLabel').textContent = `${recentSalesPage} / ${totalPages}`;
-      document.getElementById('recentSalesPrevBtn').disabled = recentSalesPage <= 1;
-      document.getElementById('recentSalesNextBtn').disabled = recentSalesPage >= totalPages;
-    }
-
-    document.getElementById('recentSalesPrevBtn').addEventListener('click', () => {
-      recentSalesPage -= 1;
-      renderRecentSalesPage();
-    });
-    document.getElementById('recentSalesNextBtn').addEventListener('click', () => {
-      recentSalesPage += 1;
-      renderRecentSalesPage();
-    });
-
     (async () => {
-      const tbody = document.querySelector('#recentSalesTable tbody');
       try {
         recentSalesAll = await fetchRecentSales(50);
-        renderRecentSalesPage();
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        recentSalesAll = [];
       }
     })();
 
-    // 상품별(헬스이용권/그룹PT/개인PT) 재등록 현황 카드 채우기
-    function fillCategoryRenewalCard(suffix, stat) {
-      const valueEl = document.getElementById(`renewal${suffix}Value`);
-      const subEl = document.getElementById(`renewal${suffix}Sub`);
-      if (!stat || stat.total === 0) {
-        valueEl.textContent = '-';
-        subEl.textContent = '이 달 TM 기록 없음';
+    // ---- 임직원 성과 지표 (대시보드, 2026-09-05 추가) ----
+    // 원래 여기 있던 "상품별 재등록 현황"(만료회원·TM 상태 기준 - 만료회원·TM 페이지와 겹치는 정보라는
+    // 피드백을 받음)과 "최근 매출 내역" 표를 지우고, 그 자리에 "이번 달 매출을 담당자별로 모아서 누가
+    // 얼마나 팔았는지" 보여주는 성과 지표 섹션을 새로 넣음. 참고 이미지(타사 대시보드)에는 OT 진행·PT
+    // 소진율·PT 신상담률 같은 컬럼도 있었지만, 이 앱에는 그런 전환 퍼널을 정확히 추적하는 데이터가 없어서
+    // (있으면 숫자가 부정확해질 위험이 있어서) 이미 앱 전체에서 쓰는, 확실한 매출 데이터 기준(총매출/
+    // PT매출/신규/재등록)만으로 구성함 - "필요없는 건 알아서 빼라"는 요청에 따른 판단.
+    let staffListCache = null; // 직원 목록(트레이너+지점장) - 달이 바뀌어도 안 바뀌므로 한 번만 불러와서 재사용
+    async function ensureStaffListLoaded() {
+      if (!staffListCache) {
+        try { staffListCache = await fetchStaff(); } catch (err) { staffListCache = []; }
+      }
+      return staffListCache;
+    }
+
+    // sales 원본 배열을 담당자(staff_id)별로 묶어서 [{id, name, role, totalAmount, totalCount, ptAmount,
+    // ptCount, newCount, renewalCount}] 형태로 반환(총매출 큰 순). staffList에 있는 직원은 이번 달에
+    // 매출이 하나도 없어도(0건) 목록에 그대로 포함시켜서 "총 임직원 수" 평균 계산의 분모가 정확하게 맞음.
+    // 담당자가 비어있거나 이미 퇴사해 profiles에서 지워진 옛날 매출은 "담당자 미지정"으로 따로 묶음.
+    function computeStaffPerf(sales, staffList) {
+      const map = new Map();
+      staffList.forEach(p => map.set(p.id, { id: p.id, name: p.name, role: p.role, totalAmount: 0, totalCount: 0, ptAmount: 0, ptCount: 0, newCount: 0, renewalCount: 0 }));
+      sales.forEach(s => {
+        const amt = Number(s.amount) || 0;
+        let row = s.staff_id ? map.get(s.staff_id) : null;
+        if (!row) {
+          row = map.get('__unassigned__');
+          if (!row) {
+            row = { id: '__unassigned__', name: '담당자 미지정', role: null, totalAmount: 0, totalCount: 0, ptAmount: 0, ptCount: 0, newCount: 0, renewalCount: 0 };
+            map.set('__unassigned__', row);
+          }
+        }
+        row.totalAmount += amt;
+        row.totalCount += 1;
+        if (s.category && PT_SALE_CATEGORIES.includes(s.category)) { row.ptAmount += amt; row.ptCount += 1; }
+        if (s.category && s.category.endsWith('_new')) row.newCount += 1;
+        if (s.category && s.category.endsWith('_renewal')) row.renewalCount += 1;
+      });
+      return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+    }
+
+    function renderStaffPerf(sales, staffList, monthLabelText) {
+      document.getElementById('staffPerfMonthLabel').textContent = `(${monthLabelText})`;
+      const rows = computeStaffPerf(sales, staffList);
+      const headcount = staffList.length;
+
+      document.getElementById('staffPerfHeadcount').textContent = headcount > 0 ? `${headcount}명` : '-';
+      const totalAmountSum = rows.reduce((sum, r) => sum + r.totalAmount, 0);
+      const ptAmountSum = rows.reduce((sum, r) => sum + r.ptAmount, 0);
+      document.getElementById('staffPerfAvgTotal').textContent = headcount > 0 ? formatWon(Math.round(totalAmountSum / headcount)) : '-';
+      document.getElementById('staffPerfAvgPt').textContent = headcount > 0 ? formatWon(Math.round(ptAmountSum / headcount)) : '-';
+
+      const medals = ['🥇', '🥈', '🥉'];
+      const medalBorder = ['#eab308', '#94a3b8', '#b45309'];
+      const top3 = rows.filter(r => r.totalAmount > 0).slice(0, 3);
+      const top3Grid = document.getElementById('staffPerfTop3Grid');
+      if (top3.length === 0) {
+        top3Grid.innerHTML = '<p class="muted" style="padding:8px 0;">이 달에는 아직 담당자가 지정된 매출 기록이 없어요.</p>';
+      } else {
+        top3Grid.innerHTML = top3.map((r, i) => `
+          <div class="stat-card" style="border-left:4px solid ${medalBorder[i]};">
+            <div class="label">${medals[i]} TOP ${i + 1}</div>
+            <div class="value">${escapeHtml(r.name)}</div>
+            <div class="delta muted">${formatWon(r.totalAmount)} · ${r.totalCount}건</div>
+          </div>
+        `).join('');
+      }
+
+      const tbody = document.getElementById('staffPerfTableBody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">등록된 직원이 없습니다.</td></tr>';
         return;
       }
-      valueEl.textContent = `${stat.rate}%`;
-      subEl.textContent = `${stat.total}건 중 재등록 ${stat.renewed}건`;
+      tbody.innerHTML = rows.map((r, i) => `
+        <tr>
+          <td>${r.totalAmount > 0 ? i + 1 : '-'}</td>
+          <td>${escapeHtml(r.name)}${r.role === 'manager' ? ' <span class="muted" style="font-size:11px;">(지점장)</span>' : ''}</td>
+          <td style="text-align:right;">${formatWon(r.totalAmount)}</td>
+          <td style="text-align:right;">${r.totalCount}건</td>
+          <td style="text-align:right;">${formatWon(r.ptAmount)}</td>
+          <td style="text-align:right;">${r.ptCount}건</td>
+          <td style="text-align:right;">${r.newCount}건</td>
+          <td style="text-align:right;">${r.renewalCount}건</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadAndRenderStaffPerf(monthStart, monthLabelText) {
+      try {
+        const [sales, staffList] = await Promise.all([
+          fetchSalesInRange(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1))),
+          ensureStaffListLoaded()
+        ]);
+        renderStaffPerf(sales, staffList, monthLabelText);
+      } catch (err) {
+        document.getElementById('staffPerfTableBody').innerHTML =
+          `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
     }
 
     // ---- 이번 달 매출 요약 / 상품별 재등록 현황 / 워크인·미스 (매출 보고 화살표로 보는 기준월을 그대로 따라감) ----
@@ -641,7 +691,6 @@
       const suffix = isCurrentRealMonth ? ' (이번 달)' : '';
 
       document.getElementById('monthSummaryLabel').textContent = `📅 ${monthLabel} 매출${suffix}`;
-      document.getElementById('categoryRenewalMonthLabel').textContent = `${monthLabel} 상품별 재등록 현황${suffix}`;
 
       try {
         const monthBucket = await computeSalesBucket(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
@@ -659,15 +708,8 @@
         if (breakdownScopes[scope].panelOpen) loadAndRenderBreakdown(scope);
       });
 
-      try {
-        const stats = await fetchCategoryRenewalStats(monthStr);
-        fillCategoryRenewalCard('Membership', stats.membership);
-        fillCategoryRenewalCard('GroupPt', stats.group_pt);
-        fillCategoryRenewalCard('Pt', stats.pt);
-      } catch (err) {
-        document.getElementById('categoryRenewalGrid').innerHTML =
-          `<div class="error-text" style="display:block; grid-column:1/-1;">${err.message}</div>`;
-      }
+      // 임직원 성과 지표도 매출 보고 화살표로 보는 기준월을 그대로 따라감
+      loadAndRenderStaffPerf(monthStart, `${monthLabel}${suffix}`);
 
       try {
         workinCache = await fetchWorkinResults(monthStr);
