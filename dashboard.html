@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788629669" />
+<link rel="stylesheet" href="style.css?v=1788630926" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -144,11 +144,12 @@
           <div class="hero-sub" id="monthTotalCount">불러오는 중...</div>
           <div class="hero-toggle-hint" id="monthTotalToggleHint">🔍 클릭해서 분류별로 보기 ▾</div>
         </div>
-        <div class="hero-card-secondary accent-purple">
+        <div class="hero-card-secondary accent-purple clickable" id="monthFcCard" role="button" tabindex="0" aria-expanded="false">
           <div class="hero-icon">🏋️</div>
           <div class="hero-label">FC 월간 총매출 <span style="font-weight:400;">(헬스이용권·그룹PT·운동복·락커)</span></div>
           <div class="hero-value hero-value-money" id="monthFcAmount">-</div>
           <div class="hero-sub" id="monthFcCount">불러오는 중...</div>
+          <div class="hero-toggle-hint" id="monthFcToggleHint">🔍 클릭해서 분류별로 보기 ▾</div>
         </div>
         <div class="hero-card-secondary accent-teal">
           <div class="hero-icon">🤸</div>
@@ -159,10 +160,11 @@
       </div>
 
       <div id="monthBreakdownPanel" class="breakdown-panel" style="display:none;">
+        <p class="muted" style="margin:0 0 12px;font-size:12px;font-weight:600;">💰 월간 총매출(FC+PT) 기준</p>
         <div class="filter-tabs" id="breakdownTabs">
-          <button type="button" class="filter-tab active" data-tab="membership5" onclick="switchBreakdownTab('membership5')">이용권 분류별</button>
-          <button type="button" class="filter-tab" data-tab="payment" onclick="switchBreakdownTab('payment')">결제 수단별</button>
-          <button type="button" class="filter-tab" data-tab="category12" onclick="switchBreakdownTab('category12')">판매 분류별</button>
+          <button type="button" class="filter-tab active" data-tab="membership5" onclick="switchBreakdownTab('all','membership5')">이용권 분류별</button>
+          <button type="button" class="filter-tab" data-tab="payment" onclick="switchBreakdownTab('all','payment')">결제 수단별</button>
+          <button type="button" class="filter-tab" data-tab="category12" onclick="switchBreakdownTab('all','category12')">판매 분류별</button>
         </div>
         <div class="breakdown-body">
           <div class="breakdown-chart-wrap">
@@ -173,6 +175,25 @@
             </div>
           </div>
           <div class="breakdown-list" id="breakdownList"><p class="muted" style="padding:8px 0;">불러오는 중...</p></div>
+        </div>
+      </div>
+
+      <div id="fcBreakdownPanel" class="breakdown-panel" style="display:none;">
+        <p class="muted" style="margin:0 0 12px;font-size:12px;font-weight:600;">🏋️ FC 월간 총매출(헬스이용권·그룹PT·운동복·락커) 기준 - 개인PT는 제외</p>
+        <div class="filter-tabs" id="fcBreakdownTabs">
+          <button type="button" class="filter-tab active" data-tab="membership5" onclick="switchBreakdownTab('fc','membership5')">이용권 분류별</button>
+          <button type="button" class="filter-tab" data-tab="payment" onclick="switchBreakdownTab('fc','payment')">결제 수단별</button>
+          <button type="button" class="filter-tab" data-tab="category12" onclick="switchBreakdownTab('fc','category12')">판매 분류별</button>
+        </div>
+        <div class="breakdown-body">
+          <div class="breakdown-chart-wrap">
+            <svg id="fcBreakdownDonut" width="176" height="176" viewBox="0 0 176 176"></svg>
+            <div class="breakdown-chart-total">
+              <div class="amt" id="fcBreakdownChartTotal">-</div>
+              <div class="lbl">FC 매출 합계</div>
+            </div>
+          </div>
+          <div class="breakdown-list" id="fcBreakdownList"><p class="muted" style="padding:8px 0;">불러오는 중...</p></div>
         </div>
       </div>
 
@@ -292,9 +313,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788629669"></script>
-  <script src="auth.js?v=1788629669"></script>
-  <script src="data.js?v=1788629669"></script>
+  <script src="config.js?v=1788630926"></script>
+  <script src="auth.js?v=1788630926"></script>
+  <script src="data.js?v=1788630926"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -615,13 +636,13 @@
         document.getElementById('monthTotalCount').textContent = err.message;
       }
 
-      // "월간 총매출" 카드를 클릭하면 펼쳐지는 이용권 분류별/결제 수단별/판매 분류별 분석 패널 -
-      // 화살표로 기준월을 옮기면 이 패널도 같이 따라가야 해서, 캐시를 비우고 이미 펼쳐져 있으면
-      // 새 기준월 데이터로 바로 다시 그려줌
-      breakdownMonthStr = null;
-      if (breakdownPanelOpen) {
-        loadAndRenderBreakdown();
-      }
+      // "월간 총매출"/"FC 월간 총매출" 카드를 클릭하면 펼쳐지는 이용권 분류별/결제 수단별/판매 분류별
+      // 분석 패널 - 화살표로 기준월을 옮기면 두 패널 다 같이 따라가야 해서, 캐시를 비우고 이미 펼쳐져
+      // 있는 패널이 있으면 새 기준월 데이터로 바로 다시 그려줌
+      monthSalesCacheMonthStr = null;
+      ['all', 'fc'].forEach(scope => {
+        if (breakdownScopes[scope].panelOpen) loadAndRenderBreakdown(scope);
+      });
 
       try {
         const stats = await fetchCategoryRenewalStats(monthStr);
@@ -644,33 +665,99 @@
       await refreshInquiryHistory();
     }
 
-    // ---- "월간 총매출" 카드 클릭 → 이용권 분류별/결제 수단별/판매 분류별 분석 패널 ----
-    // 타사 통합 경영 대시보드 캡쳐를 참고해서 만든 기능. "월간 총매출(항상 고정)" 카드를 누르면 카드
-    // 바로 아래에 도넛 차트 + 순위 목록이 펼쳐지고, 탭으로 세 가지 기준(이용권 분류별/결제 수단별/
-    // 판매 분류별)을 바꿔볼 수 있음. 데이터는 이번 달 매출 원본 행을 fetchSalesInRange로 한 번 가져와서
-    // 화면에서 그룹핑함(카드 자체의 합계 로직인 computeSalesBucket과는 별개 - 그쪽은 FC/PT 이분류만
-    // 필요해서 raw 데이터를 굳이 들고 있지 않음).
-    let breakdownPanelOpen = false;
-    let breakdownMonthStr = null; // 마지막으로 데이터를 가져온 기준월(YYYY-MM) - 화살표로 달이 바뀌면 무효화됨
-    let breakdownSalesCache = null; // 기준월의 매출 원본 행 (sale.category, sale.amount, sale.payment_method 사용)
-    let breakdownActiveTab = 'membership5';
+    // ---- "월간 총매출"/"FC 월간 총매출" 카드 클릭 → 이용권 분류별/결제 수단별/판매 분류별 분석 패널 ----
+    // 타사 통합 경영 대시보드 캡쳐를 참고해서 만든 기능. 카드를 누르면 그 카드 바로 아래에 도넛 차트 +
+    // 순위 목록이 펼쳐지고, 탭으로 세 가지 기준(이용권 분류별/결제 수단별/판매 분류별)을 바꿔볼 수 있음.
+    // 처음엔 "월간 총매출" 카드 하나만 있었는데, "FC 카드를 눌러도 FC 상품들만 따로 보고 싶다"는 요청을
+    // 받아 같은 기능을 카드별로("all"=월간 총매출 전체, "fc"=FC만) 두 벌 두는 구조로 확장함(2026-09-05).
+    // 두 패널이 같은 달의 매출 원본을 쓰기 때문에 원본 fetch는 한 번만 하고(monthSalesCache), "fc" 패널을
+    // 그릴 때만 PT를 뺀 나머지로 한 번 더 걸러서 씀 - 다른 곳의 FC/PT 이분류 기준인 PT_SALE_CATEGORIES와
+    // 항상 같은 기준을 써서 "총매출 패널 = FC+PT", "FC 패널 = 총매출 패널에서 PT만 뺀 것"이 항상 맞음.
+    const SCOPE_DOM = {
+      all: { panel: 'monthBreakdownPanel', tabs: 'breakdownTabs', donut: 'breakdownDonut', chartTotal: 'breakdownChartTotal', list: 'breakdownList', hint: 'monthTotalToggleHint', card: 'monthTotalCard' },
+      fc: { panel: 'fcBreakdownPanel', tabs: 'fcBreakdownTabs', donut: 'fcBreakdownDonut', chartTotal: 'fcBreakdownChartTotal', list: 'fcBreakdownList', hint: 'monthFcToggleHint', card: 'monthFcCard' }
+    };
+    const breakdownScopes = {
+      all: { panelOpen: false, activeTab: 'membership5' },
+      fc: { panelOpen: false, activeTab: 'membership5' }
+    };
+    let monthSalesCacheMonthStr = null; // 마지막으로 데이터를 가져온 기준월(YYYY-MM) - 화살표로 달이 바뀌면 무효화됨
+    let monthSalesCache = null; // 기준월의 매출 원본 행 전체(FC+PT) - "fc" 패널은 여기서 PT만 걸러내서 씀
+
+    // "fc" 패널용으로 PT(개인PT 신규/재등록)만 제외한 나머지를 돌려줌 - 대시보드 카드의 FC 정의
+    // (헬스이용권·그룹PT·운동복·락커)와 항상 같은 기준(PT_SALE_CATEGORIES)을 씀
+    function scopedSales(scope) {
+      const all = monthSalesCache || [];
+      if (scope === 'fc') return all.filter(s => !(s.category && PT_SALE_CATEGORIES.includes(s.category)));
+      return all;
+    }
+
+    // "이용권 분류별" 탭 전용 - "이용권"/"그룹PT"/"개인PT"를 하나로 뭉치지 않고 실제 판매된 상품명별로
+    // 세분화해서 보여줌(예: "헬스이용권 3개월"/"6개월"/"12개월", "올바른 운동 무제한 3개월권",
+    // "개인PT 10회" 등을 각각 한 줄씩 - 2026-09-05, "3개월권/6개월권/12개월권, PT 패키지별로 나눠달라"는
+    // 요청으로 추가). 락커/운동복/기타는 원래처럼 하나로 묶음. 상품명은 saleDisplayItemName()으로 뽑음
+    // (연결된 상품이 있으면 그 이름, 엑셀로 들어온 매출이면 메모에서 정리한 원본 상품명, 그것도 없으면
+    // 카테고리 이름 - data.js 참고). 도넛 차트 색은 dataviz 팔레트의 8슬롯을 이용권류 → 그룹PT류 →
+    // 개인PT류 → 락커 → 운동복 → 기타 순으로(그 안에서는 상품명 가나다순) 고정 배정하고, 실제로 파는
+    // 상품 종류가 8개를 넘어가면(예: 개인PT 회차권이 여러 개) 9번째부터는 dataviz 관례대로 그래프 색만
+    // 회색("기타")으로 합침 - 단, 목록에는 색과 무관하게 실제 상품명·금액을 그대로 한 줄씩 다 보여줌.
+    // (상품 목록이 매달 조금씩 달라질 수 있어서 완벽하게 "이 상품은 항상 이 색"까지는 보장 못 하지만,
+    // 최소한 매출액 순위에 따라 색이 매번 바뀌는 건 막아둠)
+    const MEMBERSHIP5_PARENTS = [
+      { key: 'membership', cats: ['membership_new', 'membership_renewal'] },
+      { key: 'group_pt', cats: ['group_pt_new', 'group_pt_renewal'] },
+      { key: 'pt', cats: ['pt_new', 'pt_renewal'] }
+    ];
+    const MEMBERSHIP5_LUMP = [
+      { label: '락커', cats: ['locker'] },
+      { label: '운동복', cats: ['clothes'] },
+      { label: '기타', cats: ['day_pass', 'membership_transfer', 'uncategorized', 'etc'] }
+    ];
+    const VIZ_COLOR_SLOTS = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)', 'var(--viz-5)', 'var(--viz-6)', 'var(--viz-7)', 'var(--viz-8)'];
+
+    function computeMembership5Groups(sales) {
+      const catToParent = {};
+      MEMBERSHIP5_PARENTS.forEach(p => p.cats.forEach(c => { catToParent[c] = p.key; }));
+      const catToLumpIdx = {};
+      MEMBERSHIP5_LUMP.forEach((g, i) => g.cats.forEach(c => { catToLumpIdx[c] = i; }));
+      const lastLumpIdx = MEMBERSHIP5_LUMP.length - 1;
+
+      const detailMap = new Map(); // "parentKey::상품명" -> {parentKey, label, amount, count}
+      const lumpBuckets = MEMBERSHIP5_LUMP.map(g => ({ label: g.label, amount: 0, count: 0 }));
+
+      sales.forEach(s => {
+        const amt = Number(s.amount) || 0;
+        const parentKey = catToParent[s.category];
+        if (parentKey) {
+          const name = saleDisplayItemName(s);
+          const key = parentKey + '::' + name;
+          if (!detailMap.has(key)) detailMap.set(key, { parentKey, label: name, amount: 0, count: 0 });
+          const b = detailMap.get(key);
+          b.amount += amt;
+          b.count += 1;
+        } else {
+          const idx = Object.prototype.hasOwnProperty.call(catToLumpIdx, s.category) ? catToLumpIdx[s.category] : lastLumpIdx;
+          lumpBuckets[idx].amount += amt;
+          lumpBuckets[idx].count += 1;
+        }
+      });
+
+      const parentRank = { membership: 0, group_pt: 1, pt: 2 };
+      const detailBuckets = Array.from(detailMap.values()).sort((a, b) => {
+        if (parentRank[a.parentKey] !== parentRank[b.parentKey]) return parentRank[a.parentKey] - parentRank[b.parentKey];
+        return a.label.localeCompare(b.label, 'ko');
+      });
+
+      const stableOrder = [...detailBuckets, ...lumpBuckets];
+      stableOrder.forEach((b, i) => { b.color = i < VIZ_COLOR_SLOTS.length ? VIZ_COLOR_SLOTS[i] : 'var(--viz-other)'; });
+
+      return stableOrder.filter(b => b.count > 0).sort((a, b) => b.amount - a.amount);
+    }
 
     // 색상은 dataviz 팔레트에서 검증된 8슬롯 순서를 그대로 씀(순위가 아니라 항목마다 고정 배정 -
-    // 매달 순위가 바뀌어도 "이용권"은 항상 같은 파란색으로 보이게 하기 위함). 어느 탭이든 8개 슬롯을
+    // 매달 순위가 바뀌어도 같은 항목은 같은 색으로 보이게 하기 위함). 어느 탭이든 8개 슬롯을
     // 넘는 세부 항목은 색을 새로 만들지 않고 마지막 "기타" 회색 한 칸으로 합침.
     const BREAKDOWN_TABS = {
-      membership5: {
-        title: '이용권 분류별',
-        field: 'category',
-        groups: [
-          { label: '이용권', cats: ['membership_new', 'membership_renewal'], color: 'var(--viz-1)' },
-          { label: '그룹PT', cats: ['group_pt_new', 'group_pt_renewal'], color: 'var(--viz-2)' },
-          { label: '개인PT', cats: ['pt_new', 'pt_renewal'], color: 'var(--viz-3)' },
-          { label: '락커', cats: ['locker'], color: 'var(--viz-4)' },
-          { label: '운동복', cats: ['clothes'], color: 'var(--viz-5)' },
-          { label: '기타', cats: ['day_pass', 'membership_transfer', 'uncategorized', 'etc'], color: 'var(--viz-other)' }
-        ]
-      },
       payment: {
         title: '결제 수단별',
         field: 'payment_method',
@@ -701,7 +788,7 @@
 
     // sales 원본 배열을 groups 정의대로 묶어서 [{label, color, amount, count}] 형태로 반환(금액 큰 순).
     // 어느 그룹에도 속하지 않는 값(예: payment_method가 비어있는 옛날 데이터)은 매핑 목록이 비어있는
-    // "기타" 그룹(마지막 항목)에 자동으로 합쳐짐.
+    // "기타" 그룹(마지막 항목)에 자동으로 합쳐짐. (membership5 탭은 위 computeMembership5Groups를 대신 씀)
     function computeBreakdownGroups(sales, tabDef) {
       const buckets = tabDef.groups.map(g => ({ label: g.label, color: g.color, amount: 0, count: 0 }));
       const catToIndex = {};
@@ -718,16 +805,18 @@
     }
 
     // 카드 바로 아래 패널을 펼치고(이미 열려 있으면 접고), 열 때 이번 달 매출 원본을 필요하면 새로 불러옴
-    async function toggleBreakdownPanel() {
-      breakdownPanelOpen = !breakdownPanelOpen;
-      const panel = document.getElementById('monthBreakdownPanel');
-      const hint = document.getElementById('monthTotalToggleHint');
-      const card = document.getElementById('monthTotalCard');
-      if (breakdownPanelOpen) {
+    async function toggleBreakdownPanel(scope) {
+      const state = breakdownScopes[scope];
+      const dom = SCOPE_DOM[scope];
+      state.panelOpen = !state.panelOpen;
+      const panel = document.getElementById(dom.panel);
+      const hint = document.getElementById(dom.hint);
+      const card = document.getElementById(dom.card);
+      if (state.panelOpen) {
         panel.style.display = 'block';
         hint.textContent = '🔼 클릭해서 접기';
         card.setAttribute('aria-expanded', 'true');
-        await loadAndRenderBreakdown();
+        await loadAndRenderBreakdown(scope);
       } else {
         panel.style.display = 'none';
         hint.textContent = '🔍 클릭해서 분류별로 보기 ▾';
@@ -735,38 +824,39 @@
       }
     }
 
-    async function loadAndRenderBreakdown() {
+    async function loadAndRenderBreakdown(scope) {
       const monthStr = refMonthStr();
-      if (breakdownMonthStr !== monthStr) {
-        const listEl = document.getElementById('breakdownList');
+      const dom = SCOPE_DOM[scope];
+      if (monthSalesCacheMonthStr !== monthStr) {
+        const listEl = document.getElementById(dom.list);
         listEl.innerHTML = '<p class="muted" style="padding:8px 0;">불러오는 중...</p>';
         try {
           const y = reportRefDate.getFullYear();
           const m = reportRefDate.getMonth();
           const monthStart = new Date(y, m, 1);
-          breakdownSalesCache = await fetchSalesInRange(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
-          breakdownMonthStr = monthStr;
+          monthSalesCache = await fetchSalesInRange(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
+          monthSalesCacheMonthStr = monthStr;
         } catch (err) {
           listEl.innerHTML = `<p class="error-text" style="display:block;">${err.message}</p>`;
           return;
         }
       }
-      renderBreakdownTab();
+      renderBreakdownTab(scope);
     }
 
-    function switchBreakdownTab(tab) {
-      breakdownActiveTab = tab;
-      document.querySelectorAll('#breakdownTabs .filter-tab').forEach(btn => {
+    function switchBreakdownTab(scope, tab) {
+      breakdownScopes[scope].activeTab = tab;
+      document.querySelectorAll(`#${SCOPE_DOM[scope].tabs} .filter-tab`).forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
       });
-      renderBreakdownTab();
+      renderBreakdownTab(scope);
     }
 
     // 도넛(가운데가 빈 원형) 차트를 SVG <circle> 여러 개를 겹쳐서(stroke-dasharray로 부채꼴처럼 잘라)
     // 그림 - 외부 차트 라이브러리 없이 순수 SVG만 씀. 조각 사이에 살짝 틈(2px)을 둬서 색이 붙어있는
     // 조각끼리도 경계가 또렷하게 보이게 함(dataviz 스킬의 "조각 사이 서페이스 갭" 권장사항)
-    function renderDonut(buckets, totalAmount) {
-      const svg = document.getElementById('breakdownDonut');
+    function renderDonut(donutId, buckets, totalAmount) {
+      const svg = document.getElementById(donutId);
       const size = 176, cx = size / 2, cy = size / 2, r = 66, strokeWidth = 26;
       const circumference = 2 * Math.PI * r;
       const gapPx = 2.5;
@@ -789,16 +879,19 @@
       }
     }
 
-    function renderBreakdownTab() {
-      const tabDef = BREAKDOWN_TABS[breakdownActiveTab];
-      const sales = breakdownSalesCache || [];
-      const buckets = computeBreakdownGroups(sales, tabDef);
+    function renderBreakdownTab(scope) {
+      const dom = SCOPE_DOM[scope];
+      const activeTab = breakdownScopes[scope].activeTab;
+      const sales = scopedSales(scope);
+      const buckets = activeTab === 'membership5'
+        ? computeMembership5Groups(sales)
+        : computeBreakdownGroups(sales, BREAKDOWN_TABS[activeTab]);
       const totalAmount = buckets.reduce((sum, b) => sum + b.amount, 0);
 
-      document.getElementById('breakdownChartTotal').textContent = formatWon(totalAmount);
-      renderDonut(buckets, totalAmount);
+      document.getElementById(dom.chartTotal).textContent = formatWon(totalAmount);
+      renderDonut(dom.donut, buckets, totalAmount);
 
-      const listEl = document.getElementById('breakdownList');
+      const listEl = document.getElementById(dom.list);
       if (buckets.length === 0) {
         listEl.innerHTML = '<p class="muted" style="padding:8px 0;">이 달에는 해당 매출 기록이 없어요.</p>';
         return;
@@ -816,12 +909,15 @@
       }).join('');
     }
 
-    document.getElementById('monthTotalCard').addEventListener('click', toggleBreakdownPanel);
-    document.getElementById('monthTotalCard').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggleBreakdownPanel();
-      }
+    ['all', 'fc'].forEach(scope => {
+      const card = document.getElementById(SCOPE_DOM[scope].card);
+      card.addEventListener('click', () => toggleBreakdownPanel(scope));
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleBreakdownPanel(scope);
+        }
+      });
     });
 
     // ---- 문의 경로 (센터 전체 공용, 오늘 칸만 기본 노출 - 원래 PT 관리 페이지에 있던 걸 대표님 보고
