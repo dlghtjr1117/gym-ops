@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 센터 매출</title>
-<link rel="stylesheet" href="style.css?v=1788619963" />
+<link rel="stylesheet" href="style.css?v=1788620715" />
 <style>
   /* 매출 카드가 4개(FC/PT/올바른/총매출)라 pt.html과 동일한 4열 그리드를 씀 */
   #salesHeroGrid { grid-template-columns: repeat(4, 1fr); }
@@ -68,7 +68,7 @@
         <input type="number" id="fcTargetInput" min="0" placeholder="예: 37000000" />
         <button type="button" class="btn btn-outline" id="saveFcTargetBtn" style="width:auto; padding:6px 14px; font-size:13px;">저장</button>
         <span class="muted" id="fcTargetSavedNote" style="font-size:12px;"></span>
-        <span class="muted" style="font-size:12px;">· PT 목표는 <a href="pt.html">PT 관리</a>에서 트레이너별로 설정한 값의 합계예요</span>
+        <span class="muted" style="font-size:12px;">· PT 목표는 <a href="pt.html" style="color:var(--indigo-600);">PT 관리</a>에서 트레이너별로 설정한 값의 합계예요</span>
       </div>
 
       <div class="hero-grid" id="salesHeroGrid" style="margin-top:14px;">
@@ -141,15 +141,15 @@
         <button type="button" class="filter-tab" data-tab="etc" onclick="switchSettleTab('etc')">일일권·락커·운동복·양도·미분류 정산표</button>
       </div>
       <div class="section" id="settleTables" style="margin-top:14px;">
-        <p class="muted" style="margin:0 0 10px;">개별 매출 건의 수정·삭제는 <a href="sales.html">매출 입력</a> 화면에서 할 수 있어요. 여기는 조회 전용이에요.</p>
+        <p class="muted" style="margin:0 0 10px;">개별 매출 건의 수정·삭제는 <a href="sales.html" style="color:var(--indigo-600);">매출 입력</a> 화면에서 할 수 있어요. 여기는 조회 전용이에요.</p>
         <div id="settleTableWrap">불러오는 중...</div>
       </div>
     </div>
   </div>
 
-  <script src="config.js?v=1788619963"></script>
-  <script src="auth.js?v=1788619963"></script>
-  <script src="data.js?v=1788619963"></script>
+  <script src="config.js?v=1788620715"></script>
+  <script src="auth.js?v=1788620715"></script>
+  <script src="data.js?v=1788620715"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
