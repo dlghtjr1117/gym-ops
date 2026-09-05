@@ -448,6 +448,39 @@ function formatWon(n) {
   return Number(n).toLocaleString('ko-KR') + '원';
 }
 
+// 금액 입력칸(class="money-input")은 타이핑하는 대로 1,000단위 콤마가 자동으로 붙게 함
+// ("금액 칸도 0,000 형태로 통일해달라"는 요청으로 추가함, 2026-09-05). type="number"는
+// 브라우저가 콤마 있는 값을 아예 입력 불가 처리해버려서, 이 칸들은 type="text"로 바꾸고
+// 여기서 직접 숫자만 남겨 다시 콤마를 넣어줌. 나중에 표를 다시 그려서(PT 관리 주차별 시트처럼)
+// 이 클래스의 입력칸이 새로 생기더라도 매번 따로 연결할 필요 없도록, 문서 전체에 이벤트
+// 위임(delegation)을 걸어서 한 번만 등록해두면 새로 생기는 칸에도 자동으로 적용됨.
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!el.classList || !el.classList.contains('money-input')) return;
+  const caretFromEnd = el.value.length - el.selectionStart;
+  const digits = el.value.replace(/[^0-9]/g, '');
+  const formatted = digits ? Number(digits).toLocaleString('ko-KR') : '';
+  el.value = formatted;
+  const pos = Math.max(0, formatted.length - caretFromEnd);
+  el.setSelectionRange(pos, pos);
+});
+
+// money-input 칸에서 실제 숫자 값만 뽑아냄(콤마 제거) - 비어있으면 null.
+// id 문자열이나 input 엘리먼트 둘 다 받을 수 있음.
+function moneyInputValue(elOrId) {
+  const el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+  if (!el) return null;
+  const digits = String(el.value || '').replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : null;
+}
+
+// money-input 칸에 값을 코드로 채워 넣을 때(수정 화면 열 때 등) 콤마 형식으로 넣어줌.
+function setMoneyInputValue(elOrId, n) {
+  const el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+  if (!el) return;
+  el.value = (n === null || n === undefined || n === '') ? '' : Number(n).toLocaleString('ko-KR');
+}
+
 // 매출 결제수단
 const PAYMENT_METHOD_LABEL = { card: '카드', cash: '현금', transfer: '계좌이체', kiosk: '키오스크' };
 
@@ -894,6 +927,38 @@ function normalizePhone(phone) {
   if (!digits) return null;
   if (digits.length === 10 && !digits.startsWith('0')) digits = '0' + digits;
   return digits;
+}
+
+// 전화번호를 화면에 보여줄 때 000-0000-0000 형태로 자동으로 나오게 함(DB에는 계속 숫자만
+// 저장돼있음 - normalizePhone 참고). "전화번호 형태가 다 제각각이라 통일해달라"는 요청으로 추가함
+// (2026-09-05). 010 등 휴대폰(11자리)이 대부분이라 3-4-4를 기본으로 하되, 서울 지역번호(02)나
+// 예전 방식 10자리 번호도 자연스럽게 나오도록 자리수별로 나눠서 처리함. 알 수 없는 자리수(외국
+// 번호 등 특수한 경우)는 억지로 나누지 않고 원래 값을 그대로 보여줌.
+function formatPhone(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/[^0-9]/g, '');
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) {
+    if (digits.startsWith('02')) return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 9 && digits.startsWith('02')) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  return phone; // 위 패턴에 안 맞으면(자리수가 다른 특수 케이스) 원래 값 그대로 보여줌
+}
+
+// 전화번호 입력칸(m_phone/md_f_phone/l_phone)에 타이핑하는 대로 자동으로 하이픈이 붙게 함.
+// 저장할 때는 어차피 normalizePhone()이 숫자만 남겨서 저장하므로, 입력 중 화면 표시만 이렇게
+// 예쁘게 바꿔주면 됨(전화번호 자리마다 커서 위치가 안 튀도록, 끝에서부터 남은 글자 수를 기준으로
+// 커서를 다시 맞춰줌).
+function attachPhoneAutoFormat(el) {
+  if (!el) return;
+  el.addEventListener('input', () => {
+    const caretFromEnd = el.value.length - el.selectionStart;
+    const formatted = formatPhone(el.value);
+    el.value = formatted;
+    const pos = Math.max(0, formatted.length - caretFromEnd);
+    el.setSelectionRange(pos, pos);
+  });
 }
 
 // ---- 전체 데이터 백업 (홈 화면의 "데이터 백업" 버튼에서 사용, 지점장 전용) ----

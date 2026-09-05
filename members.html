@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1788620715" />
+<link rel="stylesheet" href="style.css?v=1788624592" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -110,8 +110,8 @@
           <div class="field"><label>이용권 시작일</label><input type="date" id="m_start" /></div>
           <div class="field"><label>이용권 만료일</label><input type="date" id="m_end_date" /></div>
           <div class="field">
-            <label>이용권 정상가</label><input type="number" min="0" id="m_amount_membership" placeholder="원" />
-            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_membership" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <label>이용권 정상가</label><input type="text" inputmode="numeric" class="money-input" id="m_amount_membership" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="text" inputmode="numeric" class="money-input partial-paid-input" id="m_paid_membership" placeholder="정상가와 같으면 비워두세요" />
             <p class="partial-shortfall-note" id="m_shortfall_membership" style="display:none;"></p>
           </div>
         </div>
@@ -120,8 +120,8 @@
           <div class="field"><label>그룹PT 시작일</label><input type="date" id="m_gpt_start" /></div>
           <div class="field"><label>그룹PT 만료일</label><input type="date" id="m_gpt_end" /></div>
           <div class="field">
-            <label>그룹PT 정상가</label><input type="number" min="0" id="m_amount_group_pt" placeholder="원" />
-            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_group_pt" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <label>그룹PT 정상가</label><input type="text" inputmode="numeric" class="money-input" id="m_amount_group_pt" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="text" inputmode="numeric" class="money-input partial-paid-input" id="m_paid_group_pt" placeholder="정상가와 같으면 비워두세요" />
             <p class="partial-shortfall-note" id="m_shortfall_group_pt" style="display:none;"></p>
           </div>
         </div>
@@ -130,8 +130,8 @@
           <div class="field"><label>개인PT 시작일</label><input type="date" id="m_pt_start" /></div>
           <div class="field"><label>개인PT 만료일</label><input type="date" id="m_pt_end" /></div>
           <div class="field">
-            <label>개인PT 정상가</label><input type="number" min="0" id="m_amount_pt" placeholder="원" />
-            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_pt" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <label>개인PT 정상가</label><input type="text" inputmode="numeric" class="money-input" id="m_amount_pt" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="text" inputmode="numeric" class="money-input partial-paid-input" id="m_paid_pt" placeholder="정상가와 같으면 비워두세요" />
             <p class="partial-shortfall-note" id="m_shortfall_pt" style="display:none;"></p>
           </div>
         </div>
@@ -140,8 +140,8 @@
           <div class="field"><label>락커 시작일</label><input type="date" id="m_locker_start" /></div>
           <div class="field"><label>락커 만료일</label><input type="date" id="m_locker_end" /></div>
           <div class="field">
-            <label>락커 정상가</label><input type="number" min="0" id="m_amount_locker" placeholder="원" />
-            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_locker" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <label>락커 정상가</label><input type="text" inputmode="numeric" class="money-input" id="m_amount_locker" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="text" inputmode="numeric" class="money-input partial-paid-input" id="m_paid_locker" placeholder="정상가와 같으면 비워두세요" />
             <p class="partial-shortfall-note" id="m_shortfall_locker" style="display:none;"></p>
           </div>
         </div>
@@ -150,8 +150,8 @@
           <div class="field"><label>운동복 시작일</label><input type="date" id="m_clothes_start" /></div>
           <div class="field"><label>운동복 만료일</label><input type="date" id="m_clothes_end" /></div>
           <div class="field">
-            <label>운동복 정상가</label><input type="number" min="0" id="m_amount_clothes" placeholder="원" />
-            <label class="field-sublabel">오늘 결제 금액</label><input type="number" min="0" id="m_paid_clothes" placeholder="정상가와 같으면 비워두세요" class="partial-paid-input" />
+            <label>운동복 정상가</label><input type="text" inputmode="numeric" class="money-input" id="m_amount_clothes" placeholder="원" />
+            <label class="field-sublabel">오늘 결제 금액</label><input type="text" inputmode="numeric" class="money-input partial-paid-input" id="m_paid_clothes" placeholder="정상가와 같으면 비워두세요" />
             <p class="partial-shortfall-note" id="m_shortfall_clothes" style="display:none;"></p>
           </div>
         </div>
@@ -289,8 +289,8 @@
         <h3 id="sd_name">-</h3>
         <button type="button" class="modal-close" id="sd_closeBtn">&times;</button>
       </div>
-      <div class="field"><label>정상가 (계약 금액)</label><input type="number" id="sd_amount" min="0" /></div>
-      <div class="field" style="margin-top:10px;"><label>오늘 결제 금액</label><input type="number" id="sd_paid_amount" min="0" /></div>
+      <div class="field"><label>정상가 (계약 금액)</label><input type="text" inputmode="numeric" class="money-input" id="sd_amount" /></div>
+      <div class="field" style="margin-top:10px;"><label>오늘 결제 금액</label><input type="text" inputmode="numeric" class="money-input" id="sd_paid_amount" /></div>
       <p class="partial-shortfall-note" id="sd_shortfall_note" style="display:none;"></p>
       <button type="button" class="btn btn-primary" id="sd_saveBtn" style="width:100%; margin-top:6px;">저장</button>
     </div>
@@ -303,7 +303,7 @@
         <button type="button" class="modal-close" id="rp_closeBtn">&times;</button>
       </div>
       <p class="muted" id="rp_summary" style="margin:-6px 0 12px;"></p>
-      <div class="field"><label>이번에 받을 금액</label><input type="number" id="rp_amount" min="0" /></div>
+      <div class="field"><label>이번에 받을 금액</label><input type="text" inputmode="numeric" class="money-input" id="rp_amount" /></div>
       <div class="form-grid" style="margin-top:10px;">
         <div class="field"><label>결제 수단</label>
           <select id="rp_payment">
@@ -320,12 +320,16 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788620715"></script>
-  <script src="auth.js?v=1788620715"></script>
-  <script src="data.js?v=1788620715"></script>
+  <script src="config.js?v=1788624592"></script>
+  <script src="auth.js?v=1788624592"></script>
+  <script src="data.js?v=1788624592"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    // 전화번호 입력칸(신규 등록/수정)에 타이핑하는 대로 자동으로 하이픈이 붙게 함
+    attachPhoneAutoFormat(document.getElementById('m_phone'));
+    attachPhoneAutoFormat(document.getElementById('md_f_phone'));
 
     // 종목명 + D-day 뱃지를 항상 한 줄로만 보여줌 (페이지를 넘길 때 행 높이가 들쭉날쭉해지지 않도록,
     // 종목명이 길면 "..."으로 줄이고 title 속성으로 전체 이름을 확인할 수 있게 함)
@@ -380,7 +384,7 @@
       tbody.innerHTML = members.map(m => `
         <tr class="member-row" data-id="${m.id}">
           <td class="cell-1line" title="${escapeHtml(m.name)}${openReceivableMemberIds.has(m.id) ? ' (미수금 있음)' : ''}">${openReceivableMemberIds.has(m.id) ? '<span class="badge-receivable" title="미수금 있음"></span>' : ''}${escapeHtml(m.name)}</td>
-          <td class="cell-1line">${m.phone || '-'}</td>
+          <td class="cell-1line">${formatPhone(m.phone) || '-'}</td>
           <td class="cell-1line" title="${escapeHtml(m.trainer ? m.trainer.name : '미지정')}">${m.trainer ? escapeHtml(m.trainer.name) : '미지정'}</td>
           <td>${cell(m.membership_type, m.membership_end_date)}</td>
           <td>${cell(m.group_pt_type, m.group_pt_end_date)}</td>
@@ -560,7 +564,7 @@
               <div class="name">${item.product.name}</div>
               <button type="button" class="btn-link remove-cart-btn" data-key="${item.key}" style="color:var(--red-600);">빼기</button>
             </div>
-            <div style="margin-top:6px;">금액 <input type="number" min="0" class="cart-amount-input" data-key="${item.key}" value="${item.amount}" /></div>
+            <div style="margin-top:6px;">금액 <input type="text" inputmode="numeric" class="money-input cart-amount-input" data-key="${item.key}" value="${Number(item.amount || 0).toLocaleString('ko-KR')}" /></div>
           </div>
         `).join('');
         box.querySelectorAll('.remove-cart-btn').forEach(btn => {
@@ -572,7 +576,7 @@
         box.querySelectorAll('.cart-amount-input').forEach(inp => {
           inp.addEventListener('input', () => {
             const item = saleCart.find(i => i.key === inp.dataset.key);
-            if (item) { item.amount = Number(inp.value || 0); item.paidAmount = item.amount; }
+            if (item) { item.amount = moneyInputValue(inp) || 0; item.paidAmount = item.amount; }
             renderSaleTotal();
           });
         });
@@ -677,14 +681,14 @@
       if (!item) return;
       saleDetailKey = key;
       document.getElementById('sd_name').textContent = item.product.name;
-      document.getElementById('sd_amount').value = item.amount;
-      document.getElementById('sd_paid_amount').value = item.paidAmount != null ? item.paidAmount : item.amount;
+      setMoneyInputValue('sd_amount', item.amount);
+      setMoneyInputValue('sd_paid_amount', item.paidAmount != null ? item.paidAmount : item.amount);
       updateSaleDetailShortfallNote();
       document.getElementById('saleDetailOverlay').style.display = 'flex';
     }
     function updateSaleDetailShortfallNote() {
-      const amount = Number(document.getElementById('sd_amount').value || 0);
-      const paid = Number(document.getElementById('sd_paid_amount').value || 0);
+      const amount = moneyInputValue('sd_amount') || 0;
+      const paid = moneyInputValue('sd_paid_amount') || 0;
       const note = document.getElementById('sd_shortfall_note');
       const shortfall = amount - paid;
       if (shortfall > 0) {
@@ -707,8 +711,8 @@
     document.getElementById('sd_saveBtn').addEventListener('click', () => {
       const item = saleCart.find(i => i.key === saleDetailKey);
       if (item) {
-        item.amount = Number(document.getElementById('sd_amount').value || 0);
-        let paid = Number(document.getElementById('sd_paid_amount').value || 0);
+        item.amount = moneyInputValue('sd_amount') || 0;
+        let paid = moneyInputValue('sd_paid_amount') || 0;
         if (!Number.isFinite(paid) || paid < 0) paid = 0;
         if (paid > item.amount) paid = item.amount;
         item.paidAmount = paid;
@@ -772,7 +776,7 @@
       const remaining = Number(r.total_amount) - Number(r.paid_amount);
       document.getElementById('rp_name').textContent = r.item_name;
       document.getElementById('rp_summary').textContent = `정상가 ${formatWon(r.total_amount)} · 지금까지 ${formatWon(r.paid_amount)} 받음 · 잔금 ${formatWon(remaining)}`;
-      document.getElementById('rp_amount').value = remaining;
+      setMoneyInputValue('rp_amount', remaining);
       document.getElementById('rp_payment').value = 'card';
       document.getElementById('rp_date').value = todayStr();
       updateReceivablePayNote();
@@ -781,7 +785,7 @@
     function updateReceivablePayNote() {
       if (!currentPayingReceivable) return;
       const remaining = Number(currentPayingReceivable.total_amount) - Number(currentPayingReceivable.paid_amount);
-      const amount = Number(document.getElementById('rp_amount').value || 0);
+      const amount = moneyInputValue('rp_amount') || 0;
       const note = document.getElementById('rp_shortfall_note');
       const stillOwed = remaining - amount;
       if (amount > 0 && stillOwed > 0) {
@@ -803,7 +807,7 @@
     document.getElementById('rp_saveBtn').addEventListener('click', async () => {
       if (!currentPayingReceivable || !currentDetailMember) return;
       const remaining = Number(currentPayingReceivable.total_amount) - Number(currentPayingReceivable.paid_amount);
-      let amount = Number(document.getElementById('rp_amount').value || 0);
+      let amount = moneyInputValue('rp_amount') || 0;
       if (!Number.isFinite(amount) || amount <= 0) { alert('받을 금액을 입력해주세요.'); return; }
       if (amount > remaining) amount = remaining; // 남은 잔금보다 많이는 못 받게 눌러줌
       if (amount < remaining) {
@@ -840,10 +844,10 @@
       document.getElementById('md_successBox').style.display = 'none';
 
       document.getElementById('md_name').textContent = m.name;
-      document.getElementById('md_phone').textContent = m.phone || '전화번호 없음';
+      document.getElementById('md_phone').textContent = formatPhone(m.phone) || '전화번호 없음';
 
       document.getElementById('md_f_name').value = m.name || '';
-      document.getElementById('md_f_phone').value = m.phone || '';
+      document.getElementById('md_f_phone').value = formatPhone(m.phone) || '';
       document.getElementById('md_f_birth').value = m.birth_date || '';
       document.getElementById('md_f_address').value = m.address || '';
       document.getElementById('md_f_memo').value = m.memo || '';
@@ -928,7 +932,7 @@
         successBox.textContent = '회원 정보가 저장되었습니다.';
         successBox.style.display = 'block';
         document.getElementById('md_name').textContent = currentDetailMember.name;
-        document.getElementById('md_phone').textContent = currentDetailMember.phone || '전화번호 없음';
+        document.getElementById('md_phone').textContent = formatPhone(currentDetailMember.phone) || '전화번호 없음';
 
         // 담당 트레이너가 바뀌었으면, 이번 달 PT 회원 관리 기록만 새 트레이너 시트로 옮겨줌
         // (지난 달까지의 기록은 그때 실제로 담당했던 트레이너 이력이라 그대로 둠 - "미지정"으로
@@ -1108,11 +1112,11 @@
     // 카테고리 하나의 "오늘 결제 금액"을 계산 - 오늘 결제 금액 칸을 비워뒀으면 정상가와 같은 것(전액 결제)으로 취급,
     // 적었으면 그 값 그대로(정상가보다 많이는 못 받게 정상가로 눌러줌)
     function paidAmountFor(category) {
-      const amount = Number(document.getElementById(AMOUNT_INPUT_IDS[category]).value || 0);
+      const amount = moneyInputValue(AMOUNT_INPUT_IDS[category]) || 0;
       const paidRaw = document.getElementById(PAID_INPUT_IDS[category]).value;
       if (paidRaw === '') return amount;
-      let paid = Number(paidRaw);
-      if (!Number.isFinite(paid) || paid < 0) paid = 0;
+      let paid = moneyInputValue(PAID_INPUT_IDS[category]);
+      if (paid == null || !Number.isFinite(paid) || paid < 0) paid = 0;
       if (paid > amount) paid = amount;
       return paid;
     }
@@ -1123,7 +1127,7 @@
     function updateAddMemberTotal() {
       let totalContract = 0, totalPaid = 0;
       Object.keys(AMOUNT_INPUT_IDS).forEach(category => {
-        const amount = Number(document.getElementById(AMOUNT_INPUT_IDS[category]).value || 0);
+        const amount = moneyInputValue(AMOUNT_INPUT_IDS[category]) || 0;
         const paid = paidAmountFor(category);
         totalContract += Number.isFinite(amount) ? amount : 0;
         totalPaid += paid;
@@ -1188,7 +1192,7 @@
         const amountInputId = AMOUNT_INPUT_IDS[category];
         if (amountInputId) {
           const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
-          document.getElementById(amountInputId).value = (product && product.price != null) ? product.price : '';
+          setMoneyInputValue(amountInputId, (product && product.price != null) ? product.price : '');
           document.getElementById(PAID_INPUT_IDS[category]).value = '';
           updateAddMemberTotal();
         }
@@ -1762,7 +1766,7 @@
       Object.keys(PRODUCT_SELECT_IDS).forEach(category => {
         const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
         const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
-        const amount = Number(val(AMOUNT_INPUT_IDS[category]) || 0);
+        const amount = moneyInputValue(AMOUNT_INPUT_IDS[category]) || 0;
         if (amount <= 0) return;
         const paid = paidAmountFor(category);
         if (paid < amount) {
@@ -1814,9 +1818,9 @@
           const selectEl = document.getElementById(PRODUCT_SELECT_IDS[category]);
           const product = (productsByCategory[category] || []).find(p => p.id === selectEl.value);
           const amountInputId = AMOUNT_INPUT_IDS[category];
-          const amountRaw = amountInputId ? val(amountInputId) : '';
-          if (!product && amountRaw === '') return; // 상품도 안 고르고 금액도 안 적었으면 매출 안 남김
-          const amount = Number(amountRaw || 0);
+          const amountVal = amountInputId ? moneyInputValue(amountInputId) : null;
+          if (!product && amountVal == null) return; // 상품도 안 고르고 금액도 안 적었으면 매출 안 남김
+          const amount = amountVal || 0;
           if (amount === 0) { if (product) freeItemNames.push(product.name); return; } // 0원이면 매출로 안 남김(회원 정보 반영은 위에서 이미 됨)
           const paid = paidAmountFor(category);
           if (paid > 0) {

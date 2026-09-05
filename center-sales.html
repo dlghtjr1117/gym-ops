@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 센터 매출</title>
-<link rel="stylesheet" href="style.css?v=1788620715" />
+<link rel="stylesheet" href="style.css?v=1788624592" />
 <style>
   /* 매출 카드가 4개(FC/PT/올바른/총매출)라 pt.html과 동일한 4열 그리드를 씀 */
   #salesHeroGrid { grid-template-columns: repeat(4, 1fr); }
@@ -65,7 +65,7 @@
 
       <div class="fc-target-box">
         <label class="muted" style="font-size:13px;">FC 목표 매출(월)</label>
-        <input type="number" id="fcTargetInput" min="0" placeholder="예: 37000000" />
+        <input type="text" inputmode="numeric" class="money-input" id="fcTargetInput" placeholder="예: 37,000,000" />
         <button type="button" class="btn btn-outline" id="saveFcTargetBtn" style="width:auto; padding:6px 14px; font-size:13px;">저장</button>
         <span class="muted" id="fcTargetSavedNote" style="font-size:12px;"></span>
         <span class="muted" style="font-size:12px;">· PT 목표는 <a href="pt.html" style="color:var(--indigo-600);">PT 관리</a>에서 트레이너별로 설정한 값의 합계예요</span>
@@ -147,9 +147,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788620715"></script>
-  <script src="auth.js?v=1788620715"></script>
-  <script src="data.js?v=1788620715"></script>
+  <script src="config.js?v=1788624592"></script>
+  <script src="auth.js?v=1788624592"></script>
+  <script src="data.js?v=1788624592"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -388,7 +388,7 @@
     document.getElementById('saveFcTargetBtn').addEventListener('click', async () => {
       const btn = document.getElementById('saveFcTargetBtn');
       const note = document.getElementById('fcTargetSavedNote');
-      const val = Number(document.getElementById('fcTargetInput').value || 0);
+      const val = moneyInputValue('fcTargetInput') || 0;
       btn.disabled = true;
       try {
         centerTargetCache = (await upsertCenterTarget(getMonthRange().monthStr, val))[0];
@@ -418,7 +418,7 @@
       ptTargetsCache = targetsResult.status === 'fulfilled' ? targetsResult.value : [];
       centerTargetCache = centerTargetResult.status === 'fulfilled' ? centerTargetResult.value : null;
 
-      document.getElementById('fcTargetInput').value = centerTargetCache ? centerTargetCache.fc_target_amount : '';
+      setMoneyInputValue('fcTargetInput', centerTargetCache ? centerTargetCache.fc_target_amount : '');
 
       loadHeroCards();
       renderPaymentBreakdown();

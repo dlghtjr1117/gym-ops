@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 만료회원 · TM 관리</title>
-<link rel="stylesheet" href="style.css?v=1788620715" />
+<link rel="stylesheet" href="style.css?v=1788624592" />
 </head>
 <body>
   <div class="topbar">
@@ -75,9 +75,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788620715"></script>
-  <script src="auth.js?v=1788620715"></script>
-  <script src="data.js?v=1788620715"></script>
+  <script src="config.js?v=1788624592"></script>
+  <script src="auth.js?v=1788624592"></script>
+  <script src="data.js?v=1788624592"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -205,7 +205,7 @@
               ${it.member.tm_checked_at ? 'checked' : ''} onchange="handleCheckedToggle(this)" />
           </td>
           <td class="cell-1line" title="${escapeHtml(it.member.name)}">${escapeHtml(it.member.name)}</td>
-          <td class="cell-1line">${it.member.phone || '-'}</td>
+          <td class="cell-1line">${formatPhone(it.member.phone) || '-'}</td>
           <td class="cell-1line">${it.member.gender || '-'}</td>
           <td class="cell-1line">${it.expiryDate} ${remainingBadge(it.expiryDate)}</td>
           <td><div class="mcell"><span class="mcell-label" title="${escapeHtml(it.productLabel)}">${escapeHtml(it.productLabel)}</span></div></td>

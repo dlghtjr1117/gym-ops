@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 이용권 관리</title>
-<link rel="stylesheet" href="style.css?v=1788620715" />
+<link rel="stylesheet" href="style.css?v=1788624592" />
 </head>
 <body>
   <div class="topbar">
@@ -54,7 +54,7 @@
               <option value="etc">기타</option>
             </select>
           </div>
-          <div class="field"><label>가격(원)</label><input type="number" id="p_price" min="0" placeholder="선택 입력" /></div>
+          <div class="field"><label>가격(원)</label><input type="text" inputmode="numeric" class="money-input" id="p_price" placeholder="선택 입력" /></div>
           <div class="field"><label>유효기간(일)</label><input type="number" id="p_duration" min="0" placeholder="예: 90 (3개월)" /></div>
           <div class="field" id="p_sessionsField"><label>PT 횟수</label><input type="number" id="p_sessions" min="0" placeholder="개인PT 상품일 때만" /></div>
         </div>
@@ -72,9 +72,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788620715"></script>
-  <script src="auth.js?v=1788620715"></script>
-  <script src="data.js?v=1788620715"></script>
+  <script src="config.js?v=1788624592"></script>
+  <script src="auth.js?v=1788624592"></script>
+  <script src="data.js?v=1788624592"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -163,7 +163,7 @@
         await addProduct({
           name: val('p_name'),
           category: val('p_category'),
-          price: val('p_price') ? Number(val('p_price')) : null,
+          price: moneyInputValue('p_price'),
           duration_days: val('p_duration') ? Number(val('p_duration')) : null,
           sessions: val('p_sessions') ? Number(val('p_sessions')) : null,
           active: true

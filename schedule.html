@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 스케줄</title>
-<link rel="stylesheet" href="style.css?v=1788620715" />
+<link rel="stylesheet" href="style.css?v=1788624592" />
 <style>
   .sg-wrap { overflow-x: auto; margin-top: 14px; border-radius: 10px; }
   .sg-grid {
@@ -140,9 +140,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788620715"></script>
-  <script src="auth.js?v=1788620715"></script>
-  <script src="data.js?v=1788620715"></script>
+  <script src="config.js?v=1788624592"></script>
+  <script src="auth.js?v=1788624592"></script>
+  <script src="data.js?v=1788624592"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -255,7 +255,7 @@
     // 회원 목록이 많으면 하나씩 스크롤해서 찾기 힘드니까, 회원 관리 화면과 똑같은 방식(이름 또는
     // 전화번호 뒷자리 일부)으로 검색해서 바로 골라 넣을 수 있게 함 (matchesMemberSearch는 data.js 공용 함수)
     function memberSubLabel(m) {
-      const parts = [m.phone || '전화번호 없음'];
+      const parts = [formatPhone(m.phone) || '전화번호 없음'];
       parts.push(m.pt_remaining_sessions != null ? `잔여 ${m.pt_remaining_sessions}회` : '잔여횟수 미기록');
       if (m.assigned_trainer_id === selectedTrainerId) parts.push('내 담당');
       return parts.join(' · ');

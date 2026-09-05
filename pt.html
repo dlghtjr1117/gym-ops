@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1788620715" />
+<link rel="stylesheet" href="style.css?v=1788624592" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -273,7 +273,7 @@
             </select>
           </div>
           <div class="field"><label>상담일(날짜)</label><input type="date" id="l_contact_date" required /></div>
-          <div class="field"><label>금액(원)</label><input type="number" id="l_expected_amount" min="0" placeholder="예: 900000" /></div>
+          <div class="field"><label>금액(원)</label><input type="text" inputmode="numeric" class="money-input" id="l_expected_amount" placeholder="예: 900,000" /></div>
           <div class="field"><label>횟수</label><input type="number" id="l_sessions" min="0" placeholder="예: 10" /></div>
           <div class="field"><label>확률</label>
             <select id="l_probability">
@@ -321,7 +321,7 @@
             </select>
           </div>
           <div class="field"><label>재등록예상횟수</label><input type="number" id="cm_expected_sessions" min="0" placeholder="예: 20" /></div>
-          <div class="field"><label>예상매출(원)</label><input type="number" id="cm_expected_amount" min="0" placeholder="예: 1200000" /></div>
+          <div class="field"><label>예상매출(원)</label><input type="text" inputmode="numeric" class="money-input" id="cm_expected_amount" placeholder="예: 1,200,000" /></div>
           <div class="field"><label>재등록확률</label>
             <select id="cm_expected_probability">
               <option value="" selected>미설정</option>
@@ -358,12 +358,15 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788620715"></script>
-  <script src="auth.js?v=1788620715"></script>
-  <script src="data.js?v=1788620715"></script>
+  <script src="config.js?v=1788624592"></script>
+  <script src="auth.js?v=1788624592"></script>
+  <script src="data.js?v=1788624592"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    // 리드(상담) 전화번호 입력칸도 타이핑하는 대로 자동으로 하이픈이 붙게 함
+    attachPhoneAutoFormat(document.getElementById('l_phone'));
 
     let currentUserId = null;
     let isManagerFlag = false;
@@ -678,7 +681,9 @@
     async function handleLeadFieldSave(inputEl, field, isNumber) {
       const id = inputEl.dataset.leadId;
       let value = inputEl.value.trim();
-      if (isNumber) value = value === '' ? null : Number(value);
+      // 금액 칸(money-input)은 콤마가 자동으로 붙어있어서(예: "1,234,000") 저장 전에 콤마를 지워야 함 -
+      // 횟수처럼 콤마가 없는 숫자 칸은 지워도 값이 그대로라 같은 처리를 써도 안전함
+      if (isNumber) value = value === '' ? null : Number(value.replace(/,/g, ''));
       else value = value === '' ? null : value;
       try {
         await updatePtLead(id, { [field]: value });
@@ -747,7 +752,7 @@
             <td><input class="sheet-input" type="date" value="${l.contact_date || ''}" data-lead-id="${l.id}" onchange="handleLeadDateChange(this)" /></td>
             <td>${renderSourceSelect(l)}</td>
             <td><input class="sheet-input" type="text" value="${escapeHtml(l.name || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'name',false)" placeholder="이름" /></td>
-            <td><input class="sheet-input" type="number" min="0" value="${l.expected_amount != null ? l.expected_amount : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'expected_amount',true)" placeholder="금액" /></td>
+            <td><input class="sheet-input money-input" type="text" inputmode="numeric" value="${l.expected_amount != null ? Number(l.expected_amount).toLocaleString('ko-KR') : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'expected_amount',true)" placeholder="금액" /></td>
             <td><input class="sheet-input" type="number" min="0" value="${l.sessions != null ? l.sessions : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'sessions',true)" placeholder="횟수" /></td>
             <td>${renderProbSelect(l)}</td>
             <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="메모" /></td>
@@ -792,7 +797,8 @@
     async function handleCareFieldSave(inputEl, field, isNumber) {
       const id = inputEl.dataset.memberId;
       let value = inputEl.value.trim();
-      if (isNumber) value = value === '' ? null : Number(value);
+      // 금액 칸(money-input)은 콤마가 자동으로 붙어있어서(예: "1,234,000") 저장 전에 콤마를 지워야 함
+      if (isNumber) value = value === '' ? null : Number(value.replace(/,/g, ''));
       else value = value === '' ? null : value;
       try {
         await updatePtCareLog(id, { [field]: value });
@@ -902,7 +908,7 @@
           <td style="text-align:center;"><button type="button" class="toggle-ox ${shortVal === 'O' ? 'is-o' : 'is-x'}" data-member-id="${m.id}" data-value="${shortVal}" onclick="handleToggleShortTerm(this)">${shortVal}</button></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_long_term_plan || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_long_term_plan',false)" placeholder="장기적 플랜" /></td>
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_sessions != null ? m.pt_expected_sessions : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_sessions',true)" placeholder="예상횟수" /></td>
-          <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_amount != null ? m.pt_expected_amount : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_amount',true)" placeholder="예상매출" /></td>
+          <td><input class="sheet-input money-input" type="text" inputmode="numeric" value="${m.pt_expected_amount != null ? Number(m.pt_expected_amount).toLocaleString('ko-KR') : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_amount',true)" placeholder="예상매출" /></td>
           <td><select class="sheet-input badge ${CARE_PROB_BADGE[careProbVal] || ''}" data-member-id="${m.id}" onchange="handleCareProbSave(this)">${probOptions}</select></td>
           <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteCareLog('${m.id}')">삭제</button></td>
         </tr>`;
@@ -921,7 +927,7 @@
         box.innerHTML = list.slice(0, 8).map(m => `
           <div class="member-search-item" data-id="${m.id}">
             <div class="msi-name">${m.name}</div>
-            <div class="msi-sub">${m.phone || '전화번호 없음'} · ${m.pt_remaining_sessions != null ? '잔여 ' + m.pt_remaining_sessions + '회' : '잔여횟수 미기록'}</div>
+            <div class="msi-sub">${formatPhone(m.phone) || '전화번호 없음'} · ${m.pt_remaining_sessions != null ? '잔여 ' + m.pt_remaining_sessions + '회' : '잔여횟수 미기록'}</div>
           </div>
         `).join('');
         box.querySelectorAll('.member-search-item[data-id]').forEach(item => {
@@ -937,7 +943,7 @@
       document.getElementById('cm_memberSearch').value = m.name;
       document.getElementById('cm_memberResults').style.display = 'none';
       const selectedEl = document.getElementById('cm_memberSelected');
-      selectedEl.textContent = `✓ 연결됨: ${m.name} (${m.phone || '전화번호 없음'})`;
+      selectedEl.textContent = `✓ 연결됨: ${m.name} (${formatPhone(m.phone) || '전화번호 없음'})`;
       selectedEl.style.display = 'block';
       document.getElementById('cm_name').value = m.name;
       document.getElementById('cm_name').readOnly = true;
@@ -1042,7 +1048,7 @@
           pt_short_term_plan: document.getElementById('cm_short_term_plan').value,
           pt_long_term_plan: document.getElementById('cm_long_term_plan').value.trim() || null,
           pt_expected_sessions: document.getElementById('cm_expected_sessions').value ? Number(document.getElementById('cm_expected_sessions').value) : null,
-          pt_expected_amount: document.getElementById('cm_expected_amount').value ? Number(document.getElementById('cm_expected_amount').value) : null,
+          pt_expected_amount: moneyInputValue('cm_expected_amount'),
           ...probPatch
         });
         closeAddCareMemberModal();
@@ -1320,7 +1326,7 @@
           source: document.getElementById('l_source').value || null,
           week_no: Number(document.getElementById('l_week').value) || null,
           contact_date: document.getElementById('l_contact_date').value || formatDateStr(new Date()),
-          expected_amount: document.getElementById('l_expected_amount').value ? Number(document.getElementById('l_expected_amount').value) : null,
+          expected_amount: moneyInputValue('l_expected_amount'),
           sessions: document.getElementById('l_sessions').value ? Number(document.getElementById('l_sessions').value) : null,
           ot_date: otDate,
           ot_status: otDate ? 'scheduled' : null,
