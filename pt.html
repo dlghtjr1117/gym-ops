@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1788576580" />
+<link rel="stylesheet" href="style.css?v=1788578733" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -344,9 +344,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788576580"></script>
-  <script src="auth.js?v=1788576580"></script>
-  <script src="data.js?v=1788576580"></script>
+  <script src="config.js?v=1788578733"></script>
+  <script src="auth.js?v=1788578733"></script>
+  <script src="data.js?v=1788578733"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -716,7 +716,7 @@
             <td><input class="sheet-input" type="number" min="0" value="${l.sessions != null ? l.sessions : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'sessions',true)" placeholder="횟수" /></td>
             <td>${renderProbSelect(l)}</td>
             <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="메모" /></td>
-            <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleLeadDelete('${l.id}')">삭제</button></td>
+            <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleLeadDelete('${l.id}')">삭제</button></td>
           </tr>`;
       });
       tbody.innerHTML = html;
@@ -869,7 +869,7 @@
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_sessions != null ? m.pt_expected_sessions : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_sessions',true)" placeholder="예상횟수" /></td>
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_amount != null ? m.pt_expected_amount : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_amount',true)" placeholder="예상매출" /></td>
           <td><select class="sheet-input badge ${CARE_PROB_BADGE[careProbVal] || ''}" data-member-id="${m.id}" onchange="handleCareProbSave(this)">${probOptions}</select></td>
-          <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleDeleteCareLog('${m.id}')">삭제</button></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteCareLog('${m.id}')">삭제</button></td>
         </tr>`;
       }).join('');
     }
@@ -1146,7 +1146,7 @@
           <td><input class="sheet-input" type="text" value="${escapeHtml(r.name)}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'name',false)" /></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(r.memo || '')}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
           <td><input class="sheet-input" type="date" data-id="${r.id}" title="날짜를 정하면 OT1로 자동 이동돼요" onblur="handlePromoteToOt1(this)" /></td>
-          <td style="text-align:center;"><button type="button" class="btn-link" style="color:#dc2626;" onclick="handleDeleteOtNoResponse('${r.id}')">삭제</button></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtNoResponse('${r.id}')">삭제</button></td>
         </tr>`).join('');
     }
 

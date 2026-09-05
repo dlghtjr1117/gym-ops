@@ -235,28 +235,48 @@ tr:last-child td { border-bottom: none; }
 .member-search-selected { margin-top: 6px; font-size: 12px; color: var(--green-600); font-weight: 600; display: none; }
 
 /* PT 관리 - 주차별 매출 기록에서 확률(단계)에 따라 그 행 전체를 옅게 물들임
-   (뱃지 하나만 색이 있으면 눈에 잘 안 띈다는 피드백으로, 행 전체를 같은 색 계열로 표시함) */
+   (뱃지 하나만 색이 있으면 눈에 잘 안 띈다는 피드백으로, 행 전체를 같은 색 계열로 표시함).
+   배경은 항상 연한 색으로 고정이라, badge-*와 같은 이유로 글자색도 원래 라이트 모드 때 보이던
+   진한 남색(#0f172a)으로 고정해둠 - 안 그러면 다크 모드에서 글자색이 밝아지면서 이 연한 배경
+   위에서 거의 안 보이게 됨(PT 관리 화면 "글씨가 아예 안 보인다" 피드백으로 발견/수정, 2026-09-05) */
 .row-prob-p25 td { background: var(--slate-100, #f1f5f9); }
-.row-prob-p50 td { background: #fef9c3; }
-.row-prob-p75 td { background: #ffedd5; }
-.row-prob-p100 td { background: #dcfce7; }
-.row-prob-registered td { background: #dcfce7; }
-.row-prob-rolled_over td { background: #f3e8ff; }
-.row-prob-missed td { background: #fee2e2; }
+.row-prob-p50 td { background: #fef9c3; color: #0f172a; }
+.row-prob-p75 td { background: #ffedd5; color: #0f172a; }
+.row-prob-p100 td { background: #dcfce7; color: #0f172a; }
+.row-prob-registered td { background: #dcfce7; color: #0f172a; }
+.row-prob-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-prob-missed td { background: #fee2e2; color: #0f172a; }
 
 /* PT 관리 - PT 회원 관리(재등록확률)에서도 동일하게 행 전체를 물들임 */
 .row-care-p25 td { background: var(--slate-100, #f1f5f9); }
-.row-care-p50 td { background: #fef9c3; }
-.row-care-p75 td { background: #ffedd5; }
-.row-care-registered td { background: #dcfce7; }
-.row-care-rolled_over td { background: #f3e8ff; }
-.row-care-missed td { background: #fee2e2; }
+.row-care-p50 td { background: #fef9c3; color: #0f172a; }
+.row-care-p75 td { background: #ffedd5; color: #0f172a; }
+.row-care-registered td { background: #dcfce7; color: #0f172a; }
+.row-care-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-care-missed td { background: #fee2e2; color: #0f172a; }
 
 /* PT 관리 - OT 관리(OT1/OT2 현황)도 동일하게 행 전체를 물들임: 예정=주황, 이월=보라, 미스=빨강, 완료=초록 */
-.row-otstatus-scheduled td { background: #ffedd5; }
-.row-otstatus-rolled_over td { background: #f3e8ff; }
-.row-otstatus-missed td { background: #fee2e2; }
-.row-otstatus-done td { background: #dcfce7; }
+.row-otstatus-scheduled td { background: #ffedd5; color: #0f172a; }
+.row-otstatus-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-otstatus-missed td { background: #fee2e2; color: #0f172a; }
+.row-otstatus-done td { background: #dcfce7; color: #0f172a; }
+
+/* 위 행들의 셀 대부분은 실제로는 td 글자가 아니라 그 안의 입력칸(.sheet-input - 날짜/이름/금액/
+   횟수/메모처럼 바로 타이핑해서 저장하는 "엑셀 시트" 스타일 칸)이라서, 바로 위 td { color: #0f172a }
+   만으로는 안 고쳐짐 - <input>/<select>는 배경은 투명이라 행 색이 비치지만, 글자색은 부모(td)가
+   아니라 전역 규칙(input, select { color: var(--slate-900) })을 직접 물려받아서 다크 모드에서
+   다시 밝아짐(td 배경 고정 문제를 고쳤는데도 "글씨가 안 보인다"는 게 이 부분 때문이었음, 2026-09-05
+   재확인). 확률/상태 뱃지 select(.badge 포함)는 이미 badge-*로 색이 정해져 있어서 건드리지 않음 */
+.row-prob-p50 .sheet-input:not(.badge), .row-prob-p75 .sheet-input:not(.badge),
+.row-prob-p100 .sheet-input:not(.badge), .row-prob-registered .sheet-input:not(.badge),
+.row-prob-rolled_over .sheet-input:not(.badge), .row-prob-missed .sheet-input:not(.badge),
+.row-care-p50 .sheet-input:not(.badge), .row-care-p75 .sheet-input:not(.badge),
+.row-care-registered .sheet-input:not(.badge), .row-care-rolled_over .sheet-input:not(.badge),
+.row-care-missed .sheet-input:not(.badge),
+.row-otstatus-scheduled .sheet-input:not(.badge), .row-otstatus-rolled_over .sheet-input:not(.badge),
+.row-otstatus-missed .sheet-input:not(.badge), .row-otstatus-done .sheet-input:not(.badge) {
+  color: #0f172a;
+}
 
 /* 만료회원·TM 표에서 뱃지처럼 보이는 TM상태 <select> (클릭하면 바로 상태 변경) */
 select.tm-status-select {

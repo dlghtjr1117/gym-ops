@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788576580" />
+<link rel="stylesheet" href="style.css?v=1788578733" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -237,9 +237,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788576580"></script>
-  <script src="auth.js?v=1788576580"></script>
-  <script src="data.js?v=1788576580"></script>
+  <script src="config.js?v=1788578733"></script>
+  <script src="auth.js?v=1788578733"></script>
+  <script src="data.js?v=1788578733"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -993,7 +993,7 @@
         <tr data-id="${s.id}">
           <td class="muted" style="font-size:12px;">${formatShareDate(s.created_at)}</td>
           <td><a href="${shareUrlFor(s.id)}" target="_blank" rel="noopener" style="font-size:12px;">${shareUrlFor(s.id)}</a></td>
-          <td><button type="button" class="btn-link revoke-share-btn" style="color:#dc2626;">삭제</button></td>
+          <td><button type="button" class="btn-link revoke-share-btn" style="color:var(--red-600);">삭제</button></td>
         </tr>
       `).join('');
       tbody.querySelectorAll('.revoke-share-btn').forEach(btn => {
@@ -1048,6 +1048,13 @@
           // 숫자가 반만 잘려 나온다"는 피드백). 그래서 캡쳐용으로 복제된 문서(onclone, 실제 화면에는
           // 영향 없음)에서만 입력칸을 일반 텍스트 칸으로 바꿔치기해서 글자가 온전히 다 보이게 함.
           onclone: (clonedDoc) => {
+            // 다크 모드에서 이 버튼을 누르면, 위 backgroundColor(#f8fafc, 라이트 모드 배경값)로 채운
+            // 빈 여백 위에 카드·표는 다크 모드 색 그대로 캡쳐돼서 반은 밝고 반은 어두운 이상한
+            // 이미지가 나오는 문제가 있었음("이미지 저장했는데 이렇게 된다"는 피드백으로 발견).
+            // 카카오톡 등으로 다른 사람에게 보내는 이미지는 보내는 사람의 다크 모드 설정과 무관하게
+            // 항상 같은(원래 라이트 모드) 모습으로 나오는 게 맞아서, 복제된 문서에서만 다크 모드를
+            // 꺼서 캡쳐함 (실제 화면은 그대로 다크 모드 유지됨).
+            clonedDoc.documentElement.removeAttribute('data-theme');
             clonedDoc.querySelectorAll('input.sheet-input').forEach((inp) => {
               const val = inp.value;
               const div = clonedDoc.createElement('div');

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 홈</title>
-<link rel="stylesheet" href="style.css?v=1788576580" />
+<link rel="stylesheet" href="style.css?v=1788578733" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -74,9 +74,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788576580"></script>
-  <script src="auth.js?v=1788576580"></script>
-  <script src="data.js?v=1788576580"></script>
+  <script src="config.js?v=1788578733"></script>
+  <script src="auth.js?v=1788578733"></script>
+  <script src="data.js?v=1788578733"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -125,7 +125,7 @@
 
         status.textContent = `백업 완료! (회원 ${data.members.length}명 · 매출 ${data.sales.length}건 · 업무 ${data.tasks.length}건) 다운로드 폴더를 확인해주세요.`;
       } catch (err) {
-        status.style.color = '#dc2626';
+        status.style.color = 'var(--red-600)';
         status.textContent = '백업 중 오류가 발생했어요: ' + err.message;
       } finally {
         btn.disabled = false;
