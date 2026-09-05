@@ -71,14 +71,16 @@
   filter: invert(0.85);
 }
 /* 다크 모드 전용 - 히어로 카드 그라데이션(hero-blue/purple/teal)을 라이트 모드의 파랑/보라/청록
-   대신 레드 계열로 통일함(2026-09-05, "레드톤으로 세련되게" 요청). 완전히 같은 빨강이면 3개 카드가
-   또 구분이 안 돼서, 크림슨/로즈/코랄 3가지 레드 계열 색조로 나눔 - hero-green(성공/확정 의미)은
-   그대로 초록 유지. 홈 배너도 원래 hero-blue와 같은 인디고 그라데이션을 하드코딩해서 썼던 곳이라
-   같이 맞춰줌. 기본 버튼과 필터·리포트 탭의 "선택됨" 상태도 밋밋한 단색 대신 같은 그라데이션으로 */
+   대신 레드 계열로 통일함(2026-09-05, "레드톤으로 세련되게" 요청). 처음엔 3개 카드가 구분되도록
+   크림슨/로즈/코랄로 색조를 나눴었는데, "헷갈려도 상관없으니 그냥 다 빨간색으로 통일해달라"는
+   후속 요청을 받아 세 클래스 모두 완전히 같은 빨강 그라데이션으로 맞춤(2026-09-05) - hero-green
+   (성공/확정 의미)은 이 요청과 무관해서 그대로 초록 유지. 홈 배너도 원래 hero-blue와 같은 인디고
+   그라데이션을 하드코딩해서 썼던 곳이라 같이 맞춰줌. 기본 버튼과 필터·리포트 탭의 "선택됨" 상태도
+   밋밋한 단색 대신 같은 그라데이션으로 */
 :root[data-theme="dark"] .hero-blue,
+:root[data-theme="dark"] .hero-purple,
+:root[data-theme="dark"] .hero-teal,
 :root[data-theme="dark"] .home-banner { background: linear-gradient(135deg, #7f1d1d, #dc2626 55%, #f87171); }
-:root[data-theme="dark"] .hero-purple { background: linear-gradient(135deg, #581c1c, #9f1239 55%, #fb7185); }
-:root[data-theme="dark"] .hero-teal { background: linear-gradient(135deg, #7c2d12, #ea580c 55%, #fdba74); }
 :root[data-theme="dark"] .btn-primary { background: linear-gradient(135deg, #7f1d1d, #dc2626 60%, #f87171); box-shadow: 0 6px 16px -4px rgba(220,38,38,0.5); }
 :root[data-theme="dark"] .btn-primary:hover { background: linear-gradient(135deg, #991b1b, #ef4444 60%, #fca5a5); }
 :root[data-theme="dark"] .filter-tab.active,
@@ -345,10 +347,10 @@ select.tm-status-select {
 .hero-card-secondary.accent-blue::before { background: #4f46e5; }
 .hero-card-secondary.accent-purple::before { background: #9333ea; }
 .hero-card-secondary.accent-teal::before { background: #14b8a6; }
-/* 다크 모드에서는 위 hero-blue/purple/teal과 같은 레드 계열(크림슨/로즈/코랄) 그라데이션으로 맞춤 */
-:root[data-theme="dark"] .hero-card-secondary.accent-blue::before { background: linear-gradient(180deg, #f87171, #dc2626); }
-:root[data-theme="dark"] .hero-card-secondary.accent-purple::before { background: linear-gradient(180deg, #fb7185, #9f1239); }
-:root[data-theme="dark"] .hero-card-secondary.accent-teal::before { background: linear-gradient(180deg, #fdba74, #ea580c); }
+/* 다크 모드에서는 위 hero-blue/purple/teal과 같은 빨강으로 통일(2026-09-05, "그냥 다 빨간색으로") */
+:root[data-theme="dark"] .hero-card-secondary.accent-blue::before,
+:root[data-theme="dark"] .hero-card-secondary.accent-purple::before,
+:root[data-theme="dark"] .hero-card-secondary.accent-teal::before { background: linear-gradient(180deg, #f87171, #dc2626); }
 .hero-card-secondary .hero-icon { opacity: .85; }
 .hero-card-secondary .hero-label { color: var(--slate-500); opacity: 1; }
 .hero-card-secondary .hero-value-money { font-size: 21px; color: var(--slate-900); }
