@@ -1,9 +1,4 @@
-/* 공통 스타일. 원래는 외부 CDN 없이 순수 CSS만 썼는데, 다크 모드("크림슨 글로우 다크") 전용
-   글꼴(IBM Plex Sans KR)을 구글 폰트에서 불러오는 이 한 줄만 예외로 추가함 - 못 불러오는
-   환경(오프라인 등)에서는 아래 폰트 목록의 다음 순번(시스템 기본 한글 글꼴)으로 자연스럽게
-   대체되니 화면이 깨지지는 않음 */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap');
-
+/* 공통 스타일 - 외부 CDN 없이 순수 CSS만 사용 (오프라인에서도 항상 동일하게 보임) */
 :root {
   --indigo-600: #4f46e5;
   --indigo-700: #4338ca;
@@ -28,13 +23,13 @@
   --blue-600: #4338ca;
 }
 
-/* ---- 다크 모드: 크림슨 글로우 다크 ----
+/* ---- 다크 모드: 미디엄 다크그레이 레드 ----
    화면 우측 상단 "🌙 다크" 버튼(auth.js에서 자동으로 삽입)으로 켜고 끌 수 있음. <html>에
    data-theme="dark"가 붙으면 아래 값들로 바뀌는데, 대부분의 색이 위 :root 변수를 그대로 쓰고
    있어서 이 블록 하나로 전체 화면(카드/표/버튼/입력칸/모달 등)이 자동으로 다크 모드가 됨.
-   거의 검정에 가까운 배경 위에 브랜드 포인트색을 크림슨(진한 빨강)으로 바꾸고, 버튼/포인트
-   요소에 은은한 붉은 글로우(광선) 효과를 줘서 "크림슨 글로우 다크" 느낌을 냄. 폰트도 이 모드에서만
-   IBM Plex Sans KR로 바꿔서 좀 더 또렷하고 모던한 인상을 줌.
+   완전히 새까만 화면은 눈이 편하지 않다는 피드백을 받아서, 짙지만 너무 어둡지는 않은 중간 톤
+   회색(다크그레이)을 배경으로 쓰고 포인트색만 빨강(크림슨)으로 줌 - 순수 검정/그라데이션 글로우
+   효과 없이 차분하고 깔끔한 느낌으로 잡음.
    상태 뱃지(빨강/노랑/초록 등)나 히어로 카드 그라데이션처럼 색 자체가 의미를 담고 있는 작은
    요소들은 일부러 안 건드렸음 - 어두운 배경 위에 밝은 색 칩으로 그대로 떠 있어도 잘 보이고,
    구분도 여전히 잘 되기 때문. 특히 위험/경고를 뜻하는 --red-600(에러 문구, 미납 표시 등)은
@@ -43,34 +38,18 @@
   --indigo-600: #dc2626;
   --indigo-700: #ef4444;
   --blue-600: #818cf8;
-  --slate-50: #1c1012;
-  --slate-100: #241416;
-  --slate-200: rgba(220,38,38,0.16);
-  --slate-300: rgba(220,38,38,0.28);
-  --slate-400: #6b4e4e;
-  --slate-500: #9c7a7a;
-  --slate-700: #d8b9b9;
-  --slate-900: #f5e8e8;
-  --surface: #1a0e10;
+  --slate-50: #2b2b2f;
+  --slate-100: #3a3a3f;
+  --slate-200: rgba(255,255,255,0.08);
+  --slate-300: rgba(255,255,255,0.14);
+  --slate-400: #6c6c70;
+  --slate-500: #9a9a9e;
+  --slate-700: #c7c7ca;
+  --slate-900: #f0f0f0;
+  --surface: #35353a;
   --green-600: #4ade80;
   --red-600: #fca5a5;
   --amber-500: #fbbf24;
-}
-/* 다크 모드에서만 IBM Plex Sans KR 폰트를 씀 (라이트 모드는 기존 폰트 그대로 유지) */
-:root[data-theme="dark"] body {
-  font-family: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
-}
-/* 화면 우상단에 은은하게 번지는 붉은 글로우 - "크림슨 글로우" 느낌을 내는 배경 장식.
-   pointer-events:none이라 클릭/스크롤 등 실제 사용에는 전혀 영향 없음 */
-:root[data-theme="dark"] body::before {
-  content: "";
-  position: fixed; top: -180px; right: -160px; width: 460px; height: 460px;
-  border-radius: 50%; pointer-events: none; z-index: 0;
-  background: radial-gradient(circle, rgba(220,38,38,0.16), transparent 70%);
-}
-/* 주요 버튼(등록/저장 등)에 붉은 글로우 그림자를 줘서 포인트색이 더 도드라져 보이게 함 */
-:root[data-theme="dark"] .btn-primary {
-  box-shadow: 0 0 18px rgba(220,38,38,0.35);
 }
 /* 상단 메뉴 활성 탭 / 홈 화면 타일 아이콘은 원래 옅은 인디고색(#eef2ff)을 하드코딩해 둔 곳이라,
    다크 모드에서 포인트색이 크림슨으로 바뀌어도 자동으로 안 따라와서 따로 맞춰줌 */
@@ -97,7 +76,6 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   background: var(--slate-50);
   color: var(--slate-900);
-  position: relative;
 }
 
 /* 입력칸/셀렉트/텍스트영역은 페이지마다 배경색을 따로 안 정해준 곳이 많아서(브라우저 기본값인
