@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788624592" />
+<link rel="stylesheet" href="style.css?v=1788628716" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -16,6 +16,42 @@
   }
   .sheet-input:hover { border-color: var(--slate-300); }
   .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
+
+  /* "월간 총매출" 카드 클릭 → 이용권 분류별/결제 수단별/판매 분류별 분석 패널
+     (참고한 타사 대시보드처럼 카드 클릭하면 아래에 도넛 차트 + 순위 목록이 펼쳐지는 방식)
+     클릭 가능 상태(cursor/hover/focus-visible)는 style.css의 .hero-card-secondary.clickable에서
+     공통으로 처리하고, 여기서는 이 페이지에만 있는 힌트 문구 스타일만 둠 */
+  .hero-toggle-hint { font-size: 11px; opacity: .85; margin-top: 4px; }
+
+  .breakdown-panel { margin-top: 14px; padding: 18px; border: 1px solid var(--slate-200); border-radius: 14px; background: var(--surface); }
+  .breakdown-body { display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-start; margin-top: 16px; }
+  .breakdown-chart-wrap { flex: 0 0 190px; display: flex; flex-direction: column; align-items: center; }
+  .breakdown-chart-total { margin-top: 12px; text-align: center; }
+  .breakdown-chart-total .amt { font-size: 17px; font-weight: 700; }
+  .breakdown-chart-total .lbl { font-size: 11px; color: var(--slate-500); margin-top: 2px; }
+  .breakdown-list { flex: 1 1 300px; min-width: 240px; }
+  .breakdown-row { display: flex; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--slate-100, var(--slate-200)); font-size: 13px; }
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-swatch { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+  .breakdown-row .name { flex: 1; }
+  .breakdown-row .amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .breakdown-row .pct { width: 46px; text-align: right; color: var(--slate-500); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .breakdown-row .cnt { width: 44px; text-align: right; color: var(--slate-500); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  /* 분류별 고정 색상 슬롯 - dataviz 팔레트 검증 스크립트로 이 화면의 실제 카드 배경(라이트: 흰색,
+     다크: #12151d, 2026-09-05 네이비블랙 리뉴얼 후 값)에 대해 CVD 대비/명도 기준을 통과하는지
+     재검증한 값. 카테고리 하나당 색 하나를 고정해서 매달 순위가 바뀌어도 같은 항목은 항상 같은
+     색으로 보이게 함(예: "이용권"은 항상 파랑) */
+  :root {
+    --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
+    --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
+    --viz-other: #94a3b8;
+  }
+  :root[data-theme="dark"] {
+    --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500;
+    --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
+    --viz-other: #75757a;
+  }
 </style>
 </head>
 <body>
@@ -101,23 +137,42 @@
 
       <p class="muted" style="margin:18px 0 8px;font-size:13px;font-weight:600;" id="monthSummaryLabel">📅 이번 달 매출</p>
       <div class="hero-grid" id="monthSummaryGrid">
-        <div class="hero-card hero-blue">
+        <div class="hero-card-secondary accent-blue clickable" id="monthTotalCard" role="button" tabindex="0" aria-expanded="false">
           <div class="hero-icon">💰</div>
           <div class="hero-label">월간 총매출 (FC+PT)</div>
           <div class="hero-value hero-value-money" id="monthTotalAmount">-</div>
           <div class="hero-sub" id="monthTotalCount">불러오는 중...</div>
+          <div class="hero-toggle-hint" id="monthTotalToggleHint">🔍 클릭해서 분류별로 보기 ▾</div>
         </div>
-        <div class="hero-card hero-purple">
+        <div class="hero-card-secondary accent-purple">
           <div class="hero-icon">🏋️</div>
           <div class="hero-label">FC 월간 총매출 <span style="font-weight:400;">(헬스이용권·그룹PT·운동복·락커)</span></div>
           <div class="hero-value hero-value-money" id="monthFcAmount">-</div>
           <div class="hero-sub" id="monthFcCount">불러오는 중...</div>
         </div>
-        <div class="hero-card hero-teal">
+        <div class="hero-card-secondary accent-teal">
           <div class="hero-icon">🤸</div>
           <div class="hero-label">PT 월간 총매출 <span style="font-weight:400;">(개인PT)</span></div>
           <div class="hero-value hero-value-money" id="monthPtAmount">-</div>
           <div class="hero-sub" id="monthPtCount">불러오는 중...</div>
+        </div>
+      </div>
+
+      <div id="monthBreakdownPanel" class="breakdown-panel" style="display:none;">
+        <div class="filter-tabs" id="breakdownTabs">
+          <button type="button" class="filter-tab active" data-tab="membership5" onclick="switchBreakdownTab('membership5')">이용권 분류별</button>
+          <button type="button" class="filter-tab" data-tab="payment" onclick="switchBreakdownTab('payment')">결제 수단별</button>
+          <button type="button" class="filter-tab" data-tab="category12" onclick="switchBreakdownTab('category12')">판매 분류별</button>
+        </div>
+        <div class="breakdown-body">
+          <div class="breakdown-chart-wrap">
+            <svg id="breakdownDonut" width="176" height="176" viewBox="0 0 176 176"></svg>
+            <div class="breakdown-chart-total">
+              <div class="amt" id="breakdownChartTotal">-</div>
+              <div class="lbl">이번 달 매출 합계</div>
+            </div>
+          </div>
+          <div class="breakdown-list" id="breakdownList"><p class="muted" style="padding:8px 0;">불러오는 중...</p></div>
         </div>
       </div>
 
@@ -237,9 +292,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788624592"></script>
-  <script src="auth.js?v=1788624592"></script>
-  <script src="data.js?v=1788624592"></script>
+  <script src="config.js?v=1788628716"></script>
+  <script src="auth.js?v=1788628716"></script>
+  <script src="data.js?v=1788628716"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -560,6 +615,14 @@
         document.getElementById('monthTotalCount').textContent = err.message;
       }
 
+      // "월간 총매출" 카드를 클릭하면 펼쳐지는 이용권 분류별/결제 수단별/판매 분류별 분석 패널 -
+      // 화살표로 기준월을 옮기면 이 패널도 같이 따라가야 해서, 캐시를 비우고 이미 펼쳐져 있으면
+      // 새 기준월 데이터로 바로 다시 그려줌
+      breakdownMonthStr = null;
+      if (breakdownPanelOpen) {
+        loadAndRenderBreakdown();
+      }
+
       try {
         const stats = await fetchCategoryRenewalStats(monthStr);
         fillCategoryRenewalCard('Membership', stats.membership);
@@ -580,6 +643,186 @@
 
       await refreshInquiryHistory();
     }
+
+    // ---- "월간 총매출" 카드 클릭 → 이용권 분류별/결제 수단별/판매 분류별 분석 패널 ----
+    // 타사 통합 경영 대시보드 캡쳐를 참고해서 만든 기능. "월간 총매출(항상 고정)" 카드를 누르면 카드
+    // 바로 아래에 도넛 차트 + 순위 목록이 펼쳐지고, 탭으로 세 가지 기준(이용권 분류별/결제 수단별/
+    // 판매 분류별)을 바꿔볼 수 있음. 데이터는 이번 달 매출 원본 행을 fetchSalesInRange로 한 번 가져와서
+    // 화면에서 그룹핑함(카드 자체의 합계 로직인 computeSalesBucket과는 별개 - 그쪽은 FC/PT 이분류만
+    // 필요해서 raw 데이터를 굳이 들고 있지 않음).
+    let breakdownPanelOpen = false;
+    let breakdownMonthStr = null; // 마지막으로 데이터를 가져온 기준월(YYYY-MM) - 화살표로 달이 바뀌면 무효화됨
+    let breakdownSalesCache = null; // 기준월의 매출 원본 행 (sale.category, sale.amount, sale.payment_method 사용)
+    let breakdownActiveTab = 'membership5';
+
+    // 색상은 dataviz 팔레트에서 검증된 8슬롯 순서를 그대로 씀(순위가 아니라 항목마다 고정 배정 -
+    // 매달 순위가 바뀌어도 "이용권"은 항상 같은 파란색으로 보이게 하기 위함). 어느 탭이든 8개 슬롯을
+    // 넘는 세부 항목은 색을 새로 만들지 않고 마지막 "기타" 회색 한 칸으로 합침.
+    const BREAKDOWN_TABS = {
+      membership5: {
+        title: '이용권 분류별',
+        field: 'category',
+        groups: [
+          { label: '이용권', cats: ['membership_new', 'membership_renewal'], color: 'var(--viz-1)' },
+          { label: '그룹PT', cats: ['group_pt_new', 'group_pt_renewal'], color: 'var(--viz-2)' },
+          { label: '개인PT', cats: ['pt_new', 'pt_renewal'], color: 'var(--viz-3)' },
+          { label: '락커', cats: ['locker'], color: 'var(--viz-4)' },
+          { label: '운동복', cats: ['clothes'], color: 'var(--viz-5)' },
+          { label: '기타', cats: ['day_pass', 'membership_transfer', 'uncategorized', 'etc'], color: 'var(--viz-other)' }
+        ]
+      },
+      payment: {
+        title: '결제 수단별',
+        field: 'payment_method',
+        groups: [
+          { label: PAYMENT_METHOD_LABEL.card, cats: ['card'], color: 'var(--viz-1)' },
+          { label: PAYMENT_METHOD_LABEL.cash, cats: ['cash'], color: 'var(--viz-2)' },
+          { label: PAYMENT_METHOD_LABEL.transfer, cats: ['transfer'], color: 'var(--viz-3)' },
+          { label: PAYMENT_METHOD_LABEL.kiosk, cats: ['kiosk'], color: 'var(--viz-4)' },
+          { label: '기타/미입력', cats: [], color: 'var(--viz-other)' }
+        ]
+      },
+      category12: {
+        title: '판매 분류별',
+        field: 'category',
+        groups: [
+          { label: CATEGORY_LABEL.membership_new, cats: ['membership_new'], color: 'var(--viz-1)' },
+          { label: CATEGORY_LABEL.membership_renewal, cats: ['membership_renewal'], color: 'var(--viz-2)' },
+          { label: CATEGORY_LABEL.pt_new, cats: ['pt_new'], color: 'var(--viz-3)' },
+          { label: CATEGORY_LABEL.pt_renewal, cats: ['pt_renewal'], color: 'var(--viz-4)' },
+          { label: CATEGORY_LABEL.group_pt_new, cats: ['group_pt_new'], color: 'var(--viz-5)' },
+          { label: CATEGORY_LABEL.group_pt_renewal, cats: ['group_pt_renewal'], color: 'var(--viz-6)' },
+          { label: CATEGORY_LABEL.locker, cats: ['locker'], color: 'var(--viz-7)' },
+          { label: CATEGORY_LABEL.clothes, cats: ['clothes'], color: 'var(--viz-8)' },
+          { label: '기타 (일일권·양도·미분류 등)', cats: ['day_pass', 'membership_transfer', 'uncategorized', 'etc'], color: 'var(--viz-other)' }
+        ]
+      }
+    };
+
+    // sales 원본 배열을 groups 정의대로 묶어서 [{label, color, amount, count}] 형태로 반환(금액 큰 순).
+    // 어느 그룹에도 속하지 않는 값(예: payment_method가 비어있는 옛날 데이터)은 매핑 목록이 비어있는
+    // "기타" 그룹(마지막 항목)에 자동으로 합쳐짐.
+    function computeBreakdownGroups(sales, tabDef) {
+      const buckets = tabDef.groups.map(g => ({ label: g.label, color: g.color, amount: 0, count: 0 }));
+      const catToIndex = {};
+      tabDef.groups.forEach((g, i) => g.cats.forEach(c => { catToIndex[c] = i; }));
+      const fallbackIndex = buckets.length - 1;
+      sales.forEach(s => {
+        const amt = Number(s.amount) || 0;
+        const rawVal = s[tabDef.field];
+        const idx = Object.prototype.hasOwnProperty.call(catToIndex, rawVal) ? catToIndex[rawVal] : fallbackIndex;
+        buckets[idx].amount += amt;
+        buckets[idx].count += 1;
+      });
+      return buckets.filter(b => b.count > 0).sort((a, b) => b.amount - a.amount);
+    }
+
+    // 카드 바로 아래 패널을 펼치고(이미 열려 있으면 접고), 열 때 이번 달 매출 원본을 필요하면 새로 불러옴
+    async function toggleBreakdownPanel() {
+      breakdownPanelOpen = !breakdownPanelOpen;
+      const panel = document.getElementById('monthBreakdownPanel');
+      const hint = document.getElementById('monthTotalToggleHint');
+      const card = document.getElementById('monthTotalCard');
+      if (breakdownPanelOpen) {
+        panel.style.display = 'block';
+        hint.textContent = '🔼 클릭해서 접기';
+        card.setAttribute('aria-expanded', 'true');
+        await loadAndRenderBreakdown();
+      } else {
+        panel.style.display = 'none';
+        hint.textContent = '🔍 클릭해서 분류별로 보기 ▾';
+        card.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    async function loadAndRenderBreakdown() {
+      const monthStr = refMonthStr();
+      if (breakdownMonthStr !== monthStr) {
+        const listEl = document.getElementById('breakdownList');
+        listEl.innerHTML = '<p class="muted" style="padding:8px 0;">불러오는 중...</p>';
+        try {
+          const y = reportRefDate.getFullYear();
+          const m = reportRefDate.getMonth();
+          const monthStart = new Date(y, m, 1);
+          breakdownSalesCache = await fetchSalesInRange(toDateStr(monthStart), toDateStr(addMonths(monthStart, 1)));
+          breakdownMonthStr = monthStr;
+        } catch (err) {
+          listEl.innerHTML = `<p class="error-text" style="display:block;">${err.message}</p>`;
+          return;
+        }
+      }
+      renderBreakdownTab();
+    }
+
+    function switchBreakdownTab(tab) {
+      breakdownActiveTab = tab;
+      document.querySelectorAll('#breakdownTabs .filter-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      renderBreakdownTab();
+    }
+
+    // 도넛(가운데가 빈 원형) 차트를 SVG <circle> 여러 개를 겹쳐서(stroke-dasharray로 부채꼴처럼 잘라)
+    // 그림 - 외부 차트 라이브러리 없이 순수 SVG만 씀. 조각 사이에 살짝 틈(2px)을 둬서 색이 붙어있는
+    // 조각끼리도 경계가 또렷하게 보이게 함(dataviz 스킬의 "조각 사이 서페이스 갭" 권장사항)
+    function renderDonut(buckets, totalAmount) {
+      const svg = document.getElementById('breakdownDonut');
+      const size = 176, cx = size / 2, cy = size / 2, r = 66, strokeWidth = 26;
+      const circumference = 2 * Math.PI * r;
+      const gapPx = 2.5;
+      let offset = 0;
+      const parts = buckets.map(b => {
+        const frac = totalAmount > 0 ? b.amount / totalAmount : 0;
+        const rawLen = frac * circumference;
+        const len = Math.max(rawLen - gapPx, 0);
+        const circle = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${b.color}" ` +
+          `stroke-width="${strokeWidth}" stroke-dasharray="${len} ${circumference - len}" ` +
+          `stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})">` +
+          `<title>${escapeHtml(b.label)}: ${formatWon(b.amount)} (${totalAmount > 0 ? Math.round(b.amount / totalAmount * 1000) / 10 : 0}%)</title></circle>`;
+        offset += rawLen;
+        return circle;
+      });
+      if (buckets.length === 0) {
+        svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--slate-200)" stroke-width="${strokeWidth}"></circle>`;
+      } else {
+        svg.innerHTML = parts.join('');
+      }
+    }
+
+    function renderBreakdownTab() {
+      const tabDef = BREAKDOWN_TABS[breakdownActiveTab];
+      const sales = breakdownSalesCache || [];
+      const buckets = computeBreakdownGroups(sales, tabDef);
+      const totalAmount = buckets.reduce((sum, b) => sum + b.amount, 0);
+
+      document.getElementById('breakdownChartTotal').textContent = formatWon(totalAmount);
+      renderDonut(buckets, totalAmount);
+
+      const listEl = document.getElementById('breakdownList');
+      if (buckets.length === 0) {
+        listEl.innerHTML = '<p class="muted" style="padding:8px 0;">이 달에는 해당 매출 기록이 없어요.</p>';
+        return;
+      }
+      listEl.innerHTML = buckets.map(b => {
+        const pct = totalAmount > 0 ? Math.round(b.amount / totalAmount * 1000) / 10 : 0;
+        return `
+        <div class="breakdown-row">
+          <span class="breakdown-swatch" style="background:${b.color};"></span>
+          <span class="name">${escapeHtml(b.label)}</span>
+          <span class="cnt">${b.count}건</span>
+          <span class="amt">${formatWon(b.amount)}</span>
+          <span class="pct">${pct}%</span>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('monthTotalCard').addEventListener('click', toggleBreakdownPanel);
+    document.getElementById('monthTotalCard').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleBreakdownPanel();
+      }
+    });
 
     // ---- 문의 경로 (센터 전체 공용, 오늘 칸만 기본 노출 - 원래 PT 관리 페이지에 있던 걸 대표님 보고
     // 화면인 이 페이지로 옮겼는데, "표가 너무 길다"는 피드백을 받아서 기본은 오늘 한 줄만 보이게 바꿈.

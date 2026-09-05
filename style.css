@@ -23,30 +23,31 @@
   --blue-600: #4338ca;
 }
 
-/* ---- 다크 모드: 미디엄 다크그레이 레드 ----
+/* ---- 다크 모드: 네이비블랙 + 레드 그라데이션 ----
    화면 우측 상단 "🌙 다크" 버튼(auth.js에서 자동으로 삽입)으로 켜고 끌 수 있음. <html>에
    data-theme="dark"가 붙으면 아래 값들로 바뀌는데, 대부분의 색이 위 :root 변수를 그대로 쓰고
    있어서 이 블록 하나로 전체 화면(카드/표/버튼/입력칸/모달 등)이 자동으로 다크 모드가 됨.
-   완전히 새까만 화면은 눈이 편하지 않다는 피드백을 받아서, 짙지만 너무 어둡지는 않은 중간 톤
-   회색(다크그레이)을 배경으로 쓰고 포인트색만 빨강(크림슨)으로 줌 - 순수 검정/그라데이션 글로우
-   효과 없이 차분하고 깔끔한 느낌으로 잡음.
-   상태 뱃지(빨강/노랑/초록 등)나 히어로 카드 그라데이션처럼 색 자체가 의미를 담고 있는 작은
-   요소들은 일부러 안 건드렸음 - 어두운 배경 위에 밝은 색 칩으로 그대로 떠 있어도 잘 보이고,
-   구분도 여전히 잘 되기 때문. 특히 위험/경고를 뜻하는 --red-600(에러 문구, 미납 표시 등)은
-   브랜드 포인트색과 헷갈리지 않도록 일부러 더 밝은 연분홍 계열로 따로 잡음 */
+   원래는 눈이 편한 중간 톤 회색(다크그레이) 배경이었는데, 2026-09-05에 "더 세련되고 고급스럽게,
+   레드 톤으로" 요청을 받아 훨씬 짙은 네이비블랙 배경 + 카드에 은은한 레드 그라데이션/글로우를
+   쓰는 톤으로 리뉴얼함(회원님이 직접 골라준 시안 그대로 적용).
+   상태 뱃지(빨강/노랑/초록 등)는 여전히 일부러 안 건드렸음 - 어두운 배경 위에 밝은 색 칩으로
+   그대로 떠 있어도 잘 보이고 구분도 잘 되기 때문(과거에 테마별 변수를 썼다가 배경·글자색이 둘 다
+   밝아져서 안 보였던 버그가 있었음). 히어로 카드 그라데이션(hero-blue/purple/teal)과 홈 배너,
+   기본 버튼/탭의 "선택됨" 상태는 이 블록 아래쪽에서 레드 계열로 따로 재정의함. 위험/경고를 뜻하는
+   --red-600(에러 문구, 미납 표시 등)은 브랜드 포인트색과 헷갈리지 않도록 밝은 연분홍 계열로 유지 */
 :root[data-theme="dark"] {
   --indigo-600: #dc2626;
   --indigo-700: #ef4444;
   --blue-600: #818cf8;
-  --slate-50: #2b2b2f;
-  --slate-100: #3a3a3f;
-  --slate-200: rgba(255,255,255,0.08);
-  --slate-300: rgba(255,255,255,0.14);
-  --slate-400: #6c6c70;
-  --slate-500: #9a9a9e;
-  --slate-700: #c7c7ca;
-  --slate-900: #f0f0f0;
-  --surface: #35353a;
+  --slate-50: #0b0e16;
+  --slate-100: #1b202a;
+  --slate-200: #232a35;
+  --slate-300: #2c3340;
+  --slate-400: #6b7385;
+  --slate-500: #93a0b2;
+  --slate-700: #c7ccd6;
+  --slate-900: #f5f6f8;
+  --surface: #12151d;
   --green-600: #4ade80;
   --red-600: #fca5a5;
   --amber-500: #fbbf24;
@@ -68,6 +69,22 @@
 [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
 [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.85);
+}
+/* 다크 모드 전용 - 히어로 카드 그라데이션(hero-blue/purple/teal)을 라이트 모드의 파랑/보라/청록
+   대신 레드 계열로 통일함(2026-09-05, "레드톤으로 세련되게" 요청). 완전히 같은 빨강이면 3개 카드가
+   또 구분이 안 돼서, 크림슨/로즈/코랄 3가지 레드 계열 색조로 나눔 - hero-green(성공/확정 의미)은
+   그대로 초록 유지. 홈 배너도 원래 hero-blue와 같은 인디고 그라데이션을 하드코딩해서 썼던 곳이라
+   같이 맞춰줌. 기본 버튼과 필터·리포트 탭의 "선택됨" 상태도 밋밋한 단색 대신 같은 그라데이션으로 */
+:root[data-theme="dark"] .hero-blue,
+:root[data-theme="dark"] .home-banner { background: linear-gradient(135deg, #7f1d1d, #dc2626 55%, #f87171); }
+:root[data-theme="dark"] .hero-purple { background: linear-gradient(135deg, #581c1c, #9f1239 55%, #fb7185); }
+:root[data-theme="dark"] .hero-teal { background: linear-gradient(135deg, #7c2d12, #ea580c 55%, #fdba74); }
+:root[data-theme="dark"] .btn-primary { background: linear-gradient(135deg, #7f1d1d, #dc2626 60%, #f87171); box-shadow: 0 6px 16px -4px rgba(220,38,38,0.5); }
+:root[data-theme="dark"] .btn-primary:hover { background: linear-gradient(135deg, #991b1b, #ef4444 60%, #fca5a5); }
+:root[data-theme="dark"] .filter-tab.active,
+:root[data-theme="dark"] .report-tab.active {
+  background: linear-gradient(135deg, #7f1d1d, #dc2626);
+  border-color: transparent;
 }
 
 * { box-sizing: border-box; }
@@ -311,6 +328,35 @@ select.tm-status-select {
 .hero-ring-value { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; }
 .hero-ring-percent { font-size: 15px; font-weight: 700; margin-left: 2px; }
 @media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; } }
+
+/* "이번 달 매출(항상 고정)"처럼 히어로 카드가 한 화면에 두 줄 이상 반복될 때, 아래 줄은 덜
+   강조되도록 만든 보조(2차) 스타일 - 원래는 위/아래 6장이 색깔·굵기가 완전히 똑같아서 작은 라벨
+   글자를 안 읽으면 구분이 안 되는 "카드 벽" 문제가 있었음(2026-09-05, 대시보드 디자인 개선 요청).
+   배경은 --surface를 그대로 써서 라이트/다크 모드 카드 배경에 자연히 맞춰지고, 왼쪽의 얇은 색
+   바만으로 어떤 항목인지 표시함(hero-blue/purple/teal과 같은 순서·의미) */
+.hero-card-secondary {
+  background: var(--surface); border: 1px solid var(--slate-200); color: var(--slate-900);
+  border-radius: 14px; padding: 16px 18px 16px 20px; position: relative;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.hero-card-secondary::before {
+  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 4px;
+}
+.hero-card-secondary.accent-blue::before { background: #4f46e5; }
+.hero-card-secondary.accent-purple::before { background: #9333ea; }
+.hero-card-secondary.accent-teal::before { background: #14b8a6; }
+/* 다크 모드에서는 위 hero-blue/purple/teal과 같은 레드 계열(크림슨/로즈/코랄) 그라데이션으로 맞춤 */
+:root[data-theme="dark"] .hero-card-secondary.accent-blue::before { background: linear-gradient(180deg, #f87171, #dc2626); }
+:root[data-theme="dark"] .hero-card-secondary.accent-purple::before { background: linear-gradient(180deg, #fb7185, #9f1239); }
+:root[data-theme="dark"] .hero-card-secondary.accent-teal::before { background: linear-gradient(180deg, #fdba74, #ea580c); }
+.hero-card-secondary .hero-icon { opacity: .85; }
+.hero-card-secondary .hero-label { color: var(--slate-500); opacity: 1; }
+.hero-card-secondary .hero-value-money { font-size: 21px; color: var(--slate-900); }
+.hero-card-secondary .hero-sub { color: var(--slate-500); opacity: 1; }
+.hero-card-secondary.clickable { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+.hero-card-secondary.clickable:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+.hero-card-secondary.clickable:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
+.hero-card-secondary .hero-toggle-hint { color: var(--indigo-600); font-weight: 600; opacity: 1; }
 
 /* 만료회원 · TM 표에서 "확인함" 표시된 행 (연하게 처리해서 훑어봤음을 눈에 띄게) */
 tr.row-checked td { background: var(--slate-50); color: var(--slate-400); }
