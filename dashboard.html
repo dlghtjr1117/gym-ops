@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788633365" />
+<link rel="stylesheet" href="style.css?v=1788656357" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -224,12 +224,12 @@
     </div>
 
     <div class="section">
-      <h2>💪 임직원 성과 지표 <span class="muted" style="font-weight:400;font-size:12px;" id="staffPerfMonthLabel">(이번 달)</span></h2>
-      <p class="muted" style="margin:-6px 0 12px;font-size:13px;">이번 달 매출을 담당자별로 모아서, 누가 총매출·PT매출을 얼마나 올렸는지 순위와 표로 보여드려요. (신규/재등록 매출 건수 기준 - 매출 입력 시 담당자를 지정해야 정확히 잡혀요)</p>
+      <h2>🏋️ 트레이너 성과 지표 <span class="muted" style="font-weight:400;font-size:12px;" id="staffPerfMonthLabel">(이번 달)</span></h2>
+      <p class="muted" style="margin:-6px 0 12px;font-size:13px;">이번 달 매출을 트레이너별로 모아서, 누가 총매출·PT매출을 얼마나 올렸는지 순위와 표로 보여드려요(지점장 매출은 제외). 이름을 클릭하면 그 트레이너가 이번 달에 누구를, 어떤 항목(신규·재등록 등)으로 등록시켰는지 상세 내역이 나와요.</p>
 
       <div class="grid-3" id="staffPerfSummaryGrid" style="margin-bottom:14px;">
         <div class="stat-card">
-          <div class="label">👥 총 임직원</div>
+          <div class="label">👥 총 트레이너</div>
           <div class="value" id="staffPerfHeadcount">-</div>
         </div>
         <div class="stat-card">
@@ -324,14 +324,34 @@
     </div>
   </div>
 
+  <!-- "임직원 성과 지표"에서 TOP3 카드나 표의 이름을 클릭하면 그 직원의 이번 달 매출 내역(누구를 등록시켰는지,
+       신규/재등록 등 어떤 항목인지, 결제수단·금액까지)을 보여주는 모달 - 2026-09-06 추가 -->
+  <div class="modal-overlay" id="staffDetailOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:760px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="staffDetailName">-</h3>
+          <p class="muted" style="margin:0;font-size:12.5px;" id="staffDetailSub">-</p>
+        </div>
+        <button type="button" class="modal-close" id="staffDetailCloseBtn">&times;</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="staffDetailTable">
+          <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
+          <tbody id="staffDetailTableBody"><tr><td colspan="5" class="muted" style="padding:16px;">-</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- "이미지 복사" 버튼 전용 - 화면에 보이는 걸 그대로 캡쳐해서 PNG로 만들어주는 외부 라이브러리.
        이 프로젝트는 원래 외부 CDN 없이 순수 CSS/JS만 쓰는 걸 원칙으로 했는데, 화면을 그대로 이미지로
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788633365"></script>
-  <script src="auth.js?v=1788633365"></script>
-  <script src="data.js?v=1788633365"></script>
+  <script src="config.js?v=1788656357"></script>
+  <script src="auth.js?v=1788656357"></script>
+  <script src="data.js?v=1788656357"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -543,40 +563,55 @@
       }
     })();
 
-    // ---- 임직원 성과 지표 (대시보드, 2026-09-05 추가) ----
+    // ---- 트레이너 성과 지표 (대시보드, 2026-09-05 추가 / 2026-09-06 트레이너만으로 범위 조정 + 클릭 상세) ----
     // 원래 여기 있던 "상품별 재등록 현황"(만료회원·TM 상태 기준 - 만료회원·TM 페이지와 겹치는 정보라는
-    // 피드백을 받음)과 "최근 매출 내역" 표를 지우고, 그 자리에 "이번 달 매출을 담당자별로 모아서 누가
+    // 피드백을 받음)과 "최근 매출 내역" 표를 지우고, 그 자리에 "이번 달 매출을 트레이너별로 모아서 누가
     // 얼마나 팔았는지" 보여주는 성과 지표 섹션을 새로 넣음. 참고 이미지(타사 대시보드)에는 OT 진행·PT
     // 소진율·PT 신상담률 같은 컬럼도 있었지만, 이 앱에는 그런 전환 퍼널을 정확히 추적하는 데이터가 없어서
     // (있으면 숫자가 부정확해질 위험이 있어서) 이미 앱 전체에서 쓰는, 확실한 매출 데이터 기준(총매출/
     // PT매출/신규/재등록)만으로 구성함 - "필요없는 건 알아서 빼라"는 요청에 따른 판단.
-    let staffListCache = null; // 직원 목록(트레이너+지점장) - 달이 바뀌어도 안 바뀌므로 한 번만 불러와서 재사용
+    // 2026-09-06: 처음엔 지점장까지 포함한 "전체 직원" 기준이었는데, "지점장 매출은 넣지 말고 트레이너만
+    // 넣어달라"는 요청으로 지점장(role='manager')과 지점장이 담당자로 찍힌 매출은 통째로 제외함.
+    let staffAllCache = null; // 전체 직원(트레이너+지점장) - 어떤 staff_id가 지점장인지 판단하는 용도로만 씀
+    let staffListCache = null; // 트레이너만(성과 지표에 실제로 나오는 대상) - 달이 바뀌어도 안 바뀌므로 한 번만 불러와서 재사용
     async function ensureStaffListLoaded() {
       if (!staffListCache) {
-        try { staffListCache = await fetchStaff(); } catch (err) { staffListCache = []; }
+        try {
+          staffAllCache = await fetchStaff();
+          staffListCache = staffAllCache.filter(p => p.role === 'trainer');
+        } catch (err) {
+          staffAllCache = [];
+          staffListCache = [];
+        }
       }
       return staffListCache;
     }
 
-    // sales 원본 배열을 담당자(staff_id)별로 묶어서 [{id, name, role, totalAmount, totalCount, ptAmount,
-    // ptCount, newCount, renewalCount}] 형태로 반환(총매출 큰 순). staffList에 있는 직원은 이번 달에
-    // 매출이 하나도 없어도(0건) 목록에 그대로 포함시켜서 "총 임직원 수" 평균 계산의 분모가 정확하게 맞음.
-    // 담당자가 비어있거나 이미 퇴사해 profiles에서 지워진 옛날 매출은 "담당자 미지정"으로 따로 묶음.
+    // sales 원본 배열을 담당 트레이너(staff_id)별로 묶어서 [{id, name, role, totalAmount, totalCount,
+    // ptAmount, ptCount, newCount, renewalCount, salesRows}] 형태로 반환(총매출 큰 순). staffList에 있는
+    // 트레이너는 이번 달에 매출이 하나도 없어도(0건) 목록에 그대로 포함시켜서 "총 트레이너 수" 평균 계산의
+    // 분모가 정확하게 맞음. 지점장이 담당자로 찍힌 매출은 아예 집계에서 뺌(위 설명 참고). 담당자가
+    // 비어있거나 이미 퇴사해 profiles에서 지워진 옛날 매출은 "담당자 미지정"으로 따로 묶음. salesRows에는
+    // 그 트레이너 몫으로 잡힌 매출 원본을 그대로 담아둬서, 카드/표를 클릭했을 때 "누구를 등록시켰는지,
+    // 신규/재등록 등 어떤 항목이었는지" 상세 내역을 다시 불러올 필요 없이 바로 보여줄 수 있게 함.
     function computeStaffPerf(sales, staffList) {
+      const managerIds = new Set((staffAllCache || []).filter(p => p.role === 'manager').map(p => p.id));
       const map = new Map();
-      staffList.forEach(p => map.set(p.id, { id: p.id, name: p.name, role: p.role, totalAmount: 0, totalCount: 0, ptAmount: 0, ptCount: 0, newCount: 0, renewalCount: 0 }));
+      staffList.forEach(p => map.set(p.id, { id: p.id, name: p.name, role: p.role, totalAmount: 0, totalCount: 0, ptAmount: 0, ptCount: 0, newCount: 0, renewalCount: 0, salesRows: [] }));
       sales.forEach(s => {
+        if (s.staff_id && managerIds.has(s.staff_id)) return; // 지점장 매출은 트레이너 성과 지표에서 제외
         const amt = Number(s.amount) || 0;
         let row = s.staff_id ? map.get(s.staff_id) : null;
         if (!row) {
           row = map.get('__unassigned__');
           if (!row) {
-            row = { id: '__unassigned__', name: '담당자 미지정', role: null, totalAmount: 0, totalCount: 0, ptAmount: 0, ptCount: 0, newCount: 0, renewalCount: 0 };
+            row = { id: '__unassigned__', name: '담당자 미지정', role: null, totalAmount: 0, totalCount: 0, ptAmount: 0, ptCount: 0, newCount: 0, renewalCount: 0, salesRows: [] };
             map.set('__unassigned__', row);
           }
         }
         row.totalAmount += amt;
         row.totalCount += 1;
+        row.salesRows.push(s);
         if (s.category && PT_SALE_CATEGORIES.includes(s.category)) { row.ptAmount += amt; row.ptCount += 1; }
         if (s.category && s.category.endsWith('_new')) row.newCount += 1;
         if (s.category && s.category.endsWith('_renewal')) row.renewalCount += 1;
@@ -584,9 +619,14 @@
       return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
     }
 
+    let staffPerfRowsCache = []; // 마지막으로 그린 트레이너별 집계 결과(salesRows 포함) - 카드/표 클릭 시 다시 계산 안 하고 바로 조회
+    let staffPerfMonthLabelCache = ''; // 상세 모달 부제목에 쓸 "n월 (이번 달)" 문구
+
     function renderStaffPerf(sales, staffList, monthLabelText) {
       document.getElementById('staffPerfMonthLabel').textContent = `(${monthLabelText})`;
+      staffPerfMonthLabelCache = monthLabelText;
       const rows = computeStaffPerf(sales, staffList);
+      staffPerfRowsCache = rows;
       const headcount = staffList.length;
 
       document.getElementById('staffPerfHeadcount').textContent = headcount > 0 ? `${headcount}명` : '-';
@@ -596,14 +636,13 @@
       document.getElementById('staffPerfAvgPt').textContent = headcount > 0 ? formatWon(Math.round(ptAmountSum / headcount)) : '-';
 
       const medals = ['🥇', '🥈', '🥉'];
-      const medalBorder = ['#eab308', '#94a3b8', '#b45309'];
       const top3 = rows.filter(r => r.totalAmount > 0).slice(0, 3);
       const top3Grid = document.getElementById('staffPerfTop3Grid');
       if (top3.length === 0) {
-        top3Grid.innerHTML = '<p class="muted" style="padding:8px 0;">이 달에는 아직 담당자가 지정된 매출 기록이 없어요.</p>';
+        top3Grid.innerHTML = '<p class="muted" style="padding:8px 0;">이 달에는 아직 담당 트레이너가 지정된 매출 기록이 없어요.</p>';
       } else {
         top3Grid.innerHTML = top3.map((r, i) => `
-          <div class="stat-card" style="border-left:4px solid ${medalBorder[i]};">
+          <div class="stat-card clickable rank-${i + 1}" data-staff-id="${escapeHtml(r.id)}" role="button" tabindex="0">
             <div class="label">${medals[i]} TOP ${i + 1}</div>
             <div class="value">${escapeHtml(r.name)}</div>
             <div class="delta muted">${formatWon(r.totalAmount)} · ${r.totalCount}건</div>
@@ -613,13 +652,13 @@
 
       const tbody = document.getElementById('staffPerfTableBody');
       if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">등록된 직원이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">등록된 트레이너가 없습니다.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map((r, i) => `
-        <tr>
+        <tr class="clickable-row" data-staff-id="${escapeHtml(r.id)}" tabindex="0">
           <td>${r.totalAmount > 0 ? i + 1 : '-'}</td>
-          <td>${escapeHtml(r.name)}${r.role === 'manager' ? ' <span class="muted" style="font-size:11px;">(지점장)</span>' : ''}</td>
+          <td>${escapeHtml(r.name)}</td>
           <td style="text-align:right;">${formatWon(r.totalAmount)}</td>
           <td style="text-align:right;">${r.totalCount}건</td>
           <td style="text-align:right;">${formatWon(r.ptAmount)}</td>
@@ -642,6 +681,64 @@
           `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
     }
+
+    // TOP3 카드나 표의 트레이너 이름을 클릭(또는 Enter/Space)하면 이번 달 그 트레이너 몫 매출 내역을
+    // 모달로 보여줌 - 날짜/회원명/항목(신규·재등록 등 분류가 그대로 붙어서 나옴 - saleDisplayItemWithCategory
+    // 참고)/결제수단/금액까지 한 줄씩. 이미 renderStaffPerf에서 계산해둔 staffPerfRowsCache를 그대로 쓰기
+    // 때문에 클릭할 때마다 서버에 다시 요청하지 않음.
+    function openStaffDetail(staffId) {
+      const row = staffPerfRowsCache.find(r => r.id === staffId);
+      if (!row) return;
+      document.getElementById('staffDetailName').textContent = row.name;
+      document.getElementById('staffDetailSub').textContent =
+        `${staffPerfMonthLabelCache} · 총매출 ${formatWon(row.totalAmount)} · ${row.totalCount}건`;
+      const tbody = document.getElementById('staffDetailTableBody');
+      if (row.salesRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이 달에는 매출 기록이 없어요.</td></tr>';
+      } else {
+        const sorted = row.salesRows.slice().sort((a, b) => (a.sale_date || '').localeCompare(b.sale_date || ''));
+        tbody.innerHTML = sorted.map(s => `
+          <tr>
+            <td>${escapeHtml(s.sale_date || '-')}</td>
+            <td>${s.member ? escapeHtml(s.member.name) : '<span class="muted">-</span>'}</td>
+            <td>${saleDisplayItemWithCategory(s)}</td>
+            <td>${s.payment_method ? escapeHtml(PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method) : '-'}</td>
+            <td style="text-align:right;">${formatWon(s.amount)}</td>
+          </tr>
+        `).join('');
+      }
+      document.getElementById('staffDetailOverlay').style.display = 'flex';
+    }
+
+    function closeStaffDetail() {
+      document.getElementById('staffDetailOverlay').style.display = 'none';
+    }
+
+    document.getElementById('staffDetailCloseBtn').addEventListener('click', closeStaffDetail);
+    document.getElementById('staffDetailOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'staffDetailOverlay') closeStaffDetail();
+    });
+
+    // 카드/표는 renderStaffPerf가 호출될 때마다(달 이동 등) innerHTML이 통째로 새로 그려지므로, 매번 다시
+    // 이벤트를 붙이지 않도록 각 컨테이너에 한 번씩만 이벤트 위임(delegation)으로 걸어둠
+    document.getElementById('staffPerfTop3Grid').addEventListener('click', (e) => {
+      const card = e.target.closest('[data-staff-id]');
+      if (card) openStaffDetail(card.dataset.staffId);
+    });
+    document.getElementById('staffPerfTop3Grid').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const card = e.target.closest('[data-staff-id]');
+      if (card) { e.preventDefault(); openStaffDetail(card.dataset.staffId); }
+    });
+    document.getElementById('staffPerfTableBody').addEventListener('click', (e) => {
+      const tr = e.target.closest('[data-staff-id]');
+      if (tr) openStaffDetail(tr.dataset.staffId);
+    });
+    document.getElementById('staffPerfTableBody').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const tr = e.target.closest('[data-staff-id]');
+      if (tr) { e.preventDefault(); openStaffDetail(tr.dataset.staffId); }
+    });
 
     // ---- 이번 달 매출 요약 / 상품별 재등록 현황 / 워크인·미스 (매출 보고 화살표로 보는 기준월을 그대로 따라감) ----
     // 원래는 넷 다 "항상 실제 오늘 날짜의 이번 달"에 고정이었는데, "매출 보고 탭에서 화살표로 7월,8월

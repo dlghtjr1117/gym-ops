@@ -363,6 +363,38 @@ select.tm-status-select {
 .hero-card-secondary.clickable:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
 .hero-card-secondary .hero-toggle-hint { color: var(--indigo-600); font-weight: 600; opacity: 1; }
 
+/* 대시보드 "트레이너 성과 지표" 섹션 (2026-09-05 추가, 2026-09-06 클릭 상세 + 다크 모드 레드 톤 추가) -
+   TOP3 카드/표 행을 클릭하면 그 트레이너의 이번 달 매출 상세가 뜸. 순위 카드는 라이트 모드에선 금/은/동
+   왼쪽 테두리로 구분하고, 다크 모드에서는 이 앱의 "히어로 카드는 전부 같은 빨강" 원칙(2026-09-05)을
+   그대로 따라 순위 구분 없이 동일한 빨강 그라데이션으로 통일함(구분은 메달 이모지·순위 숫자로 충분). */
+#staffPerfTop3Grid .stat-card.rank-1 { border-left: 4px solid #eab308; }
+#staffPerfTop3Grid .stat-card.rank-2 { border-left: 4px solid #94a3b8; }
+#staffPerfTop3Grid .stat-card.rank-3 { border-left: 4px solid #b45309; }
+#staffPerfTop3Grid .stat-card.clickable,
+#staffPerfTableBody tr.clickable-row { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+#staffPerfTop3Grid .stat-card.clickable:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+#staffPerfTop3Grid .stat-card.clickable:focus-visible,
+#staffPerfTableBody tr.clickable-row:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: -2px; }
+#staffPerfTableBody tr.clickable-row:hover td { background: var(--slate-50); }
+
+:root[data-theme="dark"] #staffPerfSummaryGrid .stat-card {
+  background: linear-gradient(135deg, rgba(127,29,29,0.32), rgba(220,38,38,0.08));
+  border-color: rgba(220,38,38,0.35);
+}
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.rank-1,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.rank-2,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.rank-3 {
+  border-left: none;
+  background: linear-gradient(135deg, #7f1d1d, #dc2626 65%, #f87171);
+}
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card .label,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card .value,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card .delta.muted {
+  color: #fff;
+}
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.clickable:hover { filter: brightness(1.08); box-shadow: 0 4px 14px rgba(220,38,38,0.35); }
+:root[data-theme="dark"] #staffPerfTableBody tr.clickable-row:hover td { background: rgba(220,38,38,0.12); }
+
 /* 만료회원 · TM 표에서 "확인함" 표시된 행 (연하게 처리해서 훑어봤음을 눈에 띄게) */
 tr.row-checked td { background: var(--slate-50); color: var(--slate-400); }
 tr.row-checked .tm-status-select { opacity: .75; }
