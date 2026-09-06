@@ -380,6 +380,17 @@ async function fetchOpenReceivablesByMember(memberId) {
   return res.json();
 }
 
+// 회원 상세 화면의 "판매내역" 탭용 - 이 회원에게 찍힌 매출을 전부(최신순) 가져옴. saleDisplayItemWithCategory()로
+// "개인PT 20회(PT 재등록)"처럼 회차·분류가 같이 붙은 항목명을 만들 수 있도록 필요한 필드를 모두 select함
+async function fetchMemberSales(memberId) {
+  const { rows, error } = await fetchAllRows(
+    `sales?member_id=eq.${memberId}&select=*,staff:profiles(name)&order=sale_date.desc,created_at.desc`,
+    await authHeaders()
+  );
+  if (error) throw new Error('매출 내역을 불러오지 못했습니다.');
+  return rows;
+}
+
 // 회원 목록 화면에서 "미수금 있음" 뱃지를 보여주기 위한 가벼운 조회 - member_id만 받아서 Set으로 씀
 async function fetchOpenReceivableMemberIds() {
   const { rows, error } = await fetchAllRows('receivables?select=member_id&status=eq.open', await authHeaders());

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1788659599" />
+<link rel="stylesheet" href="style.css?v=1788661968" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -19,6 +19,42 @@
   .receivable-card .r-title { font-weight: 700; font-size: 13.5px; color: #92400e; margin-bottom: 4px; }
   .receivable-card .r-detail { font-size: 12.5px; color: #78350f; line-height: 1.6; }
   .badge-receivable { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-right: 5px; vertical-align: middle; flex: none; }
+  /* 회원 상세 > "이용권" 탭 카드 - 헬스장 관리 프로그램들이 흔히 쓰는, 종류별 색깔 리본 + 만료일
+     강조 박스 + 상세 정보 그리드가 있는 좀 더 꽉 찬 카드 스타일(2026-09-06, 참고 이미지 요청으로
+     기존의 한 줄짜리 밋밋한 카드에서 교체함). .receivable-card와 마찬가지로 라이트/다크 모드 상관없이
+     항상 같은 옅은 카드 색으로 고정해두는 편이 "상태/종류를 색으로 보여주는" 이 카드의 목적에
+     맞아서, 배경·글자색을 전부 테마 변수 대신 고정값으로 씀(다크 모드에서 배경은 그대로 밝은데
+     글자만 흰색으로 바뀌어 안 보이는 문제를 방지) */
+  .membership-card { border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0f172a; }
+  .membership-card:last-child { margin-bottom: 0; }
+  .membership-card .mc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .membership-card .mc-ribbon { display: inline-block; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 999px; background: #94a3b8; color: #fff; }
+  .membership-card .mc-status { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: #e2e8f0; color: #475569; }
+  .membership-card.is-valid .mc-status { background: #16a34a; color: #fff; }
+  .membership-card .mc-name { font-size: 17px; font-weight: 800; margin-bottom: 12px; color: #0f172a; }
+  .membership-card .mc-period { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #eef1f5; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .membership-card .mc-period .mp-label { font-size: 11.5px; font-weight: 700; color: #64748b; }
+  .membership-card .mc-period .mp-value { font-size: 13.5px; font-weight: 800; color: #0f172a; }
+  .membership-card .mc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 16px; }
+  .membership-card .mc-field .f-label { display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 2px; }
+  .membership-card .mc-field .f-value { display: block; font-size: 13.5px; font-weight: 700; color: #0f172a; }
+  /* 유효 카드일 때만 종류별로 다른 색을 입혀서 한눈에 구분되게 함(만료 카드는 전부 무채색 톤으로 통일) */
+  .membership-card.is-valid.cat-membership { background: #f5f7ff; border-color: #dbe4ff; }
+  .membership-card.is-valid.cat-membership .mc-ribbon { background: #4f46e5; }
+  .membership-card.is-valid.cat-membership .mc-period { background: #e8ecff; }
+  .membership-card.is-valid.cat-group_pt { background: #faf5ff; border-color: #ecd9ff; }
+  .membership-card.is-valid.cat-group_pt .mc-ribbon { background: #9333ea; }
+  .membership-card.is-valid.cat-group_pt .mc-period { background: #f2e6ff; }
+  .membership-card.is-valid.cat-pt { background: #fdf2f8; border-color: #fbcfe8; }
+  .membership-card.is-valid.cat-pt .mc-ribbon { background: #db2777; }
+  .membership-card.is-valid.cat-pt .mc-period { background: #fce7f2; }
+  .membership-card.is-valid.cat-locker { background: #f0fdfa; border-color: #bff4ea; }
+  .membership-card.is-valid.cat-locker .mc-ribbon { background: #0d9488; }
+  .membership-card.is-valid.cat-locker .mc-period { background: #e2f9f4; }
+  .membership-card.is-valid.cat-clothes { background: #fffbeb; border-color: #fde9b8; }
+  .membership-card.is-valid.cat-clothes .mc-ribbon { background: #d97706; }
+  .membership-card.is-valid.cat-clothes .mc-period { background: #fef3d6; }
+  #md_sales_table { width: 100%; }
 </style>
 </head>
 <body>
@@ -195,9 +231,16 @@
         </div>
       </div>
 
+      <div class="filter-tabs" id="md_top_tabs" style="margin-top:2px;">
+        <button type="button" class="filter-tab active" data-tab="home" onclick="switchMemberDetailTab('home')">🏠 홈</button>
+        <button type="button" class="filter-tab" data-tab="membership" onclick="switchMemberDetailTab('membership')">🎫 이용권</button>
+        <button type="button" class="filter-tab" data-tab="sales" onclick="switchMemberDetailTab('sales')">💳 판매내역</button>
+      </div>
+
       <div id="md_errorBox" class="error-text"></div>
       <div id="md_successBox" class="success-text"></div>
 
+      <div id="md_tab_home">
       <div class="modal-section">
         <h4>기본 정보</h4>
         <div class="form-grid" style="margin-bottom:12px;">
@@ -280,6 +323,25 @@
           <button type="button" class="btn btn-outline" id="md_sellBtn" style="width:100%;">이용권 판매 등록</button>
         </div>
       </div>
+      </div>
+
+      <div id="md_tab_membership" style="display:none;">
+        <p class="muted" style="margin:-4px 0 14px;">보유 중인 이용권을 종류별로 모아서 보여드려요. 이 화면은 시작일을 따로 저장하지 않아서, 만료일 기준으로만 유효/만료를 나눠요.</p>
+        <div class="filter-tabs" id="md_membership_subtabs">
+          <button type="button" class="filter-tab active" data-sub="valid" onclick="switchMembershipSubtab('valid')">✅ 유효이용권 (<span id="md_valid_count">0</span>)</button>
+          <button type="button" class="filter-tab" data-sub="expired" onclick="switchMembershipSubtab('expired')">⏱️ 만료이용권 (<span id="md_expired_count">0</span>)</button>
+        </div>
+        <div id="md_membership_list"></div>
+      </div>
+
+      <div id="md_tab_sales" style="display:none;">
+        <p class="muted" style="margin:-4px 0 14px;">이 회원님에게 지금까지 기록된 매출 내역 전체예요. 개별 건 수정·삭제는 <a href="sales.html">매출 입력</a> 화면에서 할 수 있어요.</p>
+        <table id="md_sales_table">
+          <thead><tr><th>날짜</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
+          <tbody id="md_sales_tbody"><tr><td colspan="5" class="muted" style="padding:14px;">불러오는 중...</td></tr></tbody>
+        </table>
+        <div id="md_sales_total" class="sale-total" style="text-align:right;"></div>
+      </div>
     </div>
   </div>
 
@@ -320,9 +382,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788659599"></script>
-  <script src="auth.js?v=1788659599"></script>
-  <script src="data.js?v=1788659599"></script>
+  <script src="config.js?v=1788661968"></script>
+  <script src="auth.js?v=1788661968"></script>
+  <script src="data.js?v=1788661968"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -835,6 +897,184 @@
       }
     });
 
+    // ---- 회원 상세 화면 상단 탭(홈/이용권/판매내역) ----
+    let memberDetailTab = 'home';
+    let membershipSubtab = 'valid';
+    let currentDetailSales = [];
+    let detailSalesFetchPromise = null; // 이용권/판매내역 두 탭이 매출 내역을 공유해서 쓰도록 캐싱(회원 바꿀 때 리셋)
+
+    // 이 앱은 아직 지점(센터)이 하나뿐이라 "이용가능지점"은 회원마다 따로 저장하지 않음 - 나중에
+    // 지점이 여러 개로 늘어나면 그때 실제 값을 저장하도록 바꾸면 됨
+    const CENTER_BRANCH_NAME = '평산덕계점';
+
+    function switchMemberDetailTab(tab) {
+      memberDetailTab = tab;
+      document.querySelectorAll('#md_top_tabs .filter-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.getElementById('md_tab_home').style.display = tab === 'home' ? 'block' : 'none';
+      document.getElementById('md_tab_membership').style.display = tab === 'membership' ? 'block' : 'none';
+      document.getElementById('md_tab_sales').style.display = tab === 'sales' ? 'block' : 'none';
+      if (tab === 'membership') renderMembershipTabAsync();
+      if (tab === 'sales') loadAndRenderMemberSales();
+    }
+
+    function switchMembershipSubtab(sub) {
+      membershipSubtab = sub;
+      document.querySelectorAll('#md_membership_subtabs .filter-tab').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
+      renderMembershipTab();
+    }
+
+    // 이용권/판매내역 탭이 공통으로 쓰는 매출 내역 로딩 - 한 번 불러오면 캐싱해서 두 번째 탭에서는 다시 안 불러옴
+    async function ensureDetailSalesLoaded(memberId) {
+      if (!detailSalesFetchPromise) {
+        detailSalesFetchPromise = fetchMemberSales(memberId).then(rows => {
+          currentDetailSales = rows;
+          return rows;
+        }).catch(err => { detailSalesFetchPromise = null; throw err; });
+      }
+      return detailSalesFetchPromise;
+    }
+
+    // EXPIRY_CATEGORIES(만료 추적 5종: 헬스이용권/그룹PT/개인PT/락커/운동복)를 그대로 재사용해서, 값이
+    // 있는 종류만 카드로 만듦 - 이 앱은 종류별로 "현재 값" 한 개만 저장하고 있어서(과거 이력을 따로
+    // 안 남김), 여러 장을 동시에 들고 있는 경우는 "이번 달엔 헬스+그룹PT 둘 다 유효" 같은 상황임
+    function buildMembershipItems(m, sales) {
+      const today = todayStr();
+      const items = [];
+      for (const cat of EXPIRY_CATEGORIES) {
+        const endDate = m[cat.field];
+        if (!endDate) continue;
+        const isValid = endDate >= today;
+        const name =
+          cat.key === 'membership' ? (m.membership_type || cat.label) :
+          cat.key === 'group_pt' ? (m.group_pt_type || cat.label) :
+          cat.label;
+        const extra = (cat.key === 'pt' && m.pt_remaining_sessions != null) ? `잔여 ${m.pt_remaining_sessions}회 · ` : '';
+        const startDate = latestSaleDateForCategory(cat.field, sales || []);
+        items.push({ key: cat.key, label: cat.label, name, endDate, isValid, extra, startDate });
+      }
+      return items;
+    }
+
+    // 이용권마다 실제 "시작일" 컬럼은 따로 저장하지 않아서, 이 회원의 매출 내역 중 그 종류(만료일
+    // 컬럼 기준)로 가장 최근에 결제한 날짜를 근사한 시작일로 보여줌(대부분 결제일 = 시작일이라
+    // 오차가 거의 없음). CATEGORY_TO_MEMBER_FIELD(등록 처리 시 어느 만료일 컬럼을 갱신할지 매핑해둔
+    // 것)를 거꾸로 뒤집어서 "이 만료일 컬럼에 해당하는 매출 카테고리들"을 구함. 일치하는 매출이
+    // 없으면(예: 예전에 엑셀로 일괄 등록해서 매출 기록 자체가 없는 회원) 지어내지 않고 null을 반환함
+    function latestSaleDateForCategory(catField, sales) {
+      const saleCats = Object.keys(CATEGORY_TO_MEMBER_FIELD).filter(k => CATEGORY_TO_MEMBER_FIELD[k] === catField);
+      const dates = sales.filter(s => saleCats.includes(s.category) && s.sale_date).map(s => s.sale_date);
+      if (dates.length === 0) return null;
+      return dates.sort().slice(-1)[0]; // 'YYYY-MM-DD' 문자열이라 사전순 정렬이 곧 날짜순 정렬
+    }
+
+    // 카테고리별 리본/강조색 클래스 (유효 카드에만 적용 - buildMembershipCardHtml에서 씀)
+    const MEMBERSHIP_CATEGORY_CLASS = { membership: 'cat-membership', group_pt: 'cat-group_pt', pt: 'cat-pt', locker: 'cat-locker', clothes: 'cat-clothes' };
+
+    // 참고 이미지처럼 리본(종류)+상태뱃지, 이용기간(시작일~만료일) 강조 박스(D-day 포함), 상세 정보
+    // 그리드가 있는 카드 하나를 만듦. "이용 가능 지점"은 지점이 하나뿐이라 고정값을 넣고, 시작일은
+    // 매출 내역 기반 근사값(latestSaleDateForCategory)을 쓰되 못 찾으면 지어내지 않고 그대로 표시함
+    function buildMembershipCardHtml(item, trainerName) {
+      const catClass = item.isValid ? (MEMBERSHIP_CATEGORY_CLASS[item.key] || '') : '';
+      const fields = [
+        { label: '이용가능지점', value: CENTER_BRANCH_NAME },
+        { label: '분류', value: item.label },
+        { label: '담당 트레이너', value: trainerName }
+      ];
+      if (item.key === 'pt' && currentDetailMember.pt_remaining_sessions != null) {
+        fields.push({ label: '잔여횟수', value: `${currentDetailMember.pt_remaining_sessions}회` });
+      }
+      const periodValue = item.startDate ? `${item.startDate} ~ ${item.endDate}` : `시작일 정보 없음 ~ ${item.endDate}`;
+      return `
+        <div class="membership-card ${item.isValid ? 'is-valid' : 'is-expired'} ${catClass}">
+          <div class="mc-top">
+            <span class="mc-ribbon">${escapeHtml(item.label)}</span>
+            <span class="mc-status">${item.isValid ? '유효' : '만료'}</span>
+          </div>
+          <div class="mc-name">${escapeHtml(item.name)}</div>
+          <div class="mc-period">
+            <span class="mp-label">이용기간</span>
+            <span class="mp-value">${periodValue}</span>
+            ${remainingBadge(item.endDate)}
+          </div>
+          <div class="mc-fields">
+            ${fields.map(f => `<div class="mc-field"><span class="f-label">${escapeHtml(f.label)}</span><span class="f-value">${escapeHtml(String(f.value))}</span></div>`).join('')}
+          </div>
+        </div>`;
+    }
+
+    // 탭을 처음 열 때 - 시작일 근사에 쓸 매출 내역을 먼저 불러온 다음 그림(캐싱되어 있으면 바로 그림)
+    async function renderMembershipTabAsync() {
+      if (!currentDetailMember) return;
+      const memberIdAtRequest = currentDetailMember.id;
+      if (!detailSalesFetchPromise) {
+        document.getElementById('md_membership_list').innerHTML = `<p class="muted" style="padding:16px 4px;">불러오는 중...</p>`;
+      }
+      try {
+        await ensureDetailSalesLoaded(memberIdAtRequest);
+      } catch (e) {
+        // 매출 내역을 못 불러와도 카드 자체(만료일·잔여횟수 등)는 보여줄 수 있어야 하므로 조용히 진행함
+        // (이 경우 시작일만 "정보 없음"으로 표시됨)
+      }
+      if (!currentDetailMember || currentDetailMember.id !== memberIdAtRequest) return;
+      renderMembershipTab();
+    }
+
+    function renderMembershipTab() {
+      if (!currentDetailMember) return;
+      const items = buildMembershipItems(currentDetailMember, currentDetailSales);
+      const valid = items.filter(i => i.isValid);
+      const expired = items.filter(i => !i.isValid);
+      document.getElementById('md_valid_count').textContent = valid.length;
+      document.getElementById('md_expired_count').textContent = expired.length;
+      const list = membershipSubtab === 'valid' ? valid : expired;
+      const box = document.getElementById('md_membership_list');
+      if (list.length === 0) {
+        box.innerHTML = `<p class="muted" style="padding:16px 4px;">${membershipSubtab === 'valid' ? '보유 중인 유효 이용권이 없어요.' : '만료된 이용권 기록이 없어요.'}</p>`;
+        return;
+      }
+      const trainerName = currentDetailMember.trainer ? currentDetailMember.trainer.name : '미지정';
+      box.innerHTML = list.map(item => buildMembershipCardHtml(item, trainerName)).join('');
+    }
+
+    async function loadAndRenderMemberSales() {
+      if (!currentDetailMember) return;
+      const memberIdAtRequest = currentDetailMember.id;
+      const tbody = document.getElementById('md_sales_tbody');
+      if (!detailSalesFetchPromise) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px;">불러오는 중...</td></tr>`;
+        document.getElementById('md_sales_total').textContent = '';
+      }
+      try {
+        await ensureDetailSalesLoaded(memberIdAtRequest);
+      } catch (e) {
+        // 탭을 빠르게 여러 번 눌러서 회원이 바뀐 사이에 이전 요청이 늦게 도착한 경우는 화면을 덮어쓰지 않음
+        if (!currentDetailMember || currentDetailMember.id !== memberIdAtRequest) return;
+        tbody.innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px;">매출 내역을 불러오지 못했습니다.</td></tr>`;
+        return;
+      }
+      if (!currentDetailMember || currentDetailMember.id !== memberIdAtRequest) return;
+      renderMemberSalesTable();
+    }
+
+    function renderMemberSalesTable() {
+      const tbody = document.getElementById('md_sales_tbody');
+      if (currentDetailSales.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px;">등록된 매출 내역이 없어요.</td></tr>`;
+        document.getElementById('md_sales_total').textContent = '';
+        return;
+      }
+      tbody.innerHTML = currentDetailSales.map(s => `
+        <tr>
+          <td>${s.sale_date || '-'}</td>
+          <td>${escapeHtml(saleDisplayItemWithCategory(s))}</td>
+          <td>${s.staff ? escapeHtml(s.staff.name) : '-'}</td>
+          <td>${PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method || '-'}</td>
+          <td style="text-align:right;">${formatWon(s.amount)}</td>
+        </tr>`).join('');
+      const total = currentDetailSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+      document.getElementById('md_sales_total').textContent = `합계 ${formatWon(total)} · 총 ${currentDetailSales.length}건`;
+    }
+
     function openMemberDetail(memberId) {
       const m = membersCache.find(x => x.id === memberId);
       if (!m) return;
@@ -842,6 +1082,11 @@
 
       document.getElementById('md_errorBox').style.display = 'none';
       document.getElementById('md_successBox').style.display = 'none';
+
+      membershipSubtab = 'valid';
+      currentDetailSales = [];
+      detailSalesFetchPromise = null;
+      switchMemberDetailTab('home');
 
       document.getElementById('md_name').textContent = m.name;
       document.getElementById('md_phone').textContent = formatPhone(m.phone) || '전화번호 없음';
