@@ -84,6 +84,15 @@
 :root[data-theme="dark"] .hero-green,
 :root[data-theme="dark"] .hero-amber,
 :root[data-theme="dark"] .home-banner { background: linear-gradient(135deg, #7f1d1d, #dc2626 55%, #f87171); }
+/* 2026-09-06 라이트 모드 파스텔 리스킨에서 새로 추가한 장식 요소들 - 다크 모드는 이 요청과
+   무관하게 원래 확정된 "올 레드 그라데이션" 모습 그대로 유지해야 해서 여기서 되돌림 */
+:root[data-theme="dark"] .hero-card::before { display: none; }
+:root[data-theme="dark"] .hero-card .hero-icon { background: transparent; }
+:root[data-theme="dark"] .hero-label { opacity: .95; }
+:root[data-theme="dark"] .hero-unit { opacity: .85; }
+:root[data-theme="dark"] .hero-sub { opacity: .9; }
+:root[data-theme="dark"] .hero-ring-bg { stroke: rgba(255,255,255,0.28); }
+:root[data-theme="dark"] .hero-ring-fg { stroke: #ffffff; }
 :root[data-theme="dark"] .btn-primary { background: linear-gradient(135deg, #7f1d1d, #dc2626 60%, #f87171); box-shadow: 0 6px 16px -4px rgba(220,38,38,0.5); }
 :root[data-theme="dark"] .btn-primary:hover { background: linear-gradient(135deg, #991b1b, #ef4444 60%, #fca5a5); }
 :root[data-theme="dark"] .filter-tab.active,
@@ -312,29 +321,49 @@ select.tm-status-select {
   -webkit-appearance: auto; appearance: auto;
 }
 
-/* 대시보드 히어로 카드 */
+/* 대시보드 히어로 카드
+   2026-09-06: 라이트 모드는 "블루-퍼플 그라데이션"(참고 이미지 톤) + "소프트 파스텔 카드"(부드러운
+   느낌, 아이콘 뱃지) 두 시안을 섞은 스타일로 교체함 - 카드 배경은 은은한 파스텔 그라데이션, 카드
+   위쪽엔 색깔별 진한 블루/퍼플 계열 그라데이션 띠(::before)를 얇게 얹고, 아이콘은 동그란 뱃지
+   모양으로. 글자색은 --slate-900(라이트=짙은 네이비, 다크=거의 흰색)을 그대로 써서 다크 모드
+   전용 규칙을 따로 안 만들어도 자동으로 맞음. 다만 라이트 모드 전용으로 새로 추가한 장식
+   요소(위쪽 그라데이션 띠, 아이콘 뱃지 배경, 링 색상, 라벨/보조문구 옅기)는 기존에 회원님이
+   확정한 다크 모드의 "전부 레드 그라데이션" 룩을 안 건드리도록 아래 다크 모드 블록에서 원래
+   값으로 되돌려둠 */
 .hero-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 4px; }
 .hero-card {
-  border-radius: 20px; padding: 22px 24px; color: var(--white); position: relative;
-  box-shadow: 0 10px 30px -14px rgba(15,23,42,0.35); transition: transform .18s ease, box-shadow .18s ease;
+  border-radius: 20px; padding: 22px 24px; color: var(--slate-900); position: relative;
+  box-shadow: 0 10px 26px -16px rgba(15,23,42,0.28); transition: transform .18s ease, box-shadow .18s ease;
+  overflow: hidden;
+}
+.hero-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
 }
 #heroMembership, #heroGroupPt { cursor: pointer; }
-#heroMembership:hover, #heroGroupPt:hover { transform: translateY(-3px); box-shadow: 0 16px 34px -12px rgba(15,23,42,0.4); }
-.hero-blue { background: linear-gradient(135deg, #4338ca, #4f46e5 55%, #818cf8); }
-.hero-purple { background: linear-gradient(135deg, #6d28d9, #9333ea 55%, #c084fc); }
-.hero-green { background: linear-gradient(135deg, #047857, #10b981 55%, #6ee7b7); text-align: center; }
-.hero-teal { background: linear-gradient(135deg, #0f766e, #14b8a6 55%, #5eead4); }
-.hero-icon { font-size: 24px; margin-bottom: 6px; opacity: .95; }
-.hero-label { font-size: 13px; font-weight: 700; opacity: .95; margin-bottom: 10px; }
+#heroMembership:hover, #heroGroupPt:hover { transform: translateY(-3px); box-shadow: 0 16px 30px -14px rgba(15,23,42,0.22); }
+.hero-blue { background: linear-gradient(150deg, #eaf1ff, #dbe8ff); }
+.hero-blue::before { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.hero-purple { background: linear-gradient(150deg, #f2ebff, #e7dbff); }
+.hero-purple::before { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+.hero-green { background: linear-gradient(150deg, #e7fbf3, #d7f5e7); text-align: center; }
+.hero-green::before { background: linear-gradient(90deg, #6ee7b7, #059669); }
+.hero-teal { background: linear-gradient(150deg, #e6fbfa, #d2f4f0); }
+.hero-teal::before { background: linear-gradient(90deg, #5eead4, #0d9488); }
+.hero-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 12px; background: rgba(255,255,255,0.65);
+  font-size: 19px; margin-bottom: 10px;
+}
+.hero-label { font-size: 13px; font-weight: 700; opacity: .68; margin-bottom: 10px; }
 .hero-value { font-size: 38px; font-weight: 800; line-height: 1; }
 /* 매출 금액처럼 자릿수가 많은 숫자가 카드 폭을 넘지 않도록 살짝 작게 */
 .hero-value-money { font-size: 26px; word-break: keep-all; }
-.hero-unit { font-size: 15px; font-weight: 600; margin-left: 4px; opacity: .85; }
-.hero-sub { font-size: 12px; opacity: .9; margin-top: 10px; }
+.hero-unit { font-size: 15px; font-weight: 600; margin-left: 4px; opacity: .7; }
+.hero-sub { font-size: 12px; opacity: .72; margin-top: 10px; }
 .hero-ring-wrap { position: relative; width: 108px; height: 108px; margin: 2px auto 8px; }
 .hero-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
-.hero-ring-bg { fill: none; stroke: rgba(255,255,255,0.28); stroke-width: 10; }
-.hero-ring-fg { fill: none; stroke: #ffffff; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(.22,.9,.3,1); }
+.hero-ring-bg { fill: none; stroke: rgba(5,150,105,0.18); stroke-width: 10; }
+.hero-ring-fg { fill: none; stroke: #059669; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(.22,.9,.3,1); }
 .hero-ring-value { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; }
 .hero-ring-percent { font-size: 15px; font-weight: 700; margin-left: 2px; }
 @media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; } }
