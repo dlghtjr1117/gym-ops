@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 매출 입력</title>
-<link rel="stylesheet" href="style.css?v=1788757259" />
+<link rel="stylesheet" href="style.css?v=1788781891" />
 </head>
 <body>
   <div class="topbar">
@@ -88,9 +88,56 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788757259"></script>
-  <script src="auth.js?v=1788757259"></script>
-  <script src="data.js?v=1788757259"></script>
+  <!-- 매출 수정 모달 - 2026-09-07: 원래 "삭제"만 있고 "수정"이 없어서 담당자/항목을 잘못 고른 매출을
+       고칠 방법이 없었던 문제를 확인하고 새로 추가함. 지점장만 버튼이 보이고(RLS로도 막혀있음), 등록
+       폼과 같은 항목을 그대로 재사용해서 값만 바꿔서 저장함 -->
+  <div class="modal-overlay" id="editSaleOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 style="margin:0;">매출 수정</h3>
+        <button type="button" class="modal-close" id="es_closeBtn">&times;</button>
+      </div>
+      <div id="editErrorBox" class="error-text"></div>
+      <form id="editSaleForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>회원</label><select id="es_member" required></select></div>
+          <div class="field"><label>항목</label>
+            <select id="es_category">
+              <option value="membership_new">신규 회원권</option>
+              <option value="membership_renewal">회원권 재등록</option>
+              <option value="pt_new">신규 PT</option>
+              <option value="pt_renewal">PT 재등록</option>
+              <option value="group_pt_new">신규 그룹PT</option>
+              <option value="group_pt_renewal">그룹PT 재등록</option>
+              <option value="locker">락커</option>
+              <option value="clothes">운동복</option>
+              <option value="day_pass">일일권</option>
+              <option value="membership_transfer">양도</option>
+              <option value="uncategorized">미분류(확인필요)</option>
+            </select>
+          </div>
+          <div class="field"><label>금액(원)</label><input type="text" inputmode="numeric" class="money-input" id="es_amount" required /></div>
+          <div class="field"><label>날짜</label><input type="date" id="es_date" required /></div>
+          <div class="field"><label>시각</label><input type="time" id="es_time" /></div>
+          <div class="field"><label>판매 담당자</label><select id="es_staff"></select></div>
+          <div class="field"><label>결제 수단</label>
+            <select id="es_payment">
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+              <option value="transfer">계좌이체</option>
+              <option value="kiosk">키오스크</option>
+            </select>
+          </div>
+          <div class="field"><label>메모</label><input type="text" id="es_memo" placeholder="선택 입력" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">저장</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js?v=1788781891"></script>
+  <script src="auth.js?v=1788781891"></script>
+  <script src="data.js?v=1788781891"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -177,7 +224,10 @@
             <td>${s.staff ? s.staff.name : '-'}</td>
             <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
             <td style="text-align:right;">${formatWon(s.amount)}</td>
-            ${isManagerFlag ? `<td><button type="button" class="btn-link delete-sale-btn" data-id="${s.id}" style="color:var(--red-600);">삭제</button></td>` : ''}
+            ${isManagerFlag ? `<td style="white-space:nowrap;">
+              <button type="button" class="btn-link edit-sale-btn" data-id="${s.id}">수정</button>
+              <button type="button" class="btn-link delete-sale-btn" data-id="${s.id}" style="color:var(--red-600);">삭제</button>
+            </td>` : ''}
           </tr>
         `).join('');
         if (isManagerFlag) {
@@ -190,6 +240,12 @@
               } catch (err) {
                 alert(err.message);
               }
+            });
+          });
+          tbody.querySelectorAll('.edit-sale-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const sale = salesAll.find(s => s.id === btn.dataset.id);
+              if (sale) openEditSale(sale);
             });
           });
         }
@@ -288,6 +344,56 @@
         document.getElementById('s_time').value = nowTimeStr();
         if (currentUserId) document.getElementById('s_staff').value = currentUserId; // reset()은 담당자를 첫 옵션으로 되돌리므로 다시 본인으로 맞춰줌
         loadSales(true); // 방금 등록한 매출이 바로 보이도록 1페이지로 리셋
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    // ---- 매출 수정 모달 ----
+    // 등록 폼(s_member/s_staff)에 이미 채워진 옵션 목록을 그대로 복사해서 씀 - 매번 다시 불러올 필요 없음
+    let editingSaleId = null;
+    function openEditSale(sale) {
+      editingSaleId = sale.id;
+      document.getElementById('editErrorBox').style.display = 'none';
+      document.getElementById('es_member').innerHTML = document.getElementById('s_member').innerHTML;
+      document.getElementById('es_staff').innerHTML = document.getElementById('s_staff').innerHTML;
+      document.getElementById('es_member').value = sale.member_id || '';
+      document.getElementById('es_staff').value = sale.staff_id || '';
+      document.getElementById('es_category').value = sale.category || 'uncategorized';
+      setMoneyInputValue('es_amount', sale.amount);
+      document.getElementById('es_date').value = sale.sale_date || '';
+      document.getElementById('es_time').value = sale.sale_time || '';
+      document.getElementById('es_payment').value = sale.payment_method || 'card';
+      document.getElementById('es_memo').value = sale.memo || '';
+      document.getElementById('editSaleOverlay').style.display = 'flex';
+    }
+    function closeEditSale() {
+      document.getElementById('editSaleOverlay').style.display = 'none';
+      editingSaleId = null;
+    }
+    document.getElementById('es_closeBtn').addEventListener('click', closeEditSale);
+    document.getElementById('editSaleOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'editSaleOverlay') closeEditSale();
+    });
+    document.getElementById('editSaleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!editingSaleId) return;
+      const errorBox = document.getElementById('editErrorBox');
+      errorBox.style.display = 'none';
+      try {
+        await updateSale(editingSaleId, {
+          member_id: document.getElementById('es_member').value,
+          staff_id: document.getElementById('es_staff').value || currentUserId,
+          category: document.getElementById('es_category').value,
+          amount: moneyInputValue('es_amount'),
+          sale_date: document.getElementById('es_date').value,
+          sale_time: document.getElementById('es_time').value || null,
+          payment_method: document.getElementById('es_payment').value || null,
+          memo: document.getElementById('es_memo').value.trim() || null
+        });
+        closeEditSale();
+        loadSales();
       } catch (err) {
         errorBox.textContent = err.message;
         errorBox.style.display = 'block';

@@ -363,6 +363,19 @@ async function deleteSale(id) {
   if (!res.ok) await throwApiError(res, '매출 삭제에 실패했습니다.');
 }
 
+// 잘못 등록한 매출 수정(담당자/항목/금액 등) - 지점장만 가능 (RLS로도 막혀있음, migration_43 참고).
+// 2026-09-07: 원래 "등록/삭제"만 있고 "수정"이 없어서, 담당자나 항목을 잘못 고른 매출을 고칠 방법이
+// 없었던 걸 확인하고 추가함.
+async function updateSale(id, fields) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(fields)
+  });
+  if (!res.ok) await throwApiError(res, '매출 수정에 실패했습니다.');
+  return res.json();
+}
+
 // ---- 미수금(분할 결제) ----
 // "정상가로 등록은 하되, 오늘은 계약금만 받고 잔금은 나중에 받는" 경우를 위한 기능. sales 테이블
 // 자체는 항상 "그날 실제로 받은 금액"만 기록하도록 그대로 두고(카드/현금 매출 집계가 항상 실제 입금액과
@@ -926,6 +939,18 @@ async function addTmLog(log) {
     body: JSON.stringify(log)
   });
   if (!res.ok) await throwApiError(res, 'TM 기록 등록에 실패했습니다.');
+  return res.json();
+}
+
+// TM 기록 일부 수정(특이사항 메모 등). tm_logs는 sales와 달리 처음부터 update RLS 정책이
+// 있어서(schema.sql "TM기록 수정") 별도 SQL 마이그레이션 없이 바로 사용 가능.
+async function updateTmLog(id, fields) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/tm_logs?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(fields)
+  });
+  if (!res.ok) await throwApiError(res, 'TM 기록 수정에 실패했습니다.');
   return res.json();
 }
 
@@ -1826,4 +1851,198 @@ function getEventRecommendations(cur, prev) {
   }
 
   return recs;
+}
+
+// ---- 객단가(ARPU) 세분화 + 장기권 가격 참고 (2026-09-07) ----
+// "객단가 카드를 클릭하면 헬스이용권/그룹PT를 3·6·12개월처럼 기간별로 더 잘게 쪼개서 보여주고, 신규가
+// 필요한 상황이면 가격을 어떻게 잡으면 좋을지도 참고할 수 있게 해달라"는 요청으로 추가.
+// 전체 객단가(computeMonthlyMetrics의 arpu)는 헬스이용권+그룹PT+락커+운동복을 다 합친 값이라 "그 중
+// 어디서 얼마씩 나오는지"는 안 보였는데, 이 함수는 그 안을 카테고리별 -> (헬스이용권/그룹PT는) 상품(기간)별로
+// 쪼개서 이번 달 실제 판매 건수·매출·평균 결제금액·일 단가까지 보여줌. computeProductPlanStats와 비슷하게
+// 실제 상품(products) 연결 매출만 기간별로 잡을 수 있고, 상품 연결 없이 직접 입력한 매출은 "상품 미연결"로 남김.
+const METRICS_ARPU_BREAKDOWN_CATEGORIES = [
+  { key: 'membership', label: '헬스이용권' },
+  { key: 'group_pt', label: '그룹PT' },
+  { key: 'other', label: '락커·운동복' } // 기간 구분이 의미 없어서 상품별 세분화는 안 하고 카테고리 합계만
+];
+function computeArpuBreakdown(monthStr, raw) {
+  const monthStart = `${monthStr}-01`;
+  const [y, m] = monthStr.split('-').map(Number);
+  const monthEnd = toDateStrPlain(new Date(y, m, 0));
+  const monthSales = raw.sales.filter(s => s.sale_date >= monthStart && s.sale_date <= monthEnd);
+
+  const arpuSales = monthSales.filter(s => METRICS_ARPU_CATEGORIES.includes(saleCategoryGroup(s)));
+
+  const buckets = {};
+  METRICS_ARPU_BREAKDOWN_CATEGORIES.forEach(c => {
+    buckets[c.key] = { key: c.key, label: c.label, revenue: 0, memberIds: new Set(), plans: new Map(), unlinkedCount: 0, unlinkedRevenue: 0 };
+  });
+
+  arpuSales.forEach(s => {
+    const group = saleCategoryGroup(s);
+    const bucketKey = (group === 'membership' || group === 'group_pt') ? group : 'other';
+    const b = buckets[bucketKey];
+    if (!b) return;
+    b.revenue += Number(s.amount) || 0;
+    if (s.member_id) b.memberIds.add(s.member_id);
+    if (bucketKey !== 'other') {
+      if (s.product_id && s.product) {
+        if (!b.plans.has(s.product_id)) {
+          b.plans.set(s.product_id, { productId: s.product_id, name: s.product.name, durationDays: s.product.duration_days || null, count: 0, revenue: 0 });
+        }
+        const p = b.plans.get(s.product_id);
+        p.count++;
+        p.revenue += Number(s.amount) || 0;
+      } else {
+        b.unlinkedCount++;
+        b.unlinkedRevenue += Number(s.amount) || 0;
+      }
+    }
+  });
+
+  const totalRevenue = arpuSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const totalMemberIds = new Set(arpuSales.filter(s => s.member_id).map(s => s.member_id));
+
+  const categories = METRICS_ARPU_BREAKDOWN_CATEGORIES.map(c => {
+    const b = buckets[c.key];
+    const memberCount = b.memberIds.size;
+    const plans = Array.from(b.plans.values())
+      .sort((a, b2) => (a.durationDays || 0) - (b2.durationDays || 0))
+      .map(p => ({
+        ...p,
+        avgPrice: p.count > 0 ? p.revenue / p.count : null,
+        perDayRate: (p.durationDays && p.count > 0) ? (p.revenue / p.count) / p.durationDays : null
+      }));
+    return {
+      key: b.key, label: b.label, revenue: b.revenue, memberCount,
+      arpu: memberCount > 0 ? b.revenue / memberCount : null,
+      sharePct: totalRevenue > 0 ? Math.round((b.revenue / totalRevenue) * 1000) / 10 : 0,
+      plans, unlinkedCount: b.unlinkedCount, unlinkedRevenue: b.unlinkedRevenue
+    };
+  });
+
+  return {
+    monthStr, totalRevenue, totalMemberCount: totalMemberIds.size,
+    totalArpu: totalMemberIds.size > 0 ? totalRevenue / totalMemberIds.size : null,
+    categories
+  };
+}
+
+// 지금 실제로 등록해둔 상품(이용권 관리 화면, products 테이블) 가격을 그대로 가져와서, 헬스이용권/그룹PT
+// 각각 "기간이 늘어날수록 일 단가가 얼마나 할인되는지"를 계산해서 보여줌 - 전부 실제 저장된 가격 기준으로
+// 계산한 값이지 지어낸 숫자가 아님. 이 정도 할인폭이 "맞다/틀리다"를 이 앱이 단정할 근거는 없어서, 지점장이
+// 판단할 수 있게 "지금 설정"을 그대로 보여주고, 참고용으로 몇 가지 할인폭(10/20/30%)을 적용하면 가격이
+// 얼마가 되는지도 같이 보여줌 (셋 다 그냥 예시 - 이 중 뭐가 맞는지는 마진·경쟁 상황 등을 지점장이 판단해야 함)
+const PRICING_REFERENCE_DISCOUNTS = [0.10, 0.20, 0.30]; // 참고용 예시 할인폭 (10%/20%/30%)
+function computePricingReference(products) {
+  const cats = ['membership', 'group_pt'].map(catKey => {
+    const plans = (products || [])
+      .filter(p => p.category === catKey && p.active !== false && p.duration_days && p.duration_days >= 60) // 1개월/일일권처럼 너무 짧은 건 "장기권 비교" 대상이 아니라서 제외(2개월=60일 이상만)
+      .map(p => ({ id: p.id, name: p.name, durationDays: p.duration_days, price: Number(p.price) || 0, perDayRate: (Number(p.price) || 0) / p.duration_days }))
+      .sort((a, b) => a.durationDays - b.durationDays);
+    if (plans.length === 0) return { key: catKey, plans: [], anchor: null };
+    // 기준(anchor)은 있는 상품 중 기간이 제일 짧은 것(보통 3개월권) - "3개월 대비 몇 % 할인"의 기준점
+    const anchor = plans[0];
+    const withDiscount = plans.map(p => ({
+      ...p,
+      isAnchor: p.id === anchor.id,
+      discountVsAnchor: p.id === anchor.id ? 0 : Math.round(((p.perDayRate - anchor.perDayRate) / anchor.perDayRate) * 1000) / 10,
+      // 참고용 예시: anchor의 일 단가에 10/20/30% 할인을 적용하면 이 기간(durationDays) 기준으로 얼마가 되는지
+      // (anchor 자기 자신은 기준점이라 참고 가격이 의미 없어서 null로 둠)
+      referencePrices: p.id === anchor.id ? null : PRICING_REFERENCE_DISCOUNTS.map(disc => Math.round(anchor.perDayRate * (1 - disc) * p.durationDays / 1000) * 1000)
+    }));
+    return { key: catKey, plans: withDiscount, anchor };
+  });
+  return { membership: cats[0], group_pt: cats[1] };
+}
+
+// ---- 객단가(ARPU)를 기준으로 역산한 3·6·12개월 가격표 (2026-09-07) ----
+// "객단가 자체가 지금 가격 x 얼마나 팔렸는지로 나온 숫자니까, 없는 가정이 들어가도 괜찮으니 그걸 거꾸로
+// 풀어서 3/6/12개월 가격표를 만들어달라"는 요청으로 추가. (위 computePricingReference는 "지금 등록된
+// 3개월권 가격"을 기준으로 계산한 거라 객단가를 실제로 쓰지 않았음 - 이 함수가 진짜로 객단가를 씀)
+//
+// 계산 방식(그대로 화면 설명 문구에도 씀):
+// 1) 이번 달 "3·6·12개월권만" 판매된 건수(n3,n6,n12)와 그 매출 합을 구해서, 매출 합 ÷ 총 건수로
+//    "3·6·12개월권 전용 평균 결제금액"을 구함. (카테고리별 객단가는 1개월권·일일권까지 섞인 숫자라 이
+//    계산엔 안 맞아서, 3·6·12개월권 판매분만 따로 다시 평균 냄 - 그래서 위 "카테고리별 객단가"와 이
+//    숫자는 다를 수 있음)
+// 2) "6개월/12개월은 3개월보다 일 단가가 얼마나 낮아야 하는가"는 이 앱이 실제로 아는 값이 아니라서
+//    가정을 세움 - 장기 결제를 받으면 헬스장 입장에서 이탈 방지·현금흐름 확보 효과가 있어서, 보통
+//    기간이 길수록 일 단가를 낮춰서 장기 결제를 유도하는 방식을 씀(일반적인 구독/이용권 가격 논리).
+//    이 할인폭이 정확히 몇 %가 맞는지는 이 앱이 알 방법이 없어서, "완만함/표준/공격적" 3가지 예시
+//    시나리오를 만들어 같이 보여줌 - 실측 데이터가 아니라 예시 가정이고, 어느 쪽이 맞는지는 지점장이 판단.
+// 3) ①이번 달 실제 평균 결제금액과 ②이번 달 실제 판매 건수 비율(n3:n6:n12)을 그대로 두고, ③가정한
+//    할인폭을 대입해서 "이 평균 결제금액이 나오려면 3개월권 일 단가가 얼마여야 하는지"를 역산 -> 거기서
+//    6개월·12개월 가격도 같이 나옴. 수식은 computeArpuCalibratedPricing 주석 참고.
+const ARPU_LADDER_DURATIONS = [
+  { key: '3m', label: '3개월', days: 90 },
+  { key: '6m', label: '6개월', days: 180 },
+  { key: '12m', label: '12개월', days: 360 }
+];
+// 참고용 예시 시나리오 3개 - 이 %들의 근거는 "장기 결제일수록 일 단가를 낮춰서 유도한다"는 일반적인
+// 구독/이용권 가격 논리일 뿐, 이 센터의 실측 데이터가 아님(이 앱은 이 %가 맞다고 주장하지 않음)
+const ARPU_PRICING_SCENARIOS = [
+  { key: 'mild', label: '완만한 할인', d6: 0.10, d12: 0.20 },
+  { key: 'standard', label: '표준 할인', d6: 0.15, d12: 0.30 },
+  { key: 'aggressive', label: '공격적 할인', d6: 0.20, d12: 0.40 }
+];
+
+// categoryBreakdown: computeArpuBreakdown()이 돌려주는 categories[] 중 하나(membership 또는 group_pt).
+// 그 안의 plans(이번 달 실제 판매된 상품별 건수/매출)를 90/180/360일(3/6/12개월) 중 제일 가까운 기간에
+// 갈라 담아서, 3·6·12개월권만의 건수·매출 합계를 구함. 1개월권·일일권처럼 60일 미만인 상품은 이 계산
+// 대상이 아니라서 뺌.
+function computeArpuLadderStats(categoryBreakdown) {
+  const buckets = {};
+  ARPU_LADDER_DURATIONS.forEach(d => { buckets[d.key] = { ...d, count: 0, revenue: 0 }; });
+  (categoryBreakdown ? categoryBreakdown.plans : []).forEach(p => {
+    if (!p.durationDays || p.durationDays < 60) return;
+    let nearest = ARPU_LADDER_DURATIONS[0];
+    let nearestDist = Math.abs(p.durationDays - nearest.days);
+    ARPU_LADDER_DURATIONS.forEach(d => {
+      const dist = Math.abs(p.durationDays - d.days);
+      if (dist < nearestDist) { nearest = d; nearestDist = dist; }
+    });
+    buckets[nearest.key].count += p.count;
+    buckets[nearest.key].revenue += p.revenue;
+  });
+  const totalCount = Object.values(buckets).reduce((s, b) => s + b.count, 0);
+  const totalRevenue = Object.values(buckets).reduce((s, b) => s + b.revenue, 0);
+  if (totalCount === 0) return null;
+  return { buckets, totalCount, totalRevenue, avgPricePerTxn: totalRevenue / totalCount };
+}
+
+// ladderStats(위 함수 결과) + 시나리오(d6,d12 할인 가정)로 3/6/12개월 제안 가격을 역산.
+// 수식: avgPricePerTxn = Σ(n_i · days_i · (1-discount_i) · x) / Σ(n_i)  (x = 3개월 기준 일 단가, 미지수)
+//  => x = avgPricePerTxn · Σ(n_i) / Σ(n_i · days_i · (1-discount_i))
+// 그 다음 각 기간 제안가 = x · days_i · (1-discount_i). 이렇게 구한 x로 이번 달 실제 판매 건수만큼
+// 팔았다고 가정하면 평균 결제금액이 정확히 avgPricePerTxn(=이번 달 실제 수치)이 나오도록 역산한 것.
+function computeArpuCalibratedPricing(ladderStats, scenario) {
+  if (!ladderStats) return null;
+  const disc = { '3m': 0, '6m': scenario.d6, '12m': scenario.d12 };
+  let weightedDaysSum = 0;
+  ARPU_LADDER_DURATIONS.forEach(d => {
+    const b = ladderStats.buckets[d.key];
+    weightedDaysSum += b.count * d.days * (1 - disc[d.key]);
+  });
+  if (weightedDaysSum === 0) return null;
+  const x = ladderStats.avgPricePerTxn * ladderStats.totalCount / weightedDaysSum;
+  const prices = {};
+  ARPU_LADDER_DURATIONS.forEach(d => {
+    prices[d.key] = Math.round(x * d.days * (1 - disc[d.key]) / 1000) * 1000;
+  });
+  return prices;
+}
+
+// products(이용권 관리에 등록된 실제 상품 목록)에서 catKey 카테고리 중 targetDays에 제일 가까운 상품의
+// 현재 등록 가격을 찾음 - "지금 등록가 대비 이 계산값이 얼마나 차이나는지" 비교해서 보여줄 때 씀
+function findCurrentPriceForDuration(products, catKey, targetDays) {
+  const candidates = (products || []).filter(p => p.category === catKey && p.active !== false && p.duration_days && p.duration_days >= 60);
+  if (candidates.length === 0) return null;
+  let nearest = candidates[0];
+  let nearestDist = Math.abs(nearest.duration_days - targetDays);
+  candidates.forEach(p => {
+    const dist = Math.abs(p.duration_days - targetDays);
+    if (dist < nearestDist) { nearest = p; nearestDist = dist; }
+  });
+  return Number(nearest.price) || null;
 }

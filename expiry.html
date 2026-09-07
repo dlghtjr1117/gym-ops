@@ -5,7 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 만료회원 · TM 관리</title>
-<link rel="stylesheet" href="style.css?v=1788757259" />
+<link rel="stylesheet" href="style.css?v=1788781891" />
+<style>
+  /* 이 페이지 전용 - 특이사항(메모) 칸: 엑셀 시트처럼 바로 타이핑해서 저장 (pt.html의
+     .sheet-input과 같은 관례) */
+  .sheet-input {
+    width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid transparent;
+    border-radius: 6px; background: transparent;
+  }
+  .sheet-input:hover { border-color: var(--slate-300); }
+  .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -66,18 +76,18 @@
       <div id="categoryTabs" class="filter-tabs"></div>
       <table id="expiryTable" class="table-fixed" style="min-width:980px;">
         <thead><tr>
-          <th style="width:40px;">확인</th><th style="width:11%;">이름</th><th style="width:14%;">전화번호</th><th style="width:5%;">성별</th>
-          <th style="width:15%;">만료일</th><th style="width:21%;">상품</th><th style="width:10%;">담당</th><th style="width:14%;">TM 상태</th>
+          <th style="width:40px;">확인</th><th style="width:9%;">이름</th><th style="width:12%;">전화번호</th><th style="width:4%;">성별</th>
+          <th style="width:13%;">만료일</th><th style="width:17%;">상품</th><th style="width:8%;">담당</th><th style="width:12%;">TM 상태</th><th style="width:16%;">특이사항</th>
         </tr></thead>
-        <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
       <div class="report-nav" id="expiryPagination" style="justify-content:flex-end; margin-top:10px;"></div>
     </div>
   </div>
 
-  <script src="config.js?v=1788757259"></script>
-  <script src="auth.js?v=1788757259"></script>
-  <script src="data.js?v=1788757259"></script>
+  <script src="config.js?v=1788781891"></script>
+  <script src="auth.js?v=1788781891"></script>
+  <script src="data.js?v=1788781891"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -124,6 +134,44 @@
       } catch (err) {
         alert(err.message);
         selectEl.disabled = false;
+      }
+    }
+
+    // TM상태 옆 "특이사항" 메모 칸: pt.html의 회차/메모 입력칸과 같은 방식(엑셀 시트처럼 바로
+    // 타이핑하고 칸을 벗어나면 저장)으로, 기존 tm_logs 기록이 있으면 그 메모를 보여주고 수정하면
+    // updateTmLog로 patch. 아직 연락 기록 자체가 없는 회원(latestTm이 null)은 addTmLog로 새
+    // 기록을 만들면서 status는 'not_contacted'(아직 연락 안 함, DB에서 허용되는 기본 상태)로 둠
+    function renderMemoCell(it) {
+      const memo = it.latestTm && it.latestTm.memo ? it.latestTm.memo : '';
+      return `<input type="text" class="sheet-input tm-memo-input" data-member-id="${it.member.id}"
+                data-category="${it.categoryKey}" data-tm-id="${it.latestTm ? it.latestTm.id : ''}"
+                data-original="${escapeHtml(memo)}" value="${escapeHtml(memo)}" placeholder="메모 입력..."
+                onblur="handleMemoChange(this)" onkeydown="if(event.key==='Enter'){this.blur();}" />`;
+    }
+
+    async function handleMemoChange(inputEl) {
+      const newValue = inputEl.value.trim();
+      const original = inputEl.dataset.original || '';
+      if (newValue === original) return; // 안 바뀌었으면 굳이 저장 안 함
+      const tmId = inputEl.dataset.tmId;
+      inputEl.disabled = true;
+      try {
+        if (tmId) {
+          await updateTmLog(tmId, { memo: newValue || null });
+        } else {
+          await addTmLog({
+            member_id: inputEl.dataset.memberId,
+            staff_id: currentUserId,
+            status: 'not_contacted',
+            category: inputEl.dataset.category,
+            contact_date: new Date().toISOString().slice(0, 10),
+            memo: newValue || null
+          });
+        }
+        await loadExpiring();
+      } catch (err) {
+        alert(err.message);
+        inputEl.disabled = false;
       }
     }
 
@@ -186,7 +234,7 @@
         : expiringItemsCache.filter(it => it.categoryKey === activeCategoryFilter);
 
       if (allItems.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">해당하는 만료 예정 회원이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">해당하는 만료 예정 회원이 없습니다.</td></tr>';
         paginationEl.innerHTML = '';
         return;
       }
@@ -211,6 +259,7 @@
           <td><div class="mcell"><span class="mcell-label" title="${escapeHtml(it.productLabel)}">${escapeHtml(it.productLabel)}</span></div></td>
           <td class="cell-1line" title="${escapeHtml(it.member.trainer ? it.member.trainer.name : '미지정')}">${it.member.trainer ? escapeHtml(it.member.trainer.name) : '미지정'}</td>
           <td>${renderTmStatusCell(it)}</td>
+          <td>${renderMemoCell(it)}</td>
         </tr>
       `).join('');
       renderCheckedProgress();
@@ -237,7 +286,7 @@
           groupPtCount > 0 ? '연락이 필요해요' : '만료 예정 회원이 없어요';
       } catch (err) {
         document.getElementById('categoryTabs').innerHTML = '';
-        tbody.innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
         document.getElementById('heroMembershipSub').textContent = err.message;
         document.getElementById('heroGroupPtSub').textContent = err.message;
       }

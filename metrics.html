@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 지표 분석</title>
-<link rel="stylesheet" href="style.css?v=1788757259" />
+<link rel="stylesheet" href="style.css?v=1788781891" />
 <style>
   /* 이 페이지 전용 - 지표 카드 5개를 한 줄에(좁은 화면에선 2줄/1줄로) */
   .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
@@ -39,6 +39,17 @@
   .plan-table td, .plan-table th { text-align: right; white-space: nowrap; }
   .plan-table td:first-child, .plan-table th:first-child { text-align: left; white-space: normal; }
   .plan-table tr.unlinked-row td { color: var(--slate-500); font-size: 12.5px; }
+
+  /* 객단가 카드 클릭 -> 세분화/가격 참고 모달 (2026-09-07) */
+  .metric-card.clickable { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+  .metric-card.clickable:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  .metric-card.clickable:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: -2px; }
+  .arpu-cat-table td, .arpu-cat-table th { text-align: right; white-space: nowrap; }
+  .arpu-cat-table td:first-child, .arpu-cat-table th:first-child { text-align: left; white-space: normal; }
+  .pricing-table td, .pricing-table th { text-align: right; white-space: nowrap; font-size: 12.5px; }
+  .pricing-table td:first-child, .pricing-table th:first-child { text-align: left; white-space: normal; }
+  .pricing-table tr.anchor-row td { font-weight: 700; }
+  .pricing-note { background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:10px 12px; font-size:12.5px; line-height:1.6; color:#1e3a8a; margin-bottom:12px; }
 </style>
 </head>
 <body>
@@ -115,11 +126,12 @@
           <span class="delta" id="mcChurnDelta"></span>
           <div class="spark" id="mcChurnSpark"></div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card clickable" id="mcArpuCard" role="button" tabindex="0" aria-label="객단가 세분화 · 가격 참고 보기">
           <div class="label">💳 객단가 (FC)</div>
           <div class="value" id="mcArpu">-</div>
           <span class="delta" id="mcArpuDelta"></span>
           <div class="spark" id="mcArpuSpark"></div>
+          <div class="muted" style="font-size:11px; margin-top:6px;">눌러서 자세히 보기 →</div>
         </div>
       </div>
     </div>
@@ -168,9 +180,44 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788757259"></script>
-  <script src="auth.js?v=1788757259"></script>
-  <script src="data.js?v=1788757259"></script>
+  <!-- 객단가 세분화 · 가격 참고 모달 - 2026-09-07: "객단가를 클릭하면 헬스이용권/그룹PT를 3·6·12개월처럼
+       기간별로 더 잘게 쪼개서 보여주고, 신규가 필요하면 가격을 어떻게 잡으면 좋을지도 참고할 수 있게
+       해달라"는 요청으로 추가. 아래 "장기권 가격 참고" 표의 숫자는 전부 지금 실제로 등록된 상품 가격을
+       기준으로 계산한 참고용 예시(10/20/30% 할인)일 뿐, 이 앱이 "정답 가격"을 정해주는 게 아님 - 최종
+       가격은 마진·경쟁 상황 등을 고려해서 직접 판단하셔야 해요 -->
+  <div class="modal-overlay" id="arpuDetailOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:760px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="margin:0;">객단가 세분화 · 가격 참고</h3>
+          <p class="muted" style="margin:2px 0 0; font-size:12.5px;" id="arpuDetailSub">-</p>
+        </div>
+        <button type="button" class="modal-close" id="arpuDetailCloseBtn">&times;</button>
+      </div>
+
+      <div id="arpuPriorityNote"></div>
+
+      <div class="modal-section" style="border-top:none; padding-top:0;">
+        <h4>카테고리별 객단가</h4>
+        <div style="overflow-x:auto;">
+          <table class="arpu-cat-table">
+            <thead><tr><th>카테고리</th><th>매출</th><th>비중</th><th>결제 회원수</th><th>평균 결제금액(객단가)</th></tr></thead>
+            <tbody id="arpuCatBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-section" id="arpuPlanSection"></div>
+
+      <div class="modal-section" id="pricingRefSection"></div>
+
+      <div class="modal-section" id="arpuCalibratedSection"></div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1788781891"></script>
+  <script src="auth.js?v=1788781891"></script>
+  <script src="data.js?v=1788781891"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -254,6 +301,11 @@
       metricsRaw = await fetchMetricsRawData(neededEarliest);
     }
 
+    // 객단가 상세 모달(openArpuDetail)에서 "지금 신규가 더 급한지, 재등록/이탈 관리가 더 급한지"를 다시
+    // 계산하지 않고 그대로 참고할 수 있게, loadMetrics가 매번 계산한 결과를 캐시해둠
+    let metricsCurCache = null;
+    let metricsRecsCache = [];
+
     async function loadMetrics() {
       updateNavLabel();
       const loadingNote = document.getElementById('metricsLoadingNote');
@@ -267,8 +319,10 @@
         const series = months.map(m => computeMonthlyMetrics(m, metricsRaw));
         const cur = series[series.length - 1];
         const prev = series.length >= 2 ? series[series.length - 2] : null;
+        metricsCurCache = cur;
+        metricsRecsCache = getEventRecommendations(cur, prev);
 
-        renderRecommendations(getEventRecommendations(cur, prev));
+        renderRecommendations(metricsRecsCache);
         renderMetricCards(cur, prev, series);
         renderTrendTable(series);
 
@@ -396,6 +450,216 @@
         </tr>
       `).join('');
     }
+
+    // ---- 객단가 세분화 · 가격 참고 모달 (2026-09-07) ----
+    let pricingProductsCache = null;
+    async function ensurePricingProductsLoaded() {
+      if (!pricingProductsCache) {
+        try { pricingProductsCache = await fetchProducts(true); } catch (e) { pricingProductsCache = []; }
+      }
+      return pricingProductsCache;
+    }
+
+    function renderArpuCatTable(breakdown) {
+      const rows = breakdown.categories.map(c => `
+        <tr>
+          <td>${escapeHtml(c.label)}</td>
+          <td>${formatWonShort(c.revenue)}</td>
+          <td>${c.sharePct}%</td>
+          <td>${c.memberCount}명</td>
+          <td>${c.arpu != null ? formatWonShort(c.arpu) : '<span class="muted">-</span>'}</td>
+        </tr>`).join('');
+      const totalRow = `
+        <tr style="font-weight:700;">
+          <td>합계</td>
+          <td>${formatWonShort(breakdown.totalRevenue)}</td>
+          <td>100%</td>
+          <td>${breakdown.totalMemberCount}명</td>
+          <td>${breakdown.totalArpu != null ? formatWonShort(breakdown.totalArpu) : '-'}</td>
+        </tr>`;
+      document.getElementById('arpuCatBody').innerHTML = rows + totalRow;
+    }
+
+    function renderArpuPlanSection(breakdown) {
+      const catsWithPlans = breakdown.categories.filter(c => c.key === 'membership' || c.key === 'group_pt');
+      document.getElementById('arpuPlanSection').innerHTML = catsWithPlans.map(c => {
+        if (c.plans.length === 0 && c.unlinkedCount === 0) {
+          return `<h4>${escapeHtml(c.label)} 기간별 상세</h4>
+            <p class="muted" style="padding:6px 0 14px; font-size:12.5px;">이번 달 ${escapeHtml(c.label)} 매출이 없어요.</p>`;
+        }
+        const rows = c.plans.map(p => `
+          <tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${p.durationDays ? `${p.durationDays}일` : '-'}</td>
+            <td>${p.count}건</td>
+            <td>${formatWonShort(p.revenue)}</td>
+            <td>${p.avgPrice != null ? formatWonShort(p.avgPrice) : '-'}</td>
+            <td>${p.perDayRate != null ? `${Math.round(p.perDayRate).toLocaleString()}원` : '-'}</td>
+          </tr>`).join('');
+        const unlinkedRow = c.unlinkedCount > 0 ? `
+          <tr class="unlinked-row">
+            <td>상품 미연결</td><td>-</td><td>${c.unlinkedCount}건</td><td>${formatWonShort(c.unlinkedRevenue)}</td><td>-</td><td>-</td>
+          </tr>` : '';
+        return `
+          <h4>${escapeHtml(c.label)} 기간별 상세 (이번 달)</h4>
+          <div style="overflow-x:auto; margin-bottom:16px;">
+            <table class="arpu-cat-table">
+              <thead><tr><th>상품</th><th>기간</th><th>건수</th><th>매출</th><th>평균 결제금액</th><th>일 단가</th></tr></thead>
+              <tbody>${rows}${unlinkedRow}</tbody>
+            </table>
+          </div>`;
+      }).join('');
+    }
+
+    function renderPricingRefSection(pricingRef) {
+      const catLabels = { membership: '헬스이용권', group_pt: '그룹PT' };
+      const discountLabels = PRICING_REFERENCE_DISCOUNTS.map(d => `${Math.round(d * 100)}%할인`);
+      const blocks = ['membership', 'group_pt'].map(key => {
+        const cat = pricingRef[key];
+        if (!cat || cat.plans.length === 0) {
+          return `<h4>${catLabels[key]} 장기권 가격 참고</h4>
+            <p class="muted" style="font-size:12.5px; padding:0 0 14px;">비교할 수 있는 2개월 이상 상품이 없어요(이용권 관리에서 등록해두시면 여기 표시돼요).</p>`;
+        }
+        const rows = cat.plans.map(p => `
+          <tr class="${p.isAnchor ? 'anchor-row' : ''}">
+            <td>${escapeHtml(p.name)}${p.isAnchor ? ' <span class="muted">(기준)</span>' : ''}</td>
+            <td>${p.durationDays}일</td>
+            <td>${formatWonShort(p.price)}</td>
+            <td>${Math.round(p.perDayRate).toLocaleString()}원</td>
+            <td>${p.isAnchor ? '<span class="muted">-</span>' : `${p.discountVsAnchor > 0 ? '+' : ''}${p.discountVsAnchor}%`}</td>
+            <td>${p.referencePrices ? p.referencePrices.map((rp, i) => `${discountLabels[i]} ${formatWonShort(rp)}`).join('<br>') : '<span class="muted">-</span>'}</td>
+          </tr>`).join('');
+        return `
+          <h4>${catLabels[key]} 장기권 가격 참고</h4>
+          <div style="overflow-x:auto; margin-bottom:14px;">
+            <table class="pricing-table">
+              <thead><tr><th>상품</th><th>기간</th><th>현재 가격</th><th>일 단가</th><th>기준 대비 할인</th><th>참고 예시(기준 일 단가 기준)</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      }).join('');
+
+      document.getElementById('pricingRefSection').innerHTML = `
+        <h4 style="margin-bottom:8px;">장기권 가격 참고</h4>
+        <div class="pricing-note">
+          "기준" 상품(등록된 상품 중 제일 짧은 기간 - 보통 3개월권)의 일 단가를 기준으로, 더 긴 기간 상품의 일 단가가 지금 몇 % 할인돼 있는지 실제 등록된 가격 그대로 계산한 값이에요. "참고 예시"는 기준 일 단가에 10%·20%·30% 할인을 적용하면 그 기간 가격이 얼마가 되는지 보여주는 예시일 뿐이고, 어떤 할인폭이 맞는지는 마진·경쟁 상황을 보고 직접 정하셔야 해요 - 이 앱이 "정답 가격"을 정해드리는 건 아니에요.
+        </div>
+        ${blocks}`;
+    }
+
+    // "객단가를 진짜로 써서 3·6·12개월 가격을 역산해달라"는 요청으로 추가한 섹션 - 위 renderPricingRefSection과
+    // 다르게, 이건 "지금 등록된 3개월권 가격"이 아니라 "이번 달 실제 3·6·12개월권 평균 결제금액 + 실제 판매
+    // 비율"을 기준으로 역산함. 자세한 계산 방식은 data.js의 computeArpuLadderStats/computeArpuCalibratedPricing
+    // 주석 참고. breakdown: computeArpuBreakdown() 결과, pricingRef: computePricingReference() 결과(현재
+    // 등록가와 비교 표시용), products: 현재 등록 상품 목록(findCurrentPriceForDuration용)
+    function renderArpuCalibratedSection(breakdown, products) {
+      const catLabels = { membership: '헬스이용권', group_pt: '그룹PT' };
+      const blocks = ['membership', 'group_pt'].map(catKey => {
+        const catBreakdown = breakdown.categories.find(c => c.key === catKey);
+        const ladder = computeArpuLadderStats(catBreakdown);
+        if (!ladder) {
+          return `<h4>${catLabels[catKey]} - 객단가 기준 가격표</h4>
+            <p class="muted" style="font-size:12.5px; padding:0 0 14px;">이번 달은 ${catLabels[catKey]} 3·6·12개월권 판매 실적이 없어서, 이번 달 데이터로는 계산할 수 없어요.</p>`;
+        }
+        const mixText = ARPU_LADDER_DURATIONS.map(d => `${d.label} ${ladder.buckets[d.key].count}건`).join(' · ');
+        const scenarioRows = ARPU_PRICING_SCENARIOS.map(scenario => {
+          const prices = computeArpuCalibratedPricing(ladder, scenario);
+          if (!prices) return '';
+          const cells = ARPU_LADDER_DURATIONS.map(d => {
+            const current = findCurrentPriceForDuration(products, catKey, d.days);
+            const suggested = prices[d.key];
+            let deltaHtml = '<span class="muted">현재가 없음</span>';
+            if (current) {
+              const deltaPct = Math.round(((suggested - current) / current) * 1000) / 10;
+              const sign = deltaPct > 0 ? '+' : '';
+              const cls = Math.abs(deltaPct) < 0.5 ? 'muted' : (deltaPct > 0 ? 'up' : 'down');
+              deltaHtml = `<span class="delta ${cls}" style="display:inline;">현재 ${formatWonShort(current)} 대비 ${sign}${deltaPct}%</span>`;
+            }
+            return `<td>${formatWonShort(suggested)}<br>${deltaHtml}</td>`;
+          }).join('');
+          return `<tr><td>${escapeHtml(scenario.label)}${scenario.key === 'standard' ? ' <span class="muted">(기본 예시)</span>' : ''}</td>${cells}</tr>`;
+        }).join('');
+        return `
+          <h4>${catLabels[catKey]} - 객단가 기준 가격표</h4>
+          <p class="muted" style="margin:-4px 0 8px; font-size:12.5px;">
+            이번 달 3·6·12개월권 판매: ${mixText} · 3·6·12개월권 전용 평균 결제금액 ${formatWonShort(ladder.avgPricePerTxn)}
+          </p>
+          <div style="overflow-x:auto; margin-bottom:16px;">
+            <table class="pricing-table">
+              <thead><tr><th>할인 가정 시나리오</th><th>3개월 제안가</th><th>6개월 제안가</th><th>12개월 제안가</th></tr></thead>
+              <tbody>${scenarioRows}</tbody>
+            </table>
+          </div>`;
+      }).join('');
+
+      document.getElementById('arpuCalibratedSection').innerHTML = `
+        <h4 style="margin-bottom:8px;">객단가 기준 가격표 (역산)</h4>
+        <div class="pricing-note">
+          위 "장기권 가격 참고"는 지금 등록된 3개월권 가격을 기준으로 계산한 거라 객단가를 직접 쓰지 않았는데, 여기는 진짜로 객단가를 씀. 이번 달 3·6·12개월권만의 실제 평균 결제금액과 실제 판매 비율(3개월:6개월:12개월)을 그대로 두고, "장기 결제일수록 일 단가를 얼마나 할인해줄지"만 예시로 가정해서(완만/표준/공격적 3가지), 그 평균 결제금액이 나오려면 각 기간 가격이 얼마여야 하는지 거꾸로 계산했어요. 할인폭 가정은 실측치가 아니라 일반적인 장기 결제 유도 논리로 잡은 예시 숫자라, 어느 시나리오가 맞는지는 직접 판단하셔야 해요. "현재가 대비"는 지금 등록된 가격과 비교한 차이예요.
+        </div>
+        ${blocks}`;
+    }
+
+    function renderArpuPriorityNote() {
+      const recs = metricsRecsCache || [];
+      const newRec = recs.find(r => r.title === '신규 회원 유치 이벤트 추천');
+      const box = document.getElementById('arpuPriorityNote');
+      if (newRec) {
+        box.innerHTML = `<div class="rec-card rec-critical" style="margin-bottom:16px;">
+          <div class="rec-title">🚨 지금은 신규 유치가 더 급해요</div>
+          <div class="rec-detail">${escapeHtml(newRec.detail)} 아래 "장기권 가격 참고"를 보고 3·6·12개월 상품 가격대를 다시 점검해보세요 - 3개월권 진입 문턱을 낮추거나, 장기권 할인폭을 키워서 첫 등록을 더 쉽게 만드는 방향이 신규 유치에 도움될 수 있어요.</div>
+        </div>`;
+      } else if (recs[0] && recs[0].title === '전반적으로 안정적이에요') {
+        // "안정적" 기본 추천은 문장 자체가 이미 완결형이라 "OOO이 더 우선이에요"에 끼워 넣으면 어색해서 따로 문구를 씀
+        const topRec = recs[0];
+        box.innerHTML = `<div class="rec-card rec-good" style="margin-bottom:16px;">
+          <div class="rec-title">✅ 지금은 신규 유치보다 안정적인 운영 유지가 더 맞아 보여요</div>
+          <div class="rec-detail">${escapeHtml(topRec.detail)} 아래 가격 참고는 신규 유치뿐 아니라, 기존 회원을 장기권으로 갈아타게 하는 재등록 유도에도 참고할 수 있어요.</div>
+        </div>`;
+      } else if (recs[0]) {
+        const topRec = recs[0];
+        box.innerHTML = `<div class="rec-card rec-${topRec.level}" style="margin-bottom:16px;">
+          <div class="rec-title">${topRec.level === 'critical' ? '🚨' : topRec.level === 'warning' ? '⚠️' : '✅'} 이번 달은 "${escapeHtml(topRec.title)}"가 더 우선이에요</div>
+          <div class="rec-detail">신규 유치보다 이게 더 급해 보여요: ${escapeHtml(topRec.detail)} 아래 가격 참고는 신규 유치뿐 아니라, 기존 회원을 장기권으로 갈아타게 하는 재등록 유도에도 참고할 수 있어요.</div>
+        </div>`;
+      } else {
+        box.innerHTML = '';
+      }
+    }
+
+    async function openArpuDetail() {
+      if (!metricsRaw || !metricsCurCache) return;
+      document.getElementById('arpuDetailSub').textContent = `${monthLabel(refMonthStr)} 기준`;
+      document.getElementById('arpuCatBody').innerHTML = '<tr><td colspan="5" class="muted" style="padding:12px;">불러오는 중...</td></tr>';
+      document.getElementById('arpuPlanSection').innerHTML = '';
+      document.getElementById('pricingRefSection').innerHTML = '<p class="muted" style="padding:8px 0;">불러오는 중...</p>';
+      document.getElementById('arpuCalibratedSection').innerHTML = '';
+      renderArpuPriorityNote();
+      document.getElementById('arpuDetailOverlay').style.display = 'flex';
+
+      const breakdown = computeArpuBreakdown(refMonthStr, metricsRaw);
+      renderArpuCatTable(breakdown);
+      renderArpuPlanSection(breakdown);
+
+      try {
+        const products = await ensurePricingProductsLoaded();
+        renderPricingRefSection(computePricingReference(products));
+        renderArpuCalibratedSection(breakdown, products);
+      } catch (err) {
+        document.getElementById('pricingRefSection').innerHTML = `<p class="error-text" style="display:block;">가격 참고 정보를 불러오지 못했습니다.</p>`;
+      }
+    }
+    function closeArpuDetail() {
+      document.getElementById('arpuDetailOverlay').style.display = 'none';
+    }
+    document.getElementById('mcArpuCard').addEventListener('click', openArpuDetail);
+    document.getElementById('mcArpuCard').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openArpuDetail(); }
+    });
+    document.getElementById('arpuDetailCloseBtn').addEventListener('click', closeArpuDetail);
+    document.getElementById('arpuDetailOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'arpuDetailOverlay') closeArpuDetail();
+    });
 
     document.getElementById('metricsPrevBtn').addEventListener('click', () => {
       refMonthStr = addMonthsToMonthStr(refMonthStr, -1);
