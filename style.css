@@ -372,7 +372,10 @@ select.tm-status-select {
    강조되도록 만든 보조(2차) 스타일 - 원래는 위/아래 6장이 색깔·굵기가 완전히 똑같아서 작은 라벨
    글자를 안 읽으면 구분이 안 되는 "카드 벽" 문제가 있었음(2026-09-05, 대시보드 디자인 개선 요청).
    배경은 --surface를 그대로 써서 라이트/다크 모드 카드 배경에 자연히 맞춰지고, 왼쪽의 얇은 색
-   바만으로 어떤 항목인지 표시함(hero-blue/purple/teal과 같은 순서·의미) */
+   바만으로 어떤 항목인지 표시함(hero-blue/purple/teal과 같은 순서·의미).
+   (2026-09-07: 잠깐 hero-card와 같은 파스텔 그라데이션 스타일로 바꿨다가, "그건 내가 말한 게
+   아니다 - 트레이너 상세 모달 안의 6개 지표 박스를 바꿔달란 거였다"는 피드백을 받아 원래대로
+   되돌림. 대신 트레이너 상세 모달의 .trainer-stat-box를 이 스타일로 바꿈 - 아래 참고) */
 .hero-card-secondary {
   background: var(--surface); border: 1px solid var(--slate-200); color: var(--slate-900);
   border-radius: 14px; padding: 16px 18px 16px 20px; position: relative;

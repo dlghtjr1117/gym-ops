@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788747648" />
+<link rel="stylesheet" href="style.css?v=1788754815" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -56,14 +56,45 @@
   /* 트레이너 상세 모달(2026-09-07) - 다른 헬스장 관리 프로그램의 트레이너 상세 화면을 참고해서
      목표/달성률, 경로별 매출, 인사이트, 최근 6개월 추이, 경로별 월별 표까지 확장함(openStaffDetail 참고).
      인사이트 카드는 .receivable-card와 같은 이유로 라이트/다크 모드 상관없이 배경·글자색을 고정값으로 씀 */
+  /* 2026-09-07: "6개 사각형(지표 박스)을 대시보드 맨 위 파랑/보라/민트 그라데이션 카드처럼
+     만들어달라"는 요청으로, hero-card(style.css)와 같은 느낌의 그라데이션 카드로 바꿈.
+     3칸×2줄 그리드라 색은 세로줄(컬럼) 기준으로 반복해서 배정함(1열=파랑, 2열=보라, 3열=민트) -
+     맨 위 "오늘/월간 매출" 두 줄이 같은 컬럼끼리 같은 색을 쓰는 것과 같은 규칙.
+     달성률/목표까지 박스의 초록(달성)·빨강(미달성) 강조는 카드 배경과 별개로 값 글자색에만
+     그대로 얹어서 표시함. 다크 모드는 이 앱의 다른 모든 hero-* 그라데이션과 똑같이 크림슨 레드로
+     통일(아래 다크 모드 블록 참고) */
   .trainer-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   @media (max-width: 640px) { .trainer-stat-grid { grid-template-columns: repeat(2, 1fr); } }
-  .trainer-stat-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--slate-50); }
-  .trainer-stat-box .ts-label { font-size: 11.5px; font-weight: 700; color: var(--slate-500); margin-bottom: 6px; }
+  .trainer-stat-box {
+    border-radius: 16px; padding: 14px 16px; position: relative; color: var(--slate-900);
+    box-shadow: 0 8px 20px -14px rgba(15,23,42,0.28); overflow: hidden;
+  }
+  .trainer-stat-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+  .trainer-stat-box.stat-blue { background: linear-gradient(150deg, #eaf1ff, #dbe8ff); }
+  .trainer-stat-box.stat-blue::before { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+  .trainer-stat-box.stat-purple { background: linear-gradient(150deg, #f2ebff, #e7dbff); }
+  .trainer-stat-box.stat-purple::before { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+  .trainer-stat-box.stat-teal { background: linear-gradient(150deg, #e6fbfa, #d2f4f0); }
+  .trainer-stat-box.stat-teal::before { background: linear-gradient(90deg, #5eead4, #0d9488); }
+  .trainer-stat-box .ts-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 9px; background: rgba(255,255,255,0.65);
+    font-size: 14px; margin-bottom: 8px;
+  }
+  .trainer-stat-box .ts-label { font-size: 11.5px; font-weight: 700; opacity: .68; margin-bottom: 6px; }
   .trainer-stat-box .ts-value { font-size: 17px; font-weight: 800; }
-  .trainer-stat-box .ts-sub { font-size: 11.5px; color: var(--slate-500); margin-top: 4px; }
+  .trainer-stat-box .ts-sub { font-size: 11.5px; opacity: .72; margin-top: 4px; }
   .trainer-stat-box.is-good .ts-value { color: #16a34a; }
   .trainer-stat-box.is-bad .ts-value { color: #dc2626; }
+  :root[data-theme="dark"] .trainer-stat-box.stat-blue,
+  :root[data-theme="dark"] .trainer-stat-box.stat-purple,
+  :root[data-theme="dark"] .trainer-stat-box.stat-teal { background: linear-gradient(135deg, #7f1d1d, #dc2626 55%, #f87171); }
+  :root[data-theme="dark"] .trainer-stat-box::before { display: none; }
+  :root[data-theme="dark"] .trainer-stat-box .ts-icon { background: transparent; }
+  :root[data-theme="dark"] .trainer-stat-box .ts-label { opacity: .95; }
+  :root[data-theme="dark"] .trainer-stat-box .ts-sub { opacity: .9; }
+  :root[data-theme="dark"] .trainer-stat-box.is-good .ts-value { color: #4ade80; }
+  :root[data-theme="dark"] .trainer-stat-box.is-bad .ts-value { color: #fca5a5; }
 
   .trainer-source-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
   .trainer-source-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
@@ -431,9 +462,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788747648"></script>
-  <script src="auth.js?v=1788747648"></script>
-  <script src="data.js?v=1788747648"></script>
+  <script src="config.js?v=1788754815"></script>
+  <script src="auth.js?v=1788754815"></script>
+  <script src="data.js?v=1788754815"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -859,17 +890,18 @@
       const newAmount = row.salesRows.filter(s => s.category === 'pt_new').reduce((s, x) => s + (Number(x.amount) || 0), 0);
       const renewalAmount = row.salesRows.filter(s => s.category === 'pt_renewal').reduce((s, x) => s + (Number(x.amount) || 0), 0);
       const boxes = [
-        { label: 'PT매출 합계', value: formatWon(row.ptAmount), sub: `${row.ptCount}건` },
-        { label: '목표', value: target != null ? formatWon(target) : '미설정', sub: '' },
-        { label: '달성률', value: achievementPct != null ? `${achievementPct}%` : '-', sub: '', cls: achievementPct == null ? '' : (achieved ? 'is-good' : '') },
-        { label: '목표까지', value: target == null ? '-' : (achieved ? '달성' : formatWon(target - row.ptAmount)),
+        { icon: '💰', color: 'stat-blue', label: 'PT매출 합계', value: formatWon(row.ptAmount), sub: `${row.ptCount}건` },
+        { icon: '🎯', color: 'stat-purple', label: '목표', value: target != null ? formatWon(target) : '미설정', sub: '' },
+        { icon: '📈', color: 'stat-teal', label: '달성률', value: achievementPct != null ? `${achievementPct}%` : '-', sub: '', cls: achievementPct == null ? '' : (achieved ? 'is-good' : '') },
+        { icon: '⏳', color: 'stat-blue', label: '목표까지', value: target == null ? '-' : (achieved ? '달성' : formatWon(target - row.ptAmount)),
           sub: target == null ? '목표 미설정' : (achieved ? `${formatWon(row.ptAmount - target)} 초과` : '남음'),
           cls: target == null ? '' : (achieved ? 'is-good' : 'is-bad') },
-        { label: '신규', value: `${row.newCount}건`, sub: formatWon(newAmount) },
-        { label: '재등록', value: `${row.renewalCount}건`, sub: formatWon(renewalAmount) }
+        { icon: '🆕', color: 'stat-purple', label: '신규', value: `${row.newCount}건`, sub: formatWon(newAmount) },
+        { icon: '🔁', color: 'stat-teal', label: '재등록', value: `${row.renewalCount}건`, sub: formatWon(renewalAmount) }
       ];
       return boxes.map(b => `
-        <div class="trainer-stat-box ${b.cls || ''}">
+        <div class="trainer-stat-box ${b.color} ${b.cls || ''}">
+          <div class="ts-icon">${b.icon}</div>
           <div class="ts-label">${b.label}</div>
           <div class="ts-value">${b.value}</div>
           ${b.sub ? `<div class="ts-sub">${b.sub}</div>` : ''}
