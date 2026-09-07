@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788661968" />
+<link rel="stylesheet" href="style.css?v=1788747648" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -52,6 +52,50 @@
     --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
     --viz-other: #75757a;
   }
+
+  /* 트레이너 상세 모달(2026-09-07) - 다른 헬스장 관리 프로그램의 트레이너 상세 화면을 참고해서
+     목표/달성률, 경로별 매출, 인사이트, 최근 6개월 추이, 경로별 월별 표까지 확장함(openStaffDetail 참고).
+     인사이트 카드는 .receivable-card와 같은 이유로 라이트/다크 모드 상관없이 배경·글자색을 고정값으로 씀 */
+  .trainer-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 640px) { .trainer-stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  .trainer-stat-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--slate-50); }
+  .trainer-stat-box .ts-label { font-size: 11.5px; font-weight: 700; color: var(--slate-500); margin-bottom: 6px; }
+  .trainer-stat-box .ts-value { font-size: 17px; font-weight: 800; }
+  .trainer-stat-box .ts-sub { font-size: 11.5px; color: var(--slate-500); margin-top: 4px; }
+  .trainer-stat-box.is-good .ts-value { color: #16a34a; }
+  .trainer-stat-box.is-bad .ts-value { color: #dc2626; }
+
+  .trainer-source-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .trainer-source-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
+  .trainer-source-box .src-top { display: flex; align-items: center; justify-content: space-between; font-size: 12px; margin-bottom: 6px; gap: 6px; }
+  .trainer-source-box .src-name { font-weight: 700; }
+  .trainer-source-box .src-pct { color: var(--slate-500); flex: none; }
+  .trainer-source-box .src-amount { font-size: 15px; font-weight: 800; margin-bottom: 8px; }
+  .trainer-source-box .src-bar-track { height: 6px; border-radius: 999px; background: var(--slate-200); overflow: hidden; }
+  .trainer-source-box .src-bar-fill { height: 100%; border-radius: 999px; }
+
+  .trainer-insight-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; color: #14532d; font-size: 13px; line-height: 1.6; }
+  .trainer-insight-card:last-child { margin-bottom: 0; }
+  .trainer-insight-card b { font-weight: 800; }
+  .trainer-insight-card.is-warn { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
+  .trainer-insight-card.is-neutral { background: #f1f5f9; border-color: #e2e8f0; color: #334155; }
+
+  .trainer-trend-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  @media (max-width: 640px) { .trainer-trend-summary { grid-template-columns: repeat(2, 1fr); } }
+  .trainer-trend-summary .tt-box { text-align: center; border: 1px solid var(--slate-200); border-radius: 10px; padding: 10px 8px; background: var(--slate-50); }
+  .trainer-trend-summary .tt-label { font-size: 11px; color: var(--slate-500); margin-bottom: 4px; }
+  .trainer-trend-summary .tt-value { font-size: 14.5px; font-weight: 800; }
+
+  .trainer-trend-chart { display: flex; align-items: flex-end; gap: 14px; height: 160px; padding: 10px 4px 0; border-bottom: 1px solid var(--slate-200); }
+  .trainer-trend-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+  .trainer-trend-bar-col .tb-amount { font-size: 11px; font-weight: 700; }
+  .trainer-trend-bar-col .tb-pct { font-size: 10.5px; color: var(--slate-500); }
+  .trainer-trend-bar { width: 60%; min-width: 22px; border-radius: 4px 4px 0 0; background: var(--indigo-600); }
+  .trainer-trend-bar-col .tb-month { font-size: 11.5px; margin-top: 6px; color: var(--slate-500); }
+  .trainer-trend-bar-col.is-current .tb-amount, .trainer-trend-bar-col.is-current .tb-month { color: #db2777; font-weight: 800; }
+  .trainer-trend-bar-col.is-current .trainer-trend-bar { background: #ec4899; }
+
+  #staffDetailSourceMonthTable th, #staffDetailSourceMonthTable td { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -327,19 +371,57 @@
   <!-- "임직원 성과 지표"에서 TOP3 카드나 표의 이름을 클릭하면 그 직원의 이번 달 매출 내역(누구를 등록시켰는지,
        신규/재등록 등 어떤 항목인지, 결제수단·금액까지)을 보여주는 모달 - 2026-09-06 추가 -->
   <div class="modal-overlay" id="staffDetailOverlay" style="display:none;">
-    <div class="modal-box" style="max-width:760px;">
+    <div class="modal-box" style="max-width:920px;">
       <div class="modal-header">
         <div>
           <h3 id="staffDetailName">-</h3>
           <p class="muted" style="margin:0;font-size:12.5px;" id="staffDetailSub">-</p>
         </div>
-        <button type="button" class="modal-close" id="staffDetailCloseBtn">&times;</button>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="badge badge-blue" id="staffDetailRankBadge" style="display:none;"></span>
+          <button type="button" class="modal-close" id="staffDetailCloseBtn">&times;</button>
+        </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table id="staffDetailTable">
-          <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
-          <tbody id="staffDetailTableBody"><tr><td colspan="5" class="muted" style="padding:16px;">-</td></tr></tbody>
-        </table>
+
+      <div class="modal-section" style="margin-top:14px; padding-top:0; border-top:none;">
+        <div class="trainer-stat-grid" id="staffDetailStatGrid"></div>
+      </div>
+
+      <div class="modal-section">
+        <h4>경로별 매출 <span class="muted" style="font-weight:400;" id="staffDetailSourceMonthLabel">(이번 달)</span></h4>
+        <p class="muted" style="margin:-6px 0 12px; font-size:12px;">PT 관리에서 등록해둔 유형(재등록·워크인·OT 등)과 이번 달 매출을 연결해서 보여드려요. 연결된 유형 기록이 없는 매출은 "미분류"로 묶여요.</p>
+        <div class="trainer-source-grid" id="staffDetailSourceGrid"></div>
+      </div>
+
+      <div class="modal-section">
+        <h4>핵심 인사이트</h4>
+        <div id="staffDetailInsights"></div>
+      </div>
+
+      <div class="modal-section">
+        <h4>최근 6개월 매출 추이</h4>
+        <div class="trainer-trend-summary" id="staffDetailTrendSummary"></div>
+        <div class="trainer-trend-chart" id="staffDetailTrendChart"></div>
+      </div>
+
+      <div class="modal-section">
+        <h4>경로별 월별 매출</h4>
+        <div style="overflow-x:auto;">
+          <table id="staffDetailSourceMonthTable">
+            <thead><tr id="staffDetailSourceMonthHead"></tr></thead>
+            <tbody id="staffDetailSourceMonthBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h4>이번 달 매출 내역</h4>
+        <div style="overflow-x:auto;">
+          <table id="staffDetailTable">
+            <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
+            <tbody id="staffDetailTableBody"><tr><td colspan="5" class="muted" style="padding:16px;">-</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -349,9 +431,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788661968"></script>
-  <script src="auth.js?v=1788661968"></script>
-  <script src="data.js?v=1788661968"></script>
+  <script src="config.js?v=1788747648"></script>
+  <script src="auth.js?v=1788747648"></script>
+  <script src="data.js?v=1788747648"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -624,10 +706,12 @@
 
     let staffPerfRowsCache = []; // 마지막으로 그린 트레이너별 집계 결과(salesRows 포함) - 카드/표 클릭 시 다시 계산 안 하고 바로 조회
     let staffPerfMonthLabelCache = ''; // 상세 모달 부제목에 쓸 "n월 (이번 달)" 문구
+    let staffPerfMonthStartCache = null; // 상세 모달의 "최근 6개월 추이"가 기준으로 삼을 월(Date) - 매출 보고 화살표로 보는 달 그대로 씀
 
-    function renderStaffPerf(ptSales, staffList, monthLabelText) {
+    function renderStaffPerf(ptSales, staffList, monthLabelText, monthStart) {
       document.getElementById('staffPerfMonthLabel').textContent = `(${monthLabelText})`;
       staffPerfMonthLabelCache = monthLabelText;
+      staffPerfMonthStartCache = monthStart;
       const rows = computeStaffPerf(ptSales, staffList);
       staffPerfRowsCache = rows;
       const headcount = staffList.length;
@@ -679,29 +763,275 @@
         // "헬스이용권 같은 건 여기 안 잡히게, 진짜 오로직 PT매출만" 요청으로 개인PT 신규/재등록 카테고리만
         // 남기고 나머지(헬스이용권·그룹PT·락커·운동복·기타)는 이 섹션 계산에 아예 안 들어가게 걸러냄
         const ptSales = sales.filter(s => s.category && PT_SALE_CATEGORIES.includes(s.category));
-        renderStaffPerf(ptSales, staffList, monthLabelText);
+        renderStaffPerf(ptSales, staffList, monthLabelText, monthStart);
       } catch (err) {
         document.getElementById('staffPerfTableBody').innerHTML =
           `<tr><td colspan="6" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
     }
 
-    // TOP3 카드나 표의 트레이너 이름을 클릭(또는 Enter/Space)하면 이번 달 그 트레이너 몫 매출 내역을
-    // 모달로 보여줌 - 날짜/회원명/항목(신규·재등록 등 분류가 그대로 붙어서 나옴 - saleDisplayItemWithCategory
-    // 참고)/결제수단/금액까지 한 줄씩. 이미 renderStaffPerf에서 계산해둔 staffPerfRowsCache를 그대로 쓰기
-    // 때문에 클릭할 때마다 서버에 다시 요청하지 않음.
-    function openStaffDetail(staffId) {
+    // ---- 트레이너 상세 모달 확장(2026-09-07) ----
+    // 다른 헬스장 관리 프로그램의 트레이너 상세 화면(목표/달성률, 경로별 매출, 인사이트, 최근 6개월
+    // 추이, 경로별 월별 표)을 참고해서 만들어달라는 요청. 그 화면은 여러 지점을 굴리는 회사 것이라
+    // "전사 평균"/"지점 평균"/"지점 내 순위"/"최근 배정 이력(지점 이동 기록)"까지 있었는데, 이 앱은
+    // 지점이 하나뿐이라 그런 항목은 지어내지 않고 뺐고, 대신 실제로 있는 데이터(PT 목표, PT 관리에서
+    // 기록하는 유형(재등록/워크인/OT 등), 매출 이력)로 최대한 비슷하게 구성함.
+    const TRAINER_SOURCE_OPTIONS = ['재등록', '오티', '워크인', '무료체험', '지인소개', '필드', '당근', '블로그'];
+    const TRAINER_SOURCE_UNCLASSIFIED = '미분류';
+    // dataviz 팔레트(--viz-1~8)를 PT 관리 화면의 유형 순서 그대로 고정 배정해서, 앱 전체에서 같은
+    // 유형은 항상 같은 색으로 보이게 함. 8개를 다 쓰므로 "미분류"는 --viz-other로 따로 둠
+    const TRAINER_SOURCE_VIZ = {
+      '재등록': 'var(--viz-1)', '오티': 'var(--viz-2)', '워크인': 'var(--viz-3)', '무료체험': 'var(--viz-4)',
+      '지인소개': 'var(--viz-5)', '필드': 'var(--viz-6)', '당근': 'var(--viz-7)', '블로그': 'var(--viz-8)'
+    };
+    function trainerSourceColor(source) { return TRAINER_SOURCE_VIZ[source] || 'var(--viz-other)'; }
+
+    // pt_leads(경로/유형 기록)와 pt_targets(월 목표)는 트레이너·기간별 서버 필터가 없어서 전체를 한 번만
+    // 불러와 캐싱하고 클라이언트에서 걸러 씀 - 둘 다 이 페이지에서 자주 안 바뀌는 데이터라 매번 다시
+    // 불러올 필요가 없음
+    let ptLeadsAllCache = null;
+    let ptTargetsAllCache = null;
+    async function ensurePtLeadsLoaded() {
+      if (!ptLeadsAllCache) {
+        try { ptLeadsAllCache = await fetchPtLeads(); } catch (e) { ptLeadsAllCache = []; }
+      }
+      return ptLeadsAllCache;
+    }
+    async function ensurePtTargetsLoaded() {
+      if (!ptTargetsAllCache) {
+        try { ptTargetsAllCache = await fetchPtTargets(); } catch (e) { ptTargetsAllCache = []; }
+      }
+      return ptTargetsAllCache;
+    }
+
+    // 이 앱은 이용권 시작일처럼 매출에 "유형(경로)"을 직접 저장하지 않지만, PT 관리에서 리드를
+    // "등록 전환"하면 그 pt_leads 행에 매출 id(converted_sale_id)가 남아있어서, 거꾸로 매출 -> 리드로
+    // 찾아가면 그 매출이 어떤 유형(재등록/워크인/OT 등)이었는지 알 수 있음. 연결된 리드가 없으면
+    // (예: 예전 매출, 엑셀 일괄 등록 등) 지어내지 않고 "미분류"로 묶음
+    function sourceForSale(sale) {
+      const lead = (ptLeadsAllCache || []).find(l => l.converted_sale_id === sale.id);
+      return (lead && lead.source) || TRAINER_SOURCE_UNCLASSIFIED;
+    }
+
+    function computeSourceBreakdown(salesRows) {
+      const map = new Map();
+      salesRows.forEach(s => {
+        const src = sourceForSale(s);
+        const cur = map.get(src) || { source: src, amount: 0, count: 0 };
+        cur.amount += Number(s.amount) || 0;
+        cur.count += 1;
+        map.set(src, cur);
+      });
+      const total = salesRows.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+      return Array.from(map.values())
+        .sort((a, b) => b.amount - a.amount)
+        .map(x => ({ ...x, pct: total > 0 ? Math.round((x.amount / total) * 1000) / 10 : 0 }));
+    }
+
+    function findMonthlyTarget(trainerId, monthStartStr) {
+      const t = (ptTargetsAllCache || []).find(x => x.trainer_id === trainerId && x.period_type === 'monthly' && x.period_start === monthStartStr);
+      return t ? Number(t.target_amount) : null;
+    }
+
+    // "최근 6개월 매출 추이"용 - 지금 보고 있는 달 기준으로 이전 5개월 + 이번 달, 총 6개월치 매출을
+    // 한 번에 불러와서(fetchSalesInRange 한 번) 월별로 나눔. 이 트레이너의 PT매출만 남김
+    async function fetchTrainerTrend(trainerId, monthStart) {
+      const rangeStart = addMonths(monthStart, -5);
+      const rangeEndExclusive = addMonths(monthStart, 1);
+      const sales = await fetchSalesInRange(toDateStr(rangeStart), toDateStr(rangeEndExclusive));
+      const ptSales = sales.filter(s => s.category && PT_SALE_CATEGORIES.includes(s.category) && s.staff_id === trainerId);
+      const months = [];
+      for (let i = 0; i < 6; i++) {
+        const d = addMonths(rangeStart, i);
+        months.push({ key: toDateStr(d).slice(0, 7), monthStart: d, label: `${d.getMonth() + 1}월`, amount: 0, count: 0, salesRows: [] });
+      }
+      ptSales.forEach(s => {
+        const key = (s.sale_date || '').slice(0, 7);
+        const bucket = months.find(m => m.key === key);
+        if (bucket) { bucket.amount += Number(s.amount) || 0; bucket.count += 1; bucket.salesRows.push(s); }
+      });
+      return months; // 오래된 달 -> 이번 달 순으로 6개
+    }
+
+    function buildStatGrid(row, target) {
+      const achievementPct = target && target > 0 ? Math.round((row.ptAmount / target) * 1000) / 10 : null;
+      const achieved = target != null && row.ptAmount >= target;
+      const newAmount = row.salesRows.filter(s => s.category === 'pt_new').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      const renewalAmount = row.salesRows.filter(s => s.category === 'pt_renewal').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      const boxes = [
+        { label: 'PT매출 합계', value: formatWon(row.ptAmount), sub: `${row.ptCount}건` },
+        { label: '목표', value: target != null ? formatWon(target) : '미설정', sub: '' },
+        { label: '달성률', value: achievementPct != null ? `${achievementPct}%` : '-', sub: '', cls: achievementPct == null ? '' : (achieved ? 'is-good' : '') },
+        { label: '목표까지', value: target == null ? '-' : (achieved ? '달성' : formatWon(target - row.ptAmount)),
+          sub: target == null ? '목표 미설정' : (achieved ? `${formatWon(row.ptAmount - target)} 초과` : '남음'),
+          cls: target == null ? '' : (achieved ? 'is-good' : 'is-bad') },
+        { label: '신규', value: `${row.newCount}건`, sub: formatWon(newAmount) },
+        { label: '재등록', value: `${row.renewalCount}건`, sub: formatWon(renewalAmount) }
+      ];
+      return boxes.map(b => `
+        <div class="trainer-stat-box ${b.cls || ''}">
+          <div class="ts-label">${b.label}</div>
+          <div class="ts-value">${b.value}</div>
+          ${b.sub ? `<div class="ts-sub">${b.sub}</div>` : ''}
+        </div>`).join('');
+    }
+
+    function buildSourceGrid(breakdown) {
+      if (breakdown.length === 0) return '<p class="muted" style="padding:8px 0;">이번 달 PT매출 기록이 없어요.</p>';
+      return breakdown.map(b => `
+        <div class="trainer-source-box">
+          <div class="src-top">
+            <span class="src-name">${escapeHtml(b.source)}</span>
+            <span class="src-pct">${b.count}건 · ${b.pct}%</span>
+          </div>
+          <div class="src-amount">${formatWon(b.amount)}</div>
+          <div class="src-bar-track"><div class="src-bar-fill" style="width:${b.pct}%; background:${trainerSourceColor(b.source)};"></div></div>
+        </div>`).join('');
+    }
+
+    // 참고 이미지의 "전사 평균 대비"/"지점 평균 대비"/"지점 내 순위"는 여러 지점 데이터가 있어야 계산할
+    // 수 있는데 이 앱엔 그런 데이터가 없어서(지점이 하나뿐) 지어내지 않고, 대신 우리 센터 안에서의
+    // 실제 순위·비중, 목표 달성 여부, 신규/재등록 구성, 전월 대비까지 실제 계산 가능한 것만 보여줌
+    function buildInsights(row, target, allRows, trendMonths) {
+      const cards = [];
+      if (row.ptAmount <= 0) {
+        cards.push({ cls: 'is-neutral', html: '이번 달에는 아직 PT매출 기록이 없어요.' });
+      } else {
+        const rankRows = allRows.filter(r => r.id !== '__unassigned__' && r.ptAmount > 0);
+        const sortedByAmount = rankRows.slice().sort((a, b) => b.ptAmount - a.ptAmount);
+        const rank = sortedByAmount.findIndex(r => r.id === row.id) + 1;
+        const centerTotal = rankRows.reduce((s, r) => s + r.ptAmount, 0);
+        const sharePct = centerTotal > 0 ? Math.round((row.ptAmount / centerTotal) * 1000) / 10 : 0;
+        if (rank > 0) {
+          cards.push({ cls: '', html: `우리 센터 트레이너 <b>${rankRows.length}명</b> 중 <b>${rank}위</b> · 이번 달 센터 전체 PT매출의 <b>${sharePct}%</b>를 차지해요.` });
+        }
+      }
+      if (target == null) {
+        cards.push({ cls: 'is-neutral', html: '이번 달 목표가 아직 설정되지 않았어요. PT 관리 화면에서 목표를 설정해보세요.' });
+      } else if (row.ptAmount >= target) {
+        cards.push({ cls: '', html: `목표를 <b>${formatWon(row.ptAmount - target)}</b> 초과 달성했습니다. (달성률 ${Math.round((row.ptAmount / target) * 1000) / 10}%)` });
+      } else {
+        cards.push({ cls: 'is-warn', html: `목표까지 <b>${formatWon(target - row.ptAmount)}</b> 남았습니다. (달성률 ${Math.round((row.ptAmount / target) * 1000) / 10}%)` });
+      }
+      if (row.ptCount > 0) {
+        const newAmount = row.salesRows.filter(s => s.category === 'pt_new').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+        const renewalAmount = row.salesRows.filter(s => s.category === 'pt_renewal').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+        const total = newAmount + renewalAmount;
+        const newPct = total > 0 ? Math.round((newAmount / total) * 100) : 0;
+        const renewalPct = total > 0 ? 100 - newPct : 0;
+        cards.push({ cls: 'is-neutral', html: `이번 달 매출 구성: 신규 <b>${formatWon(newAmount)}</b>(${newPct}%) · 재등록 <b>${formatWon(renewalAmount)}</b>(${renewalPct}%) · 총 ${row.ptCount}건` });
+      }
+      if (trendMonths && trendMonths.length >= 2) {
+        const cur = trendMonths[trendMonths.length - 1];
+        const prev = trendMonths[trendMonths.length - 2];
+        if (prev.amount > 0) {
+          const delta = cur.amount - prev.amount;
+          const deltaPct = Math.round((delta / prev.amount) * 1000) / 10;
+          const sign = delta >= 0 ? '+' : '';
+          cards.push({ cls: delta >= 0 ? '' : 'is-warn', html: `전월(${prev.label}) 대비 <b>${sign}${formatWon(delta)}</b>(${sign}${deltaPct}%)` });
+        } else if (cur.amount > 0) {
+          cards.push({ cls: '', html: `전월(${prev.label})에는 PT매출이 없었는데, 이번 달 <b>${formatWon(cur.amount)}</b>을 기록했어요.` });
+        }
+      }
+      return cards.map(c => `<div class="trainer-insight-card ${c.cls}">${c.html}</div>`).join('');
+    }
+
+    function buildTrendSection(months) {
+      const closedMonths = months.slice(0, 5); // 이번 달(진행중)을 뺀, 이미 끝난 최근 5개월
+      const closedAvg = closedMonths.length > 0 ? closedMonths.reduce((s, m) => s + m.amount, 0) / closedMonths.length : 0;
+      const sixMonthTotal = months.reduce((s, m) => s + m.amount, 0);
+      const maxAmount = Math.max(1, ...months.map(m => m.amount));
+
+      let achievedCount = 0, achievementSum = 0, achievementN = 0;
+      let prevAmountForDelta = null, deltaSum = 0, deltaN = 0;
+      const trainerId = months.__trainerId;
+      months.forEach(m => {
+        const t = findMonthlyTarget(trainerId, toDateStr(m.monthStart));
+        m.target = t;
+        if (t && t > 0) { m.achievementPct = Math.round((m.amount / t) * 1000) / 10; achievementSum += m.achievementPct; achievementN++; }
+        else { m.achievementPct = null; }
+        if (prevAmountForDelta != null && prevAmountForDelta > 0) { deltaSum += ((m.amount - prevAmountForDelta) / prevAmountForDelta) * 100; deltaN++; }
+        prevAmountForDelta = m.amount;
+      });
+      const avgAchievement = achievementN > 0 ? Math.round((achievementSum / achievementN) * 10) / 10 : null;
+      const avgDelta = deltaN > 0 ? Math.round((deltaSum / deltaN) * 10) / 10 : null;
+
+      const summaryHtml = `
+        <div class="tt-box"><div class="tt-label">마감 5개월 평균</div><div class="tt-value">${formatWon(Math.round(closedAvg))}</div></div>
+        <div class="tt-box"><div class="tt-label">평균 달성률</div><div class="tt-value">${avgAchievement != null ? avgAchievement + '%' : '-'}</div></div>
+        <div class="tt-box"><div class="tt-label">평균 전월대비</div><div class="tt-value">${avgDelta != null ? (avgDelta >= 0 ? '+' : '') + avgDelta + '%' : '-'}</div></div>
+        <div class="tt-box"><div class="tt-label">6개월 합계</div><div class="tt-value">${formatWon(sixMonthTotal)}</div></div>`;
+
+      const chartHtml = months.map((m, i) => {
+        const heightPct = Math.max(4, Math.round((m.amount / maxAmount) * 100));
+        const isCurrent = i === months.length - 1;
+        return `
+          <div class="trainer-trend-bar-col ${isCurrent ? 'is-current' : ''}">
+            <div class="tb-amount">${m.amount > 0 ? formatWon(m.amount) : '-'}</div>
+            ${m.achievementPct != null ? `<div class="tb-pct">${m.achievementPct}%</div>` : ''}
+            <div class="trainer-trend-bar" style="height:${heightPct}%;"></div>
+            <div class="tb-month">${m.label}</div>
+          </div>`;
+      }).join('');
+
+      return { summaryHtml, chartHtml };
+    }
+
+    function buildSourceMonthTable(months) {
+      const sourceSet = new Set();
+      months.forEach(m => computeSourceBreakdown(m.salesRows).forEach(b => sourceSet.add(b.source)));
+      const orderedSources = TRAINER_SOURCE_OPTIONS.filter(s => sourceSet.has(s));
+      if (sourceSet.has(TRAINER_SOURCE_UNCLASSIFIED)) orderedSources.push(TRAINER_SOURCE_UNCLASSIFIED);
+
+      const headHtml = '<th>경로</th>' + months.map(m => `<th style="text-align:right;">${m.label}</th>`).join('') + '<th style="text-align:right;">합계</th>';
+      document.getElementById('staffDetailSourceMonthHead').innerHTML = headHtml;
+
+      if (orderedSources.length === 0) {
+        return `<tr><td colspan="${months.length + 2}" class="muted" style="padding:16px;">최근 6개월간 PT매출 기록이 없어요.</td></tr>`;
+      }
+      const monthBreakdowns = months.map(m => computeSourceBreakdown(m.salesRows));
+      const rows = orderedSources.map(src => {
+        const cells = monthBreakdowns.map(bd => {
+          const found = bd.find(x => x.source === src);
+          return found ? found.amount : 0;
+        });
+        const total = cells.reduce((a, b) => a + b, 0);
+        return `<tr>
+          <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${trainerSourceColor(src)};margin-right:6px;vertical-align:middle;"></span>${escapeHtml(src)}</td>
+          ${cells.map(c => `<td style="text-align:right;">${c > 0 ? formatWon(c) : '<span class="muted">-</span>'}</td>`).join('')}
+          <td style="text-align:right; font-weight:700;">${formatWon(total)}</td>
+        </tr>`;
+      });
+      const totalsByMonth = months.map((m, i) => monthBreakdowns[i].reduce((s, b) => s + b.amount, 0));
+      const grandTotal = totalsByMonth.reduce((a, b) => a + b, 0);
+      rows.push(`<tr><td style="font-weight:700;">합계</td>${totalsByMonth.map(t => `<td style="text-align:right; font-weight:700;">${t > 0 ? formatWon(t) : '<span class="muted">-</span>'}</td>`).join('')}<td style="text-align:right; font-weight:700;">${formatWon(grandTotal)}</td></tr>`);
+      return rows.join('');
+    }
+
+    // TOP3 카드나 표의 트레이너 이름을 클릭(또는 Enter/Space)하면 이 트레이너의 상세 모달을 보여줌.
+    // 기본 정보(salesRows 등)는 이미 renderStaffPerf에서 계산해둔 staffPerfRowsCache를 그대로 쓰고,
+    // 목표·경로(유형)·최근 6개월 추이처럼 추가로 필요한 데이터만 열 때 불러옴(async).
+    async function openStaffDetail(staffId) {
       const row = staffPerfRowsCache.find(r => r.id === staffId);
       if (!row) return;
+      const rankIndex = staffPerfRowsCache.filter(r => r.id !== '__unassigned__' && r.ptAmount > 0)
+        .sort((a, b) => b.ptAmount - a.ptAmount).findIndex(r => r.id === staffId);
+
       document.getElementById('staffDetailName').textContent = row.name;
       document.getElementById('staffDetailSub').textContent =
         `${staffPerfMonthLabelCache} · PT매출 ${formatWon(row.ptAmount)} · ${row.ptCount}건`;
+      const rankBadge = document.getElementById('staffDetailRankBadge');
+      if (rankIndex >= 0) { rankBadge.style.display = ''; rankBadge.textContent = `🏆 ${rankIndex + 1}위`; }
+      else { rankBadge.style.display = 'none'; }
+      document.getElementById('staffDetailSourceMonthLabel').textContent = `(${staffPerfMonthLabelCache})`;
+
+      // 이번 달 매출 내역 표는 캐시된 데이터로 바로 그릴 수 있음
       const tbody = document.getElementById('staffDetailTableBody');
-      if (row.salesRows.length === 0) {
+      const sortedSales = row.salesRows.slice().sort((a, b) => (a.sale_date || '').localeCompare(b.sale_date || ''));
+      if (sortedSales.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이 달에는 PT매출 기록이 없어요.</td></tr>';
       } else {
-        const sorted = row.salesRows.slice().sort((a, b) => (a.sale_date || '').localeCompare(b.sale_date || ''));
-        tbody.innerHTML = sorted.map(s => `
+        tbody.innerHTML = sortedSales.map(s => `
           <tr>
             <td>${escapeHtml(s.sale_date || '-')}</td>
             <td>${s.member ? escapeHtml(s.member.name) : '<span class="muted">-</span>'}</td>
@@ -711,7 +1041,49 @@
           </tr>
         `).join('');
       }
+
+      // 나머지(목표/경로별 매출/인사이트/6개월 추이)는 pt_leads·pt_targets·6개월치 매출을 불러온 뒤 그림 -
+      // 불러오는 동안엔 로딩 문구를 보여주고, 트레이너를 빠르게 여러 번 눌렀을 때 화면이 엇갈리지 않도록
+      // 요청 시점의 staffId와 지금 열려있는 모달이 같은지 매번 확인함
+      document.getElementById('staffDetailStatGrid').innerHTML = '<p class="muted" style="padding:8px 0;">불러오는 중...</p>';
+      document.getElementById('staffDetailSourceGrid').innerHTML = '';
+      document.getElementById('staffDetailInsights').innerHTML = '';
+      document.getElementById('staffDetailTrendSummary').innerHTML = '';
+      document.getElementById('staffDetailTrendChart').innerHTML = '<p class="muted" style="padding:8px 0;">불러오는 중...</p>';
+      document.getElementById('staffDetailSourceMonthHead').innerHTML = '';
+      document.getElementById('staffDetailSourceMonthBody').innerHTML = '';
       document.getElementById('staffDetailOverlay').style.display = 'flex';
+      document.getElementById('staffDetailOverlay').dataset.openStaffId = staffId;
+
+      try {
+        const monthStart = staffPerfMonthStartCache || new Date();
+        const [, , trendMonths] = await Promise.all([
+          ensurePtLeadsLoaded(),
+          ensurePtTargetsLoaded(),
+          fetchTrainerTrend(staffId, monthStart)
+        ]);
+        // 늦게 도착한 응답이 그 사이에 다른 트레이너를 클릭해서 열어둔 화면을 덮어쓰지 않도록 확인
+        if (document.getElementById('staffDetailOverlay').dataset.openStaffId !== staffId) return;
+
+        trendMonths.__trainerId = staffId;
+        const target = findMonthlyTarget(staffId, toDateStr(monthStart));
+        const breakdown = computeSourceBreakdown(row.salesRows);
+
+        document.getElementById('staffDetailStatGrid').innerHTML = buildStatGrid(row, target);
+        document.getElementById('staffDetailSourceGrid').innerHTML = buildSourceGrid(breakdown);
+        document.getElementById('staffDetailInsights').innerHTML = buildInsights(row, target, staffPerfRowsCache, trendMonths);
+
+        const trend = buildTrendSection(trendMonths);
+        document.getElementById('staffDetailTrendSummary').innerHTML = trend.summaryHtml;
+        document.getElementById('staffDetailTrendChart').innerHTML = trend.chartHtml;
+
+        document.getElementById('staffDetailSourceMonthBody').innerHTML = buildSourceMonthTable(trendMonths);
+      } catch (err) {
+        if (document.getElementById('staffDetailOverlay').dataset.openStaffId !== staffId) return;
+        document.getElementById('staffDetailStatGrid').innerHTML = buildStatGrid(row, null);
+        document.getElementById('staffDetailSourceGrid').innerHTML = '<p class="error-text" style="display:block;">경로별 매출·목표·추이 정보를 불러오지 못했습니다.</p>';
+        document.getElementById('staffDetailTrendChart').innerHTML = '';
+      }
     }
 
     function closeStaffDetail() {
