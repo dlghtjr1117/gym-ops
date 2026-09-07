@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1788754815" />
+<link rel="stylesheet" href="style.css?v=1788757259" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -418,6 +418,8 @@
         <div class="trainer-stat-grid" id="staffDetailStatGrid"></div>
       </div>
 
+      <div id="staffDetailMissedBox"></div>
+
       <div class="modal-section">
         <h4>경로별 매출 <span class="muted" style="font-weight:400;" id="staffDetailSourceMonthLabel">(이번 달)</span></h4>
         <p class="muted" style="margin:-6px 0 12px; font-size:12px;">PT 관리에서 등록해둔 유형(재등록·워크인·OT 등)과 이번 달 매출을 연결해서 보여드려요. 연결된 유형 기록이 없는 매출은 "미분류"로 묶여요.</p>
@@ -462,9 +464,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1788754815"></script>
-  <script src="auth.js?v=1788754815"></script>
-  <script src="data.js?v=1788754815"></script>
+  <script src="config.js?v=1788757259"></script>
+  <script src="auth.js?v=1788757259"></script>
+  <script src="data.js?v=1788757259"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -738,6 +740,17 @@
     let staffPerfRowsCache = []; // 마지막으로 그린 트레이너별 집계 결과(salesRows 포함) - 카드/표 클릭 시 다시 계산 안 하고 바로 조회
     let staffPerfMonthLabelCache = ''; // 상세 모달 부제목에 쓸 "n월 (이번 달)" 문구
     let staffPerfMonthStartCache = null; // 상세 모달의 "최근 6개월 추이"가 기준으로 삼을 월(Date) - 매출 보고 화살표로 보는 달 그대로 씀
+    // 2026-09-07: "매출은 다 입력했고 PT 관리에서 등록 처리도 했는데 트레이너 실적에 안 잡힌다"는 문의로
+    // 코드를 다시 확인해보니, 트레이너별 PT매출 집계는 (1) 항목이 정확히 pt_new/pt_renewal인 매출만,
+    // (2) 담당자(staff_id)가 그 트레이너 본인인 매출만 잡고(지점장 이름으로 잡힌 매출은 트레이너 실적에서
+    // 통째로 제외됨 - computeStaffPerf 참고), 이 두 조건 중 하나라도 안 맞으면 매출 자체는 DB에 멀쩡히
+    // 있어도 "이 트레이너의 PT매출"에서는 조용히 빠짐. 흔한 실수 원인: 매출입력 화면의 "판매 담당자"
+    // 드롭다운이 매번 등록자 본인(지점장)으로 리셋되는데 다음 사람 걸 입력할 때 트레이너로 다시 안 바꾼
+    // 경우, 또는 "항목"에서 "신규 PT/PT 재등록" 대신 바로 옆에 있는 "신규 그룹PT/그룹PT 재등록"을 잘못
+    // 고른 경우. 이걸 트레이너 본인이나 지점장이 직접 눈으로 찾기 어려워서, 아래처럼 PT 관리의 "등록"
+    // 리드와 실제 매출을 이름+월 기준으로 대조해서 "빠진 것 같은 회원"을 화면에 직접 보여주는 진단
+    // 기능을 추가함 (staffPerfAllSalesCache: 카테고리/담당자로 거르기 전의 이번 달 전체 매출)
+    let staffPerfAllSalesCache = [];
 
     function renderStaffPerf(ptSales, staffList, monthLabelText, monthStart) {
       document.getElementById('staffPerfMonthLabel').textContent = `(${monthLabelText})`;
@@ -794,6 +807,7 @@
         // "헬스이용권 같은 건 여기 안 잡히게, 진짜 오로직 PT매출만" 요청으로 개인PT 신규/재등록 카테고리만
         // 남기고 나머지(헬스이용권·그룹PT·락커·운동복·기타)는 이 섹션 계산에 아예 안 들어가게 걸러냄
         const ptSales = sales.filter(s => s.category && PT_SALE_CATEGORIES.includes(s.category));
+        staffPerfAllSalesCache = sales; // 진단 기능(findMissedSalesForTrainer)이 카테고리/담당자로 거르기 전 원본이 필요해서 따로 보관
         renderStaffPerf(ptSales, staffList, monthLabelText, monthStart);
       } catch (err) {
         document.getElementById('staffPerfTableBody').innerHTML =
@@ -839,9 +853,88 @@
     // "등록 전환"하면 그 pt_leads 행에 매출 id(converted_sale_id)가 남아있어서, 거꾸로 매출 -> 리드로
     // 찾아가면 그 매출이 어떤 유형(재등록/워크인/OT 등)이었는지 알 수 있음. 연결된 리드가 없으면
     // (예: 예전 매출, 엑셀 일괄 등록 등) 지어내지 않고 "미분류"로 묶음
+    // converted_sale_id로 진짜 연결된 리드가 있으면 그걸 최우선으로 쓰고(가장 정확함), 없으면(지금은
+    // 이 연결을 실제로 만들어주는 곳이 앱 어디에도 없어서 사실상 항상 비어있음 - PT 관리의 "등록"
+    // 처리는 그 리드 자체와 PT 회원 관리만 갱신할 뿐, 실제 매출(sales) 기록과는 별개의 독립된
+    // 시스템이라 - 2026-09-07에 확인됨) 같은 트레이너 + 같은 이름 + 같은 달에 "등록" 처리된 리드가
+    //있는지로 유추함. 완전히 정확한 연결은 아니라(동명이인이면 잘못 짝지어질 수 있음) 지어내는 것보단
+    // 낫다는 판단으로 둠 - 나중에 "등록" 처리 시 실제 매출까지 자동으로 만들어주는 기능을 붙이면 이
+    // 유추 없이도 항상 정확해짐(현재는 범위 밖 - 실제 매출/회계 데이터라 신중하게 별도로 결정해야 함)
+    function findMatchingLeadForSale(sale) {
+      const leads = ptLeadsAllCache || [];
+      const linked = leads.find(l => l.converted_sale_id === sale.id);
+      if (linked) return linked;
+      const saleMemberName = sale.member && sale.member.name;
+      if (!saleMemberName) return null;
+      const saleMonth = (sale.sale_date || '').slice(0, 7);
+      return leads.find(l => l.stage === 'registered' && l.trainer_id === sale.staff_id && l.name === saleMemberName &&
+        ((l.contact_date && l.contact_date.slice(0, 7) === saleMonth) || (l.ot_date && l.ot_date.slice(0, 7) === saleMonth))
+      ) || null;
+    }
     function sourceForSale(sale) {
-      const lead = (ptLeadsAllCache || []).find(l => l.converted_sale_id === sale.id);
+      const lead = findMatchingLeadForSale(sale);
       return (lead && lead.source) || TRAINER_SOURCE_UNCLASSIFIED;
+    }
+    // 2026-09-07: "'재등록' 외에는 전부 신규로 세달라"는 요청 - 매출 입력 시 고른 분류(신규 PT/PT
+    // 재등록, sale.category)가 아니라 PT 관리의 유형(경로) 기록을 기준으로 삼음(트레이너가 매출 입력
+    // 화면에서 분류를 실수로 잘못 고르는 경우가 있어서, PT 관리 쪽 기록이 더 정확하다는 판단).
+    // 매칭되는 리드가 아예 없는 경우도 "재등록"으로 확인된 게 아니니 신규로 셈.
+    function isRenewalSale(sale) {
+      const lead = findMatchingLeadForSale(sale);
+      return !!(lead && lead.source === '재등록');
+    }
+
+    // "PT 관리에서 등록 처리됐는데 이 트레이너 실적에 안 잡힌 회원"을 찾아서 이유까지 알려주는 진단 함수.
+    // row.salesRows(이미 이 트레이너 몫으로 정상 집계된 매출)에 없는 "등록" 리드를 찾은 뒤, 카테고리/담당자
+    // 조건 없이 이름+같은 달로 전체 매출(staffPerfAllSalesCache)에서 다시 찾아봐서 - 찾아지면 "매출은
+    // 있는데 왜 안 잡혔는지" 구체적 이유(담당자가 다르게 입력됨/항목이 PT가 아님)를 보여주고, 그마저도
+    // 못 찾으면 "매출입력에 실제로 안 들어가 있는 것으로 보임"이라고 정직하게 안내함(지어내지 않음).
+    function findMissedSalesForTrainer(staffId, row, monthStr) {
+      const leads = ptLeadsAllCache || [];
+      const staffList = staffAllCache || [];
+      const registeredNames = new Set(row.salesRows.map(s => s.member && s.member.name).filter(Boolean));
+      const registeredLeads = leads.filter(l => l.trainer_id === staffId && l.stage === 'registered' &&
+        ((l.contact_date && l.contact_date.slice(0, 7) === monthStr) || (l.ot_date && l.ot_date.slice(0, 7) === monthStr))
+      );
+      const results = [];
+      registeredLeads.forEach(lead => {
+        if (registeredNames.has(lead.name)) return; // 이미 이 트레이너 매출에 정상적으로 잡혀있음
+        const candidate = (staffPerfAllSalesCache || []).find(s =>
+          s.member && s.member.name === lead.name && (s.sale_date || '').slice(0, 7) === monthStr
+        );
+        if (!candidate) {
+          results.push({ name: lead.name, source: lead.source, expectedAmount: lead.expected_amount, reason: 'no_sale', detail: '매출입력에 이 회원 매출이 아직 안 보여요.' });
+          return;
+        }
+        const reasons = [];
+        if (candidate.staff_id !== staffId) {
+          const who = staffList.find(p => p.id === candidate.staff_id);
+          reasons.push(`담당자가 "${who ? who.name : '다른 사람'}"${who && who.role === 'manager' ? '(지점장)' : ''}(으)로 입력돼 있어요`);
+        }
+        if (!(candidate.category && PT_SALE_CATEGORIES.includes(candidate.category))) {
+          reasons.push(`항목이 "${CATEGORY_LABEL[candidate.category] || candidate.category || '미확인'}"(으)로 입력돼 있어요`);
+        }
+        results.push({
+          name: lead.name, source: lead.source, expectedAmount: candidate.amount,
+          reason: 'mismatch', detail: reasons.length ? reasons.join(' · ') : '알 수 없는 이유로 집계에서 빠졌어요.'
+        });
+      });
+      return results;
+    }
+
+    function buildMissedSalesBox(missed) {
+      if (!missed || missed.length === 0) return '';
+      // "항상 고정색" 카드 컨벤션: 배경을 라이트/다크 상관없이 고정 파스텔 옐로우로 쓰는 대신, 글자색도
+      // 같이 고정(짙은 갈색)해야 다크 모드에서 옅은 배경 위에 밝은 글자가 겹쳐서 안 보이는 문제가 안 생김
+      return `
+        <div class="modal-section" style="border-top:none; padding-top:0;">
+          <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:12px 14px; color:#78350f;">
+            <p style="margin:0 0 8px; font-weight:700; font-size:13px; color:#78350f;">⚠️ PT 관리에는 "등록"으로 되어있는데 이 트레이너 매출에는 안 잡힌 회원이 있어요</p>
+            <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.6; color:#78350f;">
+              ${missed.map(m => `<li><b>${escapeHtml(m.name)}</b>(${escapeHtml(m.source || '-')}${m.expectedAmount != null ? `, ${formatWon(m.expectedAmount)}` : ''}) - ${escapeHtml(m.detail)}</li>`).join('')}
+            </ul>
+          </div>
+        </div>`;
     }
 
     function computeSourceBreakdown(salesRows) {
@@ -887,8 +980,10 @@
     function buildStatGrid(row, target) {
       const achievementPct = target && target > 0 ? Math.round((row.ptAmount / target) * 1000) / 10 : null;
       const achieved = target != null && row.ptAmount >= target;
-      const newAmount = row.salesRows.filter(s => s.category === 'pt_new').reduce((s, x) => s + (Number(x.amount) || 0), 0);
-      const renewalAmount = row.salesRows.filter(s => s.category === 'pt_renewal').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      const renewalSales = row.salesRows.filter(s => isRenewalSale(s));
+      const newSales = row.salesRows.filter(s => !isRenewalSale(s));
+      const newAmount = newSales.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      const renewalAmount = renewalSales.reduce((s, x) => s + (Number(x.amount) || 0), 0);
       const boxes = [
         { icon: '💰', color: 'stat-blue', label: 'PT매출 합계', value: formatWon(row.ptAmount), sub: `${row.ptCount}건` },
         { icon: '🎯', color: 'stat-purple', label: '목표', value: target != null ? formatWon(target) : '미설정', sub: '' },
@@ -896,8 +991,8 @@
         { icon: '⏳', color: 'stat-blue', label: '목표까지', value: target == null ? '-' : (achieved ? '달성' : formatWon(target - row.ptAmount)),
           sub: target == null ? '목표 미설정' : (achieved ? `${formatWon(row.ptAmount - target)} 초과` : '남음'),
           cls: target == null ? '' : (achieved ? 'is-good' : 'is-bad') },
-        { icon: '🆕', color: 'stat-purple', label: '신규', value: `${row.newCount}건`, sub: formatWon(newAmount) },
-        { icon: '🔁', color: 'stat-teal', label: '재등록', value: `${row.renewalCount}건`, sub: formatWon(renewalAmount) }
+        { icon: '🆕', color: 'stat-purple', label: '신규', value: `${newSales.length}건`, sub: formatWon(newAmount) },
+        { icon: '🔁', color: 'stat-teal', label: '재등록', value: `${renewalSales.length}건`, sub: formatWon(renewalAmount) }
       ];
       return boxes.map(b => `
         <div class="trainer-stat-box ${b.color} ${b.cls || ''}">
@@ -946,8 +1041,8 @@
         cards.push({ cls: 'is-warn', html: `목표까지 <b>${formatWon(target - row.ptAmount)}</b> 남았습니다. (달성률 ${Math.round((row.ptAmount / target) * 1000) / 10}%)` });
       }
       if (row.ptCount > 0) {
-        const newAmount = row.salesRows.filter(s => s.category === 'pt_new').reduce((s, x) => s + (Number(x.amount) || 0), 0);
-        const renewalAmount = row.salesRows.filter(s => s.category === 'pt_renewal').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+        const newAmount = row.salesRows.filter(s => !isRenewalSale(s)).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+        const renewalAmount = row.salesRows.filter(s => isRenewalSale(s)).reduce((s, x) => s + (Number(x.amount) || 0), 0);
         const total = newAmount + renewalAmount;
         const newPct = total > 0 ? Math.round((newAmount / total) * 100) : 0;
         const renewalPct = total > 0 ? 100 - newPct : 0;
@@ -1078,6 +1173,7 @@
       // 불러오는 동안엔 로딩 문구를 보여주고, 트레이너를 빠르게 여러 번 눌렀을 때 화면이 엇갈리지 않도록
       // 요청 시점의 staffId와 지금 열려있는 모달이 같은지 매번 확인함
       document.getElementById('staffDetailStatGrid').innerHTML = '<p class="muted" style="padding:8px 0;">불러오는 중...</p>';
+      document.getElementById('staffDetailMissedBox').innerHTML = '';
       document.getElementById('staffDetailSourceGrid').innerHTML = '';
       document.getElementById('staffDetailInsights').innerHTML = '';
       document.getElementById('staffDetailTrendSummary').innerHTML = '';
@@ -1100,8 +1196,10 @@
         trendMonths.__trainerId = staffId;
         const target = findMonthlyTarget(staffId, toDateStr(monthStart));
         const breakdown = computeSourceBreakdown(row.salesRows);
+        const missed = findMissedSalesForTrainer(staffId, row, toDateStr(monthStart).slice(0, 7));
 
         document.getElementById('staffDetailStatGrid').innerHTML = buildStatGrid(row, target);
+        document.getElementById('staffDetailMissedBox').innerHTML = buildMissedSalesBox(missed);
         document.getElementById('staffDetailSourceGrid').innerHTML = buildSourceGrid(breakdown);
         document.getElementById('staffDetailInsights').innerHTML = buildInsights(row, target, staffPerfRowsCache, trendMonths);
 

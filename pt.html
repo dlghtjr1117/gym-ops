@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1788754815" />
+<link rel="stylesheet" href="style.css?v=1788757259" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -359,9 +359,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1788754815"></script>
-  <script src="auth.js?v=1788754815"></script>
-  <script src="data.js?v=1788754815"></script>
+  <script src="config.js?v=1788757259"></script>
+  <script src="auth.js?v=1788757259"></script>
+  <script src="data.js?v=1788757259"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -659,6 +659,64 @@
         if (lead.trainer_id === selectedTrainerId) await reloadCareLogsOnly();
       } catch (err) {
         alert('PT 회원 관리에 자동으로 추가하는 중 문제가 생겼어요: ' + err.message);
+      }
+    }
+    // 2026-09-07: 확률을 "등록"으로 바꿀 때 위 addLeadToCareManagement()가 자동으로 PT 회원 관리에
+    // 추가해주는데, 실제로 트레이너 "박선정"님 건(유형: 필드)에서 등록 처리는 됐지만 PT 회원 관리엔
+    // 안 들어가 있는 경우가 발견됨 - 그 순간 네트워크 오류·권한 문제 등으로 뒷단 추가만 조용히
+    // 실패했을 가능성이 있음(리드 자체의 "등록" 저장은 별도로 먼저 성공하기 때문에 겉으로는 멀쩡해
+    // 보임). 원인을 하나하나 재현하기 어려워서, 근본 대책으로 이 화면을 열거나 달/트레이너를 바꿔서
+    // 다시 불러올 때마다 "리드는 등록인데 PT 회원 관리엔 없는" 건이 있는지 자동으로 다시 확인해서
+    // 채워 넣도록 함 - 원인이 무엇이었든 다음에 화면을 열면 스스로 복구됨.
+    let careSyncInFlight = false; // 월 이동 버튼을 빠르게 연타하면 reloadAll()이 겹쳐 돌 수 있어서, 겹치는 동안엔 건너뜀(다음 reloadAll에서 다시 확인되니 안전함)
+    async function syncMissingCareLogs() {
+      if (careSyncInFlight) return;
+      careSyncInFlight = true;
+      try {
+        // leadsCache는 이 트레이너의 "모든 달" 리드를 다 갖고 있어서(주차별 매출 표 자체가 매번
+        // isLeadInMonth로 걸러서 보여주는 것뿐), 여기서도 반드시 지금 보고 있는 달에 속하는 리드로만
+        // 먼저 좁혀야 함 - 안 그러면 다른 달로 이동했을 때 그 달과 무관한(예전/다음 리드) 사람까지
+        // "지금 보고 있는 달"의 PT 회원 관리에 잘못 채워 넣는 사고가 남(수정 전 실제로 발생해서 잡음)
+        const { monthStr, startStr, endStr } = getMonthRange();
+        const registeredLeads = leadsCache.filter(l => l.stage === 'registered' && isLeadInMonth(l, startStr, endStr));
+        const missing = registeredLeads.filter(l => !careCache.some(c => c.name === l.name));
+        if (missing.length === 0) return;
+        await syncMissingCareLogsInner(missing, monthStr);
+      } finally {
+        careSyncInFlight = false;
+      }
+    }
+    async function syncMissingCareLogsInner(missing, monthStr) {
+      let added = 0;
+      for (const lead of missing) {
+        try {
+          await addPtCareLog({
+            trainer_id: lead.trainer_id,
+            period_month: monthStr,
+            member_id: lead.converted_member_id || null,
+            name: lead.name,
+            pt_expected_renewal_month: null,
+            pt_remaining_sessions: lead.sessions != null ? lead.sessions : null,
+            pt_session_focus: null,
+            pt_short_term_plan: 'X',
+            pt_long_term_plan: null,
+            pt_expected_sessions: null,
+            pt_expected_amount: null,
+            renewal_stage: 'in_progress',
+            pt_expected_probability: null
+          });
+          added++;
+        } catch (err) {
+          console.error('PT 회원 관리 자동 채움 실패:', lead.name, err.message);
+        }
+      }
+      if (added > 0) {
+        try {
+          const all = await fetchPtCareLogs();
+          careCache = all.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr);
+          renderCareTable();
+        } catch (err) { /* 다음에 화면을 다시 열면 어차피 또 확인함 */ }
+        showToast(`이전에 놓쳤던 ${added}명을 PT 회원 관리에 자동으로 채워 넣었어요.`);
       }
     }
     async function handleProbChange(selectEl) {
@@ -1391,6 +1449,8 @@
       renderOtNoResponseTable();
       loadRevenueCards();
       loadAllMiniStats();
+      // 화면을 먼저 그려준 다음, 그 사이에 조용히 "등록인데 PT 회원 관리엔 없는" 건이 있는지 확인해서 채움
+      syncMissingCareLogs();
     }
 
     (async () => {
