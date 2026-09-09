@@ -62,16 +62,6 @@ function saleDisplayItemWithCategory(sale) {
   return categoryLabel;
 }
 
-// 센터 매출(center-sales.html)에서 매출을 4갈래(PT/회원권/올바른(그룹PT)/기타)로 나눌 때 쓰는 기준.
-// "올바른"은 지점장님이 쓰시는 그룹PT 상품 이름이라, 그룹PT 매출 카테고리를 그대로 그 항목으로 씀.
-// 기타는 신규/재등록 구분이 없는 항목들(락커·운동복·일일권·양도)을 한데 모음.
-const CENTER_SALES_BUCKETS = {
-  pt: ['pt_new', 'pt_renewal'],
-  membership: ['membership_new', 'membership_renewal'],
-  group_pt: ['group_pt_new', 'group_pt_renewal'],
-  etc: ['locker', 'clothes', 'day_pass', 'membership_transfer', 'uncategorized', 'etc']
-};
-
 // 매출을 FC(헬스이용권·그룹PT·운동복·락커)/PT(개인PT)로 나눌 때 쓰는 기준.
 // PT만 명시적으로 판별하고, 나머지 전부를 FC로 취급해서 "총매출 = FC매출 + PT총매출"이 항상 맞도록 함
 const PT_SALE_CATEGORIES = ['pt_new', 'pt_renewal'];
@@ -255,11 +245,9 @@ async function fetchRecentSales(limit = 10) {
 
 // 대시보드 매출 보고(일간/주간/월간)용: [startDate, endDate) 범위(끝날짜는 미포함)의 매출을 전부 가져옴
 // 날짜는 'YYYY-MM-DD' 문자열로 넘기면 됨 (예: 일간이면 오늘과 내일)
-// member에 assigned_trainer_id, product에 name까지 같이 가져오는 건 센터 매출(center-sales.html)에서
-// "배정 트레이너"·"종목명"을 보여주기 위함 (대시보드 등 기존 화면은 이 필드들을 안 써도 그대로 동작함)
 async function fetchSalesInRange(startDate, endDate) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/sales?select=*,member:members(name,assigned_trainer_id),staff:profiles(name),product:products(name)` +
+    `${SUPABASE_URL}/rest/v1/sales?select=*,member:members(name),staff:profiles(name)` +
     `&sale_date=gte.${startDate}&sale_date=lt.${endDate}&order=sale_date.desc`,
     { headers: await authHeaders() }
   );
@@ -1225,7 +1213,7 @@ async function upsertPtTarget(target) {
   return res.json();
 }
 
-// ---- 센터 매출(center-sales.html): 월별 FC 목표 (PT 목표는 pt_targets를 그대로 합산해서 씀) ----
+// ---- 대시보드 "이번 달 매출" 카드의 달성률 표시용: 월별 FC 목표 (PT 목표는 pt_targets를 그대로 합산해서 씀) ----
 async function fetchCenterTarget(monthStr) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/center_targets?select=*&month=eq.${monthStr}`,
