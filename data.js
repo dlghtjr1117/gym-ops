@@ -1213,10 +1213,17 @@ async function upsertPtTarget(target) {
   return res.json();
 }
 
+// center_targets.month 컬럼은 date 타입이라 항상 "그 달 1일" 전체 날짜(예: 2026-09-01)로 넣어야 함.
+// 호출하는 쪽에서는 다른 월 관련 함수들과 통일해서 'YYYY-MM' 형태(예: 2026-09)로 넘기므로, 여기서
+// '-01'을 붙여 변환해줌 - 이걸 안 하면 PostgREST가 "invalid input syntax for type date" 오류를 냄.
+function monthStrToDate(monthStr) {
+  return `${monthStr}-01`;
+}
+
 // ---- 대시보드 "이번 달 매출" 카드의 달성률 표시용: 월별 FC 목표 (PT 목표는 pt_targets를 그대로 합산해서 씀) ----
 async function fetchCenterTarget(monthStr) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/center_targets?select=*&month=eq.${monthStr}`,
+    `${SUPABASE_URL}/rest/v1/center_targets?select=*&month=eq.${monthStrToDate(monthStr)}`,
     { headers: await authHeaders() }
   );
   if (!res.ok) await throwApiError(res, '센터 목표를 불러오지 못했습니다.');
@@ -1228,7 +1235,7 @@ async function upsertCenterTarget(monthStr, fcTargetAmount) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/center_targets?on_conflict=month`, {
     method: 'POST',
     headers: { ...(await authHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
-    body: JSON.stringify({ month: monthStr, fc_target_amount: fcTargetAmount })
+    body: JSON.stringify({ month: monthStrToDate(monthStr), fc_target_amount: fcTargetAmount })
   });
   if (!res.ok) await throwApiError(res, '센터 목표 저장에 실패했습니다.');
   return res.json();
