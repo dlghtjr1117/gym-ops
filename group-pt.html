@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 그룹PT 참석 관리</title>
+<link rel="stylesheet" href="style.css?v=1788945564" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* 이 페이지 전용 - 특이사항(메모) 칸: 만료회원·TM 화면과 같은 관례(엑셀 시트처럼 바로 타이핑) */
+  .sheet-input {
+    width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid transparent;
+    border-radius: 6px; background: transparent;
+  }
+  .sheet-input:hover { border-color: var(--slate-300); }
+  .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
+  /* 페이지 전용 히어로 카드 색(다른 화면의 hero-amber와 같은 관례 - style.css의 다크모드
+     "전부 레드 그라데이션" 규칙에 이미 hero-amber가 포함돼 있어서 그대로 재사용) */
+  .hero-amber { background: linear-gradient(150deg, #fff6e6, #ffedcc); }
+  .hero-amber::before { background: linear-gradient(90deg, #fcd34d, #d97706); }
+  .days-badge { font-weight: 700; }
+  .upload-box {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--slate-50); border: 1px dashed var(--slate-300); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  [data-theme="dark"] .upload-box { background: rgba(255,255,255,0.03); }
+  .upload-box .u-left { font-size: 13px; }
+  .upload-box .u-left b { display: block; font-size: 14px; margin-bottom: 2px; }
+  .note-box {
+    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 14px;
+    font-size: 12.5px; color: #1e3a8a; margin: 10px 0 16px; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="center-sales.html">센터 매출</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="group-pt.html" class="active">그룹PT 관리</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-card hero-blue">
+        <div class="hero-icon">🤸</div>
+        <div class="hero-label">올바른 운동 무제한 · 전체</div>
+        <div class="hero-value"><span id="heroTotalCount">0</span><span class="hero-unit">명</span></div>
+        <div class="hero-sub">현재 이용 중인 회원 수</div>
+      </div>
+      <div class="hero-card hero-purple">
+        <div class="hero-icon">⏱️</div>
+        <div class="hero-label">14일 이상 미방문</div>
+        <div class="hero-value"><span id="hero14Count">0</span><span class="hero-unit">명</span></div>
+        <div class="hero-sub">슬슬 뜸해지고 있어요</div>
+      </div>
+      <div class="hero-card hero-amber">
+        <div class="hero-icon">🚨</div>
+        <div class="hero-label">30일 이상 미방문 · 관리 필요</div>
+        <div class="hero-value"><span id="hero30Count">0</span><span class="hero-unit">명</span></div>
+        <div class="hero-sub">아직 TM 안 하신 분만 집계했어요</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>바디코디 방문 기록 업로드</h2>
+      <div class="upload-box">
+        <div class="u-left">
+          <b>📤 바디코디에서 뽑은 엑셀을 올려주세요</b>
+          <span class="muted" id="uploadSubText">전화번호로 회원을 매칭해서 "마지막 방문일"만 자동으로 갱신해요. 아직 업로드한 적 없어요.</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="file" id="visitUploadFile" accept=".xlsx,.xls,.csv" style="max-width:220px;" />
+          <button type="button" class="btn btn-primary" id="visitUploadBtn">엑셀 업로드</button>
+        </div>
+      </div>
+      <div id="visitUploadResult"></div>
+      <div class="note-box">
+        💡 참석률은 그룹수업 출석부가 따로 없어서, 바디코디 엑셀의 <b>마지막 방문일자</b>를 기준으로 "오늘 기준 며칠째 안 오셨는지"로 판단해요. 완전히 정확한 "참석 횟수"는 아니지만, 이미 갖고 계신 데이터를 그대로 활용하는 방식이에요. 실제 이용권 변경·매출 등록은 이 화면에서 하지 않고, 지금처럼 회원 관리·매출 입력 화면에서 따로 처리해주세요.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>올바른 운동 무제한 회원 목록 <span class="muted">(마지막 방문일 오래된 순)</span></h2>
+      <div id="retentionTabs" class="filter-tabs"></div>
+      <table id="retentionTable" class="table-fixed" style="min-width:1100px;">
+        <thead><tr>
+          <th style="width:8%;">이름</th><th style="width:11%;">전화번호</th><th style="width:6%;">담당</th>
+          <th style="width:15%;">그룹PT 상품</th><th style="width:9%;">마지막 방문일</th><th style="width:8%;">경과</th>
+          <th style="width:18%;">TM 상태</th><th style="width:25%;">특이사항</th>
+        </tr></thead>
+        <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+      <div class="report-nav" id="retentionPagination" style="justify-content:flex-end; margin-top:10px;"></div>
+      <p class="muted" style="margin-top:10px; font-size:12px;">TM 상태: 미연락 → 연락함 → 초심자패키지 제안함 → 전환 완료 / 거절 / 보류 중 하나로 바로 클릭해서 바꿀 수 있고(만료회원·TM 화면과 같은 방식), 특이사항 칸도 그 자리에서 바로 타이핑해서 저장돼요.</p>
+    </div>
+  </div>
+
+  <script src="config.js?v=1788945564"></script>
+  <script src="auth.js?v=1788945564"></script>
+  <script src="data.js?v=1788945564"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    const str = v => (v === undefined || v === null) ? '' : v.toString().trim();
+
+    let currentUserId = null;
+    let retentionItemsCache = [];
+    let activeRetentionFilter = 'all';
+    let retentionPage = 1;
+    const RETENTION_PAGE_SIZE = 15;
+    const DAYS_WARN = 14;
+    const DAYS_URGENT = 30;
+
+    function daysBadge(days) {
+      if (days === null) return '<span class="badge badge-slate days-badge">기록 없음</span>';
+      const cls = days >= DAYS_URGENT ? 'badge-red' : days >= DAYS_WARN ? 'badge-amber' : 'badge-green';
+      return `<span class="badge ${cls} days-badge">${days}일 전</span>`;
+    }
+
+    // 만료회원·TM의 renderTmStatusCell과 같은 방식 - 뱃지처럼 보이는 <select>로 바로 상태 변경
+    function renderRetentionStatusCell(it) {
+      const currentStatus = it.latestLog ? it.latestLog.status : 'not_contacted';
+      const extraOption = EDITABLE_GROUP_PT_RETENTION_STATUSES.includes(currentStatus)
+        ? ''
+        : `<option value="${currentStatus}" selected disabled>${GROUP_PT_RETENTION_STATUS_LABEL[currentStatus] || currentStatus}</option>`;
+      const options = EDITABLE_GROUP_PT_RETENTION_STATUSES.map(key =>
+        `<option value="${key}" ${key === currentStatus ? 'selected' : ''}>${GROUP_PT_RETENTION_STATUS_LABEL[key]}</option>`
+      ).join('');
+      return `<select class="badge ${GROUP_PT_RETENTION_STATUS_BADGE[currentStatus]} tm-status-select"
+                data-member-id="${it.member.id}" onchange="handleRetentionStatusChange(this)">${extraOption}${options}</select>`;
+    }
+
+    async function handleRetentionStatusChange(selectEl) {
+      const memberId = selectEl.dataset.memberId;
+      const newStatus = selectEl.value;
+      selectEl.disabled = true;
+      try {
+        await addGroupPtRetentionLog({
+          member_id: memberId,
+          staff_id: currentUserId,
+          status: newStatus,
+          contact_date: new Date().toISOString().slice(0, 10),
+          memo: null
+        });
+        await loadRetention();
+      } catch (err) {
+        alert(err.message);
+        selectEl.disabled = false;
+      }
+    }
+
+    // 만료회원·TM의 renderMemoCell/handleMemoChange와 같은 방식
+    function renderRetentionMemoCell(it) {
+      const memo = it.latestLog && it.latestLog.memo ? it.latestLog.memo : '';
+      return `<input type="text" class="sheet-input retention-memo-input" data-member-id="${it.member.id}"
+                data-log-id="${it.latestLog ? it.latestLog.id : ''}" data-original="${escapeHtml(memo)}"
+                value="${escapeHtml(memo)}" placeholder="메모 입력..."
+                onblur="handleRetentionMemoChange(this)" onkeydown="if(event.key==='Enter'){this.blur();}" />`;
+    }
+
+    async function handleRetentionMemoChange(inputEl) {
+      const newValue = inputEl.value.trim();
+      const original = inputEl.dataset.original || '';
+      if (newValue === original) return;
+      const logId = inputEl.dataset.logId;
+      inputEl.disabled = true;
+      try {
+        if (logId) {
+          await updateGroupPtRetentionLog(logId, { memo: newValue || null });
+        } else {
+          await addGroupPtRetentionLog({
+            member_id: inputEl.dataset.memberId,
+            staff_id: currentUserId,
+            status: 'not_contacted',
+            contact_date: new Date().toISOString().slice(0, 10),
+            memo: newValue || null
+          });
+        }
+        await loadRetention();
+      } catch (err) {
+        alert(err.message);
+        inputEl.disabled = false;
+      }
+    }
+
+    // "관리 필요"(30일 이상) 여부 - 이미 전환 완료/거절로 정리된 회원은 굳이 다시 챙길 필요 없어서 제외
+    function needsAttention(it) {
+      if (it.daysSinceVisit === null || it.daysSinceVisit < DAYS_URGENT) return false;
+      const status = it.latestLog ? it.latestLog.status : 'not_contacted';
+      return status !== 'converted' && status !== 'declined';
+    }
+
+    function renderRetentionTabs() {
+      const total = retentionItemsCache.length;
+      const c14 = retentionItemsCache.filter(it => it.daysSinceVisit !== null && it.daysSinceVisit >= DAYS_WARN).length;
+      const cUrgent = retentionItemsCache.filter(needsAttention).length;
+      const tabs = [
+        { key: 'all', label: `전체 (${total})` },
+        { key: 'warn', label: `14일 이상 미방문 (${c14})` },
+        { key: 'urgent', label: `30일 이상 · 관리 필요 (${cUrgent})` }
+      ];
+      document.getElementById('retentionTabs').innerHTML = tabs.map(t =>
+        `<button type="button" class="filter-tab${t.key === activeRetentionFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+      ).join('');
+      document.querySelectorAll('#retentionTabs .filter-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeRetentionFilter = btn.dataset.key;
+          retentionPage = 1;
+          renderRetentionTabs();
+          renderRetentionTable();
+        });
+      });
+
+      document.getElementById('heroTotalCount').textContent = total;
+      document.getElementById('hero14Count').textContent = c14;
+      document.getElementById('hero30Count').textContent = cUrgent;
+    }
+
+    function renderRetentionTable() {
+      const tbody = document.querySelector('#retentionTable tbody');
+      const paginationEl = document.getElementById('retentionPagination');
+      let items = retentionItemsCache;
+      if (activeRetentionFilter === 'warn') items = items.filter(it => it.daysSinceVisit !== null && it.daysSinceVisit >= DAYS_WARN);
+      if (activeRetentionFilter === 'urgent') items = items.filter(needsAttention);
+
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">해당하는 회원이 없습니다.</td></tr>';
+        paginationEl.innerHTML = '';
+        return;
+      }
+      const totalPages = Math.max(1, Math.ceil(items.length / RETENTION_PAGE_SIZE));
+      retentionPage = Math.min(Math.max(1, retentionPage), totalPages);
+      const startIdx = (retentionPage - 1) * RETENTION_PAGE_SIZE;
+      const pageItems = items.slice(startIdx, startIdx + RETENTION_PAGE_SIZE);
+      renderPagination(paginationEl, retentionPage, items.length, RETENTION_PAGE_SIZE, (newPage) => {
+        retentionPage = newPage;
+        renderRetentionTable();
+      });
+
+      tbody.innerHTML = pageItems.map(it => `
+        <tr>
+          <td class="cell-1line" title="${escapeHtml(it.member.name)}">${escapeHtml(it.member.name)}</td>
+          <td class="cell-1line">${formatPhone(it.member.phone) || '-'}</td>
+          <td class="cell-1line" title="${escapeHtml(it.member.trainer ? it.member.trainer.name : '미지정')}">${it.member.trainer ? escapeHtml(it.member.trainer.name) : '미지정'}</td>
+          <td><div class="mcell"><span class="mcell-label" title="${escapeHtml(it.member.group_pt_type || '그룹PT')}">${escapeHtml(it.member.group_pt_type || '그룹PT')}</span></div></td>
+          <td class="cell-1line">${it.member.last_visit_date || '-'}</td>
+          <td>${daysBadge(it.daysSinceVisit)}</td>
+          <td>${renderRetentionStatusCell(it)}</td>
+          <td>${renderRetentionMemoCell(it)}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadRetention() {
+      const tbody = document.querySelector('#retentionTable tbody');
+      try {
+        retentionItemsCache = await fetchGroupPtRetentionItems();
+        renderRetentionTabs();
+        renderRetentionTable();
+      } catch (err) {
+        document.getElementById('retentionTabs').innerHTML = '';
+        tbody.innerHTML = `<tr><td colspan="8" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    // ---- 바디코디 방문기록 엑셀 업로드 ----
+    // 헤더 이름이 정확히 뭔지 몰라서("방문"/"내원"/"내점"이 들어간 컬럼을 폭넓게 찾음),
+    // 전화번호는 회원 관리 업로드와 같은 후보들(전화번호/휴대폰번호/연락처)로 찾음
+    function findHeaderKey(headerRow, matcher) {
+      return headerRow.find(h => matcher(str(h)));
+    }
+
+    function parseAnyDate(text) {
+      const t = str(text);
+      if (!t) return null;
+      const m = t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!m) return null;
+      return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    }
+
+    document.getElementById('visitUploadBtn').addEventListener('click', async () => {
+      const fileInput = document.getElementById('visitUploadFile');
+      const resultBox = document.getElementById('visitUploadResult');
+      if (!fileInput.files.length) {
+        resultBox.innerHTML = '<div class="error-text" style="display:block;">파일을 먼저 선택해주세요.</div>';
+        return;
+      }
+      const btn = document.getElementById('visitUploadBtn');
+      btn.disabled = true;
+      resultBox.innerHTML = '<div class="muted">처리 중...</div>';
+
+      try {
+        const file = fileInput.files[0];
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const headerRow = (XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 })[0] || []).map(h => str(h));
+        const rows = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+
+        const phoneKey = findHeaderKey(headerRow, h => ['전화번호', '휴대폰번호', '연락처', '핸드폰번호'].includes(h));
+        const visitKey = findHeaderKey(headerRow, h => h.includes('방문') || h.includes('내원') || h.includes('내점'));
+
+        if (!phoneKey || !visitKey) {
+          resultBox.innerHTML = `<div class="error-text" style="display:block;">전화번호 칸${phoneKey ? '' : '(못 찾음)'}이나 방문일 칸${visitKey ? '' : '(못 찾음)'}을 찾지 못했어요. 엑셀에 "전화번호"와 "방문"이 들어간 컬럼이 있는지 확인해주세요.</div>`;
+          btn.disabled = false;
+          return;
+        }
+
+        // 같은 회원이 여러 행(방문할 때마다 한 줄)으로 나올 수 있어서, 전화번호별로 가장 최근 날짜만 남김
+        const latestByPhone = {};
+        for (const row of rows) {
+          const phone = normalizePhone(row[phoneKey]);
+          const date = parseAnyDate(row[visitKey]);
+          if (!phone || !date) continue;
+          if (!latestByPhone[phone] || date > latestByPhone[phone]) latestByPhone[phone] = date;
+        }
+
+        const phones = Object.keys(latestByPhone);
+        let matched = 0, unmatched = 0;
+        const errors = [];
+        for (let i = 0; i < phones.length; i++) {
+          const phone = phones[i];
+          if (i % 20 === 0) {
+            resultBox.innerHTML = `<div class="muted">처리 중... ${i} / ${phones.length}건</div>`;
+          }
+          try {
+            const existing = await findMemberByPhone(phone);
+            if (!existing) { unmatched++; continue; }
+            await updateMember(existing.id, { last_visit_date: latestByPhone[phone] });
+            matched++;
+          } catch (err) {
+            errors.push(`${phone}: ${err.message}`);
+          }
+        }
+
+        const now = new Date();
+        const nowLabel = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        document.getElementById('uploadSubText').textContent = `전화번호로 회원을 매칭해서 "마지막 방문일"만 자동으로 갱신해요. 마지막 업로드: ${nowLabel}`;
+
+        const shownErrors = errors.slice(0, 20);
+        resultBox.innerHTML = `
+          <div class="success-text" style="display:block;">방문일 갱신 ${matched}명 완료${unmatched ? ` · 회원 매칭 안 됨 ${unmatched}건(전화번호가 회원 목록에 없음)` : ''}</div>
+          ${errors.length ? `<div class="error-text" style="display:block; white-space:pre-line;">실패 ${errors.length}건:\n${shownErrors.join('\n')}${errors.length > shownErrors.length ? `\n...외 ${errors.length - shownErrors.length}건 더` : ''}</div>` : ''}
+        `;
+        fileInput.value = '';
+        loadRetention();
+      } catch (err) {
+        resultBox.innerHTML = `<div class="error-text" style="display:block;">${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+        currentUserId = profile.id;
+      }
+      loadRetention();
+    })();
+  </script>
+</body>
+</html>

@@ -684,6 +684,82 @@ async function fetchExpiringItems(daysAhead = 14) {
   return items;
 }
 
+// ---- 그룹PT(올바른 운동 무제한) 참석 관리: 방문이 뜸해진 회원을 찾아서 초심자패키지 5회
+// 전환을 제안하는 TM을 기록하는 전용 공간. 자세한 이유는 migration_44_group_pt_retention.sql
+// 주석 참고 - tm_logs와 완전히 분리된 테이블(group_pt_retention_logs)을 씀
+const GROUP_PT_RETENTION_STATUS_LABEL = {
+  not_contacted: '미연락',
+  contacted: '연락함',
+  proposed: '초심자패키지 제안함',
+  converted: '전환 완료',
+  declined: '거절',
+  on_hold: '보류'
+};
+const GROUP_PT_RETENTION_STATUS_BADGE = {
+  not_contacted: 'badge-slate',
+  contacted: 'badge-blue',
+  proposed: 'badge-purple',
+  converted: 'badge-green',
+  declined: 'badge-orange',
+  on_hold: 'badge-amber'
+};
+// 그룹PT 참석 관리 페이지에서 직접 고를 수 있는 상태 (표시 순서 그대로, not_contacted는 첫 기록
+// 전까지의 기본값이라 목록에서 빠짐 - 만료회원·TM의 EDITABLE_TM_STATUSES와 같은 방식)
+const EDITABLE_GROUP_PT_RETENTION_STATUSES = ['contacted', 'proposed', 'converted', 'declined', 'on_hold'];
+
+// 현재 이용 중인 그룹PT(올바른 운동 무제한) 회원 목록 + 마지막 방문일로부터 며칠 지났는지 +
+// 가장 최근 전환TM 기록을 한 번에 계산해서 돌려줌
+async function fetchGroupPtRetentionItems() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name),group_pt_retention_logs(id,status,contact_date,memo,created_at)` +
+    `&status=neq.left&group_pt_end_date=not.is.null` +
+    `&order=name.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '그룹PT 회원 목록을 불러오지 못했습니다.');
+  const members = await res.json();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const today = new Date(todayStr + 'T00:00:00');
+
+  return members.map(m => {
+    const logs = (m.group_pt_retention_logs || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const latestLog = logs[0] || null;
+    let daysSinceVisit = null;
+    if (m.last_visit_date) {
+      const visited = new Date(m.last_visit_date + 'T00:00:00');
+      daysSinceVisit = Math.round((today - visited) / (1000 * 60 * 60 * 24));
+    }
+    return { member: m, daysSinceVisit, latestLog };
+  }).sort((a, b) => {
+    // 마지막 방문일을 아예 모르는 회원(엑셀에 매칭 안 됨)은 맨 아래로 - 지금 당장은 판단할 근거가 없어서
+    if (a.daysSinceVisit === null && b.daysSinceVisit === null) return 0;
+    if (a.daysSinceVisit === null) return 1;
+    if (b.daysSinceVisit === null) return -1;
+    return b.daysSinceVisit - a.daysSinceVisit; // 오래 안 온 사람이 위로
+  });
+}
+
+async function addGroupPtRetentionLog(log) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_retention_logs`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(log)
+  });
+  if (!res.ok) await throwApiError(res, 'TM 기록 등록에 실패했습니다.');
+  return res.json();
+}
+
+async function updateGroupPtRetentionLog(id, fields) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_retention_logs?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(fields)
+  });
+  if (!res.ok) await throwApiError(res, 'TM 기록 수정에 실패했습니다.');
+  return res.json();
+}
+
 // 등록 처리: TM 기록 남기기 + 회원 만료일(해당 항목) 갱신 + (금액 입력 시) 매출까지 한 번에 연동
 async function registerRenewal({ memberId, staffId, category, newEndDate, ptRemaining, amount, memo, contactDate }) {
   const memberField = CATEGORY_TO_MEMBER_FIELD[category];
