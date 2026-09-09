@@ -884,6 +884,7 @@ Supabase 대시보드 → Table Editor에서 실제 테이블/컬럼을 확인�
 - DB 변경 없음 - FC 목표를 저장하던 `center_targets` 테이블은 그대로 두고, 읽고 쓰는 화면만 대시보드로 옮긴 것. data.js의 관련 함수(`fetchCenterTarget`/`upsertCenterTarget`)도 이름과 동작 그대로 재사용함.
 - 참고: `CENTER_SALES_BUCKETS`(4갈래 분류 상수)는 센터 매출 화면에서만 쓰이던 것이라 같이 정리함. `fetchSalesInRange`가 트레이너별 표를 위해 같이 가져오던 `assigned_trainer_id`/상품명도 이제 아무 화면에서도 안 써서 함께 정리함(매출 보고 데이터 불러오는 속도에 미세하게 도움).
 - **오류 수정(같은 날)**: 처음 올려드린 버전에서 저장 버튼을 누르면 "센터 목표를 불러오지 못했습니다 (HTTP 400: invalid input syntax for type date: "2026-09")" 오류가 났음. `center_targets.month` 컬럼이 date 타입이라 "그 달 1일" 형태의 완전한 날짜(예: `2026-09-01`)만 받는데, `fetchCenterTarget`/`upsertCenterTarget`에는 다른 월 관련 함수들과 통일된 `'2026-09'` 형태(연-월만)를 그대로 넘기고 있어서 생긴 문제였음(원래 센터 매출 화면에 있던 로직을 그대로 재사용한 것이었는데, 사실 그 화면에서도 이 저장 기능은 실제로 눌러본 적이 없었던 것으로 보임). `data.js`에 `monthStrToDate()` 함수를 추가해서, 두 함수 안에서 `'YYYY-MM'` → `'YYYY-MM-01'`로 변환해 보내도록 고침 - 호출하는 쪽(대시보드)은 그대로 `'YYYY-MM'`을 넘기면 됨. DB 변경 없음.
+- **오류 수정 2(같은 날)**: "트레이너별로 PT 목표를 다 설정했는데 PT 카드에 '목표 미설정'으로 뜬다"는 제보로 확인함. `pt_targets.period_start`도 `center_targets.month`와 똑같이 date 컬럼이라 "그 달 1일" 전체 날짜(`2026-09-01`)로 저장되는데, PT 목표 합계를 구하는 코드에서 이 값을 `'2026-09'`(연-월만)와 비교하고 있어서 항상 하나도 안 걸리고 0으로 계산됐던 것. 트레이너별 성과 지표 쪽 코드(`findMonthlyTarget`)는 원래부터 `toDateStr(monthStart)`로 정확하게 비교하고 있었는데, 이번에 새로 짠 코드에서만 그 기준을 안 맞춰서 생긴 실수였음. `toDateStr(monthStart)`로 비교하도록 고쳐서, 이제 트레이너별로 설정해두신 월 목표들의 합계가 PT 카드 목표로 정확히 반영돼요. DB 변경 없음.
 
 ## 아직 안 만든 것 / 예정
 
