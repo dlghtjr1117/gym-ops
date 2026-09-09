@@ -707,8 +707,15 @@ const GROUP_PT_RETENTION_STATUS_BADGE = {
 // 전까지의 기본값이라 목록에서 빠짐 - 만료회원·TM의 EDITABLE_TM_STATUSES와 같은 방식)
 const EDITABLE_GROUP_PT_RETENTION_STATUSES = ['contacted', 'proposed', 'converted', 'declined', 'on_hold'];
 
-// 현재 이용 중인 그룹PT(올바른 운동 무제한) 회원 목록 + 마지막 방문일로부터 며칠 지났는지 +
-// 가장 최근 전환TM 기록을 한 번에 계산해서 돌려줌
+// "무료 2회 체험권"처럼 기간이 아니라 횟수 기반인 체험 상품은 "무제한 회원인데 참석이 뜸해져서
+// 전환을 제안한다"는 이 화면의 취지에 안 맞아서(체험 중인 사람은애초에 전환 대상이 아님) 대상에서
+// 뺌 - 종목명에 "개월"이 들어간(3개월권/6개월권/12개월권처럼 실제 기간이 있는) 경우만 포함
+function isDurationGroupPtType(typeText) {
+  return !!(typeText && typeText.includes('개월'));
+}
+
+// 현재 이용 중인 그룹PT(올바른 운동 무제한, 기간제 상품만) 회원 목록 + 마지막 방문일로부터
+// 며칠 지났는지 + 가장 최근 전환TM 기록을 한 번에 계산해서 돌려줌
 async function fetchGroupPtRetentionItems() {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name),group_pt_retention_logs(id,status,contact_date,memo,created_at)` +
@@ -717,7 +724,8 @@ async function fetchGroupPtRetentionItems() {
     { headers: await authHeaders() }
   );
   if (!res.ok) await throwApiError(res, '그룹PT 회원 목록을 불러오지 못했습니다.');
-  const members = await res.json();
+  const allMembers = await res.json();
+  const members = allMembers.filter(m => isDurationGroupPtType(m.group_pt_type));
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const today = new Date(todayStr + 'T00:00:00');
