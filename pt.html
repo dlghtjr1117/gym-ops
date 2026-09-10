@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789009404" />
+<link rel="stylesheet" href="style.css?v=1789010281" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -146,11 +146,11 @@
       <div style="overflow-x:auto; margin-top:14px;">
         <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:900px;">
           <thead><tr>
-            <th style="width:8%;">주차</th><th style="width:11%;">날짜</th><th style="width:9%;">유형</th><th style="width:9%;">이름</th>
-            <th style="width:11%;">금액</th><th style="width:10%;">미납금</th><th style="width:5%;">횟수</th><th style="width:8%;">확률</th><th style="width:23%;">특이사항 · 메모</th><th style="width:6%;"></th>
+            <th style="width:8%;">주차</th><th style="width:12%;">날짜</th><th style="width:10%;">유형</th><th style="width:10%;">이름</th>
+            <th style="width:12%;">금액</th><th style="width:6%;">횟수</th><th style="width:9%;">확률</th><th style="width:27%;">특이사항 · 메모</th><th style="width:6%;"></th>
           </tr></thead>
-          <tbody><tr><td colspan="10" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-          <tfoot><tr><td colspan="4" style="text-align:right; font-weight:700;">합계</td><td id="weeklyTotal" style="font-weight:700;">0원</td><td id="weeklyUnpaidTotal" style="font-weight:700;">0원</td><td colspan="4"></td></tr></tfoot>
+          <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tfoot><tr><td colspan="4" style="text-align:right; font-weight:700;">합계</td><td id="weeklyTotal" style="font-weight:700;">0원</td><td colspan="4"></td></tr></tfoot>
         </table>
       </div>
     </div>
@@ -271,11 +271,11 @@
               <option value="">선택 안 함</option>
               <option value="재등록">재등록</option><option value="오티">오티</option><option value="워크인">워크인</option><option value="무료체험">무료체험</option>
               <option value="지인소개">지인소개</option><option value="필드">필드</option><option value="당근">당근</option><option value="블로그">블로그</option>
+              <option value="미납금">미납금</option>
             </select>
           </div>
           <div class="field"><label>상담일(날짜)</label><input type="date" id="l_contact_date" required /></div>
           <div class="field"><label>금액(원)</label><input type="text" inputmode="numeric" class="money-input" id="l_expected_amount" placeholder="예: 900,000" /></div>
-          <div class="field"><label>미납금(원)</label><input type="text" inputmode="numeric" class="money-input" id="l_unpaid_amount" placeholder="예: 300,000" /></div>
           <div class="field"><label>횟수</label><input type="number" id="l_sessions" min="0" placeholder="예: 10" /></div>
           <div class="field"><label>확률</label>
             <select id="l_probability">
@@ -360,9 +360,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789009404"></script>
-  <script src="auth.js?v=1789009404"></script>
-  <script src="data.js?v=1789009404"></script>
+  <script src="config.js?v=1789010281"></script>
+  <script src="auth.js?v=1789010281"></script>
+  <script src="data.js?v=1789010281"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -533,13 +533,20 @@
     // ---- 섹션 A: 주차별 매출 기록 ----
     // "무료체험" 추가 (2026-09-05) - 유형이 죽 나열만 되어있고 색 구분이 없어서 한눈에 잘 안 들어온다는
     // 피드백으로, 확률/상태 select처럼 유형별로도 뱃지 색을 따로 줌(SOURCE_BADGE)
-    const SOURCE_OPTIONS = ['재등록', '오티', '워크인', '무료체험', '지인소개', '필드', '당근', '블로그'];
+    // "미납금" 추가 (2026-09-10) - 예전엔 별도의 "미납금" 숫자 칸으로 만들었었는데, 실제로 원하신 건
+    // "분납으로 계약해서 미납 상태였던 잔금을 오늘 실제로 받았다"는 것을 이 표에 남기는 용도였음(그날 실제로
+    // 돈이 들어온 것이므로 확정 매출에도 정상적으로 잡혀야 함). 그래서 별도 칸이 아니라 다른 유형(재등록/
+    // 워크인 등)과 똑같이 "유형"에 하나 추가하고, "금액" 칸에 그날 받은 금액을 그대로 적으면 됨 -
+    // 이렇게 하면 재등록·워크인 등과 똑같은 방식으로 확정 매출에 자동으로 합산됨.
+    const SOURCE_OPTIONS = ['재등록', '오티', '워크인', '무료체험', '지인소개', '필드', '당근', '블로그', '미납금'];
     // badge-slate는 글자색이 var(--slate-700)이라 배경(연한 회색)까지 테마에 따라 거의 투명해져서,
     // 다른 행(예: 노란 확률 행) 위에서는 글자가 잘 안 보일 수 있음 - 그래서 여기선 배경·글자색이 둘 다
-    // 고정값인 색만 골라 씀(badge-teal 추가해서 8개 유형 모두 서로 다른 고정 색으로 구분되게 함)
+    // 고정값인 색만 골라 씀(badge-teal 추가해서 8개 유형 모두 서로 다른 고정 색으로 구분되게 함,
+    // "미납금" 추가하면서 badge-pink도 새로 추가함)
     const SOURCE_BADGE = {
       '재등록': 'badge-green', '오티': 'badge-blue', '워크인': 'badge-amber', '무료체험': 'badge-red',
-      '지인소개': 'badge-purple', '필드': 'badge-orange', '당근': 'badge-yellow', '블로그': 'badge-teal'
+      '지인소개': 'badge-purple', '필드': 'badge-orange', '당근': 'badge-yellow', '블로그': 'badge-teal',
+      '미납금': 'badge-pink'
     };
     function renderSourceSelect(lead) {
       const cur = lead.source || '';
@@ -614,7 +621,6 @@
           week_no: 1,
           contact_date: nextMonthFirstDay,
           expected_amount: lead.expected_amount != null ? lead.expected_amount : null,
-          unpaid_amount: lead.unpaid_amount != null ? lead.unpaid_amount : null, // 미납금이 남아있으면 다음 달까지 그대로 따라가서 계속 챙길 수 있게 함
           sessions: lead.sessions != null ? lead.sessions : null,
           ot_date: null,
           ot_status: null,
@@ -798,26 +804,22 @@
         });
 
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ 상담/매출 기록 추가"로 남겨보세요.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ 상담/매출 기록 추가"로 남겨보세요.</td></tr>';
         document.getElementById('weeklyTotal').textContent = '0원';
-        document.getElementById('weeklyUnpaidTotal').textContent = '0원';
         return;
       }
 
       // 칸마다 바로 클릭해서 수정 가능 (주차도 직접 선택 가능하도록 select로)
       let html = '';
       let total = 0;
-      let unpaidTotal = 0;
       items.forEach(l => {
         total += Number(l.expected_amount || 0);
-        unpaidTotal += Number(l.unpaid_amount || 0);
         html += `<tr class="row-prob-${leadToProbValue(l)}">
             <td>${renderWeekSelect(l)}</td>
             <td><input class="sheet-input" type="date" value="${l.contact_date || ''}" data-lead-id="${l.id}" onchange="handleLeadDateChange(this)" /></td>
             <td>${renderSourceSelect(l)}</td>
             <td><input class="sheet-input" type="text" value="${escapeHtml(l.name || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'name',false)" placeholder="이름" /></td>
             <td><input class="sheet-input money-input" type="text" inputmode="numeric" value="${l.expected_amount != null ? Number(l.expected_amount).toLocaleString('ko-KR') : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'expected_amount',true)" placeholder="금액" /></td>
-            <td><input class="sheet-input money-input" type="text" inputmode="numeric" value="${l.unpaid_amount != null ? Number(l.unpaid_amount).toLocaleString('ko-KR') : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'unpaid_amount',true)" placeholder="미납금" /></td>
             <td><input class="sheet-input" type="number" min="0" value="${l.sessions != null ? l.sessions : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'sessions',true)" placeholder="횟수" /></td>
             <td>${renderProbSelect(l)}</td>
             <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="메모" /></td>
@@ -826,7 +828,6 @@
       });
       tbody.innerHTML = html;
       document.getElementById('weeklyTotal').textContent = formatWon(total);
-      document.getElementById('weeklyUnpaidTotal').textContent = formatWon(unpaidTotal);
     }
 
     // 이 달 "유형=sourceValue"로 남긴 상담 건 중, 몇 건이 "등록"으로 확정됐는지
@@ -1393,7 +1394,6 @@
           week_no: Number(document.getElementById('l_week').value) || null,
           contact_date: document.getElementById('l_contact_date').value || formatDateStr(new Date()),
           expected_amount: moneyInputValue('l_expected_amount'),
-          unpaid_amount: moneyInputValue('l_unpaid_amount'),
           sessions: document.getElementById('l_sessions').value ? Number(document.getElementById('l_sessions').value) : null,
           ot_date: otDate,
           ot_status: otDate ? 'scheduled' : null,
@@ -1440,7 +1440,7 @@
         leadsCache = leadsResult.value.filter(l => l.trainer_id === selectedTrainerId);
       } else {
         leadsCache = [];
-        document.querySelector('#weeklyTable tbody').innerHTML = `<tr><td colspan="10" class="error-text" style="display:table-cell;">${leadsResult.reason.message}</td></tr>`;
+        document.querySelector('#weeklyTable tbody').innerHTML = `<tr><td colspan="9" class="error-text" style="display:table-cell;">${leadsResult.reason.message}</td></tr>`;
       }
       careCache = careResult.status === 'fulfilled'
         ? careResult.value.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr)

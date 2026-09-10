@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1789009404" />
+<link rel="stylesheet" href="style.css?v=1789010281" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -45,11 +45,13 @@
   :root {
     --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
     --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
+    --viz-9: #0d9488; /* "미납금" 유형 추가(2026-09-10)로 9번째 슬롯 필요해져서 추가 - dataviz 검증 스크립트로 통과 확인 */
     --viz-other: #94a3b8;
   }
   :root[data-theme="dark"] {
     --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500;
     --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
+    --viz-9: #0f9c8f;
     --viz-other: #75757a;
   }
 
@@ -474,9 +476,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1789009404"></script>
-  <script src="auth.js?v=1789009404"></script>
-  <script src="data.js?v=1789009404"></script>
+  <script src="config.js?v=1789010281"></script>
+  <script src="auth.js?v=1789010281"></script>
+  <script src="data.js?v=1789010281"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -838,13 +840,17 @@
     // "전사 평균"/"지점 평균"/"지점 내 순위"/"최근 배정 이력(지점 이동 기록)"까지 있었는데, 이 앱은
     // 지점이 하나뿐이라 그런 항목은 지어내지 않고 뺐고, 대신 실제로 있는 데이터(PT 목표, PT 관리에서
     // 기록하는 유형(재등록/워크인/OT 등), 매출 이력)로 최대한 비슷하게 구성함.
-    const TRAINER_SOURCE_OPTIONS = ['재등록', '오티', '워크인', '무료체험', '지인소개', '필드', '당근', '블로그'];
+    // "미납금"(2026-09-10 추가) - PT 관리 "유형"에 새로 생긴 값으로, 분납 계약의 미납 잔금을 그날 실제로
+    // 받았을 때 남기는 기록. 유입경로라기보다는 결제 성격에 가깝지만, PT 관리와 같은 source 필드를 그대로
+    // 쓰므로 여기 경로별 매출 breakdown에도 똑같이 나타남 - 다른 유형들과 같은 방식으로 취급함
+    const TRAINER_SOURCE_OPTIONS = ['재등록', '오티', '워크인', '무료체험', '지인소개', '필드', '당근', '블로그', '미납금'];
     const TRAINER_SOURCE_UNCLASSIFIED = '미분류';
-    // dataviz 팔레트(--viz-1~8)를 PT 관리 화면의 유형 순서 그대로 고정 배정해서, 앱 전체에서 같은
-    // 유형은 항상 같은 색으로 보이게 함. 8개를 다 쓰므로 "미분류"는 --viz-other로 따로 둠
+    // dataviz 팔레트(--viz-1~9)를 PT 관리 화면의 유형 순서 그대로 고정 배정해서, 앱 전체에서 같은
+    // 유형은 항상 같은 색으로 보이게 함. 9개를 다 쓰므로 "미분류"는 --viz-other로 따로 둠
     const TRAINER_SOURCE_VIZ = {
       '재등록': 'var(--viz-1)', '오티': 'var(--viz-2)', '워크인': 'var(--viz-3)', '무료체험': 'var(--viz-4)',
-      '지인소개': 'var(--viz-5)', '필드': 'var(--viz-6)', '당근': 'var(--viz-7)', '블로그': 'var(--viz-8)'
+      '지인소개': 'var(--viz-5)', '필드': 'var(--viz-6)', '당근': 'var(--viz-7)', '블로그': 'var(--viz-8)',
+      '미납금': 'var(--viz-9)'
     };
     function trainerSourceColor(source) { return TRAINER_SOURCE_VIZ[source] || 'var(--viz-other)'; }
 
