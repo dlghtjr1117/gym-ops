@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1789028341" />
+<link rel="stylesheet" href="style.css?v=1789089908" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -18,6 +18,9 @@
   .receivable-card:last-child { margin-bottom: 0; }
   .receivable-card .r-title { font-weight: 700; font-size: 13.5px; color: #92400e; margin-bottom: 4px; }
   .receivable-card .r-detail { font-size: 12.5px; color: #78350f; line-height: 1.6; }
+  /* 같은 종류(카테고리) 상품이 장바구니에 중복으로 담겼을 때 - 나중에 담긴 항목의 시작일이 조용히
+     우선 적용돼서 먼저 신경 써서 맞춘 시작일이 무시되는 사고를 막기 위한 눈에 띄는 경고 */
+  .checkout-dup-warning { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; color: #92400e; line-height: 1.6; }
   .badge-receivable { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-right: 5px; vertical-align: middle; flex: none; }
   /* 회원 상세 > "이용권" 탭 카드 - 헬스장 관리 프로그램들이 흔히 쓰는, 종류별 색깔 리본 + 만료일
      강조 박스 + 상세 정보 그리드가 있는 좀 더 꽉 찬 카드 스타일(2026-09-06, 참고 이미지 요청으로
@@ -306,6 +309,7 @@
         <div id="md_sale_checkout_view" style="display:none;">
           <button type="button" class="btn-link" id="md_checkout_back_btn" style="margin-bottom:12px;">← 다시 선택</button>
           <p class="muted" style="margin:-4px 0 10px;">시작일을 바꾸면 종료일이 자동으로 다시 계산돼요. 가격을 바꾸려면 "상세설정"을 눌러주세요. 아래 "판매 날짜"는 (위 항목별 시작일과 별개로) 매출로 잡히는 날짜예요 - 정산이 안 맞아서 매출 잡힌 날짜만 바꿔야 할 때, 지우고 다시 등록하지 않고 여기서 바로 바꿔서 등록하시면 돼요.</p>
+          <div id="md_checkout_dup_warning" class="checkout-dup-warning" style="display:none;"></div>
           <div id="md_checkout_items" class="checkout-items"></div>
           <div class="form-grid" style="margin:14px 0 10px;">
             <div class="field"><label>판매 담당자</label><select id="md_sale_staff"></select></div>
@@ -383,9 +387,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789028341"></script>
-  <script src="auth.js?v=1789028341"></script>
-  <script src="data.js?v=1789028341"></script>
+  <script src="config.js?v=1789089908"></script>
+  <script src="auth.js?v=1789089908"></script>
+  <script src="data.js?v=1789089908"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -605,6 +609,15 @@
         row.addEventListener('click', () => {
           const product = productsCacheForModal.find(p => p.id === row.dataset.id);
           if (!product) return;
+          // 오류 방지: 이미 같은 상품이 장바구니에 담겨 있는데 또 담으면(뒤로 갔다가 실수로 같은 걸
+          // 다시 누르는 경우 등), 나중에 담긴 항목이 시작일 기본값(오늘)인 채로 "이용권 판매 등록" 시
+          // 조용히 우선 적용되면서 - 먼저 담은 항목에 공들여 설정해둔 시작일이 무시되는 사고가 날 수
+          // 있었음. 그래서 이미 담긴 상품을 또 누르면 한 번 확인하고 넘어가게 함.
+          const alreadyInCart = saleCart.some(i => i.product.id === product.id);
+          if (alreadyInCart) {
+            const ok = confirm(`"${product.name}"은(는) 이미 담겨 있어요.\n\n같은 상품을 하나 더 담으면, 나중에 담는 쪽의 시작일이 최종 적용돼요(둘 다 따로 시작일을 정확히 맞춰야 해요). 그래도 하나 더 담으시겠어요?`);
+            if (!ok) return;
+          }
           // paidAmount(오늘 실제로 받을 금액)는 기본으로 amount(정상가)와 같게 시작함 - "상세설정"에서
           // 둘을 다르게 바꾸면 그 차액이 미수금이 됨(담을 때는 항상 전액 결제로 가정)
           const price = product.price != null ? product.price : 0;
@@ -706,8 +719,31 @@
       return '기간 없음';
     }
 
+    // 같은 카테고리(예: 헬스이용권) 상품이 장바구니에 2개 이상 담겨 있으면, 회원에게는 그중 "나중에
+    // 담긴 항목"의 시작일·종료일만 최종 반영됨(위 saleCart.forEach 병합 로직 참고) - 이 사실이 화면에
+    // 안 보이면 먼저 정성껏 맞춘 시작일이 조용히 무시된 걸 나중에야 알게 되므로, 여기서 미리 알려줌
+    function renderCheckoutDupWarning() {
+      const warnBox = document.getElementById('md_checkout_dup_warning');
+      const byCategory = {};
+      saleCart.forEach(item => { (byCategory[item.product.category] = byCategory[item.product.category] || []).push(item); });
+      const dupCategories = Object.keys(byCategory).filter(cat => byCategory[cat].length > 1);
+      if (dupCategories.length === 0) {
+        warnBox.style.display = 'none';
+        warnBox.innerHTML = '';
+        return;
+      }
+      const lines = dupCategories.map(cat => {
+        const items = byCategory[cat];
+        const lastName = items[items.length - 1].product.name;
+        return `- ${CATEGORY_KOREAN_LABEL[cat] || cat}: ${items.length}개 담김 → 맨 아래 "${lastName}"의 시작일만 회원 만료일에 최종 반영돼요.`;
+      }).join('<br/>');
+      warnBox.innerHTML = `⚠️ 같은 종류의 상품이 여러 개 담겨 있어요.<br/>${lines}`;
+      warnBox.style.display = 'block';
+    }
+
     function renderCheckoutItems() {
       const box = document.getElementById('md_checkout_items');
+      renderCheckoutDupWarning();
       box.innerHTML = saleCart.map(item => {
         const paid = item.paidAmount != null ? item.paidAmount : item.amount;
         const priceHtml = paid < item.amount
