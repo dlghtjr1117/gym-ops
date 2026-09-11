@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1789010281" />
+<link rel="stylesheet" href="style.css?v=1789028341" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -305,7 +305,7 @@
 
         <div id="md_sale_checkout_view" style="display:none;">
           <button type="button" class="btn-link" id="md_checkout_back_btn" style="margin-bottom:12px;">← 다시 선택</button>
-          <p class="muted" style="margin:-4px 0 10px;">시작일을 바꾸면 종료일이 자동으로 다시 계산돼요. 가격을 바꾸려면 "상세설정"을 눌러주세요.</p>
+          <p class="muted" style="margin:-4px 0 10px;">시작일을 바꾸면 종료일이 자동으로 다시 계산돼요. 가격을 바꾸려면 "상세설정"을 눌러주세요. 아래 "판매 날짜"는 (위 항목별 시작일과 별개로) 매출로 잡히는 날짜예요 - 정산이 안 맞아서 매출 잡힌 날짜만 바꿔야 할 때, 지우고 다시 등록하지 않고 여기서 바로 바꿔서 등록하시면 돼요.</p>
           <div id="md_checkout_items" class="checkout-items"></div>
           <div class="form-grid" style="margin:14px 0 10px;">
             <div class="field"><label>판매 담당자</label><select id="md_sale_staff"></select></div>
@@ -317,6 +317,7 @@
                 <option value="kiosk">키오스크</option>
               </select>
             </div>
+            <div class="field"><label>판매 날짜</label><input type="date" id="md_sale_date" /></div>
             <div class="field"><label>메모</label><input type="text" id="md_sale_memo" placeholder="선택 입력" /></div>
           </div>
           <div id="md_sale_total" class="sale-total">합계 0원</div>
@@ -382,9 +383,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789010281"></script>
-  <script src="auth.js?v=1789010281"></script>
-  <script src="data.js?v=1789010281"></script>
+  <script src="config.js?v=1789028341"></script>
+  <script src="auth.js?v=1789028341"></script>
+  <script src="data.js?v=1789028341"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -685,6 +686,7 @@
       document.getElementById('md_errorBox').style.display = 'none';
       document.getElementById('md_sale_cart_view').style.display = 'none';
       document.getElementById('md_sale_checkout_view').style.display = 'block';
+      document.getElementById('md_sale_date').value = todayStr(); // 판매 날짜(매출로 잡히는 날짜) 기본은 오늘 - 필요하면 바꾸면 됨
       renderCheckoutItems();
     });
 
@@ -1225,6 +1227,9 @@
       const memo = document.getElementById('md_sale_memo').value.trim() || null;
       const saleStaffId = document.getElementById('md_sale_staff').value || currentUserId;
       const paymentMethod = document.getElementById('md_sale_payment').value || null;
+      // 매출로 잡히는 날짜 - 항목별 "시작일"(이용권이 언제부터 유효한지)과는 별개 값. 정산 때 매출이
+      // 잡힌 날짜만 고쳐야 하는 경우, 예전엔 등록을 통째로 지우고 다시 해야 했는데 이제 여기서 바로 지정 가능
+      const saleDateCommon = document.getElementById('md_sale_date').value || todayStr();
 
       const btn = document.getElementById('md_sellBtn');
       btn.disabled = true;
@@ -1260,7 +1265,7 @@
             category: PRODUCT_CATEGORY_TO_SALE_CATEGORY[item.product.category] || 'membership_renewal',
             product_id: item.product.id,
             amount: Number(item.paidAmount != null ? item.paidAmount : item.amount),
-            sale_date: item.startDate,
+            sale_date: saleDateCommon,
             payment_method: paymentMethod,
             memo
           }));
