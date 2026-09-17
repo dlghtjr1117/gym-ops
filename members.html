@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1789089908" />
+<link rel="stylesheet" href="style.css?v=1789607516" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -340,7 +340,7 @@
       </div>
 
       <div id="md_tab_sales" style="display:none;">
-        <p class="muted" style="margin:-4px 0 14px;">이 회원님에게 지금까지 기록된 매출 내역 전체예요. 개별 건 수정·삭제는 <a href="sales.html">매출 입력</a> 화면에서 할 수 있어요.</p>
+        <p class="muted" style="margin:-4px 0 14px;">이 회원님에게 지금까지 기록된 매출 내역 전체예요. "담당"은 여기서 바로 바꿀 수 있어요(지점장만 가능 - 대시보드 트레이너 실적에도 바로 반영돼요). 그 외 금액·항목 등을 고치거나 건을 삭제하려면 <a href="sales.html">매출 입력</a> 화면에서 할 수 있어요.</p>
         <table id="md_sales_table">
           <thead><tr><th>날짜</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
           <tbody id="md_sales_tbody"><tr><td colspan="5" class="muted" style="padding:14px;">불러오는 중...</td></tr></tbody>
@@ -387,9 +387,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789089908"></script>
-  <script src="auth.js?v=1789089908"></script>
-  <script src="data.js?v=1789089908"></script>
+  <script src="config.js?v=1789607516"></script>
+  <script src="auth.js?v=1789607516"></script>
+  <script src="data.js?v=1789607516"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -993,16 +993,25 @@
       return items;
     }
 
-    // 이용권마다 실제 "시작일" 컬럼은 따로 저장하지 않아서, 이 회원의 매출 내역 중 그 종류(만료일
-    // 컬럼 기준)로 가장 최근에 결제한 날짜를 근사한 시작일로 보여줌(대부분 결제일 = 시작일이라
-    // 오차가 거의 없음). CATEGORY_TO_MEMBER_FIELD(등록 처리 시 어느 만료일 컬럼을 갱신할지 매핑해둔
-    // 것)를 거꾸로 뒤집어서 "이 만료일 컬럼에 해당하는 매출 카테고리들"을 구함. 일치하는 매출이
-    // 없으면(예: 예전에 엑셀로 일괄 등록해서 매출 기록 자체가 없는 회원) 지어내지 않고 null을 반환함
+    // 이용권마다 실제 "시작일" 컬럼은 회원 테이블엔 따로 저장하지 않아서(과거 이력을 안 남기는 구조라),
+    // 이 회원의 매출 내역 중 그 종류(만료일 컬럼 기준)로 "가장 최근에 등록된 실제 이용권 건"의 시작일을
+    // 보여줌. sales.item_start_date(이용권이 실제로 언제부터 유효한지 - "이용권 판매(등록)"에서 항목별로
+    // 지정하는 시작일을 그대로 저장해둔 값)가 있는 매출만 우선 대상으로 삼음 - 미수금 잔금만 받은 매출
+    // (collectReceivablePayment로 생긴 건 - 새 이용 기간이 아니라 예전 계약의 잔금을 나중에 받은 것뿐이라
+    // item_start_date가 없음)은 여기서 제외해야, "잔금 받은 날"이 "이용 시작일"로 잘못 보이지 않음.
+    // item_start_date가 있는 매출이 하나도 없으면(이 칸 추가 전 예전 매출뿐인 회원) sale_date로 예전
+    // 방식 그대로 근사함(그때는 결제일=시작일로 같이 취급했어서 오차가 거의 없었음).
+    // "가장 최근"의 기준은 sale_date/시작일이 아니라 created_at(실제 등록된 시각)으로 정함 - sale_date나
+    // item_start_date는 정산 때 관리자가 나중에 자유롭게 바꿀 수 있는 값이라, 그걸로 "최신"을 정하면
+    // 오히려 엉뚱한 매출이 골라질 수 있기 때문.
     function latestSaleDateForCategory(catField, sales) {
       const saleCats = Object.keys(CATEGORY_TO_MEMBER_FIELD).filter(k => CATEGORY_TO_MEMBER_FIELD[k] === catField);
-      const dates = sales.filter(s => saleCats.includes(s.category) && s.sale_date).map(s => s.sale_date);
-      if (dates.length === 0) return null;
-      return dates.sort().slice(-1)[0]; // 'YYYY-MM-DD' 문자열이라 사전순 정렬이 곧 날짜순 정렬
+      const inCategory = sales.filter(s => saleCats.includes(s.category));
+      const withStart = inCategory.filter(s => s.item_start_date).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+      if (withStart.length > 0) return withStart[withStart.length - 1].item_start_date;
+      const legacyDates = inCategory.filter(s => s.sale_date).map(s => s.sale_date);
+      if (legacyDates.length === 0) return null;
+      return legacyDates.sort().slice(-1)[0]; // 'YYYY-MM-DD' 문자열이라 사전순 정렬이 곧 날짜순 정렬
     }
 
     // 카테고리별 리본/강조색 클래스 (유효 카드에만 적용 - buildMembershipCardHtml에서 씀)
@@ -1094,6 +1103,19 @@
       renderMemberSalesTable();
     }
 
+    // "담당" 칸: 지점장이고 담당자 목록(staffCache)을 불러온 상태면 그 자리에서 바로 바꿀 수 있는 select로,
+    // 아니면(트레이너 로그인이거나 목록을 못 불러왔으면) 예전처럼 이름 텍스트만 보여줌. 트레이너는 매출 수정
+    // 권한 자체가 RLS로 막혀 있어서(migration_43) select를 보여줘도 저장이 안 되므로 아예 텍스트로만 둠.
+    function saleStaffCellHtml(s) {
+      if (!isManagerFlag || staffCache.length === 0) {
+        return escapeHtml(s.staff ? s.staff.name : '-');
+      }
+      const options = staffCache.map(st =>
+        `<option value="${st.id}" ${st.id === s.staff_id ? 'selected' : ''}>${escapeHtml(st.name)}${st.role === 'manager' ? ' (지점장)' : ''}</option>`
+      ).join('');
+      return `<select class="sale-staff-edit-select" data-sale-id="${s.id}" style="padding:4px 6px; font-size:12.5px;">${options}</select>`;
+    }
+
     function renderMemberSalesTable() {
       const tbody = document.getElementById('md_sales_tbody');
       if (currentDetailSales.length === 0) {
@@ -1105,12 +1127,40 @@
         <tr>
           <td>${s.sale_date || '-'}</td>
           <td>${escapeHtml(saleDisplayItemWithCategory(s))}</td>
-          <td>${s.staff ? escapeHtml(s.staff.name) : '-'}</td>
+          <td>${saleStaffCellHtml(s)}</td>
           <td>${PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method || '-'}</td>
           <td style="text-align:right;">${formatWon(s.amount)}</td>
         </tr>`).join('');
       const total = currentDetailSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
       document.getElementById('md_sales_total').textContent = `합계 ${formatWon(total)} · 총 ${currentDetailSales.length}건`;
+      tbody.querySelectorAll('.sale-staff-edit-select').forEach(sel => {
+        sel.addEventListener('change', () => onSaleStaffChanged(sel));
+      });
+    }
+
+    // 판매내역 표에서 담당자를 바로 바꾸면 - sales.staff_id를 곧장 수정함(sales.html의 "매출 수정"과 같은
+    // updateSale API). 이 테이블도, 대시보드의 트레이너 성과 지표·PT 매출도 전부 같은 sales 테이블을
+    // 그대로 조회해서 보여주는 것뿐이라, 여기서 담당자를 바꾸면 다음에 대시보드를 열 때 자동으로 반영됨
+    // (따로 동기화해줄 다른 곳이 없음 - pt_leads처럼 별도 테이블을 쓰는 화면이 아니라서).
+    async function onSaleStaffChanged(selectEl) {
+      const saleId = selectEl.dataset.saleId;
+      const sale = currentDetailSales.find(s => s.id === saleId);
+      if (!sale) return;
+      const prevStaffId = sale.staff_id;
+      const newStaffId = selectEl.value;
+      if (newStaffId === prevStaffId) return;
+      selectEl.disabled = true;
+      try {
+        await updateSale(saleId, { staff_id: newStaffId });
+        sale.staff_id = newStaffId;
+        const newStaff = staffCache.find(st => st.id === newStaffId);
+        sale.staff = newStaff ? { name: newStaff.name } : null;
+      } catch (err) {
+        alert(`담당자 변경에 실패했습니다: ${err.message}`);
+        selectEl.value = prevStaffId; // 실패하면 원래 담당자로 되돌림
+      } finally {
+        selectEl.disabled = false;
+      }
     }
 
     function openMemberDetail(memberId) {
@@ -1302,6 +1352,7 @@
             product_id: item.product.id,
             amount: Number(item.paidAmount != null ? item.paidAmount : item.amount),
             sale_date: saleDateCommon,
+            item_start_date: item.startDate, // "이용권" 탭에 보여줄 실제 이용 시작일 - 매출일(판매 날짜)과는 별개로 정확히 저장해둠
             payment_method: paymentMethod,
             memo
           }));
@@ -1364,6 +1415,7 @@
     });
 
     let trainersCache = [];
+    let staffCache = []; // "판매내역" 탭에서 담당자를 바로 바꿀 수 있게 하는 select용 - 트레이너뿐 아니라 지점장 본인도 담당자가 될 수 있어서 fetchStaff()(전 직원)로 채움. 지점장만 불러옴(트레이너는 매출 수정 권한이 RLS로 막혀 있어서 - migration_43 참고)
     let productsByCategory = {};
 
     // 카테고리별 상품 select 채우기 + 고르면 종목/만료일/PT횟수를 자동으로 계산해서 채워 넣음
@@ -1513,6 +1565,8 @@
               sel.appendChild(opt);
             });
           }).catch(() => { /* 트레이너 목록 못 불러와도 회원 등록 자체는 진행 가능 */ });
+          // "판매내역" 탭의 담당자 바로 수정 기능용 - 전 직원(지점장 포함) 목록을 미리 받아둠
+          fetchStaff().then(list => { staffCache = list; }).catch(() => { /* 못 불러오면 담당자 칸은 그냥 텍스트로만 보임(수정 불가) */ });
         } else {
           // 트레이너는 담당 트레이너 목록을 조회할 권한이 없으므로(RLS상 본인만 조회 가능),
           // "담당 트레이너" 칸은 본인으로 고정해서 보여줌
@@ -2109,6 +2163,8 @@
           const amount = amountVal || 0;
           if (amount === 0) { if (product) freeItemNames.push(product.name); return; } // 0원이면 매출로 안 남김(회원 정보 반영은 위에서 이미 됨)
           const paid = paidAmountFor(category);
+          const startInputId = START_INPUT_IDS[category];
+          const itemStartDate = startInputId ? (val(startInputId) || todayStr()) : todayStr();
           if (paid > 0) {
             salesPayload.push({
               member_id: newMember.id,
@@ -2117,6 +2173,7 @@
               product_id: product ? product.id : null, // 직접 입력이면 연결된 상품 없이 금액만 기록
               amount: paid, // 오늘 실제로 받은 금액만 매출로 기록 (미수금 남은 만큼은 아래에서 receivables로 따로 기록)
               sale_date: saleDateCommon,
+              item_start_date: itemStartDate, // "이용권" 탭에 보여줄 실제 이용 시작일 - 판매 날짜와는 별개
               sale_time: saleTime,
               payment_method: salePayment,
               memo: product ? '회원 등록과 함께 자동 기록' : '회원 등록과 함께 자동 기록 (직접 입력·가격 변동)'
