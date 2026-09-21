@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - OT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789965872" />
+<link rel="stylesheet" href="style.css?v=1789967310" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
   .sheet-input {
@@ -62,6 +62,37 @@
   @media (max-width: 900px) { .ot-detail-stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
   .ot-stat-group-title { font-size: 12px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: .02em; margin: 22px 0 10px; }
   .ot-stat-group-title:first-child { margin-top: 0; }
+
+  /* "트레이너별 OT 성과 순위" 섹션 (2026-09-21 추가) - pt.html "트레이너 매출 순위"(lb-row)와
+     같은 결로 맞추되, 금액 막대 1개 대신 성공/실패/진행중 3색 세그먼트 막대를 씀 */
+  .otp-row {
+    display: flex; align-items: center; gap: 14px; padding: 12px 6px; border-radius: 12px;
+    cursor: pointer; border: none; background: none; width: 100%; text-align: left; box-sizing: border-box;
+  }
+  .otp-row:hover, .otp-row:focus-visible { background: var(--slate-50); outline: none; }
+  .otp-rank { width: 30px; flex-shrink: 0; text-align: center; font-size: 15px; font-weight: 800; color: var(--slate-400); }
+  .otp-rank.is-top { font-size: 20px; }
+  .otp-avatar {
+    width: 34px; height: 34px; border-radius: 999px; background: var(--indigo-600); color: var(--white);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12.5px; flex-shrink: 0;
+  }
+  .otp-main { flex: 1 1 auto; min-width: 0; }
+  .otp-name-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .otp-name { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .otp-rate { font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+  .otp-bar-track {
+    display: flex; position: relative; height: 8px; border-radius: 99px; background: var(--slate-200);
+    overflow: hidden; gap: 2px;
+  }
+  .otp-bar-seg { display: block; height: 100%; transition: width 0.4s ease; }
+  .otp-seg-success { background: #16a34a; }
+  .otp-seg-fail { background: #dc2626; }
+  .otp-seg-pending { background: var(--slate-300); }
+  .otp-subline { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 11.5px; color: var(--slate-500); flex-wrap: wrap; }
+  .otp-subline .dot { width: 7px; height: 7px; border-radius: 99px; display: inline-block; margin-right: 4px; }
+  .otp-chevron { color: var(--slate-300); font-size: 16px; flex-shrink: 0; }
+  .otp-tabs { display: flex; align-items: center; gap: 2px; background: var(--slate-50); border-radius: 12px; padding: 4px; }
+  .otp-tabs button { border: none; }
 </style>
 </head>
 <body>
@@ -129,6 +160,29 @@
         <div class="hero-value"><span id="ovNoResponse">0</span><span class="hero-unit">건</span></div>
         <div class="hero-sub" id="ovNoResponseSub">-</div>
       </div>
+    </div>
+
+    <!-- 트레이너별 OT 성과 순위(리더보드) - 지점장 화면 전용 (2026-09-21 추가).
+         pt.html "트레이너 매출 순위"와 달리 이 순위는 개별 회원 정보가 아니라 건수 집계라
+         공개 범위를 넓힐 이유가 적어서, 기존 카드 그리드와 같은 자리(지점장 목록 화면)에만 둠.
+         트레이너 본인 화면에는 노출하지 않음(본인 상세는 detailView에서 이미 확인 가능). -->
+    <div class="hero-card-secondary accent-blue" id="otPerfPanel" style="display:none; margin-top:18px; padding:18px 22px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:14px; margin:0;">📊 트레이너별 OT 성과 순위 <span class="muted" style="font-weight:400;">(이번 달, 성공률 기준)</span></h3>
+        <div class="otp-tabs" id="otpMetricTabs">
+          <button type="button" class="filter-tab active" data-metric="combined">통합(OT1+OT2)</button>
+          <button type="button" class="filter-tab" data-metric="ot1">OT1만</button>
+          <button type="button" class="filter-tab" data-metric="ot2">OT2만</button>
+        </div>
+      </div>
+      <p class="muted" style="margin:0 0 10px;">막대를 누르면 그 선생님의 OT 상세 현황으로 바로 이동해요.</p>
+      <div class="ot-legend" style="margin-bottom:10px; padding-bottom:12px; border-bottom:1px solid var(--slate-100);">
+        <span><span class="dot" style="background:#16a34a;"></span>성공</span>
+        <span><span class="dot" style="background:#dc2626;"></span>실패(미스)</span>
+        <span><span class="dot" style="background:var(--slate-300);"></span>진행중(예정 · 이월)</span>
+      </div>
+      <div id="otpBars"></div>
+      <div id="otpEmpty" class="muted" style="display:none; padding:10px 2px;">아직 이번 달 OT 기록이 없어요.</div>
     </div>
 
     <!-- ==== 지점장: 카드형 / 표로 보기 목록 화면 ==== -->
@@ -276,9 +330,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789965872"></script>
-  <script src="auth.js?v=1789965872"></script>
-  <script src="data.js?v=1789965872"></script>
+  <script src="config.js?v=1789967310"></script>
+  <script src="auth.js?v=1789967310"></script>
+  <script src="data.js?v=1789967310"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -293,6 +347,8 @@
     let monthAnchor = new Date();
     let selectedTrainerId = null; // null = 목록 화면(지점장 전용), 값 있으면 그 트레이너 상세
     let viewMode = 'card';        // 'card' | 'table' (목록 화면에서만 씀)
+    let otPerfCache = [];         // "트레이너별 OT 성과 순위" - migration_51 RPC 결과 캐시
+    let otpMetric = 'combined';   // 'combined' | 'ot1' | 'ot2' (순위표 상단 탭)
 
     const OT_STATUS_OPTIONS = [
       { value: 'scheduled', label: '예정' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }, { value: 'done', label: '완료' }
@@ -402,6 +458,85 @@
       return '#dc2626';
     }
 
+    // ---- 트레이너별 OT 성과 순위(리더보드) - migration_51 ----
+    // (실제 fetch는 reloadCoreData()에서 다른 핵심 데이터와 함께 일괄 처리함)
+    // otpMetric에 따라 성공/실패/진행중/합계를 뽑아냄 ('combined'은 OT1+OT2를 더한 값)
+    function otpMetricValues(row) {
+      if (otpMetric === 'ot1') {
+        return { total: row.ot1_total, success: row.ot1_success, fail: row.ot1_fail, pending: row.ot1_pending };
+      }
+      if (otpMetric === 'ot2') {
+        return { total: row.ot2_total, success: row.ot2_success, fail: row.ot2_fail, pending: row.ot2_pending };
+      }
+      return {
+        total: row.ot1_total + row.ot2_total,
+        success: row.ot1_success + row.ot2_success,
+        fail: row.ot1_fail + row.ot2_fail,
+        pending: row.ot1_pending + row.ot2_pending
+      };
+    }
+    function renderOtPerformanceLeaderboard() {
+      const container = document.getElementById('otpBars');
+      const emptyEl = document.getElementById('otpEmpty');
+      const rows = otPerfCache
+        .map(r => ({ r, v: otpMetricValues(r) }))
+        .filter(x => x.v.total > 0)
+        .map(x => ({ ...x, rate: Math.round((x.v.success / x.v.total) * 100) }))
+        .sort((a, b) => b.rate - a.rate || b.v.total - a.v.total);
+
+      if (rows.length === 0) {
+        container.innerHTML = '';
+        emptyEl.style.display = '';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      container.innerHTML = rows.map((x, i) => {
+        const { r, v, rate } = x;
+        const info = rateInfo(rate);
+        const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}위`;
+        const successPct = (v.success / v.total) * 100;
+        const failPct = (v.fail / v.total) * 100;
+        const pendingPct = (v.pending / v.total) * 100;
+        return `
+        <button type="button" class="otp-row" data-trainer-id="${r.trainer_id}">
+          <span class="otp-rank ${i < 3 ? 'is-top' : ''}">${rankLabel}</span>
+          <span class="otp-avatar">${escapeHtml(initials(r.trainer_name))}</span>
+          <span class="otp-main">
+            <span class="otp-name-row">
+              <span class="otp-name">${escapeHtml(r.trainer_name)}</span>
+              <span class="otp-rate" style="color:${rateColorHex(rate)};">${rate}% <span class="badge ${info.cls}" style="margin-left:4px;">${rate >= 70 ? '우수' : rate >= 40 ? '주의' : '위험'}</span></span>
+            </span>
+            <span class="otp-bar-track">
+              <span class="otp-bar-seg otp-seg-success" style="width:${successPct}%;"></span>
+              <span class="otp-bar-seg otp-seg-fail" style="width:${failPct}%;"></span>
+              <span class="otp-bar-seg otp-seg-pending" style="width:${pendingPct}%;"></span>
+            </span>
+            <span class="otp-subline">
+              <span>총 ${v.total}건</span>
+              <span><span class="dot" style="background:#16a34a;"></span>성공 ${v.success}</span>
+              <span><span class="dot" style="background:#dc2626;"></span>실패 ${v.fail}</span>
+              <span><span class="dot" style="background:var(--slate-300);"></span>진행중 ${v.pending}</span>
+            </span>
+          </span>
+          <span class="otp-chevron">›</span>
+        </button>`;
+      }).join('');
+      container.querySelectorAll('.otp-row').forEach(row => {
+        row.addEventListener('click', () => {
+          selectedTrainerId = row.dataset.trainerId;
+          render();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+    }
+    document.getElementById('otpMetricTabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-metric]');
+      if (!btn) return;
+      otpMetric = btn.dataset.metric;
+      document.querySelectorAll('#otpMetricTabs button').forEach(b => b.classList.toggle('active', b === btn));
+      renderOtPerformanceLeaderboard();
+    });
+
     // ---- 렌더 ----
     function render() {
       const { startStr, endStr, monthStr } = getMonthRange();
@@ -423,11 +558,14 @@
       if (isManagerFlag && selectedTrainerId === null) {
         document.getElementById('listView').style.display = '';
         document.getElementById('detailView').style.display = 'none';
+        document.getElementById('otPerfPanel').style.display = '';
         document.getElementById('pageSubText').textContent = '트레이너별 OT 진행 인원 · 성공률 · 미응답 현황을 한눈에 확인해요';
         renderListView(startStr, endStr, monthStr);
+        renderOtPerformanceLeaderboard();
       } else {
         document.getElementById('listView').style.display = 'none';
         document.getElementById('detailView').style.display = '';
+        document.getElementById('otPerfPanel').style.display = 'none';
         const tid = isManagerFlag ? selectedTrainerId : currentUserId;
         document.getElementById('backToListBtn').style.display = isManagerFlag ? '' : 'none';
         document.getElementById('detailOverallGroup').style.display = isManagerFlag ? '' : 'none';
@@ -813,9 +951,15 @@
 
     // ---- 로드 ----
     async function reloadCoreData() {
-      const [leadsResult, noResponseResult] = await Promise.allSettled([fetchPtLeads(), fetchPtOtNoResponse()]);
+      const { startStr, endStr } = getMonthRange();
+      const tasks = [fetchPtLeads(), fetchPtOtNoResponse()];
+      // "트레이너별 OT 성과 순위"는 지점장 화면에만 노출되므로, 트레이너 계정에서는 불필요한
+      // RPC 호출을 만들지 않도록 지점장일 때만 같이 불러옴
+      if (isManagerFlag) tasks.push(fetchOtPerformanceLeaderboard(startStr, endStr));
+      const [leadsResult, noResponseResult, otPerfResult] = await Promise.allSettled(tasks);
       leadsAllCache = leadsResult.status === 'fulfilled' ? leadsResult.value : [];
       noResponseAllCache = noResponseResult.status === 'fulfilled' ? noResponseResult.value : [];
+      if (isManagerFlag) otPerfCache = (otPerfResult && otPerfResult.status === 'fulfilled') ? otPerfResult.value : [];
     }
     async function reloadAll() {
       await reloadCoreData();

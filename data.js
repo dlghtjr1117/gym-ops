@@ -1267,6 +1267,16 @@ async function fetchPtTrainerMonthRank(monthStartStr, monthEndStr) {
   if (!res.ok) await throwApiError(res, '트레이너 순위 정보를 불러오지 못했습니다.');
   return res.json();
 }
+// ot.html "트레이너별 OT 성과 순위" - migration_51 (2026-09-21)
+async function fetchOtPerformanceLeaderboard(monthStartStr, monthEndStr) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_ot_performance_leaderboard`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_month_start: monthStartStr, p_month_end: monthEndStr })
+  });
+  if (!res.ok) await throwApiError(res, 'OT 성과 순위를 불러오지 못했습니다.');
+  return res.json();
+}
 
 // center_targets.month 컬럼은 date 타입이라 항상 "그 달 1일" 전체 날짜(예: 2026-09-01)로 넣어야 함.
 // 호출하는 쪽에서는 다른 월 관련 함수들과 통일해서 'YYYY-MM' 형태(예: 2026-09)로 넘기므로, 여기서
