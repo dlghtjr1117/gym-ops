@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1790003404" />
+<link rel="stylesheet" href="style.css?v=1790004248" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -36,6 +36,12 @@
   .toggle-ox.is-o { background: #dcfce7; border-color: #86efac; color: #16a34a; }
   .toggle-ox.is-x { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
   .week-band { font-size: 11px; font-weight: 700; color: var(--slate-500); white-space: nowrap; }
+  /* 표 맨 아래 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 (신규상담/OT 관리 화면과 같은 관례) */
+  .add-row-trigger td {
+    cursor: pointer; color: var(--indigo-600); font-weight: 700; text-align: center;
+    padding: 11px 12px; border-top: 1px dashed var(--slate-300);
+  }
+  .add-row-trigger:hover td { background: var(--slate-50); }
   .sheet-table td, .sheet-table th { padding: 6px 8px; }
   .mini-stat-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
   .mini-stat-box .mini-title { font-size: 12px; font-weight: 700; color: var(--slate-500); margin-bottom: 8px; }
@@ -276,8 +282,8 @@
         <div style="overflow-x:auto; margin-top:14px;">
           <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:960px;">
             <thead><tr>
-              <th style="width:7%;">주차</th><th style="width:14%;">날짜</th><th style="width:9%;">유형</th><th style="width:9%;">이름</th>
-              <th style="width:11%;">금액</th><th style="width:7%;">횟수</th><th style="width:8%;">확률</th><th style="width:29%;">특이사항 · 메모</th><th style="width:6%;"></th>
+              <th style="width:76px; white-space:nowrap;">주차</th><th style="width:132px;">날짜</th><th style="width:92px;">유형</th><th style="width:92px;">이름</th>
+              <th style="width:112px;">금액</th><th style="width:64px;">횟수</th><th style="width:84px;">확률</th><th>특이사항 · 메모</th><th style="width:54px;"></th>
             </tr></thead>
             <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
             <tfoot><tr><td colspan="4" style="text-align:right; font-weight:700;">합계</td><td id="weeklyTotal" style="font-weight:700;">0원</td><td colspan="4"></td></tr></tfoot>
@@ -305,54 +311,6 @@
       </div>
     </div>
 
-  </div>
-
-  <!-- 상담/매출 기록 추가 모달 -->
-  <div class="modal-overlay" id="addLeadOverlay" style="display:none;">
-    <div class="modal-box" style="max-width:640px;">
-      <div class="modal-header">
-        <div><h3>상담 · 매출 기록 추가</h3><p class="muted" style="margin:0;" id="addLeadTrainerHint"></p></div>
-        <button type="button" class="modal-close" id="closeAddLeadBtn">&times;</button>
-      </div>
-      <div id="addLeadErrorBox" class="error-text"></div>
-      <form id="addLeadForm">
-        <div class="form-grid">
-          <div class="field"><label>이름 *</label><input type="text" id="l_name" required /></div>
-          <div class="field"><label>전화번호</label><input type="text" id="l_phone" placeholder="선택 입력" /></div>
-          <div class="field"><label>주차</label>
-            <select id="l_week">
-              <option value="1">1주차</option><option value="2">2주차</option><option value="3">3주차</option>
-              <option value="4">4주차</option><option value="5">5주차</option>
-            </select>
-          </div>
-          <div class="field"><label>유형</label>
-            <select id="l_source">
-              <option value="">선택 안 함</option>
-              <option value="재등록">재등록</option><option value="오티">오티</option><option value="워크인">워크인</option><option value="무료체험">무료체험</option>
-              <option value="지인소개">지인소개</option><option value="필드">필드</option><option value="당근">당근</option><option value="블로그">블로그</option>
-              <option value="미납금">미납금</option>
-            </select>
-          </div>
-          <div class="field"><label>상담일(날짜)</label><input type="date" id="l_contact_date" required /></div>
-          <div class="field"><label>금액(원)</label><input type="text" inputmode="numeric" class="money-input" id="l_expected_amount" placeholder="예: 900,000" /></div>
-          <div class="field"><label>횟수</label><input type="number" id="l_sessions" min="0" placeholder="예: 10" /></div>
-          <div class="field"><label>확률</label>
-            <select id="l_probability">
-              <option value="p25">25%</option>
-              <option value="p50" selected>50%</option>
-              <option value="p75">75%</option>
-              <option value="registered">등록</option>
-              <option value="rolled_over">이월</option>
-              <option value="missed">미스</option>
-            </select>
-          </div>
-          <div class="field"><label>OT1 예정일 (해당 시 OT관리에도 표시됨)</label><input type="date" id="l_ot_date" /></div>
-          <div class="field"><label>OT2 예정일 (2차 팔로우업, 선택)</label><input type="date" id="l_ot2_date" /></div>
-        </div>
-        <div class="field"><label>특이사항 · 메모</label><input type="text" id="l_memo" placeholder="선택 입력" /></div>
-        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
-      </form>
-    </div>
   </div>
 
   <!-- PT 회원 관리 시트에 회원 추가 모달 ("상담/매출 기록 추가"처럼 바로 입력해서 새로 만드는 방식) -->
@@ -479,15 +437,12 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790003404"></script>
-  <script src="auth.js?v=1790003404"></script>
-  <script src="data.js?v=1790003404"></script>
+  <script src="config.js?v=1790004248"></script>
+  <script src="auth.js?v=1790004248"></script>
+  <script src="data.js?v=1790004248"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
-
-    // 리드(상담) 전화번호 입력칸도 타이핑하는 대로 자동으로 하이픈이 붙게 함
-    attachPhoneAutoFormat(document.getElementById('l_phone'));
 
     let currentUserId = null;
     let isManagerFlag = false;
@@ -1248,8 +1203,10 @@
           return (a.contact_date < b.contact_date ? -1 : a.contact_date > b.contact_date ? 1 : 0);
         });
 
+      const addRowHtml = '<tr class="add-row-trigger" onclick="handleQuickAddLead()"><td colspan="9">+ 추가하기</td></tr>';
+
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ 상담/매출 기록 추가"로 남겨보세요.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ 추가하기"로 남겨보세요.</td></tr>' + addRowHtml;
         document.getElementById('weeklyTotal').textContent = '0원';
         return;
       }
@@ -1271,7 +1228,7 @@
             <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleLeadDelete('${l.id}')">삭제</button></td>
           </tr>`;
       });
-      tbody.innerHTML = html;
+      tbody.innerHTML = html + addRowHtml;
       document.getElementById('weeklyTotal').textContent = formatWon(total);
     }
 
@@ -1569,58 +1526,44 @@
       } catch (err) { alert(err.message); }
     }
 
-    // ---- 상담/매출 기록 추가 ----
-    function openAddLeadModal() {
-      document.getElementById('addLeadForm').reset();
-      document.getElementById('addLeadErrorBox').style.display = 'none';
-      document.getElementById('l_contact_date').value = formatDateStr(new Date());
-      document.getElementById('l_week').value = String(weekOfMonth(formatDateStr(new Date())));
-      document.getElementById('l_probability').value = 'p50';
-      document.getElementById('addLeadTrainerHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 기록으로 등록돼요.`;
-      document.getElementById('addLeadOverlay').style.display = 'flex';
-    }
-    function closeAddLeadModal() { document.getElementById('addLeadOverlay').style.display = 'none'; }
-    document.getElementById('openAddLeadBtn').addEventListener('click', openAddLeadModal);
-    document.getElementById('closeAddLeadBtn').addEventListener('click', closeAddLeadModal);
-    document.getElementById('addLeadOverlay').addEventListener('click', (e) => { if (e.target.id === 'addLeadOverlay') closeAddLeadModal(); });
-    // 상담일을 바꾸면 주차도 자동으로 맞춰서 제안 (직접 눌러서 바꿀 수도 있음)
-    document.getElementById('l_contact_date').addEventListener('change', (e) => {
-      if (e.target.value) document.getElementById('l_week').value = String(weekOfMonth(e.target.value));
-    });
-
-    document.getElementById('addLeadForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errorBox = document.getElementById('addLeadErrorBox');
-      errorBox.style.display = 'none';
-      const probVal = document.getElementById('l_probability').value;
-      const stagePatch = probVal.startsWith('p') ? { stage: 'in_progress', probability: Number(probVal.slice(1)) } : { stage: probVal, probability: null };
-      const otDate = document.getElementById('l_ot_date').value || null;
-      const ot2Date = document.getElementById('l_ot2_date').value || null;
+    // ---- 상담/매출 기록 추가 (모달 없이 바로 새 줄 생성 - 신규상담/OT 관리 화면과 같은 관례) ----
+    let quickAddLeadInProgress = false;
+    async function handleQuickAddLead() {
+      if (quickAddLeadInProgress) return;
+      quickAddLeadInProgress = true;
       try {
-        await addPtLead({
+        const { startStr, endStr } = getMonthRange();
+        const today = formatDateStr(new Date());
+        const defaultDate = (today >= startStr && today < endStr) ? today : startStr;
+        const created = await addPtLead({
           trainer_id: selectedTrainerId,
-          name: document.getElementById('l_name').value.trim(),
-          phone: document.getElementById('l_phone').value.trim() || null,
-          source: document.getElementById('l_source').value || null,
-          week_no: Number(document.getElementById('l_week').value) || null,
-          contact_date: document.getElementById('l_contact_date').value || formatDateStr(new Date()),
-          expected_amount: moneyInputValue('l_expected_amount'),
-          sessions: document.getElementById('l_sessions').value ? Number(document.getElementById('l_sessions').value) : null,
-          ot_date: otDate,
-          ot_status: otDate ? 'scheduled' : null,
-          ot2_date: ot2Date,
-          ot2_status: ot2Date ? 'scheduled' : null,
-          memo: document.getElementById('l_memo').value.trim() || null,
-          ...stagePatch
+          name: '새 상담',
+          phone: null,
+          source: null,
+          week_no: weekOfMonth(defaultDate),
+          contact_date: defaultDate,
+          expected_amount: null,
+          sessions: null,
+          ot_date: null,
+          ot_status: null,
+          ot2_date: null,
+          ot2_status: null,
+          memo: null,
+          stage: 'in_progress',
+          probability: 50
         });
-        closeAddLeadModal();
+        const rec = Array.isArray(created) ? created[0] : created;
         await reloadLeadsOnly();
-        showToast('기록이 등록되었습니다.');
+        showToast('기록이 추가되었습니다.');
+        const nameInput = document.querySelector(`#weeklyTable input[data-lead-id="${rec.id}"][onchange="handleLeadFieldSave(this,'name',false)"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
       } catch (err) {
-        errorBox.textContent = err.message;
-        errorBox.style.display = 'block';
+        alert(err.message);
+      } finally {
+        quickAddLeadInProgress = false;
       }
-    });
+    }
+    document.getElementById('openAddLeadBtn').addEventListener('click', handleQuickAddLead);
 
     // ---- 로드 ----
     async function reloadLeadsOnly() {
