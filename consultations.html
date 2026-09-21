@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 신규상담 · 워크인 관리</title>
-<link rel="stylesheet" href="style.css?v=1790002014" />
+<link rel="stylesheet" href="style.css?v=1790002698" />
 <style>
   /* 이 페이지 전용 - 특이사항(메모)/성함/전화번호 칸: 엑셀 시트처럼 바로 타이핑해서 저장 */
   .sheet-input {
@@ -15,8 +15,12 @@
   .sheet-input:hover { border-color: var(--slate-300); }
   .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
   .interest-check { width: 17px; height: 17px; cursor: pointer; }
-  .checkbox-row { display: flex; align-items: center; gap: 18px; }
-  .checkbox-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; margin: 0; white-space: nowrap; }
+  /* 표 맨 아래 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 */
+  .add-row-trigger td {
+    cursor: pointer; color: var(--indigo-600); font-weight: 700; text-align: center;
+    padding: 11px 12px; border-top: 1px dashed var(--slate-300);
+  }
+  .add-row-trigger:hover td { background: var(--slate-50); }
 </style>
 </head>
 <body>
@@ -110,50 +114,9 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="addConsultOverlay" style="display:none;">
-    <div class="modal-box" style="max-width:560px;">
-      <div class="modal-header">
-        <div><h3>상담 · 워크인 기록 추가</h3><p class="muted" style="margin:0;">전화 상담 또는 워크인으로 들어온 신규 문의를 등록해요.</p></div>
-        <button type="button" class="modal-close" id="closeAddConsultBtn">&times;</button>
-      </div>
-      <div id="addConsultErrorBox" class="error-text"></div>
-      <form id="addConsultForm">
-        <div class="form-grid">
-          <div class="field"><label>날짜 *</label><input type="date" id="wc_date" required /></div>
-          <div class="field"><label>성함 *</label><input type="text" id="wc_name" required /></div>
-        </div>
-        <div class="form-grid">
-          <div class="field"><label>전화번호</label><input type="text" id="wc_phone" placeholder="010-0000-0000" /></div>
-          <div class="field"><label>성별</label>
-            <select id="wc_gender">
-              <option value="">선택 안 함</option>
-              <option value="male">남</option>
-              <option value="female">여</option>
-            </select>
-          </div>
-        </div>
-        <div class="field"><label>유입경로</label>
-          <select id="wc_channel">
-            <option value="">선택 안 함</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>관심 분야</label>
-          <div class="checkbox-row">
-            <label><input type="checkbox" id="wc_interest_gym" class="interest-check" /> 헬스</label>
-            <label><input type="checkbox" id="wc_interest_pt" class="interest-check" /> PT</label>
-            <label><input type="checkbox" id="wc_interest_group_pt" class="interest-check" /> 그룹PT</label>
-          </div>
-        </div>
-        <div class="field"><label>특이사항</label><input type="text" id="wc_memo" placeholder="선택 입력" /></div>
-        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
-      </form>
-    </div>
-  </div>
-
-  <script src="config.js?v=1790002014"></script>
-  <script src="auth.js?v=1790002014"></script>
-  <script src="data.js?v=1790002014"></script>
+  <script src="config.js?v=1790002698"></script>
+  <script src="auth.js?v=1790002698"></script>
+  <script src="data.js?v=1790002698"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -187,10 +150,6 @@
     const STATUS_LABEL = {};
     const STATUS_BADGE = {};
     STATUS_OPTIONS.forEach(o => { STATUS_LABEL[o.value] = o.label; STATUS_BADGE[o.value] = o.badge; });
-
-    // 추가 모달의 유입경로 select 옵션을 채워둠 (엑셀 시트 칸의 select와 같은 목록)
-    document.getElementById('wc_channel').insertAdjacentHTML('beforeend',
-      CHANNEL_OPTIONS.map(o => `<option value="${o.value}">${o.label}</option>`).join(''));
 
     function getMonthRange() {
       const start = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
@@ -356,6 +315,13 @@
       });
     }
 
+    // 표 맨 아래에 붙는 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 (페이지네이션과
+    // 무관하게 항상 마지막에 붙여서, 지금 보고 있는 페이지 바로 아래에서 바로 추가할 수 있게 함)
+    const ADD_ROW_HTML = `
+        <tr class="add-row-trigger" onclick="handleQuickAddConsult()">
+          <td colspan="11">+ 추가하기</td>
+        </tr>`;
+
     function renderConsultTable() {
       const tbody = document.querySelector('#consultTable tbody');
       const paginationEl = document.getElementById('consultPagination');
@@ -364,7 +330,7 @@
         : consultAllCache.filter(c => c.status === activeStatusFilter);
 
       if (allItems.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="muted" style="padding:16px;">해당하는 상담 기록이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="muted" style="padding:16px;">해당하는 상담 기록이 없습니다.</td></tr>' + ADD_ROW_HTML;
         paginationEl.innerHTML = '';
         return;
       }
@@ -397,7 +363,7 @@
           <td>${renderStatusSelect(c)}</td>
           <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteConsult('${c.id}')">삭제</button></td>
         </tr>
-      `).join('');
+      `).join('') + ADD_ROW_HTML;
     }
 
     function renderHeroStats() {
@@ -443,41 +409,53 @@
       }
     }
 
-    function openAddConsultModal() {
-      document.getElementById('addConsultForm').reset();
-      document.getElementById('addConsultErrorBox').style.display = 'none';
-      document.getElementById('wc_date').value = formatDateStr(new Date());
-      document.getElementById('addConsultOverlay').style.display = 'flex';
-    }
-    function closeAddConsultModal() { document.getElementById('addConsultOverlay').style.display = 'none'; }
-    document.getElementById('openAddConsultBtn').addEventListener('click', openAddConsultModal);
-    document.getElementById('closeAddConsultBtn').addEventListener('click', closeAddConsultModal);
-    document.getElementById('addConsultOverlay').addEventListener('click', (e) => { if (e.target.id === 'addConsultOverlay') closeAddConsultModal(); });
-    document.getElementById('addConsultForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errorBox = document.getElementById('addConsultErrorBox');
-      errorBox.style.display = 'none';
+    // "+ 상담 기록 추가"(상단 버튼)나 표 맨 아래 "+ 추가하기" 줄, 둘 중 아무거나 눌러도 모달 없이
+    // 바로 빈 줄(이름은 "새 상담"으로 임시로 채워서 저장 - DB에서 이름이 필수값이라 완전히 빈 채로는
+    // 저장이 안 돼서)을 표에 추가하고, 그 줄의 성함 칸에 바로 커서를 놓고 전체 선택해줘서 이어서
+    // 타이핑하면 바로 덮어써짐 ("모달 뜨는 게 불편하다"는 피드백으로 인라인 방식으로 바꿈 -
+    // OT/PT 관리의 모달 방식과는 다르게 이 화면만 이렇게 처리함)
+    let quickAddInProgress = false; // 두 트리거를 빠르게 연타해도 중복으로 추가되지 않게 막음
+    async function handleQuickAddConsult() {
+      if (quickAddInProgress) return;
+      quickAddInProgress = true;
+      const btn = document.getElementById('openAddConsultBtn');
+      btn.disabled = true;
       try {
-        await addWalkinConsultation({
-          consult_date: document.getElementById('wc_date').value,
-          name: document.getElementById('wc_name').value.trim(),
-          phone: document.getElementById('wc_phone').value.trim() || null,
-          gender: document.getElementById('wc_gender').value || null,
-          channel: document.getElementById('wc_channel').value || null,
-          interest_gym: document.getElementById('wc_interest_gym').checked,
-          interest_pt: document.getElementById('wc_interest_pt').checked,
-          interest_group_pt: document.getElementById('wc_interest_group_pt').checked,
-          memo: document.getElementById('wc_memo').value.trim() || null,
+        const { startStr, endStr } = getMonthRange();
+        const today = formatDateStr(new Date());
+        // 지금 보고 있는 달이 실제 이번 달이면 오늘 날짜로, 과거/미래 달을 보고 있으면 그 달 1일로 -
+        // 그래야 새로 추가한 줄이 지금 보고 있는 목록에 바로 나타남
+        const defaultDate = (today >= startStr && today < endStr) ? today : startStr;
+        const created = await addWalkinConsultation({
+          consult_date: defaultDate,
+          name: '새 상담',
+          phone: null,
+          gender: null,
+          channel: null,
+          interest_gym: false,
+          interest_pt: false,
+          interest_group_pt: false,
+          memo: null,
+          status: 'considering',
           created_by: currentUserId
         });
-        closeAddConsultModal();
-        await reloadAll();
-        showToast('상담 기록이 추가되었습니다.');
+        const rec = Array.isArray(created) ? created[0] : created;
+        consultAllCache.unshift(rec);
+        activeStatusFilter = 'all'; // 다른 상태 탭을 보고 있어서 방금 추가한 줄이 안 보이는 일 없게
+        consultPage = 1;
+        renderStatusTabs();
+        renderConsultTable();
+        renderHeroStats();
+        const nameInput = document.querySelector(`input[data-id="${rec.id}"][onchange="handleNameSave(this)"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
       } catch (err) {
-        errorBox.textContent = err.message;
-        errorBox.style.display = 'block';
+        alert(err.message);
+      } finally {
+        quickAddInProgress = false;
+        btn.disabled = false;
       }
-    });
+    }
+    document.getElementById('openAddConsultBtn').addEventListener('click', handleQuickAddConsult);
 
     let currentUserId = null;
     (async () => {
