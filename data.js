@@ -1618,6 +1618,44 @@ async function deletePtOtNoResponse(id) {
   if (!res.ok) await throwApiError(res, 'OT 미응답 기록 삭제에 실패했습니다.');
 }
 
+// ---- 신규상담 · 워크인 관리 (walkin_consultations) ----
+async function fetchWalkinConsultations() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/walkin_consultations?select=*&order=consult_date.desc,created_at.desc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '신규상담 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addWalkinConsultation(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/walkin_consultations`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '신규상담 기록 추가에 실패했습니다.');
+  return res.json();
+}
+
+async function updateWalkinConsultation(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/walkin_consultations?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '신규상담 기록 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deleteWalkinConsultation(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/walkin_consultations?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '신규상담 기록 삭제에 실패했습니다.');
+}
+
 // ---- 미팅 기록일지(meetings.html) ----
 async function fetchMeetingLogs() {
   const res = await fetch(

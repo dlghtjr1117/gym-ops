@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 홈</title>
-<link rel="stylesheet" href="style.css?v=1790000552" />
+<link rel="stylesheet" href="style.css?v=1790002014" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -15,6 +15,7 @@
       <a href="home.html" class="active">홈</a>
       <a href="dashboard.html">대시보드</a>
       <a href="members.html">회원 관리</a>
+      <a href="consultations.html">신규상담</a>
       <a href="sales.html">매출 입력</a>
       <a href="expiry.html">만료회원 · TM</a>
       <a href="group-pt.html">그룹PT 관리</a>
@@ -49,6 +50,10 @@
         <div class="home-tile-icon">👤</div>
         <div class="home-tile-label">고객관리</div>
       </a>
+      <a class="home-tile" href="consultations.html">
+        <div class="home-tile-icon">🆕</div>
+        <div class="home-tile-label">신규상담 · 워크인</div>
+      </a>
       <a class="home-tile" href="tasks.html">
         <div class="home-tile-icon">💼</div>
         <div class="home-tile-label">선생님 업무 리스트</div>
@@ -75,9 +80,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790000552"></script>
-  <script src="auth.js?v=1790000552"></script>
-  <script src="data.js?v=1790000552"></script>
+  <script src="config.js?v=1790002014"></script>
+  <script src="auth.js?v=1790002014"></script>
+  <script src="data.js?v=1790002014"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
