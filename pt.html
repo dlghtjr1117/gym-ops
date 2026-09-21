@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789983337" />
+<link rel="stylesheet" href="style.css?v=1789999548" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -273,10 +273,10 @@
           </div>
         </div>
         <div style="overflow-x:auto; margin-top:14px;">
-          <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:900px;">
+          <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:960px;">
             <thead><tr>
-              <th style="width:8%;">주차</th><th style="width:12%;">날짜</th><th style="width:10%;">유형</th><th style="width:10%;">이름</th>
-              <th style="width:12%;">금액</th><th style="width:6%;">횟수</th><th style="width:9%;">확률</th><th style="width:27%;">특이사항 · 메모</th><th style="width:6%;"></th>
+              <th style="width:7%;">주차</th><th style="width:14%;">날짜</th><th style="width:9%;">유형</th><th style="width:9%;">이름</th>
+              <th style="width:11%;">금액</th><th style="width:7%;">횟수</th><th style="width:8%;">확률</th><th style="width:29%;">특이사항 · 메모</th><th style="width:6%;"></th>
             </tr></thead>
             <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
             <tfoot><tr><td colspan="4" style="text-align:right; font-weight:700;">합계</td><td id="weeklyTotal" style="font-weight:700;">0원</td><td colspan="4"></td></tr></tfoot>
@@ -478,9 +478,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789983337"></script>
-  <script src="auth.js?v=1789983337"></script>
-  <script src="data.js?v=1789983337"></script>
+  <script src="config.js?v=1789999548"></script>
+  <script src="auth.js?v=1789999548"></script>
+  <script src="data.js?v=1789999548"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
