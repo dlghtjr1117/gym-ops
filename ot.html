@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - OT 관리</title>
-<link rel="stylesheet" href="style.css?v=1790002698" />
+<link rel="stylesheet" href="style.css?v=1790003404" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
   .sheet-input {
@@ -120,6 +120,13 @@
   .otp-chevron { color: var(--slate-300); font-size: 16px; flex-shrink: 0; }
   .otp-tabs { display: flex; align-items: center; gap: 2px; background: var(--slate-50); border-radius: 12px; padding: 4px; }
   .otp-tabs button { border: none; }
+
+  /* 표 맨 아래 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 (신규상담 화면과 같은 관례) */
+  .add-row-trigger td {
+    cursor: pointer; color: var(--indigo-600); font-weight: 700; text-align: center;
+    padding: 11px 12px; border-top: 1px dashed var(--slate-300);
+  }
+  .add-row-trigger:hover td { background: var(--slate-50); }
 </style>
 </head>
 <body>
@@ -334,48 +341,9 @@
     </div>
   </div>
 
-  <!-- OT1 기록 추가 모달 -->
-  <div class="modal-overlay" id="addOt1Overlay" style="display:none;">
-    <div class="modal-box" style="max-width:480px;">
-      <div class="modal-header">
-        <div><h3>OT1 기록 추가</h3><p class="muted" style="margin:0;" id="addOt1Hint"></p></div>
-        <button type="button" class="modal-close" id="closeAddOt1Btn">&times;</button>
-      </div>
-      <div id="addOt1ErrorBox" class="error-text"></div>
-      <form id="addOt1Form">
-        <div class="form-grid">
-          <div class="field"><label>이름 *</label><input type="text" id="o1_name" required /></div>
-          <div class="field"><label>연락드린날짜</label><input type="date" id="o1_contact_date" /></div>
-          <div class="field"><label>OT1 예정일 *</label><input type="date" id="o1_ot_date" required /></div>
-        </div>
-        <div class="field"><label>특이사항 · 메모</label><input type="text" id="o1_memo" placeholder="선택 입력" /></div>
-        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- OT 연락 미응답 기록 추가 모달 -->
-  <div class="modal-overlay" id="addOtNoResponseOverlay" style="display:none;">
-    <div class="modal-box" style="max-width:520px;">
-      <div class="modal-header">
-        <div><h3>OT 연락 미응답 기록 추가</h3><p class="muted" style="margin:0;" id="addOtNoResponseHint"></p></div>
-        <button type="button" class="modal-close" id="closeAddOtNoResponseBtn">&times;</button>
-      </div>
-      <div id="addOtNoResponseErrorBox" class="error-text"></div>
-      <form id="addOtNoResponseForm">
-        <div class="form-grid">
-          <div class="field"><label>이름 *</label><input type="text" id="nr_name" required /></div>
-          <div class="field"><label>연락드린날짜</label><input type="date" id="nr_contact_date" /></div>
-        </div>
-        <div class="field"><label>특이사항 · 메모</label><input type="text" id="nr_memo" placeholder="선택 입력" /></div>
-        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
-      </form>
-    </div>
-  </div>
-
-  <script src="config.js?v=1790002698"></script>
-  <script src="auth.js?v=1790002698"></script>
-  <script src="data.js?v=1790002698"></script>
+  <script src="config.js?v=1790003404"></script>
+  <script src="auth.js?v=1790003404"></script>
+  <script src="data.js?v=1790003404"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -713,9 +681,6 @@
       fillStatGroup('dp', personal);
       fillStatGroup('do', overall);
 
-      document.getElementById('addOt1Hint').textContent = `${staffName(tid)} 트레이너의 기록으로 등록돼요.`;
-      document.getElementById('addOtNoResponseHint').textContent = `${staffName(tid)} 트레이너의 기록으로 등록돼요.`;
-
       renderOt1Table(tid, startStr, endStr);
       renderOt2Table(tid, startStr, endStr);
       renderOtNoResponseTable(tid, monthStr);
@@ -728,8 +693,12 @@
         .filter(l => l.trainer_id === tid && l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
         .slice()
         .sort((a, b) => (a.ot_date < b.ot_date ? -1 : a.ot_date > b.ot_date ? 1 : 0));
+      const addRowHtml = `
+        <tr class="add-row-trigger" onclick="handleQuickAddOt1()">
+          <td colspan="8">+ 추가하기</td>
+        </tr>`;
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>' + addRowHtml;
         return;
       }
       tbody.innerHTML = items.map(l => {
@@ -748,7 +717,7 @@
           <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
           <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtLead('${l.id}')">삭제</button></td>
         </tr>`;
-      }).join('');
+      }).join('') + addRowHtml;
     }
     function renderOt2Table(tid, startStr, endStr) {
       const tbody = document.querySelector('#ot2Table tbody');
@@ -855,49 +824,55 @@
     }
 
     // ---- OT1 기록 추가 ----
-    function openAddOt1Modal() {
-      document.getElementById('addOt1Form').reset();
-      document.getElementById('addOt1ErrorBox').style.display = 'none';
-      document.getElementById('o1_contact_date').value = formatDateStr(new Date());
-      document.getElementById('addOt1Hint').textContent = `${staffName(isManagerFlag ? selectedTrainerId : currentUserId)} 트레이너의 기록으로 등록돼요.`;
-      document.getElementById('addOt1Overlay').style.display = 'flex';
-    }
-    function closeAddOt1Modal() { document.getElementById('addOt1Overlay').style.display = 'none'; }
-    document.getElementById('openAddOt1Btn').addEventListener('click', openAddOt1Modal);
-    document.getElementById('closeAddOt1Btn').addEventListener('click', closeAddOt1Modal);
-    document.getElementById('addOt1Overlay').addEventListener('click', (e) => { if (e.target.id === 'addOt1Overlay') closeAddOt1Modal(); });
-    document.getElementById('addOt1Form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errorBox = document.getElementById('addOt1ErrorBox');
-      errorBox.style.display = 'none';
-      const tid = isManagerFlag ? selectedTrainerId : currentUserId;
+    // "+ OT1 기록 추가" 버튼(상단)이나 표 맨 아래 "+ 추가하기" 줄, 둘 중 아무거나 눌러도 모달 없이
+    // 바로 빈 줄(이름은 "새 회원"으로 임시로 채워서 저장 - pt_leads에서 이름이 필수값이라 완전히
+    // 빈 채로는 저장이 안 돼서)을 OT1 표에 추가하고, 그 줄의 이름 칸에 바로 커서를 놓고 전체
+    // 선택해줘서 이어서 타이핑하면 바로 덮어써짐 (신규상담 화면과 같은 관례로 통일)
+    let quickAddOt1InProgress = false;
+    async function handleQuickAddOt1() {
+      if (quickAddOt1InProgress) return;
+      quickAddOt1InProgress = true;
       try {
-        await addPtLead({
+        const tid = isManagerFlag ? selectedTrainerId : currentUserId;
+        const { startStr, endStr } = getMonthRange();
+        const today = formatDateStr(new Date());
+        // 지금 보고 있는 달이 실제 이번 달이면 오늘 날짜로, 과거/미래 달을 보고 있으면 그 달 1일로 -
+        // 그래야 새로 추가한 줄이 지금 보고 있는 목록에 바로 나타남
+        const defaultOtDate = (today >= startStr && today < endStr) ? today : startStr;
+        const created = await addPtLead({
           trainer_id: tid,
-          name: document.getElementById('o1_name').value.trim(),
+          name: '새 회원',
           source: '오티',
-          contact_date: document.getElementById('o1_contact_date').value || formatDateStr(new Date()),
-          week_no: weekOfMonth(document.getElementById('o1_contact_date').value || formatDateStr(new Date())),
-          ot_date: document.getElementById('o1_ot_date').value,
+          contact_date: today,
+          week_no: weekOfMonth(today),
+          ot_date: defaultOtDate,
           ot_status: 'scheduled',
-          memo: document.getElementById('o1_memo').value.trim() || null
+          memo: null
         });
-        closeAddOt1Modal();
+        const rec = Array.isArray(created) ? created[0] : created;
         await reloadCoreData();
         render();
         showToast('OT1 기록이 추가되었습니다.');
+        const nameInput = document.querySelector(`#ot1Table input[data-lead-id="${rec.id}"][onchange="handleOtNameFieldSave(this)"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
       } catch (err) {
-        errorBox.textContent = err.message;
-        errorBox.style.display = 'block';
+        alert(err.message);
+      } finally {
+        quickAddOt1InProgress = false;
       }
-    });
+    }
+    document.getElementById('openAddOt1Btn').addEventListener('click', handleQuickAddOt1);
 
     // ---- OT 연락 미응답 ----
     function renderOtNoResponseTable(tid, monthStr) {
       const tbody = document.querySelector('#otNoResponseTable tbody');
       const items = noResponseAllCache.filter(r => r.trainer_id === tid && r.period_month === monthStr);
+      const addRowHtml = `
+        <tr class="add-row-trigger" onclick="handleQuickAddOtNoResponse()">
+          <td colspan="5">+ 추가하기</td>
+        </tr>`;
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이번 달 미응답 기록이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이번 달 미응답 기록이 없습니다.</td></tr>' + addRowHtml;
         return;
       }
       tbody.innerHTML = items.map(r => `
@@ -907,7 +882,7 @@
           <td><input class="sheet-input" type="text" value="${escapeHtml(r.memo || '')}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'memo')" placeholder="특이사항" /></td>
           <td><input class="sheet-input" type="date" data-id="${r.id}" title="날짜를 정하면 OT1로 자동 이동돼요" onblur="handlePromoteToOt1(this)" /></td>
           <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtNoResponse('${r.id}')">삭제</button></td>
-        </tr>`).join('');
+        </tr>`).join('') + addRowHtml;
     }
     async function handlePromoteToOt1(inputEl) {
       const id = inputEl.dataset.id;
@@ -958,39 +933,36 @@
         showToast('기록이 삭제되었습니다.', 'danger');
       } catch (err) { alert(err.message); }
     }
-    function openAddOtNoResponseModal() {
-      document.getElementById('addOtNoResponseForm').reset();
-      document.getElementById('addOtNoResponseErrorBox').style.display = 'none';
-      document.getElementById('nr_contact_date').value = formatDateStr(new Date());
-      document.getElementById('addOtNoResponseHint').textContent = `${staffName(isManagerFlag ? selectedTrainerId : currentUserId)} 트레이너의 기록으로 등록돼요.`;
-      document.getElementById('addOtNoResponseOverlay').style.display = 'flex';
-    }
-    function closeAddOtNoResponseModal() { document.getElementById('addOtNoResponseOverlay').style.display = 'none'; }
-    document.getElementById('openAddOtNoResponseBtn').addEventListener('click', openAddOtNoResponseModal);
-    document.getElementById('closeAddOtNoResponseBtn').addEventListener('click', closeAddOtNoResponseModal);
-    document.getElementById('addOtNoResponseOverlay').addEventListener('click', (e) => { if (e.target.id === 'addOtNoResponseOverlay') closeAddOtNoResponseModal(); });
-    document.getElementById('addOtNoResponseForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errorBox = document.getElementById('addOtNoResponseErrorBox');
-      errorBox.style.display = 'none';
-      const tid = isManagerFlag ? selectedTrainerId : currentUserId;
+    // "+ 미응답 기록 추가" 버튼(상단)이나 표 맨 아래 "+ 추가하기" 줄, 둘 중 아무거나 눌러도 모달
+    // 없이 바로 빈 줄(이름은 "새 상담"으로 임시로 채워서 저장 - pt_ot_no_response에서 이름이
+    // 필수값이라 완전히 빈 채로는 저장이 안 돼서)을 표에 추가하고, 그 줄의 이름 칸에 바로 커서를
+    // 놓고 전체 선택해줘서 이어서 타이핑하면 바로 덮어써짐
+    let quickAddNrInProgress = false;
+    async function handleQuickAddOtNoResponse() {
+      if (quickAddNrInProgress) return;
+      quickAddNrInProgress = true;
       try {
-        await addPtOtNoResponse({
+        const tid = isManagerFlag ? selectedTrainerId : currentUserId;
+        const created = await addPtOtNoResponse({
           trainer_id: tid,
           period_month: getMonthRange().monthStr,
-          name: document.getElementById('nr_name').value.trim(),
-          contact_date: document.getElementById('nr_contact_date').value || null,
-          memo: document.getElementById('nr_memo').value.trim() || null
+          name: '새 상담',
+          contact_date: formatDateStr(new Date()),
+          memo: null
         });
-        closeAddOtNoResponseModal();
+        const rec = Array.isArray(created) ? created[0] : created;
         await reloadCoreData();
         render();
         showToast('미응답 기록이 추가되었습니다.');
+        const nameInput = document.querySelector(`#otNoResponseTable input[data-id="${rec.id}"][onchange="handleOtNoResponseFieldSave(this,'name')"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
       } catch (err) {
-        errorBox.textContent = err.message;
-        errorBox.style.display = 'block';
+        alert(err.message);
+      } finally {
+        quickAddNrInProgress = false;
       }
-    });
+    }
+    document.getElementById('openAddOtNoResponseBtn').addEventListener('click', handleQuickAddOtNoResponse);
 
     // ---- 로드 ----
     async function reloadCoreData() {
