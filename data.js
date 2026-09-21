@@ -1223,6 +1223,20 @@ async function upsertPtTarget(target) {
   return res.json();
 }
 
+// PT 관리(pt.html) "트레이너 매출 순위" 막대그래프용 - 트레이너별 확정 매출 합계(+유형별 세부 합계,
+// 목표 매출)만 돌려주는 SECURITY DEFINER 함수(migration_48) 호출. pt_leads 원본 행(상담자 이름 등)은
+// 안 돌려주기 때문에, 지점장이 아닌 트레이너 계정으로 호출해도 다른 트레이너의 개별 상담 기록까지
+// 새어나가지 않음 - 순위표에 필요한 "합계 숫자"만 안전하게 우회해서 보여주는 용도.
+async function fetchPtTrainerLeaderboard(monthStartStr, monthEndStr) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_pt_trainer_leaderboard`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_month_start: monthStartStr, p_month_end: monthEndStr })
+  });
+  if (!res.ok) await throwApiError(res, '트레이너 매출 순위를 불러오지 못했습니다.');
+  return res.json();
+}
+
 // center_targets.month 컬럼은 date 타입이라 항상 "그 달 1일" 전체 날짜(예: 2026-09-01)로 넣어야 함.
 // 호출하는 쪽에서는 다른 월 관련 함수들과 통일해서 'YYYY-MM' 형태(예: 2026-09)로 넘기므로, 여기서
 // '-01'을 붙여 변환해줌 - 이걸 안 하면 PostgREST가 "invalid input syntax for type date" 오류를 냄.
