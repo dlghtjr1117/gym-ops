@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - OT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789999548" />
+<link rel="stylesheet" href="style.css?v=1790000552" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
   .sheet-input {
@@ -65,15 +65,24 @@
   .ot-stat-group-title { font-size: 12px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: .02em; margin: 22px 0 10px; }
   .ot-stat-group-title:first-child { margin-top: 0; }
 
-  /* OT1 / OT2를 세로로 쌓지 않고 나란히 2단 배치 (2026-09-21 추가) */
+  /* OT1 / OT2를 세로로 쌓지 않고 나란히 2단 배치 (2026-09-21 추가)
+     시행착오: 처음엔 1.15fr/1fr로 화면 남는 폭을 그리드가 다 채우게 했더니, 표 자체는
+     680px/600px면 충분한데 973px/846px까지 늘어나면서 특이사항 칸 뒤나 select 화살표 앞에
+     불필요하게 큰 빈 공간이 생김 → 그래서 표 폭을 아예 고정(820px/640px)으로 바꿨더니 이번엔
+     반대로 오른쪽에 안 쓰는 빈 공간이 넓게 남게 됨(둘 다 피드백 받음: "불필요하게 너무 넓다"
+     다음엔 "이 빈 공간도 활용하면 될 것 같은데"). 결론: 화면이 넓어지면 남는 공간을 놀리지 않고
+     쓰되, 그 공간을 "필요한 칸"(특이사항 - 메모가 길수록 좋음)에만 몰아주고 "불필요한 칸"
+     (날짜·이름·현황·예상등록률처럼 내용 길이가 짧고 고정적인 칸)은 그리드가 늘어나도 커지지
+     않게 함 - 아래 표의 th에서 특이사항만 width를 안 주고(= 남는 폭을 전부 가져감), 나머지는
+     전부 px로 고정폭을 줘서 해결. 그래서 그리드는 다시 늘어나게(fr) 두어도 안전함 */
   .ot12-2col {
     display: grid;
-    grid-template-columns: minmax(680px, 1.15fr) minmax(600px, 1fr);
+    grid-template-columns: minmax(820px, 1.15fr) minmax(640px, 1fr);
     gap: 20px;
     align-items: start;
     margin-top: 26px;
   }
-  @media (max-width: 1400px) {
+  @media (max-width: 1500px) {
     .ot12-2col { grid-template-columns: 1fr; }
   }
   .ot12-col h3 { font-size: 14px; margin: 0; }
@@ -280,10 +289,10 @@
             <button type="button" class="btn btn-primary" id="openAddOt1Btn" style="width:auto; padding:7px 14px; font-size:12.5px;">+ OT1 기록 추가</button>
           </div>
           <div style="overflow-x:auto;">
-            <table id="ot1Table" class="table-fixed sheet-table" style="min-width:680px;">
+            <table id="ot1Table" class="table-fixed sheet-table" style="min-width:820px;">
               <thead><tr>
-                <th style="width:11%;">OT1날짜</th><th style="width:10%;">연락일</th><th style="width:9%;">이름</th>
-                <th style="width:22%;">특이사항</th><th style="width:13%;">현황</th><th style="width:13%;">예상등록률</th><th style="width:13%;">OT2예정일</th><th style="width:6%;"></th>
+                <th style="width:140px;">OT1날짜</th><th style="width:85px;">연락일</th><th style="width:85px;">이름</th>
+                <th>특이사항</th><th style="width:100px;">현황</th><th style="width:105px;">예상등록률</th><th style="width:140px;">OT2예정일</th><th style="width:55px;"></th>
               </tr></thead>
               <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
             </table>
@@ -296,10 +305,10 @@
             <span class="muted" style="font-size:11.5px;">OT1 표에서 "OT2예정일"을 넣으면 자동으로 여기 생겨요</span>
           </div>
           <div style="overflow-x:auto;">
-            <table id="ot2Table" class="table-fixed sheet-table" style="min-width:600px;">
+            <table id="ot2Table" class="table-fixed sheet-table" style="min-width:640px;">
               <thead><tr>
-                <th style="width:14%;">OT2날짜</th><th style="width:11%;">이름</th>
-                <th style="width:36%;">특이사항</th><th style="width:16%;">현황</th><th style="width:16%;">예상등록률</th><th style="width:7%;"></th>
+                <th style="width:140px;">OT2날짜</th><th style="width:85px;">이름</th>
+                <th>특이사항</th><th style="width:100px;">현황</th><th style="width:105px;">예상등록률</th><th style="width:55px;"></th>
               </tr></thead>
               <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
             </table>
@@ -363,9 +372,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789999548"></script>
-  <script src="auth.js?v=1789999548"></script>
-  <script src="data.js?v=1789999548"></script>
+  <script src="config.js?v=1790000552"></script>
+  <script src="auth.js?v=1790000552"></script>
+  <script src="data.js?v=1790000552"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
