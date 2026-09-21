@@ -354,6 +354,12 @@ async function deleteSale(id) {
 // 잘못 등록한 매출 수정(담당자/항목/금액 등) - 지점장만 가능 (RLS로도 막혀있음, migration_43 참고).
 // 2026-09-07: 원래 "등록/삭제"만 있고 "수정"이 없어서, 담당자나 항목을 잘못 고른 매출을 고칠 방법이
 // 없었던 걸 확인하고 추가함.
+// 2026-09-17: "판매내역 표에서 담당자를 바꿨는데 껐다 켜면 다시 원래대로 돌아온다"는 제보로 확인한
+// 문제를 같이 고침 - RLS 정책(migration_43)이 아직 적용 안 된 상태에서 PATCH를 보내면, Supabase가
+// 에러가 아니라 "200 OK + 빈 배열"로 응답함(권한이 없어서 조건에 맞는 행이 0건이라 그런 것으로 처리됨).
+// res.ok만 보면 성공한 것처럼 보이지만 실제로는 DB가 하나도 안 바뀐 상태라, 화면은 바뀐 것처럼 보이다가
+// 새로고침하면 원래 값으로 되돌아와 있어서 사용자 입장에서는 "저장이 안 된다"로 느껴짐. 이제 응답으로
+// 온 배열이 비어있으면 그 자리에서 바로 명확한 에러를 띄워서, 조용히 실패하는 일이 없도록 함.
 async function updateSale(id, fields) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?id=eq.${id}`, {
     method: 'PATCH',
@@ -361,7 +367,11 @@ async function updateSale(id, fields) {
     body: JSON.stringify(fields)
   });
   if (!res.ok) await throwApiError(res, '매출 수정에 실패했습니다.');
-  return res.json();
+  const rows = await res.json();
+  if (!rows || rows.length === 0) {
+    throw new Error('매출 수정이 저장되지 않았어요(0건 반영됨). 권한 문제일 가능성이 커요 - Supabase에 migration_43_sales_update.sql이 실행되어 있는지 확인해주세요.');
+  }
+  return rows;
 }
 
 // ---- 미수금(분할 결제) ----

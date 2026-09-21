@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789607516" />
+<link rel="stylesheet" href="style.css?v=1789607826" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -62,6 +62,7 @@
       <a href="expiry.html">만료회원 · TM</a>
       <a href="group-pt.html">그룹PT 관리</a>
       <a href="pt.html" class="active">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
       <a href="schedule.html">PT 스케줄</a>
       <a href="tasks.html">업무 리스트</a>
       <a href="meetings.html">미팅 기록</a>
@@ -120,8 +121,9 @@
     <div class="filter-tabs" id="sectionTabs" style="margin-top:22px;">
       <button type="button" class="filter-tab active" data-tab="weekly" onclick="switchTab('weekly')">📅 주차별 매출 기록</button>
       <button type="button" class="filter-tab" data-tab="care" onclick="switchTab('care')">🧑‍🤝‍🧑 PT 회원 관리</button>
-      <button type="button" class="filter-tab" data-tab="ot" onclick="switchTab('ot')">🎯 OT 관리</button>
     </div>
+    <!-- OT 관리는 2026-09-21에 별도의 "OT 관리" 시트(ot.html)로 분리됨 - 트레이너 한 명씩 골라서 보던
+         이 탭 대신, 지점장이 트레이너 전원을 한 화면에서 비교할 수 있는 전용 대시보드로 이동함 -->
 
     <!-- 섹션 A: 주차별 매출 기록 -->
     <div class="section" id="sectionWeekly" style="margin-top:14px;">
@@ -174,78 +176,6 @@
       </div>
     </div>
 
-    <!-- 섹션 C: OT 관리 (OT1 최초 체험 / OT2 팔로우업 두 트랙) -->
-    <div class="section" id="sectionOt" style="margin-top:14px; display:none;">
-      <h2>OT 관리 <span class="muted">(이번 달 OT 예정 · 진행 대상)</span></h2>
-
-      <h3 style="font-size:14px; margin:18px 0 8px;">OT1 (최초 체험)</h3>
-      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px;">
-        <div class="mini-stat-box"><div class="mini-title">OT1 진행</div><div class="mini-row"><span>이번 달 건수</span><b id="ot1TotalCount">0</b></div></div>
-        <div class="mini-stat-box"><div class="mini-title">OT1 완료</div><div class="mini-row"><span>완료 건수</span><b id="ot1DoneCount">0</b></div></div>
-        <div class="mini-stat-box"><div class="mini-title">OT1 성공률</div><div class="mini-row"><span>완료/진행</span><b id="ot1SuccessRate">-</b></div></div>
-      </div>
-      <div style="overflow-x:auto; margin-top:10px;">
-        <table id="ot1Table" class="table-fixed sheet-table" style="min-width:1080px;">
-          <thead><tr>
-            <th style="width:13%;">OT1날짜</th><th style="width:11%;">연락드린날짜</th><th style="width:9%;">이름</th>
-            <th style="width:28%;">특이사항</th><th style="width:13%;">현황</th><th style="width:12%;">예상 등록률</th><th style="width:14%;">OT2 예정일</th>
-          </tr></thead>
-          <tbody><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-        </table>
-      </div>
-
-      <h3 style="font-size:14px; margin:26px 0 8px;">OT2 (2차 팔로우업)</h3>
-      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px;">
-        <div class="mini-stat-box"><div class="mini-title">OT2 진행</div><div class="mini-row"><span>이번 달 건수</span><b id="ot2TotalCount">0</b></div></div>
-        <div class="mini-stat-box"><div class="mini-title">OT2 완료</div><div class="mini-row"><span>완료 건수</span><b id="ot2DoneCount">0</b></div></div>
-        <div class="mini-stat-box"><div class="mini-title">OT2 성공률</div><div class="mini-row"><span>완료/진행</span><b id="ot2SuccessRate">-</b></div></div>
-      </div>
-      <div style="overflow-x:auto; margin-top:10px;">
-        <table id="ot2Table" class="table-fixed sheet-table" style="min-width:1000px;">
-          <thead><tr>
-            <th style="width:14%;">OT2날짜</th><th style="width:10%;">이름</th>
-            <th style="width:40%;">특이사항</th><th style="width:18%;">현황</th><th style="width:18%;">예상 등록률</th>
-          </tr></thead>
-          <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-        </table>
-      </div>
-
-      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-top:26px;">
-        <h3 style="font-size:14px; margin:0 0 2px;">OT 연락 미응답 <span class="muted" style="font-weight:400;">(OT 잡으려고 연락드렸는데 응답이 없으셨던 분)</span></h3>
-        <button type="button" class="btn btn-primary" id="openAddOtNoResponseBtn" style="width:auto; padding-left:16px; padding-right:16px; flex-shrink:0;">+ 미응답 기록 추가</button>
-      </div>
-      <p class="muted" style="margin:2px 0 10px;">아직 OT 일정조차 못 잡은 분들을 따로 남겨두는 표예요. 칸을 클릭해서 바로 입력하면 자동 저장되고, 월 이동해서 지난 달 기록도 확인할 수 있어요. 나중에 연락이 닿아서 수업 날짜가 정해지면 "OT1 날짜 확정" 칸에 날짜를 넣어주세요 — 자동으로 위 OT1 표로 옮겨지고 이 목록에서는 사라져요.</p>
-      <div class="mini-stat-box" style="max-width:220px; margin-bottom:10px;"><div class="mini-title">이번 달 미응답</div><div class="mini-row"><span>건수</span><b id="otNoResponseCount">0</b></div></div>
-      <div style="overflow-x:auto;">
-        <table id="otNoResponseTable" class="table-fixed sheet-table" style="min-width:820px;">
-          <thead><tr>
-            <th style="width:12%;">연락드린날짜</th><th style="width:12%;">이름</th><th style="width:48%;">특이사항</th>
-            <th style="width:16%;">OT1 날짜 확정</th><th style="width:12%;"></th>
-          </tr></thead>
-          <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- OT 연락 미응답 기록 추가 모달 -->
-  <div class="modal-overlay" id="addOtNoResponseOverlay" style="display:none;">
-    <div class="modal-box" style="max-width:520px;">
-      <div class="modal-header">
-        <div><h3>OT 연락 미응답 기록 추가</h3><p class="muted" style="margin:0;" id="addOtNoResponseHint"></p></div>
-        <button type="button" class="modal-close" id="closeAddOtNoResponseBtn">&times;</button>
-      </div>
-      <div id="addOtNoResponseErrorBox" class="error-text"></div>
-      <form id="addOtNoResponseForm">
-        <div class="form-grid">
-          <div class="field"><label>이름 *</label><input type="text" id="nr_name" required /></div>
-          <div class="field"><label>연락드린날짜</label><input type="date" id="nr_contact_date" /></div>
-        </div>
-        <div class="field"><label>특이사항 · 메모</label><input type="text" id="nr_memo" placeholder="선택 입력" /></div>
-        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
-      </form>
-    </div>
   </div>
 
   <!-- 상담/매출 기록 추가 모달 -->
@@ -360,9 +290,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789607516"></script>
-  <script src="auth.js?v=1789607516"></script>
-  <script src="data.js?v=1789607516"></script>
+  <script src="config.js?v=1789607826"></script>
+  <script src="auth.js?v=1789607826"></script>
+  <script src="data.js?v=1789607826"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -378,7 +308,6 @@
 
     let leadsCache = [];      // 선택된 트레이너의 pt_leads 전체 (월 필터는 화면에서)
     let careCache = [];       // 선택된 트레이너의 PT 케어 대상 회원
-    let otNoResponseCache = []; // 선택된 트레이너의 이번 달 OT 연락 미응답 기록
     let targetsCache = [];
 
     let monthAnchor = new Date();
@@ -390,15 +319,6 @@
       { value: 'registered', label: '등록' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }
     ];
     const PROB_BADGE = { p25: 'badge-slate', p50: 'badge-yellow', p75: 'badge-orange', p100: 'badge-green', registered: 'badge-green', rolled_over: 'badge-purple', missed: 'badge-red' };
-    const OT_STATUS_OPTIONS = [
-      { value: 'scheduled', label: '예정' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }, { value: 'done', label: '완료' }
-    ];
-    const OT_STATUS_BADGE = { scheduled: 'badge-orange', rolled_over: 'badge-purple', missed: 'badge-red', done: 'badge-green' };
-    // OT1/OT2 각각의 "예상 등록률" - 주차별 매출 기록의 재등록확률과는 별개의 독립적인 값
-    const OT_PROB_OPTIONS = [
-      { value: '', label: '미설정' }, { value: '25', label: '25%' }, { value: '50', label: '50%' }, { value: '75', label: '75%' }
-    ];
-    const OT_PROB_BADGE = { '': '', '25': 'badge-slate', '50': 'badge-yellow', '75': 'badge-orange' };
     // PT 회원 관리(재등록확률)도 100%를 따로 두지 않고 "등록"으로 합치고, "이월" 단계를 추가함
     const CARE_PROB_OPTIONS = [
       { value: '', label: '미설정' }, { value: 'p25', label: '25%' }, { value: 'p50', label: '50%' }, { value: 'p75', label: '75%' },
@@ -505,7 +425,6 @@
       document.querySelectorAll('#sectionTabs .filter-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
       document.getElementById('sectionWeekly').style.display = tab === 'weekly' ? '' : 'none';
       document.getElementById('sectionCare').style.display = tab === 'care' ? '' : 'none';
-      document.getElementById('sectionOt').style.display = tab === 'ot' ? '' : 'none';
       window.scrollTo({ top: document.getElementById('sectionTabs').offsetTop - 12, behavior: 'smooth' });
     }
     // 확정/예상 매출 카드를 누르면 그 근거가 되는 주차별 매출 기록으로 바로 이동
@@ -557,8 +476,8 @@
       ).join('');
       return `<select class="sheet-input badge ${SOURCE_BADGE[cur] || ''}" data-lead-id="${lead.id}" onchange="handleSourceChange(this)">${optionsHtml}</select>`;
     }
-    // 유형(source)이 바뀌면 값 저장과 함께 뱃지 색도 바로 바꿔줌 (확률/상태 select와 같은 방식 -
-    // handleOtProbSave 등 참고). 표 전체를 다시 불러오지 않고 이 select 하나만 가볍게 갱신함
+    // 유형(source)이 바뀌면 값 저장과 함께 뱃지 색도 바로 바꿔줌 (확률/상태 select와 같은 방식).
+    // 표 전체를 다시 불러오지 않고 이 select 하나만 가볍게 갱신함
     async function handleSourceChange(selectEl) {
       const id = selectEl.dataset.leadId;
       const value = selectEl.value || null;
@@ -844,20 +763,9 @@
       document.getElementById(idPrefix + 'ConfirmedRate').textContent = expected.length > 0 ? `${Math.round((confirmed.length / expected.length) * 100)}%` : '-';
     }
 
-    // OT1/OT2 공용: dateField/statusField만 바꿔서 진행·완료·성공률 계산
-    function loadOtMiniStats(dateField, statusField, idPrefix) {
-      const { startStr, endStr } = getMonthRange();
-      const items = leadsCache.filter(l => l[dateField] && l[dateField] >= startStr && l[dateField] < endStr);
-      const doneItems = items.filter(l => l[statusField] === 'done');
-      document.getElementById(idPrefix + 'TotalCount').textContent = items.length;
-      document.getElementById(idPrefix + 'DoneCount').textContent = doneItems.length;
-      document.getElementById(idPrefix + 'SuccessRate').textContent = items.length > 0 ? `${Math.round((doneItems.length / items.length) * 100)}%` : '-';
-    }
     function loadAllMiniStats() {
       loadConfirmMiniStats('재등록', 'renewal');
       loadConfirmMiniStats('오티', 'otConfirm');
-      loadOtMiniStats('ot_date', 'ot_status', 'ot1');
-      loadOtMiniStats('ot2_date', 'ot2_status', 'ot2');
     }
 
     // ---- 섹션 B: PT 회원 관리 ----
@@ -1135,229 +1043,6 @@
       } catch (err) { alert(err.message); }
     }
 
-    // ---- 섹션 C: OT 관리 (OT1/OT2 공용) ----
-    // 현황(예정/이월/미스/완료)이 바뀌면 뱃지 색뿐 아니라 그 행 전체 배경색도 같이 바꿔줌
-    async function handleOtStatusFieldSave(selectEl, field) {
-      const id = selectEl.dataset.leadId;
-      const value = selectEl.value;
-      try {
-        await updatePtLead(id, { [field]: value });
-        const l = leadsCache.find(x => x.id === id);
-        if (l) l[field] = value;
-        selectEl.className = 'badge ' + (OT_STATUS_BADGE[value] || '') + ' sheet-input';
-        const row = selectEl.closest('tr');
-        if (row) row.className = 'row-otstatus-' + value;
-        // OT1/OT2 현황도 "이월"로 바뀌면 주차별 매출 기록의 이월과 같은 방식으로 다음 달에 자동으로
-        // 이어서 만들어줌 (OT 날짜는 이번 달 특정 일정에 묶여있던 값이라 새로 잡을 수 있게 비워서 넘김)
-        if (value === 'rolled_over' && l) {
-          await carryOverLeadToNextMonth(l);
-          await reloadLeadsOnly();
-        }
-        loadAllMiniStats();
-      } catch (err) { alert(err.message); }
-    }
-    // OT1/OT2 각각의 "예상 등록률"(25%/50%/75%) 저장
-    async function handleOtProbSave(selectEl, field) {
-      const id = selectEl.dataset.leadId;
-      const raw = selectEl.value;
-      const value = raw === '' ? null : Number(raw);
-      try {
-        await updatePtLead(id, { [field]: value });
-        const l = leadsCache.find(x => x.id === id);
-        if (l) l[field] = value;
-        selectEl.className = 'sheet-input badge ' + (OT_PROB_BADGE[raw] || '');
-      } catch (err) { alert(err.message); }
-    }
-    // OT2 예정일을 넣으면 자동으로 ot2_status를 '예정'으로 세팅 (OT2 표에 바로 나타나게)
-    async function handleOt2DateSave(inputEl) {
-      const id = inputEl.dataset.leadId;
-      const value = inputEl.value || null;
-      try {
-        const patch = { ot2_date: value };
-        const lead = leadsCache.find(l => l.id === id);
-        if (value && lead && !lead.ot2_status) patch.ot2_status = 'scheduled';
-        await updatePtLead(id, patch);
-        if (lead) Object.assign(lead, patch);
-        renderOt1Table(); renderOt2Table(); loadAllMiniStats();
-      } catch (err) { alert(err.message); }
-    }
-
-    function renderOt1Table() {
-      const tbody = document.querySelector('#ot1Table tbody');
-      const { startStr, endStr } = getMonthRange();
-      const items = leadsCache
-        .filter(l => l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
-        .slice()
-        .sort((a, b) => (a.ot_date < b.ot_date ? -1 : a.ot_date > b.ot_date ? 1 : 0));
-
-      if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = items.map(l => {
-        const status = l.ot_status || 'scheduled';
-        const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
-        const probVal = l.ot_expected_probability != null ? String(l.ot_expected_probability) : '';
-        const probOptions = OT_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === probVal ? 'selected' : ''}>${o.label}</option>`).join('');
-        return `
-        <tr class="row-otstatus-${status}">
-          <td><input class="sheet-input" type="date" value="${l.ot_date || ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'ot_date',false)" /></td>
-          <td class="cell-1line">${l.contact_date || '-'}</td>
-          <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
-          <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot_status')">${options}</select></td>
-          <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot_expected_probability')">${probOptions}</select></td>
-          <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
-        </tr>`;
-      }).join('');
-    }
-
-    function renderOt2Table() {
-      const tbody = document.querySelector('#ot2Table tbody');
-      const { startStr, endStr } = getMonthRange();
-      const items = leadsCache
-        .filter(l => l.ot2_date && l.ot2_date >= startStr && l.ot2_date < endStr)
-        .slice()
-        .sort((a, b) => (a.ot2_date < b.ot2_date ? -1 : a.ot2_date > b.ot2_date ? 1 : 0));
-
-      if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이번 달 OT2(2차 팔로우업) 기록이 없습니다. OT1 표 오른쪽에서 OT2 예정일을 넣으면 여기 나타나요.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = items.map(l => {
-        const status = l.ot2_status || 'scheduled';
-        const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
-        const probVal = l.ot2_expected_probability != null ? String(l.ot2_expected_probability) : '';
-        const probOptions = OT_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === probVal ? 'selected' : ''}>${o.label}</option>`).join('');
-        return `
-        <tr class="row-otstatus-${status}">
-          <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
-          <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
-          <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot2_status')">${options}</select></td>
-          <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot2_expected_probability')">${probOptions}</select></td>
-        </tr>`;
-      }).join('');
-    }
-
-    // ---- OT 연락 미응답 (pt_ot_no_response) ----
-    function renderOtNoResponseTable() {
-      const tbody = document.querySelector('#otNoResponseTable tbody');
-      document.getElementById('otNoResponseCount').textContent = otNoResponseCache.length;
-      if (otNoResponseCache.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이번 달 미응답 기록이 없습니다.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = otNoResponseCache.map(r => `
-        <tr>
-          <td><input class="sheet-input" type="date" value="${r.contact_date || ''}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'contact_date',false)" /></td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(r.name)}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'name',false)" /></td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(r.memo || '')}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
-          <td><input class="sheet-input" type="date" data-id="${r.id}" title="날짜를 정하면 OT1로 자동 이동돼요" onblur="handlePromoteToOt1(this)" /></td>
-          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtNoResponse('${r.id}')">삭제</button></td>
-        </tr>`).join('');
-    }
-
-    // 연락이 닿아서 OT1 날짜가 확정되면: pt_leads에 새 리드로 등록(OT1 표에 나타남) + 미응답 목록에서는 삭제
-    //
-    // onchange가 아니라 onblur에 연결한 이유: 아이폰(iOS Safari)에서는 날짜 달력(휠피커)을
-    // 스크롤하는 도중에도 change 이벤트가 계속 발생해서(최종 선택 전인데도), 예전에 onchange로
-    // 연결했을 때는 날짜를 고르는 중간중간 계속 confirm 팝업이 뜨는 문제가 있었음.
-    // onblur는 사용자가 날짜 선택을 끝내고 다른 곳을 탭했을 때(포커스를 벗어났을 때) 딱 한 번만
-    // 실행되므로, 날짜 고르는 도중에는 아무 일도 일어나지 않고 다 고른 뒤에만 확인 팝업이 뜸
-    async function handlePromoteToOt1(inputEl) {
-      const id = inputEl.dataset.id;
-      const otDate = inputEl.value;
-      if (!otDate) return;
-      const row = otNoResponseCache.find(r => r.id === id);
-      if (!row) return;
-      if (!confirm(`${row.name}님을 ${otDate}일 OT1로 옮길까요? 미응답 목록에서는 사라져요.`)) {
-        inputEl.value = '';
-        return;
-      }
-      inputEl.disabled = true;
-      try {
-        await addPtLead({
-          trainer_id: selectedTrainerId,
-          name: row.name,
-          source: '오티',
-          contact_date: row.contact_date || formatDateStr(new Date()),
-          week_no: weekOfMonth(row.contact_date || formatDateStr(new Date())),
-          ot_date: otDate,
-          ot_status: 'scheduled',
-          memo: row.memo || null
-        });
-        await deletePtOtNoResponse(id);
-        await reloadLeadsOnly();
-        await reloadOtNoResponseOnly();
-        showToast(`${row.name}님이 OT1로 이동되었습니다.`);
-      } catch (err) {
-        alert(err.message);
-        inputEl.disabled = false;
-      }
-    }
-
-    async function handleOtNoResponseFieldSave(inputEl, field) {
-      const id = inputEl.dataset.id;
-      const value = inputEl.value.trim ? inputEl.value.trim() : inputEl.value;
-      try {
-        await updatePtOtNoResponse(id, { [field]: value || null });
-        const r = otNoResponseCache.find(x => x.id === id);
-        if (r) r[field] = value || null;
-      } catch (err) { alert(err.message); }
-    }
-
-    async function handleDeleteOtNoResponse(id) {
-      if (!confirm('이 기록을 삭제할까요?')) return;
-      try {
-        await deletePtOtNoResponse(id);
-        await reloadOtNoResponseOnly();
-        showToast('기록이 삭제되었습니다.', 'danger');
-      } catch (err) { alert(err.message); }
-    }
-
-    async function reloadOtNoResponseOnly() {
-      const { monthStr } = getMonthRange();
-      try {
-        const all = await fetchPtOtNoResponse();
-        otNoResponseCache = all.filter(r => r.trainer_id === selectedTrainerId && r.period_month === monthStr);
-      } catch (err) { otNoResponseCache = []; }
-      renderOtNoResponseTable();
-    }
-
-    function openAddOtNoResponseModal() {
-      document.getElementById('addOtNoResponseForm').reset();
-      document.getElementById('addOtNoResponseErrorBox').style.display = 'none';
-      document.getElementById('nr_contact_date').value = formatDateStr(new Date());
-      document.getElementById('addOtNoResponseHint').textContent = `${staffName(selectedTrainerId)} 트레이너의 기록으로 등록돼요.`;
-      document.getElementById('addOtNoResponseOverlay').style.display = 'flex';
-    }
-    function closeAddOtNoResponseModal() { document.getElementById('addOtNoResponseOverlay').style.display = 'none'; }
-    document.getElementById('openAddOtNoResponseBtn').addEventListener('click', openAddOtNoResponseModal);
-    document.getElementById('closeAddOtNoResponseBtn').addEventListener('click', closeAddOtNoResponseModal);
-    document.getElementById('addOtNoResponseOverlay').addEventListener('click', (e) => { if (e.target.id === 'addOtNoResponseOverlay') closeAddOtNoResponseModal(); });
-
-    document.getElementById('addOtNoResponseForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errorBox = document.getElementById('addOtNoResponseErrorBox');
-      errorBox.style.display = 'none';
-      try {
-        await addPtOtNoResponse({
-          trainer_id: selectedTrainerId,
-          period_month: getMonthRange().monthStr,
-          name: document.getElementById('nr_name').value.trim(),
-          contact_date: document.getElementById('nr_contact_date').value || null,
-          memo: document.getElementById('nr_memo').value.trim() || null
-        });
-        closeAddOtNoResponseModal();
-        await reloadOtNoResponseOnly();
-        showToast('미응답 기록이 추가되었습니다.');
-      } catch (err) {
-        errorBox.textContent = err.message;
-        errorBox.style.display = 'block';
-      }
-    });
-
     // ---- 상담/매출 기록 추가 ----
     function openAddLeadModal() {
       document.getElementById('addLeadForm').reset();
@@ -1418,8 +1103,6 @@
         leadsCache = all.filter(l => l.trainer_id === selectedTrainerId);
       } catch (err) { leadsCache = []; }
       renderWeeklyTable();
-      renderOt1Table();
-      renderOt2Table();
       loadAllMiniStats();
       loadRevenueCards();
     }
@@ -1433,8 +1116,8 @@
       // 4개 요청을 순서대로 하나씩 기다리면 화면이 뜨기까지 그만큼 느려지므로, 서로 의존관계가 없는
       // 요청들은 한꺼번에 보내고(Promise.allSettled) 결과만 각자 따로 처리함 (로딩 체감 속도 개선)
       const { monthStr } = getMonthRange();
-      const [leadsResult, careResult, noResponseResult, targetsResult] = await Promise.allSettled([
-        fetchPtLeads(), fetchPtCareLogs(), fetchPtOtNoResponse(), fetchPtTargets()
+      const [leadsResult, careResult, targetsResult] = await Promise.allSettled([
+        fetchPtLeads(), fetchPtCareLogs(), fetchPtTargets()
       ]);
       if (leadsResult.status === 'fulfilled') {
         leadsCache = leadsResult.value.filter(l => l.trainer_id === selectedTrainerId);
@@ -1445,16 +1128,10 @@
       careCache = careResult.status === 'fulfilled'
         ? careResult.value.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr)
         : [];
-      otNoResponseCache = noResponseResult.status === 'fulfilled'
-        ? noResponseResult.value.filter(r => r.trainer_id === selectedTrainerId && r.period_month === monthStr)
-        : [];
       targetsCache = targetsResult.status === 'fulfilled' ? targetsResult.value : [];
 
       renderWeeklyTable();
       renderCareTable();
-      renderOt1Table();
-      renderOt2Table();
-      renderOtNoResponseTable();
       loadRevenueCards();
       loadAllMiniStats();
       // 화면을 먼저 그려준 다음, 그 사이에 조용히 "등록인데 PT 회원 관리엔 없는" 건이 있는지 확인해서 채움
