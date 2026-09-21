@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -346,6 +346,11 @@
       </div>
     </div>
 
+    <!-- 2026-09-21 가독성/레이아웃 개선: "문의 경로"와 "상담 워크인/미스"는 둘 다 숫자 몇 칸짜리
+         작은 표라서(680~820px면 충분) 화면이 넓어진 만큼 세로로 따로 쌓아두지 말고 나란히 두 칸으로
+         배치함 - 스크롤 없이 두 표를 한 화면에서 바로 비교해볼 수 있음(화면이 좁아지면 다시 세로로
+         쌓임, 아래 dash-2col 미디어쿼리 참고) -->
+    <div class="dash-2col">
     <div class="section">
       <h2>문의 경로 <span class="muted" style="font-weight:400;font-size:12px;">(센터 전체 공용 - 오늘)</span></h2>
       <p class="muted" style="margin:-6px 0 12px;font-size:13px;">전화·톡톡 등으로 온 문의 건수를 이름 없이 오늘 날짜에 바로 세는 카운터예요. 헬스/올바른운동 그룹PT 두 줄이 한 화면에 같이 보여서 바로 비교돼요. 칸을 클릭해서 숫자만 입력하면 자동 저장되고, 날짜가 바뀌면 어제 기록은 그대로 저장된 채 오늘 칸이 새로 비워져요.</p>
@@ -409,6 +414,7 @@
           <div class="value" id="workinSuccessRate">-</div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 
@@ -477,9 +483,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -1951,7 +1957,7 @@
             ? `<td rowspan="2" style="font-weight:700; background:var(--slate-50); vertical-align:middle; text-align:center;">${week.weekNo}주차<br /><span class="muted" style="font-weight:400; font-size:11px;">${rangeLabel}</span></td>`
             : '';
           const resultLabel = result === 'success' ? '✅ 성공' : '❌ 실패';
-          html += `<tr>${weekCell}<td>${resultLabel}</td>${cellsHtml}<td class="muted" style="text-align:center; font-weight:700;">${weekTotal || ''}</td></tr>`;
+          html += `<tr class="wi-row-${result}">${weekCell}<td>${resultLabel}</td>${cellsHtml}<td class="muted" style="text-align:center; font-weight:700;">${weekTotal || ''}</td></tr>`;
         });
       });
       tbody.innerHTML = html || '<tr><td colspan="10" class="muted" style="padding:16px;">표시할 주차가 없어요.</td></tr>';

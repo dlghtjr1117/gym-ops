@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 만료회원 · TM 관리</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <style>
   /* 이 페이지 전용 - 특이사항(메모) 칸: 엑셀 시트처럼 바로 타이핑해서 저장 (pt.html의
      .sheet-input과 같은 관례) */
@@ -75,20 +75,22 @@
       <h2>만료 예정 · 만료된 회원 <span class="muted">(오늘 기준 45일 이내 만료 또는 이미 만료)</span></h2>
       <p class="muted" style="margin:-6px 0 12px;">맨 왼쪽 체크박스는 "내가 이미 확인/연락한 회원"을 표시해두는 용도예요 (TM 상태와는 별개로, 어디까지 훑어봤는지 흔적만 남겨요). <span id="checkedProgress"></span></p>
       <div id="categoryTabs" class="filter-tabs"></div>
-      <table id="expiryTable" class="table-fixed" style="min-width:980px;">
+      <div style="overflow-x:auto;">
+      <table id="expiryTable" class="table-fixed" style="min-width:980px; max-width:1600px;">
         <thead><tr>
           <th style="width:40px;">확인</th><th style="width:9%;">이름</th><th style="width:12%;">전화번호</th><th style="width:4%;">성별</th>
           <th style="width:13%;">만료일</th><th style="width:17%;">상품</th><th style="width:8%;">담당</th><th style="width:12%;">TM 상태</th><th style="width:16%;">특이사항</th>
         </tr></thead>
         <tbody><tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
+      </div>
       <div class="report-nav" id="expiryPagination" style="justify-content:flex-end; margin-top:10px;"></div>
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

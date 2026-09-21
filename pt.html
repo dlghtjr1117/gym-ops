@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -257,7 +257,7 @@
         </div>
       </div>
       <div style="overflow-x:auto; margin-top:14px;">
-        <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:900px;">
+        <table id="weeklyTable" class="table-fixed sheet-table" style="min-width:900px; max-width:1500px;">
           <thead><tr>
             <th style="width:8%;">주차</th><th style="width:12%;">날짜</th><th style="width:10%;">유형</th><th style="width:10%;">이름</th>
             <th style="width:12%;">금액</th><th style="width:6%;">횟수</th><th style="width:9%;">확률</th><th style="width:27%;">특이사항 · 메모</th><th style="width:6%;"></th>
@@ -276,7 +276,7 @@
       </div>
       <p class="muted" style="margin:-6px 0 12px;">칸을 클릭해서 바로 입력하면 자동 저장돼요. 이번 달에 추가한 기록만 보이고, 지난 달 기록은 그대로 남아있어요 (월 이동해서 확인 가능).</p>
       <div style="overflow-x:auto;">
-        <table id="careTable" class="table-fixed sheet-table" style="min-width:1220px;">
+        <table id="careTable" class="table-fixed sheet-table" style="min-width:1220px; max-width:1700px;">
           <thead><tr>
             <th style="width:13%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
             <th style="width:15%;">수업방향</th><th style="width:5%;">단기</th><th style="width:16%;">장기적 플랜(관리 방향)</th>
@@ -461,9 +461,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

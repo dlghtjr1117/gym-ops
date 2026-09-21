@@ -107,6 +107,10 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   background: var(--slate-50);
   color: var(--slate-900);
+  /* 2026-09-21 가독성 개선: 줄간격 기본값이 없어서(브라우저 기본값 ~1.15) 두 줄 이상 되는 문구가
+     답답하게 붙어 보였음 - 전 화면 공통으로 살짝 더 여유 있게. 표 셀처럼 한 줄짜리 짧은 글자는
+     줄간격 영향이 거의 없어서 밀도가 오히려 좋아지는 곳(표)은 이 값 때문에 손해 보지 않음 */
+  line-height: 1.5;
 }
 
 /* 입력칸/셀렉트/텍스트영역은 페이지마다 배경색을 따로 안 정해준 곳이 많아서(브라우저 기본값인
@@ -234,19 +238,32 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 @media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } }
+/* 대시보드 전용 - "문의 경로" / "상담 워크인/미스" 처럼 폭이 좁아도 충분한 작은 표 두 개를
+   나란히 배치할 때 씀(2026-09-21 추가). 화면이 좁아지면(각 칸이 380px도 못 채울 정도) 다시
+   세로로 쌓이게 함 - minmax(380px, 1fr) 오토핏이라 1200px 정도부터 자연스럽게 한 줄로 바뀜. */
+.dash-2col { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px; align-items: start; margin-top: 32px; }
+.dash-2col > .section { margin-top: 0; }
 .stat-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 16px; }
 .stat-card .label { font-size: 12px; color: var(--slate-500); margin-bottom: 6px; }
 .stat-card .value { font-size: 22px; font-weight: 700; }
 .stat-card .delta { font-size: 12px; margin-top: 4px; }
 .delta.up { color: var(--green-600); }
 .delta.down { color: var(--red-600); }
-.section { margin-top: 24px; }
-.section h2 { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+/* 2026-09-21 가독성 개선: 섹션 사이 간격을 넓혀서(24px -> 32px) 어디까지가 한 섹션인지 더 잘
+   구분되게 하고, 제목(h2)도 살짝 키워서 각 섹션의 "시작점"이 눈에 더 잘 띄게 함 */
+.section { margin-top: 32px; }
+.section h2 { font-size: 16px; font-weight: 700; margin: 0 0 14px; letter-spacing: -0.01em; }
 table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; }
-th, td { text-align: left; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--slate-200); }
+/* 표 글자 크기(13px->13.5px)와 셀 여백(10px 14px -> 12px 16px)을 살짝 넓혀서 숫자/글자가 빽빽하게
+   붙어 보이던 걸 줄임. 다만 회원 목록처럼 줄 수가 아주 많은 표는 .table-fixed가 따로 자기만의 셀
+   높이/여백을 갖고 있어서(아래 참고) 이 변경의 영향을 받지 않음 - 한 화면에 많은 행을 보여줘야 하는
+   표까지 다 늘어나면 오히려 스크롤이 늘어나서 더 안 좋아지기 때문 */
+th, td { text-align: left; padding: 12px 16px; font-size: 13.5px; border-bottom: 1px solid var(--slate-200); }
 th { color: var(--slate-500); font-weight: 600; background: var(--slate-50); }
 tr:last-child td { border-bottom: none; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
 /* badge-red/green/blue는 원래 배경은 고정된 연한 색, 글자색만 var(--red-600) 등 테마별 변수를 썼는데
    -- 다크 모드에서 그 변수들이 "어두운 배경 위에서 잘 보이는 밝은 색"으로 바뀌다 보니, 정작 이 뱃지들처럼
    배경이 항상 연한 채로 고정된 곳에서는 오히려 글자가 배경과 비슷하게 밝아져서 잘 안 보이는 문제가
@@ -304,6 +321,12 @@ tr:last-child td { border-bottom: none; }
 .row-otstatus-missed td { background: #fee2e2; color: #0f172a; }
 .row-otstatus-done td { background: #dcfce7; color: #0f172a; }
 
+/* 대시보드 "상담 워크인/미스" 표 (2026-09-21 가독성 개선 추가) - 같은 주차 안에서 성공/실패 두 줄이
+   테두리 하나로만 구분돼 있어서 숫자만 쭉 나열되면 어느 줄이 성공이고 어느 줄이 실패인지 한눈에
+   안 들어온다는 피드백으로, 위 row-otstatus-*와 같은 방식(행 전체를 옅게 물들임)으로 구분되게 함 */
+.wi-row-success td { background: #f0fdf4; color: #0f172a; }
+.wi-row-fail td { background: #fef2f2; color: #0f172a; }
+
 /* 위 행들의 셀 대부분은 실제로는 td 글자가 아니라 그 안의 입력칸(.sheet-input - 날짜/이름/금액/
    횟수/메모처럼 바로 타이핑해서 저장하는 "엑셀 시트" 스타일 칸)이라서, 바로 위 td { color: #0f172a }
    만으로는 안 고쳐짐 - <input>/<select>는 배경은 투명이라 행 색이 비치지만, 글자색은 부모(td)가
@@ -321,7 +344,8 @@ tr:last-child td { border-bottom: none; }
 .row-care-registered .sheet-input:not(.badge), .row-care-rolled_over .sheet-input:not(.badge),
 .row-care-missed .sheet-input:not(.badge),
 .row-otstatus-scheduled .sheet-input:not(.badge), .row-otstatus-rolled_over .sheet-input:not(.badge),
-.row-otstatus-missed .sheet-input:not(.badge), .row-otstatus-done .sheet-input:not(.badge) {
+.row-otstatus-missed .sheet-input:not(.badge), .row-otstatus-done .sheet-input:not(.badge),
+.wi-row-success .sheet-input:not(.badge), .wi-row-fail .sheet-input:not(.badge) {
   color: #0f172a;
   background: transparent;
 }
@@ -411,16 +435,28 @@ select.tm-status-select {
 .hero-card-secondary.clickable:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
 .hero-card-secondary .hero-toggle-hint { color: var(--indigo-600); font-weight: 600; opacity: 1; }
 
-/* 대시보드 "트레이너 성과 지표" 섹션 (2026-09-05 추가, 2026-09-06 클릭 상세 + 다크 모드 레드 톤 추가) -
-   TOP3 카드/표 행을 클릭하면 그 트레이너의 이번 달 매출 상세가 뜸. 순위 카드는 라이트 모드에선 금/은/동
-   왼쪽 테두리로 구분하고, 다크 모드에서는 이 앱의 "히어로 카드는 전부 같은 빨강" 원칙(2026-09-05)을
-   그대로 따라 순위 구분 없이 동일한 빨강 그라데이션으로 통일함(구분은 메달 이모지·순위 숫자로 충분). */
-#staffPerfTop3Grid .stat-card.rank-1 { border-left: 4px solid #eab308; }
-#staffPerfTop3Grid .stat-card.rank-2 { border-left: 4px solid #94a3b8; }
-#staffPerfTop3Grid .stat-card.rank-3 { border-left: 4px solid #b45309; }
+/* 대시보드 "트레이너 성과 지표" 섹션 (2026-09-05 추가, 2026-09-06 클릭 상세 + 다크 모드 레드 톤 추가,
+   2026-09-21 가독성/일관성 개선 - 흰 배경+색 테두리만으로는 맨 위 파랑/보라/민트 히어로 카드와
+   톤이 따로 놀아서 "색상이 일관성 없다"는 피드백을 받음. 그래서 히어로 카드와 같은 문법(옅은
+   그라데이션 배경 + 위쪽 얇은 진한색 띠)을 금/은/동에 맞는 색으로 그대로 적용해서, 이 페이지의
+   "중요한 카드"는 전부 같은 스타일 언어를 쓰도록 통일함. 다크 모드는 기존처럼 이 앱의 "히어로
+   카드는 전부 같은 빨강" 원칙(2026-09-05)을 그대로 따름(구분은 메달 이모지·순위 숫자로 충분). */
+#staffPerfTop3Grid .stat-card {
+  border-radius: 20px; position: relative; overflow: hidden; border-color: transparent;
+  box-shadow: 0 10px 26px -16px rgba(15,23,42,0.28);
+}
+#staffPerfTop3Grid .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+#staffPerfTop3Grid .stat-card.rank-1 { background: linear-gradient(150deg, #fffaeb, #fef0c7); }
+#staffPerfTop3Grid .stat-card.rank-1::before { background: linear-gradient(90deg, #fbbf24, #d97706); }
+#staffPerfTop3Grid .stat-card.rank-2 { background: linear-gradient(150deg, #f8fafc, #e7ecf2); }
+#staffPerfTop3Grid .stat-card.rank-2::before { background: linear-gradient(90deg, #cbd5e1, #64748b); }
+#staffPerfTop3Grid .stat-card.rank-3 { background: linear-gradient(150deg, #fff3ea, #fde0c8); }
+#staffPerfTop3Grid .stat-card.rank-3::before { background: linear-gradient(90deg, #fb923c, #b45309); }
+#staffPerfTop3Grid .stat-card .label { opacity: .7; }
+#staffPerfTop3Grid .stat-card .value { font-size: 20px; }
 #staffPerfTop3Grid .stat-card.clickable,
 #staffPerfTableBody tr.clickable-row { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
-#staffPerfTop3Grid .stat-card.clickable:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+#staffPerfTop3Grid .stat-card.clickable:hover { box-shadow: 0 16px 30px -14px rgba(15,23,42,0.22); transform: translateY(-3px); }
 #staffPerfTop3Grid .stat-card.clickable:focus-visible,
 #staffPerfTableBody tr.clickable-row:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: -2px; }
 #staffPerfTableBody tr.clickable-row:hover td { background: var(--slate-50); }
@@ -435,6 +471,7 @@ select.tm-status-select {
   border-left: none;
   background: linear-gradient(135deg, #7f1d1d, #dc2626 65%, #f87171);
 }
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card::before { display: none; }
 :root[data-theme="dark"] #staffPerfTop3Grid .stat-card .label,
 :root[data-theme="dark"] #staffPerfTop3Grid .stat-card .value,
 :root[data-theme="dark"] #staffPerfTop3Grid .stat-card .delta.muted {
@@ -555,8 +592,11 @@ tr.member-row:hover td { background: var(--slate-50); }
 }
 .home-banner .greeting { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
 .home-banner .sub { font-size: 13px; opacity: .9; }
+/* 2026-09-21 가독성 개선: 고정 4열이라 타일이 5개(4+1)면 마지막 줄에 하나만 덩그러니 남아
+   화면이 넓어질수록 오른쪽이 휑하게 비어보였음 - auto-fit으로 바꿔서 타일 개수에 맞게 한 줄에
+   고르게 나눠 채워지게 함(타일이 늘어나도 계속 자연스럽게 맞춰짐) */
 .home-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;
 }
 @media (max-width: 720px) { .home-grid { grid-template-columns: repeat(2, 1fr); } }
 .home-tile {

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -91,6 +91,20 @@
       <button type="button" class="btn btn-primary" id="openAddMemberBtn" style="display:none; width:auto; padding:10px 24px;">+ 회원 등록</button>
     </div>
 
+    <!-- 2026-09-21 가독성 개선: 회원 목록은 표가 하나뿐이라 대시보드처럼 옆에 다른 표를 붙이기보다,
+         이미 화면에서 계산해두고 있던 숫자(전체 회원 수·미수금 있는 회원 수)를 카드로 먼저 보여줘서
+         한눈에 현황이 보이게 함(새 데이터 조회 없이 기존 membersCache/openReceivableMemberIds 재사용) -->
+    <div class="grid-2" style="margin-bottom:20px;">
+      <div class="stat-card">
+        <div class="label">전체 회원</div>
+        <div class="value" id="memberStatTotal">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">미수금 있는 회원</div>
+        <div class="value" id="memberStatReceivable">-</div>
+      </div>
+    </div>
+
     <div class="panel" id="uploadPanel" style="display:none;">
       <h3>엑셀로 회원 일괄 등록 / 업데이트</h3>
       <p class="muted" style="margin-top:-6px; margin-bottom:12px;">
@@ -109,7 +123,7 @@
         <input type="text" id="memberSearch" placeholder="이름 또는 전화번호 뒷자리로 검색" />
       </div>
       <div style="overflow-x:auto;">
-      <table id="membersTable" class="table-fixed" style="min-width:1020px;">
+      <table id="membersTable" class="table-fixed" style="min-width:1020px; max-width:1500px;">
         <thead><tr>
           <th style="width:11%;">이름</th><th style="width:13%;">전화번호</th><th style="width:8%;">담당</th>
           <th style="width:17%;">이용권</th><th style="width:17%;">그룹PT</th><th style="width:17%;">개인PT</th><th style="width:8%;">락커</th><th style="width:8%;">운동복</th><th id="deleteColHeader" style="display:none; width:6%;"></th>
@@ -388,9 +402,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -494,6 +508,8 @@
         ]);
         membersCache = members;
         openReceivableMemberIds = receivableIds;
+        document.getElementById('memberStatTotal').textContent = membersCache.length + '명';
+        document.getElementById('memberStatReceivable').textContent = openReceivableMemberIds.size + '명';
         renderMembersTable();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 9 : 8}" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;

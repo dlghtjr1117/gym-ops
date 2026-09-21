@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 매출 입력</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 </head>
 <body>
   <div class="topbar">
@@ -34,7 +34,9 @@
   </div>
 
   <div class="wrap">
-    <div class="panel">
+    <!-- 2026-09-21 가독성 개선: 입력 폼(.form-grid)은 auto-fit 그리드라 화면이 넓어진 만큼 칸 하나하나가
+         너무 넓게 늘어나서 오히려 입력칸처럼 안 보이던 문제 - 폼을 담은 패널 자체를 적당한 폭으로 잡음 -->
+    <div class="panel" style="max-width:900px;">
       <h3>매출 등록</h3>
       <div id="addErrorBox" class="error-text"></div>
       <div id="addSuccessBox" class="success-text"></div>
@@ -77,10 +79,12 @@
 
     <div class="section">
       <h2>최근 매출 내역</h2>
-      <table id="salesTable">
+      <div style="overflow-x:auto;">
+      <table id="salesTable" style="max-width:1200px;">
         <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th><th id="salesDeleteColHeader" style="display:none;"></th></tr></thead>
         <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
+      </div>
       <div class="report-nav" style="margin-top:10px; justify-content:flex-end;">
         <button type="button" class="report-nav-arrow" id="salesPrevBtn">◀</button>
         <div class="muted" id="salesPageLabel">-</div>
@@ -136,9 +140,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

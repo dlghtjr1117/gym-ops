@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 직원 관리</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <style>
   /* 이 페이지 전용 - 권한 드롭다운을 뱃지처럼 보이게 */
   .role-select {
@@ -55,16 +55,16 @@
     <div class="section">
       <h2>직원 목록</h2>
       <p class="muted" style="margin:-4px 0 12px;">권한 칸을 클릭해서 트레이너 ↔ 지점장으로 바로 전환할 수 있어요. 지점장으로 바꾸면 그 직원도 전체 회원 · 매출 · PT 기록을 다 볼 수 있게 돼요. 본인 권한은 실수로 잠기는 걸 막기 위해 여기서 바꿀 수 없어요 — 다른 지점장에게 부탁해주세요.</p>
-      <table id="staffTable">
+      <table id="staffTable" style="max-width:800px;">
         <thead><tr><th>이름</th><th>연락처</th><th>가입일</th><th>권한</th></tr></thead>
         <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

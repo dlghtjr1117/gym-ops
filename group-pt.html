@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 그룹PT 참석 관리</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 특이사항(메모) 칸: 만료회원·TM 화면과 같은 관례(엑셀 시트처럼 바로 타이핑) */
@@ -103,7 +103,8 @@
     <div class="section">
       <h2>올바른 운동 무제한 회원 목록 <span class="muted">(마지막 방문일 오래된 순)</span></h2>
       <div id="retentionTabs" class="filter-tabs"></div>
-      <table id="retentionTable" class="table-fixed" style="min-width:1100px;">
+      <div style="overflow-x:auto;">
+      <table id="retentionTable" class="table-fixed" style="min-width:1100px; max-width:1600px;">
         <thead><tr>
           <th style="width:8%;">이름</th><th style="width:11%;">전화번호</th><th style="width:6%;">담당</th>
           <th style="width:15%;">그룹PT 상품</th><th style="width:9%;">마지막 방문일</th><th style="width:8%;">경과</th>
@@ -111,14 +112,15 @@
         </tr></thead>
         <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
+      </div>
       <div class="report-nav" id="retentionPagination" style="justify-content:flex-end; margin-top:10px;"></div>
       <p class="muted" style="margin-top:10px; font-size:12px;">TM 상태: 미연락 → 연락함 → 초심자패키지 제안함 → 전환 완료 / 거절 / 보류 중 하나로 바로 클릭해서 바꿀 수 있고(만료회원·TM 화면과 같은 방식), 특이사항 칸도 그 자리에서 바로 타이핑해서 저장돼요.</p>
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

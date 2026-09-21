@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 미팅 기록일지</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 </head>
 <body>
   <div class="topbar">
@@ -34,7 +34,9 @@
   </div>
 
   <div class="wrap">
-    <div class="panel">
+    <!-- 2026-09-21 가독성 개선: 요약/메모/전사처럼 긴 글을 쓰고 읽는 화면이라, 화면 끝까지 넓히면
+         입력칸도 텍스트 줄도 너무 길어져서 오히려 읽기 불편해짐 - 적당한 폭으로 고정 -->
+    <div class="panel" style="max-width:900px;">
       <h3>미팅 기록 추가</h3>
       <p class="muted" style="margin:-6px 0 12px;">
         직원 회의(지점장·트레이너) 내용을 기록해두는 곳이에요. 직접 타이핑해도 되고,
@@ -81,15 +83,15 @@
 
     <div class="section">
       <h2>미팅 기록 목록</h2>
-      <div id="meetingListBody">
+      <div id="meetingListBody" style="max-width:900px;">
         <p class="muted" style="padding:16px;">불러오는 중...</p>
       </div>
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

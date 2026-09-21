@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 업무 리스트</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 </head>
 <body>
   <div class="topbar">
@@ -34,7 +34,10 @@
   </div>
 
   <div class="wrap">
-    <div class="panel">
+    <!-- 2026-09-21 가독성 개선: 입력 폼 패널과 체크리스트 목록 모두 화면 끝까지 늘어나면 칸/줄이
+         휑해지는 타입이라(업무 목록은 표가 아니라 좌측 텍스트+우측 "수정" 버튼인 체크리스트라 더 그럼)
+         적당한 폭으로 잡음 -->
+    <div class="panel" style="max-width:900px;">
       <h3>업무 추가</h3>
       <p class="muted" style="margin:-6px 0 12px;">지점장은 아무에게나 업무를 배정할 수 있고, 트레이너는 본인 앞으로만 업무를 추가할 수 있어요. "매일"/"매주"로 등록하면 마이크로소프트 투두처럼 체크한 업무가 다음 주기에 자동으로 다시 미체크 상태로 돌아와요. "10시 회의", "오후 3시 OO쌤 미팅"처럼 특정 시각이 있는 일정은 "시간"까지 같이 넣어주면 목록에서 시간순으로 정렬돼요.</p>
       <div id="addErrorBox" class="error-text"></div>
@@ -85,7 +88,7 @@
       <h2 id="taskListTitle">업무 목록</h2>
       <div id="trainerTabs" class="filter-tabs"></div>
       <p class="muted" id="taskProgress" style="margin:0 0 12px;"></p>
-      <div id="taskBody">
+      <div id="taskBody" style="max-width:900px;">
         <p class="muted" style="padding:16px;">불러오는 중...</p>
       </div>
     </div>
@@ -140,9 +143,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

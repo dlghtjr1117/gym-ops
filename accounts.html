@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 계정 관리</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <style>
   /* 이 페이지 전용 - 비밀번호 칸을 점(dot)으로 가려서 보여줄 때 쓰는 스타일 */
   .pw-text { font-family: 'Courier New', monospace; letter-spacing: 1px; }
@@ -40,7 +40,9 @@
   </div>
 
   <div class="wrap">
-    <div class="panel" id="addPanel">
+    <!-- 2026-09-21 가독성 개선: 짧은 목록형 화면이라 표/폼이 화면 끝까지 늘어나면 오히려 휑해 보여서
+         적당한 폭으로 잡음 -->
+    <div class="panel" id="addPanel" style="max-width:900px;">
       <h3>계정 등록</h3>
       <p class="muted" style="margin:-6px 0 12px;">네이버, 네이버플레이스, 노션, 구글 등 센터에서 같이 쓰는 서비스 계정을 등록해두면 직원 누구나 여기서 바로 확인할 수 있어요.</p>
       <div id="addErrorBox" class="error-text"></div>
@@ -57,16 +59,16 @@
     <div class="section">
       <h2>등록된 계정 목록</h2>
       <p class="muted" style="margin:-4px 0 12px;">비밀번호는 기본적으로 가려져 있어요. "보기"를 누르면 그 자리에서 바로 보여요.</p>
-      <table id="accountsTable">
+      <table id="accountsTable" style="max-width:900px;">
         <thead><tr><th>서비스명</th><th>아이디</th><th>비밀번호</th><th>수정일</th><th></th></tr></thead>
         <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

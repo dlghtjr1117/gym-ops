@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 지표 분석</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 <style>
   /* 이 페이지 전용 - 지표 카드 5개를 한 줄에(좁은 화면에선 2줄/1줄로) */
   .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
@@ -150,7 +150,7 @@
     <div class="section">
       <h2>최근 6개월 추이</h2>
       <div style="overflow-x:auto;">
-        <table id="trendTable">
+        <table id="trendTable" style="max-width:900px;">
           <thead><tr>
             <th>월</th><th>총 회원수</th><th>신규 등록</th><th>재등록률</th><th>이탈률</th><th>객단가(FC)</th>
           </tr></thead>
@@ -216,9 +216,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -395,14 +395,14 @@
 
         if (!planRows && !unlinkedRow) {
           return `
-            <div class="panel" style="margin-top:12px;">
+            <div class="panel" style="margin-top:0;">
               <h3 style="margin:0 0 8px; font-size:14px;">${escapeHtml(cat.categoryLabel)}</h3>
               <p class="muted" style="font-size:12.5px; margin:0;">이번 달 등록 없음</p>
             </div>`;
         }
 
         return `
-          <div class="panel" style="margin-top:12px;">
+          <div class="panel" style="margin-top:0;">
             <h3 style="margin:0 0 8px; font-size:14px;">${escapeHtml(cat.categoryLabel)} <span class="muted" style="font-weight:400; font-size:12px;">(이번 달 총 ${cat.totalCount}건)</span></h3>
             <div style="overflow-x:auto;">
               <table class="plan-table">
@@ -413,7 +413,10 @@
           </div>`;
       }).join('');
 
-      document.getElementById('planStatsWrap').innerHTML = html;
+      // 2026-09-21 가독성 개선: 헬스이용권/그룹PT/개인PT 3개 카테고리 패널이 전엔 세로로 쭉 쌓여서
+      // 스크롤이 길었는데, 화면이 넓어진 만큼 3열로 나란히 배치해서 한눈에 비교되게 함
+      // (좁은 화면에서는 .grid-3의 기존 미디어쿼리대로 자동으로 세로 배치로 돌아감)
+      document.getElementById('planStatsWrap').innerHTML = `<div class="grid-3" style="align-items:start;">${html}</div>`;
     }
 
     function renderMetricCards(cur, prev, series) {

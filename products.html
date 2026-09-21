@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 이용권 관리</title>
-<link rel="stylesheet" href="style.css?v=1789971800" />
+<link rel="stylesheet" href="style.css?v=1789981900" />
 </head>
 <body>
   <div class="topbar">
@@ -38,7 +38,9 @@
       <p class="muted" style="margin:0;">이용권 상품을 등록·수정하는 건 지점장만 할 수 있어요. 매출 입력이나 회원 등록 화면에서는 등록된 상품을 그대로 골라 쓰실 수 있어요.</p>
     </div>
 
-    <div class="panel" id="addPanel" style="display:none;">
+    <!-- 2026-09-21 가독성 개선: 짧은 목록형 화면이라 표/폼이 화면 끝까지 늘어나면 오히려 휑해 보여서
+         적당한 폭으로 잡음 -->
+    <div class="panel" id="addPanel" style="display:none; max-width:900px;">
       <h3>상품 등록</h3>
       <p class="muted" style="margin:-6px 0 12px;">여기서 만든 상품은 매출 입력·회원 등록 화면에서 바로 골라 쓸 수 있고, 가격/만료일/PT 횟수가 자동으로 채워져요.</p>
       <div id="addErrorBox" class="error-text"></div>
@@ -66,16 +68,16 @@
     <div class="section">
       <h2>이용권 상품 목록</h2>
       <div id="categoryTabs" class="filter-tabs"></div>
-      <table id="productsTable">
+      <table id="productsTable" style="max-width:1100px;">
         <thead><tr><th>상품명</th><th>카테고리</th><th>가격</th><th>유효기간</th><th>PT 횟수</th><th>상태</th><th></th></tr></thead>
         <tbody><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
     </div>
   </div>
 
-  <script src="config.js?v=1789971800"></script>
-  <script src="auth.js?v=1789971800"></script>
-  <script src="data.js?v=1789971800"></script>
+  <script src="config.js?v=1789981900"></script>
+  <script src="auth.js?v=1789981900"></script>
+  <script src="data.js?v=1789981900"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
