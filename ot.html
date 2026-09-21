@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - OT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789981900" />
+<link rel="stylesheet" href="style.css?v=1789982712" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
   .sheet-input {
@@ -64,6 +64,22 @@
   @media (max-width: 900px) { .ot-detail-stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
   .ot-stat-group-title { font-size: 12px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: .02em; margin: 22px 0 10px; }
   .ot-stat-group-title:first-child { margin-top: 0; }
+
+  /* OT1 / OT2를 세로로 쌓지 않고 나란히 2단 배치 (2026-09-21 추가) */
+  .ot12-2col {
+    display: grid;
+    grid-template-columns: minmax(680px, 1.15fr) minmax(600px, 1fr);
+    gap: 20px;
+    align-items: start;
+    margin-top: 26px;
+  }
+  @media (max-width: 1400px) {
+    .ot12-2col { grid-template-columns: 1fr; }
+  }
+  .ot12-col h3 { font-size: 14px; margin: 0; }
+  .ot12-col-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px; gap: 8px; }
+  .ot12-col table.table-fixed th, .ot12-col table.table-fixed td { padding: 6px 8px; font-size: 12px; }
+  .ot12-col .sheet-input { font-size: 12px; }
 
   /* "트레이너별 OT 성과 순위" 섹션 (2026-09-21 추가) - pt.html "트레이너 매출 순위"(lb-row)와
      같은 결로 맞추되, 금액 막대 1개 대신 성공/실패/진행중 3색 세그먼트 막대를 씀 */
@@ -251,29 +267,44 @@
         </div>
       </div>
 
-      <div style="display:flex; align-items:center; justify-content:space-between; margin:26px 0 8px;">
-        <h3 style="font-size:14px; margin:0;">OT1 (최초 체험)</h3>
-        <button type="button" class="btn btn-primary" id="openAddOt1Btn" style="width:auto; padding-left:16px; padding-right:16px;">+ OT1 기록 추가</button>
-      </div>
-      <div style="overflow-x:auto;">
-        <table id="ot1Table" class="table-fixed sheet-table" style="min-width:1160px;">
-          <thead><tr>
-            <th style="width:12%;">OT1날짜</th><th style="width:10%;">연락드린날짜</th><th style="width:8%;">이름</th>
-            <th style="width:20%;">특이사항</th><th style="width:12%;">현황</th><th style="width:11%;">예상 등록률</th><th style="width:12%;">OT2 예정일</th><th style="width:7%;"></th>
-          </tr></thead>
-          <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-        </table>
-      </div>
+      <!-- 2026-09-21: OT1/OT2를 세로로 쌓지 않고 나란히 2단으로 배치함("OT1 아래에 OT2가 있는데
+           그럴 필요 없을 것 같다"는 요청 - OT2는 대부분 OT1보다 기록이 적어서 아래로 스크롤해야만
+           보이던 걸, 한 화면에서 바로 비교하게 함). 두 표 모두 칸을 좁게 압축(font-size 12px, 셀
+           패딩도 줄임)하고 OT1 표는 min-width:680px / OT2는 min-width:600px로 좁혀서 웬만한 넓은
+           화면(1400px+)에서는 한 줄에 나란히 들어가고, 그보다 좁아지면(노트북 등) 자동으로 다시
+           세로로 쌓임 - 사용자 승인받은 목업(2026-09-21) 그대로 반영 -->
+      <div class="ot12-2col">
+        <div class="ot12-col">
+          <div class="ot12-col-header">
+            <h3 style="font-size:14px; margin:0;">OT1 (최초 체험)</h3>
+            <button type="button" class="btn btn-primary" id="openAddOt1Btn" style="width:auto; padding:7px 14px; font-size:12.5px;">+ OT1 기록 추가</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="ot1Table" class="table-fixed sheet-table" style="min-width:680px;">
+              <thead><tr>
+                <th style="width:11%;">OT1날짜</th><th style="width:10%;">연락일</th><th style="width:9%;">이름</th>
+                <th style="width:22%;">특이사항</th><th style="width:13%;">현황</th><th style="width:13%;">예상등록률</th><th style="width:13%;">OT2예정일</th><th style="width:6%;"></th>
+              </tr></thead>
+              <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
 
-      <h3 style="font-size:14px; margin:26px 0 8px;">OT2 (2차 팔로우업)</h3>
-      <div style="overflow-x:auto;">
-        <table id="ot2Table" class="table-fixed sheet-table" style="min-width:1080px;">
-          <thead><tr>
-            <th style="width:13%;">OT2날짜</th><th style="width:9%;">이름</th>
-            <th style="width:32%;">특이사항</th><th style="width:16%;">현황</th><th style="width:16%;">예상 등록률</th><th style="width:8%;"></th>
-          </tr></thead>
-          <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-        </table>
+        <div class="ot12-col">
+          <div class="ot12-col-header">
+            <h3 style="font-size:14px; margin:0;">OT2 (2차 팔로우업)</h3>
+            <span class="muted" style="font-size:11.5px;">OT1 표에서 "OT2예정일"을 넣으면 자동으로 여기 생겨요</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="ot2Table" class="table-fixed sheet-table" style="min-width:600px;">
+              <thead><tr>
+                <th style="width:14%;">OT2날짜</th><th style="width:11%;">이름</th>
+                <th style="width:36%;">특이사항</th><th style="width:16%;">현황</th><th style="width:16%;">예상등록률</th><th style="width:7%;"></th>
+              </tr></thead>
+              <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-top:26px;">
@@ -332,9 +363,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789981900"></script>
-  <script src="auth.js?v=1789981900"></script>
-  <script src="data.js?v=1789981900"></script>
+  <script src="config.js?v=1789982712"></script>
+  <script src="auth.js?v=1789982712"></script>
+  <script src="data.js?v=1789982712"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
