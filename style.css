@@ -226,7 +226,11 @@ p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 12px; align-items: end; }
 .form-grid .field { margin-bottom: 0; }
 .muted { color: var(--slate-500); font-size: 12px; }
-.wrap { max-width: 1000px; margin: 0 auto; padding: 20px; }
+/* 2026-09-21: 처음엔 1000px -> 1600px로만 넓혔었는데, "대시보드·회원관리·매출입력·만료회원 등
+   모든 페이지를 전체 화면으로 넓혀달라"는 추가 요청으로 최대 폭 제한 자체를 없앰(전 페이지가 이
+   .wrap 클래스 하나를 같이 쓰고 있어서 여기 한 줄만 고치면 모든 화면에 다 적용됨).
+   화면 양 끝에 글자가 완전히 붙는 건 답답해 보여서 좌우 40px 여백만 남기고 나머지는 다 씀. */
+.wrap { max-width: none; margin: 0 auto; padding: 20px 40px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 @media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }

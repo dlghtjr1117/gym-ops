@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - OT 관리</title>
-<link rel="stylesheet" href="style.css?v=1789968400" />
+<link rel="stylesheet" href="style.css?v=1789971800" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
   .sheet-input {
@@ -42,8 +42,10 @@
   .ot-trainer-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-2px); border-color: var(--indigo-600); }
   .ot-trainer-card:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
   .ot-trainer-card.has-alert { border-color: #fca5a5; }
-  .ot-trainer-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
-  @media (max-width: 860px) { .ot-trainer-grid { grid-template-columns: 1fr; } }
+  /* 2026-09-21: .wrap이 넓어진 만큼, 카드가 2개로 고정되어 억지로 늘어나지 않고 화면 폭에 맞춰
+     3~4개까지 자동으로 늘어나도록 auto-fit으로 변경(카드 1개 최소 폭 340px 기준) - 좁은 화면에서는
+     기존처럼 자연스럽게 1개씩 쌓임(별도 media query 불필요) */
+  .ot-trainer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
   .ot-avatar {
     width: 40px; height: 40px; border-radius: 999px; background: var(--indigo-600); color: var(--white);
     display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0;
@@ -121,7 +123,7 @@
     </div>
   </div>
 
-  <div class="wrap" style="max-width:1200px;">
+  <div class="wrap">
     <!-- 월 선택 (트레이너 선택은 없음 - 지점장은 카드를 눌러 드릴다운, 트레이너는 본인 현황만 보임) -->
     <div class="report-nav">
       <div style="display:flex; flex-direction:column; gap:2px;">
@@ -330,9 +332,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1789968400"></script>
-  <script src="auth.js?v=1789968400"></script>
-  <script src="data.js?v=1789968400"></script>
+  <script src="config.js?v=1789971800"></script>
+  <script src="auth.js?v=1789971800"></script>
+  <script src="data.js?v=1789971800"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
