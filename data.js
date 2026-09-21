@@ -1237,6 +1237,37 @@ async function fetchPtTrainerLeaderboard(monthStartStr, monthEndStr) {
   return res.json();
 }
 
+// PT 관리 리더보드에서 트레이너 막대를 눌렀을 때 뜨는 상세 모달(대시보드 "트레이너 성과 지표"와 완전히
+// 같은 화면 구성)용 - migration_49의 SECURITY DEFINER 함수 3개. 전부 다른 트레이너 계정으로 호출해도
+// 정상적으로 데이터가 돌아오도록(=RLS를 이 함수들에 한해서만 의도적으로 우회) 만들어져 있음.
+async function fetchPtTrainerSalesRows(trainerId, rangeStartStr, rangeEndStr) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_pt_trainer_sales_rows`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_trainer_id: trainerId, p_range_start: rangeStartStr, p_range_end: rangeEndStr })
+  });
+  if (!res.ok) await throwApiError(res, '트레이너 매출 내역을 불러오지 못했습니다.');
+  return res.json();
+}
+async function fetchPtTrainerTargetsAll(trainerId) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_pt_trainer_targets`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_trainer_id: trainerId })
+  });
+  if (!res.ok) await throwApiError(res, '트레이너 목표를 불러오지 못했습니다.');
+  return res.json();
+}
+async function fetchPtTrainerMonthRank(monthStartStr, monthEndStr) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_pt_trainer_month_rank`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_month_start: monthStartStr, p_month_end: monthEndStr })
+  });
+  if (!res.ok) await throwApiError(res, '트레이너 순위 정보를 불러오지 못했습니다.');
+  return res.json();
+}
+
 // center_targets.month 컬럼은 date 타입이라 항상 "그 달 1일" 전체 날짜(예: 2026-09-01)로 넣어야 함.
 // 호출하는 쪽에서는 다른 월 관련 함수들과 통일해서 'YYYY-MM' 형태(예: 2026-09)로 넘기므로, 여기서
 // '-01'을 붙여 변환해줌 - 이걸 안 하면 PostgREST가 "invalid input syntax for type date" 오류를 냄.
