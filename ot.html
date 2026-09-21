@@ -24,6 +24,10 @@
   select.sheet-input.badge-purple { background: #f3e8ff; }
   select.sheet-input.badge-teal { background: #ccfbf1; }
   .sheet-table td, .sheet-table th { padding: 6px 8px; }
+  /* .mini-stat-box는 pt.html에도 있지만 공용 style.css가 아니라 그 페이지 전용 <style>에만 있어서
+     이 페이지에도 똑같이 옮겨옴(안 옮기면 카드 테두리·배경 없이 글자만 뜸) */
+  .mini-stat-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+  .mini-stat-box .mini-title { font-size: 12px; font-weight: 700; color: var(--slate-500); margin-bottom: 6px; }
   .mini-stat-box .mini-value { font-family: inherit; font-size: 22px; font-weight: 800; margin-top: 2px; }
 
   /* 트레이너별 OT 현황 카드 (지점장 전용 "카드형" 보기) - 한 눈에 진행 인원 · 성공률 · 미응답을
@@ -196,23 +200,23 @@
         <button type="button" class="btn btn-primary" id="openAddOt1Btn" style="width:auto; padding-left:16px; padding-right:16px;">+ OT1 기록 추가</button>
       </div>
       <div style="overflow-x:auto;">
-        <table id="ot1Table" class="table-fixed sheet-table" style="min-width:1080px;">
+        <table id="ot1Table" class="table-fixed sheet-table" style="min-width:1160px;">
           <thead><tr>
-            <th style="width:13%;">OT1날짜</th><th style="width:11%;">연락드린날짜</th><th style="width:9%;">이름</th>
-            <th style="width:28%;">특이사항</th><th style="width:13%;">현황</th><th style="width:12%;">예상 등록률</th><th style="width:14%;">OT2 예정일</th>
+            <th style="width:12%;">OT1날짜</th><th style="width:10%;">연락드린날짜</th><th style="width:8%;">이름</th>
+            <th style="width:20%;">특이사항</th><th style="width:12%;">현황</th><th style="width:11%;">예상 등록률</th><th style="width:12%;">OT2 예정일</th><th style="width:7%;"></th>
           </tr></thead>
-          <tbody><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
 
       <h3 style="font-size:14px; margin:26px 0 8px;">OT2 (2차 팔로우업)</h3>
       <div style="overflow-x:auto;">
-        <table id="ot2Table" class="table-fixed sheet-table" style="min-width:1000px;">
+        <table id="ot2Table" class="table-fixed sheet-table" style="min-width:1080px;">
           <thead><tr>
-            <th style="width:14%;">OT2날짜</th><th style="width:10%;">이름</th>
-            <th style="width:40%;">특이사항</th><th style="width:18%;">현황</th><th style="width:18%;">예상 등록률</th>
+            <th style="width:13%;">OT2날짜</th><th style="width:9%;">이름</th>
+            <th style="width:32%;">특이사항</th><th style="width:16%;">현황</th><th style="width:16%;">예상 등록률</th><th style="width:8%;"></th>
           </tr></thead>
-          <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
 
@@ -544,7 +548,7 @@
         .slice()
         .sort((a, b) => (a.ot_date < b.ot_date ? -1 : a.ot_date > b.ot_date ? 1 : 0));
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>';
         return;
       }
       tbody.innerHTML = items.map(l => {
@@ -556,11 +560,12 @@
         <tr class="row-otstatus-${status}">
           <td><input class="sheet-input" type="date" value="${l.ot_date || ''}" data-lead-id="${l.id}" onchange="handleOtLeadFieldSave(this,'ot_date',false)" /></td>
           <td class="cell-1line">${l.contact_date || '-'}</td>
-          <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.name)}" data-lead-id="${l.id}" title="${escapeHtml(l.name)}" onchange="handleOtNameFieldSave(this)" /></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleOtLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
           <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot_status')">${options}</select></td>
           <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot_expected_probability')">${probOptions}</select></td>
           <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtLead('${l.id}')">삭제</button></td>
         </tr>`;
       }).join('');
     }
@@ -571,7 +576,7 @@
         .slice()
         .sort((a, b) => (a.ot2_date < b.ot2_date ? -1 : a.ot2_date > b.ot2_date ? 1 : 0));
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이번 달 OT2(2차 팔로우업) 기록이 없습니다. OT1 표 오른쪽에서 OT2 예정일을 넣으면 여기 나타나요.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:16px;">이번 달 OT2(2차 팔로우업) 기록이 없습니다. OT1 표 오른쪽에서 OT2 예정일을 넣으면 여기 나타나요.</td></tr>';
         return;
       }
       tbody.innerHTML = items.map(l => {
@@ -582,10 +587,11 @@
         return `
         <tr class="row-otstatus-${status}">
           <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
-          <td class="cell-1line" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.name)}" data-lead-id="${l.id}" title="${escapeHtml(l.name)}" onchange="handleOtNameFieldSave(this)" /></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleOtLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
           <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot2_status')">${options}</select></td>
           <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot2_expected_probability')">${probOptions}</select></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtLead('${l.id}')">삭제</button></td>
         </tr>`;
       }).join('');
     }
@@ -596,6 +602,34 @@
         await updatePtLead(id, { [field]: value });
         const l = leadsAllCache.find(x => x.id === id);
         if (l) l[field] = value;
+      } catch (err) { alert(err.message); }
+    }
+    // 이름은 pt_leads에서 not null 컬럼이라 빈 값으로 저장하면 안 돼서 별도 핸들러로 처리
+    async function handleOtNameFieldSave(inputEl) {
+      const id = inputEl.dataset.leadId;
+      const value = inputEl.value.trim();
+      const l = leadsAllCache.find(x => x.id === id);
+      if (!value) {
+        alert('이름은 비워둘 수 없습니다.');
+        inputEl.value = l ? l.name : '';
+        return;
+      }
+      try {
+        await updatePtLead(id, { name: value });
+        if (l) l.name = value;
+        inputEl.title = value;
+      } catch (err) {
+        alert(err.message);
+        inputEl.value = l ? l.name : '';
+      }
+    }
+    async function handleDeleteOtLead(id) {
+      if (!confirm('이 OT 기록을 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+      try {
+        await deletePtLead(id);
+        await reloadCoreData();
+        render();
+        showToast('OT 기록이 삭제되었습니다.', 'danger');
       } catch (err) { alert(err.message); }
     }
     async function handleOtStatusFieldSave(selectEl, field) {
