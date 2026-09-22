@@ -1359,6 +1359,33 @@ async function upsertWorkinResult({ result_date, result, count, updated_by }) {
   return res.json();
 }
 
+// ---- 포대수(dashboard.html "문의 경로" 아래 일별 전단지 배포 개수) ----
+// 문의 경로/워크인과 같은 방식(이름 없이 그날짜 건수만 집계, 센터 공용)인데, 채널·결과 구분 없이
+// 날짜 하나에 숫자 하나만 있으면 되는 가장 단순한 형태
+async function fetchFlyerCounts(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const endDate = new Date(y, m, 1); // m은 이미 1~12라 그대로 넣으면 다음 달 1일이 됨
+  const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-01`;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/flyer_counts?record_date=gte.${start}&record_date=lt.${end}`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '포대수 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 같은 날짜면 덮어쓰기(upsert) - migration_54의 unique 제약을 이용
+async function upsertFlyerCount({ record_date, count, updated_by }) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/flyer_counts?on_conflict=record_date`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify({ record_date, count, updated_by: updated_by || null, updated_at: new Date().toISOString() })
+  });
+  if (!res.ok) await throwApiError(res, '포대수 기록 저장에 실패했습니다.');
+  return res.json();
+}
+
 // ---- 매출 보고 공유 링크(dashboard.html "🔗 공유 링크 만들기" -> report.html) ----
 // "캡쳐해서 일일이 보내지 말고 링크로 보여줄 수 있게" 요청으로 추가. 공유 버튼을 누른 시점의 숫자를
 // 그대로 jsonb 스냅샷으로 저장해두고, report.html이 로그인 없이 그 한 건만 읽어서 보여줌(실시간 X).

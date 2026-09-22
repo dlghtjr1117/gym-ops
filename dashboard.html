@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1790065581" />
+<link rel="stylesheet" href="style.css?v=1790066626" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -132,6 +132,25 @@
 
   .fc-target-box { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 2px 0; }
   .fc-target-box input { width:140px; padding:6px 8px; border:1px solid var(--slate-300); border-radius:8px; font-size:13px; }
+
+  /* 포대수(전단지 배포 개수) 기록 - "문의 경로" 카드 밑에 남는 빈 공간을 채워달라는 요청(2026-09-22)으로
+     추가. 날짜별로 숫자 하나만 입력하면 되는 표라, 세로로 길게 쌓는 대신 실제 달력처럼 7칸씩 가로로
+     배치해서("달력처럼 1일부터 29~31까지") 옆 칸(상담 워크인/미스)과 높이가 비슷해지도록 함 */
+  .flyer-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .flyer-cal-cell {
+    border: 1px solid var(--slate-200); border-radius: 8px; padding: 5px 3px 6px;
+    text-align: center; background: var(--slate-50);
+  }
+  .flyer-cal-cell.is-today { border-color: var(--indigo-600); background: color-mix(in srgb, var(--indigo-600) 8%, var(--slate-50)); }
+  .flyer-cal-cell.is-blank { visibility: hidden; }
+  .flyer-cal-cell .fc-daynum { font-size: 11px; color: var(--slate-500); margin-bottom: 3px; }
+  .flyer-cal-cell.is-today .fc-daynum { color: var(--indigo-600); font-weight: 700; }
+  .flyer-cal-cell input {
+    width: 100%; box-sizing: border-box; text-align: center; padding: 4px 2px; font-size: 12.5px;
+    border: 1px solid var(--slate-200); border-radius: 6px; background: var(--surface);
+  }
+  .flyer-cal-cell input:focus { border-color: var(--indigo-600); outline: none; }
+  .flyer-cal-weekday { text-align: center; font-size: 10.5px; color: var(--slate-500); padding-bottom: 2px; }
 </style>
 </head>
 <body>
@@ -386,6 +405,24 @@
           </table>
         </div>
       </div>
+
+      <!-- 포대수(전단지 배포 개수) 기록 - "문의 경로" 카드 밑에 남는 빈 공간을 채워달라는 요청(2026-09-22)으로
+           추가. 토글 없이 항상 보이게 둠(빈 공간이 토글 상태와 무관하게 늘 있었기 때문). 매출 보고
+           화살표로 보는 기준월(refMonthStr())을 그대로 따라가서 옆의 워크인/문의 경로 지난 기록과 같은
+           달을 보게 됨 -->
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--slate-200);">
+        <h3 style="margin:0 0 4px; font-size:14px;">📋 포대수 <span class="muted" style="font-weight:400;font-size:12px;" id="flyerMonthLabel">(이번 달)</span></h3>
+        <p class="muted" style="margin:0 0 10px;font-size:12.5px;">하루에 전단지 몇 포대 돌렸는지 날짜별로 기록해요. 달력처럼 배치돼 있어서 오늘 칸을 바로 찾아 숫자만 입력하면 자동 저장돼요.</p>
+        <div class="flyer-cal-grid" id="flyerCalWeekdayRow">
+          <div class="flyer-cal-weekday">일</div><div class="flyer-cal-weekday">월</div><div class="flyer-cal-weekday">화</div>
+          <div class="flyer-cal-weekday">수</div><div class="flyer-cal-weekday">목</div><div class="flyer-cal-weekday">금</div>
+          <div class="flyer-cal-weekday">토</div>
+        </div>
+        <div class="flyer-cal-grid" id="flyerCalGrid" style="margin-top:4px;">
+          <p class="muted" style="padding:8px 0;">불러오는 중...</p>
+        </div>
+        <div class="muted" style="margin-top:10px; text-align:right; font-size:13px;">이번 달 합계: <strong id="flyerMonthTotal">-</strong>포대</div>
+      </div>
     </div>
 
     <div class="section">
@@ -485,9 +522,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1790065581"></script>
-  <script src="auth.js?v=1790065581"></script>
-  <script src="data.js?v=1790065581"></script>
+  <script src="config.js?v=1790066626"></script>
+  <script src="auth.js?v=1790066626"></script>
+  <script src="data.js?v=1790066626"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -1375,6 +1412,7 @@
       renderWorkinTable();
 
       await refreshInquiryHistory();
+      await refreshFlyerCalendar();
     }
 
     // FC 목표 매출 저장 - 지금 화살표로 보고 있는 달(refMonthStr()) 기준으로 저장함. 화살표로 다른 달로
@@ -1858,6 +1896,80 @@
         // 포커스가 끊기지 않음)
         renderInquiryTodayRow();
         renderInquiryTable();
+      } catch (err) {
+        alert(err.message);
+      }
+      inputEl.disabled = false;
+    }
+
+    // ---- 포대수(전단지 배포 개수) - "문의 경로" 카드 아래 빈 공간에 추가(2026-09-22). 문의 경로/
+    // 워크인과 같은 "센터 공용, 이름 없이 숫자만" 집계지만, 채널/결과 구분이 없는 가장 단순한 형태라
+    // 지난 기록 토글 없이 매출 보고 화살표(refMonthStr())를 따라 그 달 전체를 항상 달력 모양으로 보여줌 ----
+    let flyerCache = [];
+    let flyerCacheMonthStr = null;
+
+    function renderFlyerCalendar() {
+      const grid = document.getElementById('flyerCalGrid');
+      const monthStr = flyerCacheMonthStr || refMonthStr();
+      const [y, m] = monthStr.split('-').map(Number);
+      const totalDays = daysInMonthStr(monthStr);
+      const firstWeekday = new Date(y, m - 1, 1).getDay(); // 0=일 ~ 6=토
+      const todayStr = toDateStr(new Date());
+      const isCurrentRealMonth = monthStr === currentMonthStr();
+
+      const labelEl = document.getElementById('flyerMonthLabel');
+      if (labelEl) labelEl.textContent = `(${y}년 ${m}월${isCurrentRealMonth ? ' · 이번 달' : ''})`;
+
+      const byDate = {};
+      flyerCache.forEach(r => { byDate[r.record_date] = r.count; });
+
+      let html = '';
+      for (let i = 0; i < firstWeekday; i++) {
+        html += `<div class="flyer-cal-cell is-blank"></div>`;
+      }
+      let monthTotal = 0;
+      for (let d = 1; d <= totalDays; d++) {
+        const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+        const val = byDate[dateStr] || 0;
+        monthTotal += val;
+        const todayClass = (isCurrentRealMonth && dateStr === todayStr) ? ' is-today' : '';
+        html += `<div class="flyer-cal-cell${todayClass}">
+          <div class="fc-daynum">${d}</div>
+          <input class="sheet-input" type="number" min="0" value="${val || ''}" placeholder="0"
+            data-date="${dateStr}" onchange="handleFlyerCellSave(this)" />
+        </div>`;
+      }
+      grid.innerHTML = html;
+      document.getElementById('flyerMonthTotal').textContent = monthTotal || '0';
+    }
+
+    // 매출 보고 화살표로 지금 보고 있는 기준월(refMonthStr())의 포대수 기록을 불러와서 다시 그림 -
+    // refreshMonthPinnedSections()에서 문의 경로/워크인과 함께 호출됨
+    async function refreshFlyerCalendar() {
+      const monthStr = refMonthStr();
+      try {
+        flyerCache = await fetchFlyerCounts(monthStr);
+        flyerCacheMonthStr = monthStr;
+      } catch (err) {
+        flyerCache = [];
+        flyerCacheMonthStr = monthStr;
+        document.getElementById('flyerCalGrid').innerHTML = `<p class="error-text">${err.message}</p>`;
+        return;
+      }
+      renderFlyerCalendar();
+    }
+
+    async function handleFlyerCellSave(inputEl) {
+      const date = inputEl.dataset.date;
+      const count = inputEl.value === '' ? 0 : Math.max(0, Math.round(Number(inputEl.value)));
+      inputEl.value = count || '';
+      inputEl.disabled = true;
+      try {
+        await upsertFlyerCount({ record_date: date, count, updated_by: currentUserId });
+        const existing = flyerCache.find(r => r.record_date === date);
+        if (existing) existing.count = count;
+        else flyerCache.push({ record_date: date, count });
+        renderFlyerCalendar();
       } catch (err) {
         alert(err.message);
       }
