@@ -1656,6 +1656,81 @@ async function deleteWalkinConsultation(id) {
   if (!res.ok) await throwApiError(res, '신규상담 기록 삭제에 실패했습니다.');
 }
 
+// ---- 광고 성과 관리 (marketing.html) - 캠페인(ad_campaigns) + 일별 기록(ad_campaign_logs) ----
+async function fetchAdCampaigns() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/ad_campaigns?select=*&order=created_at.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '광고 캠페인 목록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addAdCampaign(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/ad_campaigns`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '광고 캠페인 추가에 실패했습니다.');
+  return res.json();
+}
+
+async function updateAdCampaign(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/ad_campaigns?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '광고 캠페인 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deleteAdCampaign(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/ad_campaigns?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '광고 캠페인 삭제에 실패했습니다.');
+}
+
+async function fetchAdCampaignLogs() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/ad_campaign_logs?select=*&order=log_date.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '광고 일별 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+async function addAdCampaignLog(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/ad_campaign_logs`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '광고 일별 기록 추가에 실패했습니다.');
+  return res.json();
+}
+
+async function updateAdCampaignLog(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/ad_campaign_logs?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '광고 일별 기록 수정에 실패했습니다.');
+  return res.json();
+}
+
+async function deleteAdCampaignLog(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/ad_campaign_logs?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '광고 일별 기록 삭제에 실패했습니다.');
+}
+
 // ---- 미팅 기록일지(meetings.html) ----
 async function fetchMeetingLogs() {
   const res = await fetch(

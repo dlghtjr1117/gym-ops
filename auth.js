@@ -177,7 +177,7 @@ if (document.readyState === 'loading') {
 // 지점장은 그대로 전체 메뉴가 다 보임. 각 페이지에서 getMyProfile() 이후에 호출.
 function applyRoleNav(profile) {
   if (!profile || profile.role === 'manager') return;
-  const hideHrefs = ['dashboard.html', 'sales.html', 'expiry.html', 'group-pt.html', 'products.html', 'staff.html', 'metrics.html'];
+  const hideHrefs = ['dashboard.html', 'sales.html', 'expiry.html', 'group-pt.html', 'products.html', 'staff.html', 'metrics.html', 'marketing.html'];
   // 상단 메뉴(.topnav) 말고도 홈 화면의 바로가기 타일(home.html)이나 대시보드의
   // "+ 매출 등록하기" 같은 인라인 링크(dashboard.html)에도 같은 href가 쓰이고 있어서,
   // .topnav 안쪽만 가리면 트레이너가 그 링크들을 타고 들어가 매출 입력/만료회원/이용권
