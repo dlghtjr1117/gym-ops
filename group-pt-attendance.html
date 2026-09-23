@@ -5,13 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 그룹PT 출석 관리</title>
-<link rel="stylesheet" href="style.css?v=1790129422" />
+<link rel="stylesheet" href="style.css?v=1790130971" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   .att-row-done td { background: color-mix(in srgb, var(--green-600) 7%, var(--surface)); }
   .att-row-pending td { background: color-mix(in srgb, var(--amber-500) 9%, var(--surface)); }
   .progress-mini-track { width: 84px; height: 7px; border-radius: 999px; background: var(--slate-200); overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 8px; }
   .progress-mini-fill { height: 100%; border-radius: 999px; background: var(--indigo-600); }
+
+  /* 일일 출석 현황 / 전체 출석현황 탭 - 광고 관리의 플랫폼 필터 탭과 같은 스타일 */
+  .att-view-toggle { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 14px; }
+  .att-view-toggle button {
+    border: 1px solid var(--slate-200); background: var(--surface); border-radius: 999px;
+    padding: 7px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--slate-600);
+  }
+  .att-view-toggle button.active { background: var(--indigo-600); border-color: var(--indigo-600); color: #fff; }
 
   /* 오늘의 출석 QR 전체화면 모달 */
   .qr-modal-overlay {
@@ -95,6 +103,11 @@
         </div>
       </div>
 
+      <div class="att-view-toggle" id="attViewToggle">
+        <button type="button" data-view="daily" class="active">📆 일일 출석 현황</button>
+        <button type="button" data-view="all">👥 전체 출석현황</button>
+      </div>
+
       <div style="overflow-x:auto;">
         <table class="table-fixed">
           <thead><tr>
@@ -146,14 +159,23 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790129422"></script>
-  <script src="auth.js?v=1790129422"></script>
-  <script src="data.js?v=1790129422"></script>
+  <script src="config.js?v=1790130971"></script>
+  <script src="auth.js?v=1790130971"></script>
+  <script src="data.js?v=1790130971"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
 
     let overviewCache = null;
+    let attViewMode = 'daily'; // 'daily' = 오늘 출석한 회원만, 'all' = 그룹PT 회원 전체
+
+    document.querySelectorAll('#attViewToggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        attViewMode = btn.dataset.view;
+        document.querySelectorAll('#attViewToggle button').forEach(b => b.classList.toggle('active', b.dataset.view === attViewMode));
+        renderAttendanceTable();
+      });
+    });
 
     async function loadOverview() {
       try {
@@ -183,7 +205,12 @@
         tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">회원 관리에서 "그룹PT 종류"가 채워진 회원이 아직 없어요.</td></tr>`;
         return;
       }
-      tbody.innerHTML = rows.map(r => {
+      const visibleRows = attViewMode === 'daily' ? rows.filter(r => r.checkedInToday) : rows;
+      if (visibleRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">오늘 출석한 회원이 아직 없어요. QR로 출석하면 여기에 바로 나타나요.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = visibleRows.map(r => {
         const statusBadge = r.checkedInToday
           ? (r.todayMethod === 'manual' ? `<span class="badge badge-amber">✓ 수동체크</span>` : `<span class="badge badge-green">✓ QR 출석</span>`)
           : `<span class="badge badge-slate">미출석</span>`;
