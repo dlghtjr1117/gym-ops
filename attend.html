@@ -167,6 +167,24 @@
     background: linear-gradient(120deg, var(--mvp-btn1), var(--mvp-btn2));
   }
 
+  /* ---- 축하 팝업 "확인" 이후: 코인이 포인트 칸으로 날아가며 숫자가 올라가는 연출 ---- */
+  .coin-fly-layer { position: fixed; inset: 0; pointer-events: none; z-index: 70; }
+  .coin-fly {
+    position: fixed; font-size: 22px; transform: translate(0, 0) scale(1); opacity: 1;
+    transition: transform 0.65s cubic-bezier(.2,.7,.3,1), opacity 0.65s ease-in;
+    filter: drop-shadow(0 4px 8px rgba(224,137,0,0.5));
+  }
+  @keyframes pointsImpact {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.14); }
+    55% { transform: scale(0.96); }
+    100% { transform: scale(1); }
+  }
+  .points-impact {
+    animation: pointsImpact 0.6s ease;
+    box-shadow: 0 0 0 3px rgba(245,165,36,0.35), 0 10px 20px -8px rgba(245,165,36,0.55);
+  }
+
   .cal-wrap { padding: 20px 24px 8px; }
   .cal-head { font-size: 14.5px; font-weight: 800; margin-bottom: 12px; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
@@ -404,7 +422,7 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790133450"></script>
+  <script src="config.js?v=1790134013"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -838,19 +856,85 @@
     }
 
     function openCelebrateOverlay(status, result) {
+      // 확인을 누른 뒤 "누적 포인트가 코인과 함께 실시간으로 올라가는" 연출에 쓰기 위해
+      // 지금(보너스 받기 전) 포인트를 미리 기록해둠
+      const overlay = document.getElementById('celebrateOverlay');
+      overlay.dataset.oldTotal = statusCache ? statusCache.total_points : 0;
+      overlay.dataset.newTotal = result.new_total_points;
       document.getElementById('celebrateCard').className = `celebrate-card rank-${status.rank}`;
       document.getElementById('celebrateTitle').textContent = `${status.bonus_month}월 출석왕 ${MVP_RANK_LABEL[status.rank]} 보너스`;
       document.getElementById('celebrateAmount').textContent = `+${result.bonus_points}P 증정!`;
       document.getElementById('celebrateSub').innerHTML = `현재 누적 포인트 <strong>${result.new_total_points}P</strong>`;
-      document.getElementById('celebrateOverlay').classList.add('show');
+      overlay.classList.add('show');
     }
 
-    document.getElementById('celebrateConfirmBtn').addEventListener('click', async () => {
-      document.getElementById('celebrateOverlay').classList.remove('show');
+    document.getElementById('celebrateConfirmBtn').addEventListener('click', () => {
+      const overlay = document.getElementById('celebrateOverlay');
+      const oldTotal = Number(overlay.dataset.oldTotal || 0);
+      const newTotal = Number(overlay.dataset.newTotal || oldTotal);
+      overlay.classList.remove('show');
       document.getElementById('mvpBonusWrap').innerHTML = '';
-      // 포인트가 바뀌었으니 캘린더 화면 숫자(포인트/보상 로드맵)도 최신으로 다시 불러옴
-      await loadCalendarView(getSavedMemberId());
+      if (statusCache) statusCache.total_points = newTotal; // 서버를 다시 안 불러도 되게 로컬 값도 맞춰둠
+      playCoinBurstToPoints();
+      animatePointsCountUp(oldTotal, newTotal);
     });
+
+    // ---- 보너스 확인 후: 코인이 "포인트" 칸으로 날아가면서 숫자가 실시간으로 올라가는 연출 ----
+    function playCoinBurstToPoints() {
+      const targetEl = document.getElementById('statPointsBox');
+      if (!targetEl) return;
+      const targetRect = targetEl.getBoundingClientRect();
+      const targetX = targetRect.left + targetRect.width / 2;
+      const targetY = targetRect.top + targetRect.height / 2;
+      const startX = window.innerWidth / 2;
+      const startY = window.innerHeight * 0.4; // 방금까지 축하 팝업이 떠 있던 대략적인 위치
+
+      const layer = document.createElement('div');
+      layer.className = 'coin-fly-layer';
+      document.body.appendChild(layer);
+
+      const COIN_COUNT = 7;
+      for (let i = 0; i < COIN_COUNT; i++) {
+        const coin = document.createElement('div');
+        coin.className = 'coin-fly';
+        coin.textContent = '🪙';
+        const jitterX = (Math.random() - 0.5) * 70;
+        const jitterY = (Math.random() - 0.5) * 40;
+        coin.style.left = `${startX + jitterX}px`;
+        coin.style.top = `${startY + jitterY}px`;
+        layer.appendChild(coin);
+        const delay = i * 55;
+        setTimeout(() => {
+          coin.style.transform = `translate(${targetX - (startX + jitterX)}px, ${targetY - (startY + jitterY)}px) scale(0.3)`;
+          coin.style.opacity = '0';
+        }, delay + 20);
+      }
+
+      setTimeout(() => {
+        targetEl.classList.add('points-impact');
+        setTimeout(() => targetEl.classList.remove('points-impact'), 650);
+        layer.remove();
+      }, COIN_COUNT * 55 + 560);
+    }
+
+    function animatePointsCountUp(from, to) {
+      const el = document.getElementById('statPoints');
+      if (!el || from === to) { if (el) el.textContent = to + 'P'; return; }
+      const duration = 900;
+      const startDelay = 300; // 코인이 도착하는 타이밍에 맞춰 숫자가 같이 튀어 오르게
+      const startTime = performance.now();
+      function tick(now) {
+        const elapsed = now - startTime - startDelay;
+        if (elapsed < 0) { requestAnimationFrame(tick); return; }
+        const progress = Math.min(1, elapsed / duration);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out
+        const current = Math.round(from + (to - from) * eased);
+        el.textContent = current + 'P';
+        if (progress < 1) requestAnimationFrame(tick);
+        else el.textContent = to + 'P';
+      }
+      requestAnimationFrame(tick);
+    }
 
     // ---- 진입점 ----
     (function init() {
