@@ -112,59 +112,108 @@
     background: linear-gradient(120deg, var(--mvp-btn1), var(--mvp-btn2)); box-shadow: 0 10px 18px -8px rgba(0,0,0,0.28);
   }
   .mvp-err { font-size: 12.5px; color: #DC2626; font-weight: 700; padding: 4px 0 2px; }
-  .glow-ring {
-    width: 92px; height: 92px; border-radius: 50%; margin: 4px auto 12px;
-    background: radial-gradient(circle, rgba(0,0,0,0.08), transparent 68%);
-    display: flex; align-items: center; justify-content: center; position: relative;
+  /* ---- MVP 보너스 받기 전체화면 트로피 모달(검은 배경 + 큰 트로피 → 탭하면 빛줄기 폭발 → 트로피 증정) ---- */
+  .trophy-modal {
+    position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .22s;
+    background: radial-gradient(circle at 50% 42%, rgba(28,22,48,0.9) 0%, rgba(7,5,16,0.96) 62%, rgba(2,2,6,0.985) 100%);
   }
-  .glow-ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px dashed var(--mvp-border); }
-  .trophy-tap { font-size: 46px; cursor: pointer; filter: drop-shadow(0 8px 14px rgba(0,0,0,0.25)); }
-  .tap-arrow { font-size: 11px; color: var(--mvp-sub); margin-top: 8px; }
+  .trophy-modal.show { opacity: 1; pointer-events: auto; }
+  .trophy-modal-close {
+    position: absolute; top: 20px; right: 20px; width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.65); border: none; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 3;
+  }
+  .tm-stage { position: relative; flex-direction: column; align-items: center; justify-content: center; padding: 0 30px; text-align: center; width: 100%; }
 
-  /* ---- 보너스 지급 순간(트로피 탭) 축하 팝업 ---- */
-  .celebrate-overlay { position: fixed; inset: 0; background: rgba(10,8,25,0.62); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 60; }
-  .celebrate-overlay.show { opacity: 1; pointer-events: auto; }
-  .celebrate-card {
-    width: min(88vw, 320px); background: #fff; border-radius: 26px; padding: 36px 26px 26px; text-align: center;
-    position: relative; box-shadow: 0 30px 70px -20px rgba(15,17,35,0.55); transform: scale(.9); transition: transform .2s;
+  /* Stage A: 정중앙에 크게 뜨는 트로피 */
+  .tm-orb {
+    width: 220px; height: 220px; border-radius: 50%; position: relative; margin: 0 auto;
+    background: radial-gradient(circle at 50% 45%, rgba(245,165,36,0.55), rgba(245,165,36,0.08) 60%, transparent 72%);
+    display: flex; align-items: center; justify-content: center; animation: tmOrbPulse 2.2s ease-in-out infinite;
   }
-  .celebrate-overlay.show .celebrate-card { transform: scale(1); }
-  .celebrate-card.rank-1 { --mvp-title:#7A4A05; --mvp-amount:#E08900; --mvp-btn1:#F5A524; --mvp-btn2:#E08900; --mvp-burst: rgba(245,165,36,0.35); }
-  .celebrate-card.rank-2 { --mvp-title:#45505F; --mvp-amount:#5E6B7D; --mvp-btn1:#9FACC0; --mvp-btn2:#707E92; --mvp-burst: rgba(141,153,172,0.35); }
-  .celebrate-card.rank-3 { --mvp-title:#7A4419; --mvp-amount:#A85F22; --mvp-btn1:#D99553; --mvp-btn2:#B06B2C; --mvp-burst: rgba(201,127,60,0.35); }
-  .burst {
-    position: absolute; top: 50%; left: 50%; width: 340px; height: 340px; transform: translate(-50%, -56%);
-    background: conic-gradient(from 0deg, var(--mvp-burst) 0deg, transparent 18deg, var(--mvp-burst) 36deg, transparent 54deg, var(--mvp-burst) 72deg, transparent 90deg, var(--mvp-burst) 108deg, transparent 126deg, var(--mvp-burst) 144deg, transparent 162deg, var(--mvp-burst) 180deg, transparent 198deg, var(--mvp-burst) 216deg, transparent 234deg, var(--mvp-burst) 252deg, transparent 270deg, var(--mvp-burst) 288deg, transparent 306deg, var(--mvp-burst) 324deg, transparent 342deg);
-    border-radius: 50%; z-index: 0; animation: burstSpin 6s linear infinite;
+  @keyframes tmOrbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+  .tm-orb::before { content: ""; position: absolute; inset: -18px; border-radius: 50%; border: 2px solid rgba(245,165,36,0.35); pointer-events: none; }
+  .tm-orb::after { content: ""; position: absolute; inset: -38px; border-radius: 50%; border: 1px solid rgba(245,165,36,0.18); pointer-events: none; }
+  .tm-trophy-big { font-size: 104px; cursor: pointer; filter: drop-shadow(0 0 26px rgba(245,165,36,0.85)) drop-shadow(0 12px 20px rgba(0,0,0,0.5)); }
+  .tm-rank-badge {
+    margin-top: 24px; background: linear-gradient(135deg,#FFD76A,#F5A524); color: #3B2200; font-weight: 800;
+    font-size: 14px; padding: 7px 18px; border-radius: 999px; box-shadow: 0 6px 18px -6px rgba(245,165,36,0.6); display: inline-block;
   }
-  @keyframes burstSpin { from { transform: translate(-50%, -56%) rotate(0deg); } to { transform: translate(-50%, -56%) rotate(360deg); } }
-  .confetti { position: absolute; inset: 0; overflow: visible; z-index: 1; pointer-events: none; }
-  .confetti span { position: absolute; font-size: 15px; }
-  .trophy-shake {
-    position: relative; z-index: 2; font-size: 64px; display: inline-block;
-    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.3)); animation: trophyShake .5s ease-in-out 2;
+  .tm-hint { margin-top: 16px; color: #F3EFFF; font-size: 14.5px; font-weight: 600; animation: tmHintBlink 1.6s ease-in-out infinite; }
+  @keyframes tmHintBlink { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+  /* Stage B: 트로피 탭 → 빛줄기가 한 줄씩 뻗어나가며 폭발 → +100P 증정 */
+  .tm-rays { position: absolute; left: 50%; top: 46%; width: 0; height: 0; }
+  .ray-line {
+    position: absolute; left: 0; top: 0; width: 3px; height: 0; border-radius: 3px;
+    background: linear-gradient(to top, rgba(255,224,140,0) 0%, rgba(255,224,140,0.95) 55%, rgba(255,224,140,0) 100%);
+    transform-origin: 50% 100%; opacity: 0; transition: height .42s cubic-bezier(.2,.8,.3,1), opacity .25s ease;
   }
-  @keyframes trophyShake {
-    0%, 100% { transform: rotate(0deg) scale(1); }
-    20% { transform: rotate(-10deg) scale(1.06); }
-    40% { transform: rotate(9deg) scale(1.1); }
-    60% { transform: rotate(-7deg) scale(1.06); }
-    80% { transform: rotate(5deg) scale(1.02); }
+  .tm-rays.burst .ray-line { height: 240px; opacity: 1; }
+  .tm-core-flash {
+    position: absolute; left: 50%; top: 46%; width: 40px; height: 40px; border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0.3); opacity: 0; pointer-events: none;
+    background: radial-gradient(circle, #fff 0%, #FFE9B0 22%, #F5A524 46%, rgba(245,165,36,0) 72%);
+    transition: width .55s cubic-bezier(.2,.9,.3,1), height .55s cubic-bezier(.2,.9,.3,1), opacity .4s ease, transform .55s cubic-bezier(.2,.9,.3,1);
   }
-  .flash-ring {
-    position: absolute; top: 50%; left: 50%; width: 130px; height: 130px; transform: translate(-50%,-50%);
-    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.9), var(--mvp-burst) 60%, transparent 75%);
-    z-index: 1; animation: flashPulse 1.2s ease-in-out infinite;
+  .tm-core-flash.burst { opacity: 1; width: 300px; height: 300px; transform: translate(-50%, -50%) scale(1); }
+  .tm-trophy-mini { position: relative; z-index: 2; font-size: 58px; filter: drop-shadow(0 0 18px rgba(255,224,140,0.9)); }
+  @keyframes tmTextIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .tm-grant-title { position: relative; z-index: 2; color: #fff; font-size: 16px; font-weight: 700; opacity: 0; margin-top: 12px; animation: tmTextIn .4s ease both; animation-delay: .58s; }
+  .tm-grant-amount {
+    position: relative; z-index: 2; margin-top: 8px; font-size: 40px; font-weight: 900; opacity: 0;
+    background: linear-gradient(135deg,#FFF3D0,#F5A524); -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: tmTextIn .45s ease both; animation-delay: .68s;
   }
-  @keyframes flashPulse { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
-  .grant-title { position: relative; z-index: 2; font-size: 15px; font-weight: 800; color: var(--mvp-title); margin-top: 14px; }
-  .grant-amount { position: relative; z-index: 2; font-size: 30px; font-weight: 900; color: var(--mvp-amount); margin-top: 4px; letter-spacing: -0.5px; }
-  .grant-sub { position: relative; z-index: 2; font-size: 12px; color: var(--mvp-title); margin-top: 10px; opacity: .85; }
-  .grant-sub strong { color: var(--ink); }
-  .celebrate-card .confirm-btn {
-    position: relative; z-index: 2; width: 100%; margin-top: 22px; padding: 13px; border: none; border-radius: 14px;
-    font-size: 14.5px; font-weight: 800; font-family: inherit; cursor: pointer; color: #fff;
-    background: linear-gradient(120deg, var(--mvp-btn1), var(--mvp-btn2));
+  .tm-grant-sub { position: relative; z-index: 2; margin-top: 8px; color: #F3EFFF; font-size: 13.5px; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .78s; }
+  .tm-grant-sub strong { color: #fff; }
+
+  /* Stage C: 트로피 증정 화면 */
+  .tm-glow-static {
+    position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); width: 360px; height: 360px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(245,165,36,0.4) 0%, rgba(245,165,36,0.1) 45%, rgba(245,165,36,0) 70%);
+  }
+  .tm-ring1, .tm-ring2 { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); border-radius: 50%; border: 1px solid rgba(255,224,140,0.3); }
+  .tm-ring1 { width: 226px; height: 226px; }
+  .tm-ring2 { width: 286px; height: 286px; border-color: rgba(255,224,140,0.16); }
+  .tm-ribbon {
+    position: relative; z-index: 2; display: inline-block; background: linear-gradient(135deg,#FFD76A,#F5A524); color: #3B2200; font-weight: 800; font-size: 12.5px;
+    padding: 5px 15px; border-radius: 999px; margin-bottom: 14px; letter-spacing: .4px; opacity: 0; animation: tmTextIn .35s ease both;
+  }
+  .tm-trophy-grant { position: relative; z-index: 2; font-size: 92px; filter: drop-shadow(0 0 28px rgba(255,224,140,0.9)); opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .08s; }
+  .tm-grant-title2 { position: relative; z-index: 2; margin-top: 16px; color: #fff; font-size: 20px; font-weight: 900; text-align: center; line-height: 1.4; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .16s; }
+  .tm-grant-title2 .hi { color: #FFD76A; }
+  .tm-grant-sub2 { position: relative; z-index: 2; margin-top: 8px; color: #CBD0E6; font-size: 13px; text-align: center; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .24s; }
+
+  .tm-confirm-btn {
+    position: relative; z-index: 2; margin-top: 26px; background: linear-gradient(135deg,#FFD76A,#F5A524); color: #3B2200;
+    font-weight: 800; font-size: 14.5px; padding: 13px 40px; border-radius: 999px; border: none; font-family: inherit; cursor: pointer;
+    opacity: 0; animation: tmTextIn .35s ease both; animation-delay: .3s;
+  }
+
+  /* ---- 명예 훈장(그동안 받은 MVP 트로피 모음) + 이름 옆 출석왕 배지 ---- */
+  .honor-case { margin: 14px 24px 0; border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; background: linear-gradient(180deg, #FFFDF6, #fff); }
+  .honor-case .hc-title { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .honor-case .hc-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .hc-item { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 52px; }
+  .hc-circle { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 23px; box-shadow: 0 6px 14px -6px rgba(245,165,36,0.7); }
+  .hc-circle.r1 { background: radial-gradient(circle at 40% 35%, #FFE9B0, #F5A524 70%); }
+  .hc-circle.r2 { background: radial-gradient(circle at 40% 35%, #F1F4F9, #ADB8C9 70%); }
+  .hc-circle.r3 { background: radial-gradient(circle at 40% 35%, #F0D2B0, #C97F3C 70%); }
+  .hc-item .hc-lbl { font-size: 9.5px; color: var(--muted); font-weight: 600; text-align: center; line-height: 1.3; }
+  .hc-item.new-badge .hc-circle { animation: hcPop .45s ease; }
+  @keyframes hcPop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+  .name-badge {
+    display: inline-flex; align-items: center; gap: 3px; background: linear-gradient(135deg,#FFD76A,#F5A524);
+    color: #3B2200; font-size: 12px; font-weight: 800; padding: 3px 9px 3px 7px; border-radius: 999px; vertical-align: middle;
+  }
+
+  /* ---- 트로피 증정 확인 후: 트로피가 "명예 훈장" 칸으로 날아가는 연출(코인 연출과 같은 방식) ---- */
+  .trophy-fly {
+    position: fixed; font-size: 42px; transform: translate(0,0) scale(1); opacity: 1;
+    transition: transform .78s cubic-bezier(.2,.7,.3,1), opacity .78s ease-in;
+    filter: drop-shadow(0 4px 10px rgba(245,165,36,0.6)); z-index: 71;
   }
 
   /* ---- 축하 팝업 "확인" 이후: 코인이 포인트 칸으로 날아가며 숫자가 올라가는 연출 ---- */
@@ -336,6 +385,7 @@
       <h1 id="calGreeting">-</h1>
       <div class="sub" id="calSub">캘린더의 파란 칸을 눌러 오늘 출석을 체크해주세요</div>
     </div>
+    <div id="honorCaseWrap"></div>
     <div id="mvpBonusWrap"></div>
     <div class="stat-row">
       <div class="stat-box clickable" id="statTotalDaysBox"><div class="label">누적 출석</div><div class="value" id="statTotalDays">-</div><div class="tap-hint">기록 보기 ›</div></div>
@@ -403,26 +453,51 @@
     </div>
   </div>
 
-  <div class="celebrate-overlay" id="celebrateOverlay">
-    <div class="celebrate-card" id="celebrateCard">
-      <div class="burst"></div>
-      <div class="flash-ring"></div>
-      <div class="confetti">
-        <span style="left:8%; top:14%;">🎉</span>
-        <span style="right:10%; top:10%;">✨</span>
-        <span style="left:14%; bottom:18%;">⭐</span>
-        <span style="right:12%; bottom:22%;">🎊</span>
-        <span style="left:50%; top:2%;">✨</span>
+  <div class="trophy-modal" id="trophyModal">
+    <button type="button" class="trophy-modal-close" id="trophyModalClose">✕</button>
+
+    <div class="tm-stage" id="tmStageA">
+      <div class="tm-orb"><div class="tm-trophy-big" id="tmTrophyBig">🏆</div></div>
+      <div class="tm-rank-badge" id="tmRankBadge">-</div>
+      <div class="tm-hint">트로피를 눌러서 열어보세요 👆</div>
+    </div>
+
+    <div class="tm-stage" id="tmStageB" style="display:none;">
+      <div class="tm-rays" id="tmRays">
+        <span class="ray-line" style="transform:rotate(0deg); transition-delay:0ms;"></span>
+        <span class="ray-line" style="transform:rotate(30deg); transition-delay:25ms;"></span>
+        <span class="ray-line" style="transform:rotate(60deg); transition-delay:50ms;"></span>
+        <span class="ray-line" style="transform:rotate(90deg); transition-delay:75ms;"></span>
+        <span class="ray-line" style="transform:rotate(120deg); transition-delay:100ms;"></span>
+        <span class="ray-line" style="transform:rotate(150deg); transition-delay:125ms;"></span>
+        <span class="ray-line" style="transform:rotate(180deg); transition-delay:150ms;"></span>
+        <span class="ray-line" style="transform:rotate(210deg); transition-delay:175ms;"></span>
+        <span class="ray-line" style="transform:rotate(240deg); transition-delay:200ms;"></span>
+        <span class="ray-line" style="transform:rotate(270deg); transition-delay:225ms;"></span>
+        <span class="ray-line" style="transform:rotate(300deg); transition-delay:250ms;"></span>
+        <span class="ray-line" style="transform:rotate(330deg); transition-delay:275ms;"></span>
       </div>
-      <div class="trophy-shake">🏆</div>
-      <div class="grant-title" id="celebrateTitle">-</div>
-      <div class="grant-amount" id="celebrateAmount">-</div>
-      <div class="grant-sub" id="celebrateSub"></div>
-      <button type="button" class="confirm-btn" id="celebrateConfirmBtn">확인</button>
+      <div class="tm-core-flash" id="tmCoreFlash"></div>
+      <div class="tm-trophy-mini">🏆</div>
+      <div class="tm-grant-title" id="tmGrantTitle">-</div>
+      <div class="tm-grant-amount" id="tmGrantAmount">-</div>
+      <div class="tm-grant-sub" id="tmGrantSub"></div>
+      <button type="button" class="tm-confirm-btn" id="tmConfirmB">확인</button>
+    </div>
+
+    <div class="tm-stage" id="tmStageC" style="display:none;">
+      <div class="tm-glow-static"></div>
+      <div class="tm-ring1"></div>
+      <div class="tm-ring2"></div>
+      <div class="tm-ribbon">TROPHY GET</div>
+      <div class="tm-trophy-grant">🏆</div>
+      <div class="tm-grant-title2" id="tmGrantTitle2">-</div>
+      <div class="tm-grant-sub2">확인을 누르면 내 명예 훈장에 담겨요</div>
+      <button type="button" class="tm-confirm-btn" id="tmConfirmC">확인</button>
     </div>
   </div>
 
-  <script src="config.js?v=1790134013"></script>
+  <script src="config.js?v=1790136048"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -552,12 +627,14 @@
       showView('viewCalendar');
       document.getElementById('calGreeting').textContent = '불러오는 중...';
       try {
-        const [statusRows, valid] = await Promise.all([
+        const [statusRows, valid, historyRows] = await Promise.all([
           callRpc('group_pt_get_member_status', { p_member_id: memberId }),
-          qrToken ? callRpc('group_pt_validate_token', { p_token: qrToken }) : Promise.resolve(false)
+          qrToken ? callRpc('group_pt_validate_token', { p_token: qrToken }) : Promise.resolve(false),
+          callRpc('group_pt_mvp_bonus_history', { p_member_id: memberId }).catch(() => [])
         ]);
         statusCache = (statusRows && statusRows[0]) || null;
         hasValidTodayToken = !!valid;
+        myHonorHistory = historyRows || [];
       } catch (err) {
         document.getElementById('calGreeting').textContent = '불러오지 못했어요';
         document.getElementById('calSub').textContent = err.message;
@@ -568,12 +645,20 @@
         return;
       }
       renderCalendarView();
+      renderHonorCase();
       checkMvpBonus(memberId);
+    }
+
+    function renderGreeting() {
+      if (!statusCache) return;
+      const hasTrophy = myHonorHistory.length > 0;
+      document.getElementById('calGreeting').innerHTML =
+        `${escapeHtmlAttend(statusCache.display_name)}님${hasTrophy ? ' <span class="name-badge">🏆 출석왕</span>' : ''}, 오늘도 출석해볼까요? 😊`;
     }
 
     function renderCalendarView() {
       const s = statusCache;
-      document.getElementById('calGreeting').textContent = `${s.display_name}님, 오늘도 출석해볼까요? 😊`;
+      renderGreeting();
       document.getElementById('statTotalDays').textContent = s.total_days + '일';
       document.getElementById('statPoints').textContent = s.total_points + 'P';
       document.getElementById('lbBannerTitle').textContent = `${new Date().getMonth() + 1}월 출석왕 보러가기`;
@@ -801,6 +886,7 @@
     // (group_pt_mvp_bonus_status/claim 함수 안에서) 다시 계산해서 확인하고, 클라이언트 값은 안 믿음.
     const MVP_RANK_LABEL = { 1: '1등', 2: '2등', 3: '3등' };
     const MVP_RANK_MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' };
+    let myHonorHistory = []; // 이 회원이 지금까지 받은 MVP 트로피들 {bonus_year, bonus_month, rank}
 
     async function checkMvpBonus(memberId) {
       const wrap = document.getElementById('mvpBonusWrap');
@@ -827,57 +913,146 @@
         <div class="mvp-sub">${rankLabel} 보너스 <strong>${status.bonus_points}P</strong>를 받아보세요</div>
         <button type="button" class="mvp-claim-btn" id="mvpClaimBtn">🎁 보너스 포인트 받기</button>
       </div>`;
-      document.getElementById('mvpClaimBtn').addEventListener('click', () => renderMvpTrophyStep(status));
+      document.getElementById('mvpClaimBtn').addEventListener('click', () => openTrophyModal(status));
     }
 
-    function renderMvpTrophyStep(status) {
-      const card = document.getElementById('mvpCard');
-      const rankLabel = MVP_RANK_LABEL[status.rank];
-      card.innerHTML = `
-        <div class="glow-ring"><div class="trophy-tap" id="mvpTrophyBtn">🏆</div></div>
-        <div class="mvp-title">트로피를 눌러보세요!</div>
-        <div class="mvp-sub">${rankLabel} 보너스 ${status.bonus_points}P가 기다리고 있어요</div>
-        <div class="tap-arrow">👆 트로피를 탭하면 포인트가 지급돼요</div>`;
-      document.getElementById('mvpTrophyBtn').addEventListener('click', () => handleMvpClaim(status));
+    // ---- 전체화면 트로피 모달: A) 큰 트로피 대기 → B) 탭하면 빛줄기 폭발+포인트 증정 → C) 트로피 증정 ----
+    let pendingMvpResult = null;
+
+    function showTmStage(stage) {
+      ['A', 'B', 'C'].forEach(s => {
+        document.getElementById('tmStage' + s).style.display = s === stage ? 'flex' : 'none';
+      });
+      document.getElementById('trophyModalClose').style.display = stage === 'A' ? 'flex' : 'none';
     }
 
+    function openTrophyModal(status) {
+      document.getElementById('tmRankBadge').textContent = `${status.bonus_month}월 출석왕 ${MVP_RANK_LABEL[status.rank]}`;
+      document.getElementById('tmRays').classList.remove('burst');
+      document.getElementById('tmCoreFlash').classList.remove('burst');
+      showTmStage('A');
+      document.getElementById('trophyModal').classList.add('show');
+      document.getElementById('tmTrophyBig').onclick = () => handleMvpClaim(status);
+    }
+
+    function closeTrophyModal() {
+      document.getElementById('trophyModal').classList.remove('show');
+    }
+
+    document.getElementById('trophyModalClose').addEventListener('click', () => closeTrophyModal());
+
+    let mvpClaiming = false;
     async function handleMvpClaim(status) {
-      const trophyBtn = document.getElementById('mvpTrophyBtn');
-      if (trophyBtn) trophyBtn.style.pointerEvents = 'none';
+      if (mvpClaiming) return;
+      mvpClaiming = true;
+      const trophyBig = document.getElementById('tmTrophyBig');
+      if (trophyBig) trophyBig.style.pointerEvents = 'none';
       try {
         const rows = await callRpc('group_pt_mvp_bonus_claim', { p_member_id: getSavedMemberId() });
         const r = rows && rows[0];
         if (!r || !r.ok) throw new Error((r && r.message) || '보너스 지급 중 문제가 발생했어요.');
-        openCelebrateOverlay(status, r);
+        showBurstStage(status, r);
       } catch (err) {
+        closeTrophyModal();
         const card = document.getElementById('mvpCard');
         if (card) card.innerHTML = `<div class="mvp-title">앗, 잠깐만요</div><div class="mvp-err">${escapeHtmlAttend(err.message)}</div>`;
+      } finally {
+        mvpClaiming = false;
+        if (trophyBig) trophyBig.style.pointerEvents = '';
       }
     }
 
-    function openCelebrateOverlay(status, result) {
-      // 확인을 누른 뒤 "누적 포인트가 코인과 함께 실시간으로 올라가는" 연출에 쓰기 위해
-      // 지금(보너스 받기 전) 포인트를 미리 기록해둠
-      const overlay = document.getElementById('celebrateOverlay');
-      overlay.dataset.oldTotal = statusCache ? statusCache.total_points : 0;
-      overlay.dataset.newTotal = result.new_total_points;
-      document.getElementById('celebrateCard').className = `celebrate-card rank-${status.rank}`;
-      document.getElementById('celebrateTitle').textContent = `${status.bonus_month}월 출석왕 ${MVP_RANK_LABEL[status.rank]} 보너스`;
-      document.getElementById('celebrateAmount').textContent = `+${result.bonus_points}P 증정!`;
-      document.getElementById('celebrateSub').innerHTML = `현재 누적 포인트 <strong>${result.new_total_points}P</strong>`;
-      overlay.classList.add('show');
+    // Stage B: 빛줄기가 한 줄씩 뻗어나가다가 가운데가 확 터지면서(펑) +100P 증정 문구가 뜸
+    function showBurstStage(status, result) {
+      pendingMvpResult = { status, result };
+      const rankLabel = MVP_RANK_LABEL[status.rank];
+      document.getElementById('tmGrantTitle').textContent = `${status.bonus_month}월 출석왕 ${rankLabel} 보너스`;
+      document.getElementById('tmGrantAmount').textContent = `+${result.bonus_points}P 증정!`;
+      document.getElementById('tmGrantSub').innerHTML = `현재 누적 포인트 <strong>${result.new_total_points}P</strong>`;
+      showTmStage('B');
+      const rays = document.getElementById('tmRays');
+      const flash = document.getElementById('tmCoreFlash');
+      rays.classList.remove('burst');
+      flash.classList.remove('burst');
+      void rays.offsetWidth; // 리플로우를 강제해서 빛줄기 트랜지션이 처음부터 다시 재생되게 함
+      requestAnimationFrame(() => {
+        rays.classList.add('burst');
+        flash.classList.add('burst');
+      });
     }
 
-    document.getElementById('celebrateConfirmBtn').addEventListener('click', () => {
-      const overlay = document.getElementById('celebrateOverlay');
-      const oldTotal = Number(overlay.dataset.oldTotal || 0);
-      const newTotal = Number(overlay.dataset.newTotal || oldTotal);
-      overlay.classList.remove('show');
+    // Stage B 확인 → Stage C(트로피 증정)로 이어짐
+    document.getElementById('tmConfirmB').addEventListener('click', () => {
+      if (!pendingMvpResult) return;
+      const { status } = pendingMvpResult;
+      document.getElementById('tmGrantTitle2').innerHTML =
+        `${status.bonus_month}월 출석왕 <span class="hi">${MVP_RANK_LABEL[status.rank]}</span><br>트로피 증정!`;
+      showTmStage('C');
+    });
+
+    // Stage C 확인 → 모달을 닫고, 포인트는 코인이 되어 "포인트" 칸으로, 트로피는 "명예 훈장" 칸으로 동시에 날아감
+    document.getElementById('tmConfirmC').addEventListener('click', () => {
+      if (!pendingMvpResult) return;
+      const { status, result } = pendingMvpResult;
+      pendingMvpResult = null;
+      closeTrophyModal();
       document.getElementById('mvpBonusWrap').innerHTML = '';
+      const oldTotal = statusCache ? statusCache.total_points : 0;
+      const newTotal = result.new_total_points;
       if (statusCache) statusCache.total_points = newTotal; // 서버를 다시 안 불러도 되게 로컬 값도 맞춰둠
       playCoinBurstToPoints();
       animatePointsCountUp(oldTotal, newTotal);
+      playTrophyFlyToHonorCase(status);
     });
+
+    // ---- 명예 훈장(그동안 받은 MVP 트로피들을 보여주는 칸) ----
+    function renderHonorCase(justAddedIndex) {
+      const wrap = document.getElementById('honorCaseWrap');
+      if (!wrap) return;
+      if (!myHonorHistory.length) { wrap.innerHTML = ''; return; }
+      const items = myHonorHistory.map((h, i) => {
+        const medal = MVP_RANK_MEDAL[h.rank] || '🏆';
+        return `<div class="hc-item${i === justAddedIndex ? ' new-badge' : ''}">
+          <div class="hc-circle r${h.rank}">${medal}</div>
+          <div class="hc-lbl">${h.bonus_month}월 · ${MVP_RANK_LABEL[h.rank]}</div>
+        </div>`;
+      }).join('');
+      wrap.innerHTML = `<div class="honor-case"><div class="hc-title">🎖️ 내 명예 훈장</div><div class="hc-row">${items}</div></div>`;
+    }
+
+    // Stage C 확인 후: 트로피가 코인 연출과 같은 방식으로 "명예 훈장" 칸으로 날아가 쌓임
+    function playTrophyFlyToHonorCase(status) {
+      const startX = window.innerWidth / 2;
+      const startY = window.innerHeight * 0.38;
+      const trophy = document.createElement('div');
+      trophy.className = 'trophy-fly';
+      trophy.textContent = '🏆';
+      trophy.style.left = startX + 'px';
+      trophy.style.top = startY + 'px';
+      document.body.appendChild(trophy);
+
+      // 첫 트로피라 명예 훈장 칸이 아직 없으면, 날아갈 목적지를 확보하기 위해 빈 칸을 먼저 만들어둠
+      const wrap = document.getElementById('honorCaseWrap');
+      if (wrap && !wrap.querySelector('.honor-case')) {
+        wrap.innerHTML = `<div class="honor-case"><div class="hc-title">🎖️ 내 명예 훈장</div><div class="hc-row"></div></div>`;
+      }
+      const target = wrap ? wrap.querySelector('.honor-case') : null;
+      const targetRect = target ? target.getBoundingClientRect() : null;
+      const targetX = targetRect ? targetRect.left + 28 : startX;
+      const targetY = targetRect ? targetRect.top + targetRect.height / 2 : startY;
+
+      requestAnimationFrame(() => {
+        trophy.style.transform = `translate(${targetX - startX}px, ${targetY - startY}px) scale(0.35) rotate(-14deg)`;
+        trophy.style.opacity = '0.15';
+      });
+
+      setTimeout(() => {
+        trophy.remove();
+        myHonorHistory.push({ bonus_year: status.bonus_year, bonus_month: status.bonus_month, rank: status.rank });
+        renderHonorCase(myHonorHistory.length - 1);
+        renderGreeting();
+      }, 780);
+    }
 
     // ---- 보너스 확인 후: 코인이 "포인트" 칸으로 날아가면서 숫자가 실시간으로 올라가는 연출 ----
     function playCoinBurstToPoints() {
