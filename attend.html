@@ -506,17 +506,45 @@
   /* ---- 포인트 적립 팝업 ---- */
   .overlay { position: fixed; inset: 0; background: rgba(15,17,35,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 50; }
   .overlay.show { opacity: 1; pointer-events: auto; }
-  .popup { width: min(88vw, 300px); background: #fff; border-radius: 24px; padding: 30px 26px 26px; text-align: center; box-shadow: 0 30px 60px -20px rgba(15,17,35,0.5); transform: scale(.92); transition: transform .18s; }
+  .popup { width: min(88vw, 300px); background: #fff; border-radius: 24px; padding: 30px 26px 26px; text-align: center; box-shadow: 0 30px 60px -20px rgba(15,17,35,0.5); transform: scale(.92); transition: transform .18s; overflow: visible; }
   .overlay.show .popup { transform: scale(1); }
-  .coin { width: 78px; height: 78px; margin: 0 auto 16px; border-radius: 50%; background: linear-gradient(150deg, #FFE9B8, var(--gold)); display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 800; color: #fff; box-shadow: 0 12px 22px -10px rgba(245,165,36,0.6); }
+  .coin-wrap { position: relative; width: 78px; height: 78px; margin: 0 auto 16px; }
+  .coin { width: 78px; height: 78px; border-radius: 50%; background: linear-gradient(150deg, #FFE9B8, var(--gold)); display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 800; color: #fff; box-shadow: 0 12px 22px -10px rgba(245,165,36,0.6); position: relative; z-index: 2; }
   .popup.is-error .coin { background: linear-gradient(150deg, #fee2e2, #fca5a5); }
+  .coin-glow { position: absolute; inset: -20px; border-radius: 50%; background: radial-gradient(circle, rgba(245,165,36,0.5), transparent 70%); opacity: 0; z-index: 0; }
+  .coin-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--gold); opacity: 0; z-index: 1; }
+  .coin-spark { position: absolute; top: 50%; left: 50%; font-size: 13px; opacity: 0; z-index: 3; }
+  .popup.checkin-pop .coin { animation: coinPopIn .55s cubic-bezier(.34,1.56,.64,1); }
+  .popup.checkin-pop .coin-glow { animation: coinGlowBurst .9s ease-out; }
+  .popup.checkin-pop .coin-ring { animation: coinRingBurst .7s ease-out; }
+  .popup.checkin-pop .coin-spark { animation: coinSparkOut .7s ease-out .05s both; }
+  .popup.checkin-pop .coin-spark:nth-child(4) { --tx: 34px; --ty: -30px; animation-delay: .02s; }
+  .popup.checkin-pop .coin-spark:nth-child(5) { --tx: -36px; --ty: -26px; animation-delay: .06s; }
+  .popup.checkin-pop .coin-spark:nth-child(6) { --tx: 40px; --ty: 10px; animation-delay: .1s; }
+  .popup.checkin-pop .coin-spark:nth-child(7) { --tx: -42px; --ty: 8px; animation-delay: .04s; }
+  .popup.checkin-pop .coin-spark:nth-child(8) { --tx: 18px; --ty: 40px; animation-delay: .12s; }
+  .popup.checkin-pop .coin-spark:nth-child(9) { --tx: -18px; --ty: 42px; animation-delay: .08s; }
+  @keyframes coinPopIn { 0% { transform: scale(0) rotate(-30deg); } 60% { transform: scale(1.18) rotate(10deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes coinGlowBurst { 0% { opacity: 0; transform: scale(.4); } 35% { opacity: 1; } 100% { opacity: 0; transform: scale(1.7); } }
+  @keyframes coinRingBurst { 0% { opacity: .9; transform: scale(.5); } 100% { opacity: 0; transform: scale(2.1); } }
+  @keyframes coinSparkOut { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.3); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1); } }
   .popup .big { font-size: 19px; font-weight: 800; margin-bottom: 6px; }
+  .popup.checkin-pop .big { animation: popupTextIn .4s ease .15s both; }
   .popup .plus { font-size: 26px; font-weight: 900; color: var(--gold); margin-bottom: 10px; }
+  .popup.checkin-pop .plus { animation: popupTextIn .4s ease .25s both; }
+  @keyframes popupTextIn { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: translateY(0); } }
   .popup .total { font-size: 12.5px; color: var(--muted); margin-bottom: 22px; }
   .popup .total strong { color: var(--ink); }
   .popup button { width: 100%; padding: 13px; border: none; border-radius: 14px; background: var(--brand); color: #fff; font-size: 14.5px; font-weight: 800; font-family: inherit; cursor: pointer; }
 
   .loading-dim { opacity: .5; pointer-events: none; }
+
+  /* ---- 출석 체크 시 캘린더 칸에 도장 찍히는 연출 ---- */
+  .cal-cell { transition: background-color .35s ease, color .35s ease; }
+  .cal-cell.stamp-pulse { animation: calStampPulse .5s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes calStampPulse { 0% { transform: scale(1); } 45% { transform: scale(1.28); box-shadow: 0 0 0 6px rgba(22,163,74,0.18); } 100% { transform: scale(1); box-shadow: none; } }
+  .cal-stamp-mark { display: inline-block; animation: calStampMarkIn .5s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes calStampMarkIn { 0% { transform: scale(2.6) rotate(-22deg); opacity: 0; } 55% { transform: scale(0.85) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
 </style>
 <!-- 트로피 터지는 연출의 파티클(색종이/컨페티) 부분을 전문 모션 디자이너가 만든 애니메이션으로 재생하기
      위해 Lottie 렌더러(lottie-web, airbnb/lottiefiles의 핵심 오픈소스 라이브러리)를 CDN에서 불러옴.
@@ -659,7 +687,17 @@
 
   <div class="overlay" id="overlay">
     <div class="popup" id="popupBox">
-      <div class="coin" id="popupCoin">P</div>
+      <div class="coin-wrap">
+        <div class="coin-glow"></div>
+        <div class="coin-ring"></div>
+        <div class="coin" id="popupCoin">P</div>
+        <div class="coin-spark">✨</div>
+        <div class="coin-spark">✨</div>
+        <div class="coin-spark">⭐</div>
+        <div class="coin-spark">✨</div>
+        <div class="coin-spark">⭐</div>
+        <div class="coin-spark">✨</div>
+      </div>
       <div class="big" id="popupTitle">출석 체크 완료!</div>
       <div class="plus" id="popupPlus">+10P 적립</div>
       <div class="total" id="popupTotal"></div>
@@ -718,7 +756,7 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790145073"></script>
+  <script src="config.js?v=1790146388"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -1092,6 +1130,8 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    let lastCheckinResult = null; // 확인 버튼을 눌렀을 때 "도장 찍기 + 코인 날아가기" 연출에 쓸 값 보관
+
     async function handleCheckin() {
       const btn = document.getElementById('todayCheckinBtn');
       if (btn) btn.classList.add('loading-dim');
@@ -1099,8 +1139,10 @@
         const rows = await callRpc('group_pt_checkin', { p_member_id: getSavedMemberId(), p_token: qrToken });
         const r = rows && rows[0];
         if (!r) throw new Error('알 수 없는 오류가 발생했어요.');
+        lastCheckinResult = r.ok ? r : null;
         openPopup(r);
       } catch (err) {
+        lastCheckinResult = null;
         openPopup({ ok: false, message: err.message });
       }
     }
@@ -1108,8 +1150,12 @@
     function openPopup(result) {
       const popup = document.getElementById('popupBox');
       popup.classList.toggle('is-error', !result.ok);
+      // checkin-pop 클래스를 지웠다가 다시 붙여야 같은 세션에서 두 번째 출석 팝업에서도 애니메이션이
+      // 처음부터 다시 재생됨(클래스가 이미 붙어있는 상태에서 다시 add해봤자 CSS 애니메이션은 안 다시 실행됨)
+      popup.classList.remove('checkin-pop');
+      if (result.ok) { void popup.offsetWidth; popup.classList.add('checkin-pop'); }
       document.getElementById('popupCoin').textContent = result.ok ? 'P' : '!';
-      document.getElementById('popupTitle').textContent = result.ok ? '출석 체크 완료!' : '앗, 잠깐만요';
+      document.getElementById('popupTitle').textContent = result.ok ? '출석 완료! 🎉' : '앗, 잠깐만요';
       document.getElementById('popupPlus').textContent = result.ok ? `+${result.points_earned}P 적립` : (result.message || '문제가 발생했어요');
       document.getElementById('popupPlus').style.color = result.ok ? '' : '#DC2626';
       document.getElementById('popupTotal').innerHTML = result.ok ? `현재 누적 포인트 <strong>${result.total_points}P</strong>` : '';
@@ -1120,13 +1166,49 @@
     document.getElementById('confirmBtn').addEventListener('click', async () => {
       document.getElementById('overlay').classList.remove('show');
       const wasOk = document.getElementById('overlay').dataset.wasOk === '1';
-      if (wasOk) {
+      if (wasOk && lastCheckinResult) {
+        playCheckinCelebration(lastCheckinResult);
+      } else if (wasOk) {
+        // 혹시 값이 유실됐으면 안전하게 그냥 새로고침만
         await loadCalendarView(getSavedMemberId());
       } else {
         const btn = document.getElementById('todayCheckinBtn');
         if (btn) btn.classList.remove('loading-dim');
       }
     });
+
+    // 확인 버튼을 누른 직후: ① 오늘 칸에 체크 도장이 실시간으로 찍히고 ② 코인이 포인트 칸으로 날아가며
+    // 숫자가 올라가고 ③ 누적 출석 숫자도 함께 반짝임 - 전부 끝나면 조용히 서버 최신 데이터로 다시 동기화함
+    // (화면에 보이는 값들은 이미 group_pt_checkin이 돌려준 값이랑 똑같아서, 다시 불러와도 티 안 나게 자연스럽게 이어짐)
+    function playCheckinCelebration(result) {
+      const todayCell = document.getElementById('todayCheckinBtn');
+      if (todayCell) {
+        todayCell.disabled = true;
+        todayCell.removeAttribute('id'); // 출석 완료 칸은 더 이상 "출석하기" 버튼이 아니므로 id도 정리
+        todayCell.classList.remove('today-pending');
+        todayCell.classList.add('attended', 'stamp-pulse');
+        todayCell.innerHTML = '<span class="cal-stamp-mark">✓</span>';
+        setTimeout(() => todayCell.classList.remove('stamp-pulse'), 520);
+      }
+
+      playCoinBurstToPoints();
+      const prevPoints = result.total_points - result.points_earned;
+      animatePointsCountUp(prevPoints, result.total_points);
+
+      const daysBox = document.getElementById('statTotalDaysBox');
+      const daysEl = document.getElementById('statTotalDays');
+      setTimeout(() => {
+        if (daysEl) daysEl.textContent = result.total_days + '일';
+        if (daysBox) {
+          daysBox.classList.add('points-impact');
+          setTimeout(() => daysBox.classList.remove('points-impact'), 650);
+        }
+      }, 300);
+
+      // 화면에 보여준 값과 서버 값이 이미 같으니, 조용히 다시 불러와서 명예의 전당/로드맵 등
+      // 나머지 화면 요소까지 최신 상태로 맞춰둠(사용자 눈에는 끊김 없이 자연스럽게 보임)
+      setTimeout(() => { loadCalendarView(getSavedMemberId()); }, 1600);
+    }
 
     function getSavedMemberId() {
       try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
