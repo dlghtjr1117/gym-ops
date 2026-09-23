@@ -2366,16 +2366,19 @@ function currentUserIdForGroupPt() {
 // group-pt-attendance.html이 표/카드를 그리는 데 필요한 형태로 미리 계산해줌(보상은 누적 방식이라
 // "이번 달"이 아니라 전체 기간 기준으로 계산함 - migration_55의 group_pt_checkin과 동일한 기준)
 async function fetchGroupPtAttendanceOverview() {
-  const [membersRes, attendanceRes, tiersRes, claimsRes] = await Promise.all([
+  const [membersRes, attendanceRes, tiersRes, claimsRes, mvpBonusRes] = await Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/members?group_pt_type=not.is.null&select=id,name,phone,group_pt_type&order=name.asc`, { headers: await authHeaders() }),
     fetch(`${SUPABASE_URL}/rest/v1/group_pt_attendance?select=*&order=attendance_date.asc`, { headers: await authHeaders() }),
     fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_tiers?select=*&order=days_required.asc`, { headers: await authHeaders() }),
-    fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_claims?select=*`, { headers: await authHeaders() })
+    fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_claims?select=*`, { headers: await authHeaders() }),
+    fetch(`${SUPABASE_URL}/rest/v1/group_pt_mvp_bonus_claims?select=member_id,bonus_points`, { headers: await authHeaders() })
   ]);
   if (!membersRes.ok) await throwApiError(membersRes, '그룹PT 회원 목록을 불러오지 못했습니다.');
   if (!attendanceRes.ok) await throwApiError(attendanceRes, '출석 기록을 불러오지 못했습니다.');
   if (!tiersRes.ok) await throwApiError(tiersRes, '보상 단계를 불러오지 못했습니다.');
   if (!claimsRes.ok) await throwApiError(claimsRes, '보상 지급 현황을 불러오지 못했습니다.');
+  // MVP 보너스 테이블(migration_57)이 아직 적용 전이어도 다른 기능은 그대로 동작하게 조용히 무시함
+  const mvpBonusClaims = mvpBonusRes.ok ? await mvpBonusRes.json() : [];
 
   const members = await membersRes.json();
   const attendance = await attendanceRes.json();
@@ -2392,7 +2395,10 @@ async function fetchGroupPtAttendanceOverview() {
     // DB 변경 없이 바로 쓸 수 있음
     const lastRow = memberAttendance.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] || null;
     const nextTier = tiers.find(t => t.days_required > totalDays) || null;
-    const points = totalDays * 10;
+    // 이달의 출석왕 MVP 추가 포인트(migration_57)까지 합산 - 회원 본인 화면(group_pt_get_member_status)의
+    // 포인트 계산과 같은 기준으로 맞춰서 관리자 화면과 회원 화면 숫자가 항상 일치하게 함
+    const mvpBonusSum = mvpBonusClaims.filter(c => c.member_id === m.id).reduce((sum, c) => sum + c.bonus_points, 0);
+    const points = totalDays * 10 + mvpBonusSum;
     return {
       member: m,
       totalDays,

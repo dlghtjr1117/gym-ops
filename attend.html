@@ -89,6 +89,84 @@
   .leaderboard-banner .t1 { display: block; font-size: 13.5px; font-weight: 800; color: #fff; }
   .leaderboard-banner .t2 { display: block; font-size: 11px; color: rgba(255,255,255,0.78); margin-top: 3px; line-height: 1.4; }
   .leaderboard-banner .arrow { color: #fff; font-size: 15px; opacity: .8; }
+
+  /* ---- 이달의 출석왕 MVP 추가 포인트 카드(캘린더 화면 상단, 지난달 TOP3인데 아직 안 받았을 때만 표시) ---- */
+  .mvp-card {
+    border-radius: 20px; padding: 18px 18px 16px; text-align: center; position: relative; overflow: hidden;
+    margin: 14px 24px 0; background: linear-gradient(150deg, var(--mvp-c1) 0%, var(--mvp-c2) 60%, var(--mvp-c3) 100%);
+    border: 1.5px solid var(--mvp-border); box-shadow: 0 14px 28px -16px rgba(0,0,0,0.18);
+  }
+  .mvp-card.rank-1 { --mvp-c1:#FFF6E0; --mvp-c2:#FFEFC7; --mvp-c3:#FFE6A8; --mvp-border:#F6D584; --mvp-ribbon:#F5A524; --mvp-title:#7A4A05; --mvp-sub:#92660F; --mvp-amount:#E08900; --mvp-btn1:#F5A524; --mvp-btn2:#E08900; }
+  .mvp-card.rank-2 { --mvp-c1:#F6F8FC; --mvp-c2:#EAEFF6; --mvp-c3:#DFE6EF; --mvp-border:#C7D0DE; --mvp-ribbon:#8D99AC; --mvp-title:#45505F; --mvp-sub:#5B6674; --mvp-amount:#5E6B7D; --mvp-btn1:#9FACC0; --mvp-btn2:#707E92; }
+  .mvp-card.rank-3 { --mvp-c1:#FBEEE2; --mvp-c2:#F5DFC9; --mvp-c3:#EFD0AE; --mvp-border:#E0B37F; --mvp-ribbon:#C97F3C; --mvp-title:#7A4419; --mvp-sub:#8A5A28; --mvp-amount:#A85F22; --mvp-btn1:#D99553; --mvp-btn2:#B06B2C; }
+  .mvp-ribbon {
+    display: inline-flex; align-items: center; gap: 5px; background: var(--mvp-ribbon); color: #fff; font-size: 10.5px;
+    font-weight: 800; padding: 4px 12px; border-radius: 999px; margin-bottom: 10px;
+  }
+  .mvp-title { font-size: 15px; font-weight: 900; color: var(--mvp-title); margin-bottom: 4px; }
+  .mvp-sub { font-size: 12px; color: var(--mvp-sub); margin-bottom: 14px; }
+  .mvp-sub strong { font-size: 15px; color: var(--mvp-amount); }
+  .mvp-claim-btn {
+    width: 100%; padding: 13px; border: none; border-radius: 14px; font-size: 14.5px; font-weight: 800;
+    font-family: inherit; cursor: pointer; color: #fff;
+    background: linear-gradient(120deg, var(--mvp-btn1), var(--mvp-btn2)); box-shadow: 0 10px 18px -8px rgba(0,0,0,0.28);
+  }
+  .mvp-err { font-size: 12.5px; color: #DC2626; font-weight: 700; padding: 4px 0 2px; }
+  .glow-ring {
+    width: 92px; height: 92px; border-radius: 50%; margin: 4px auto 12px;
+    background: radial-gradient(circle, rgba(0,0,0,0.08), transparent 68%);
+    display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .glow-ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px dashed var(--mvp-border); }
+  .trophy-tap { font-size: 46px; cursor: pointer; filter: drop-shadow(0 8px 14px rgba(0,0,0,0.25)); }
+  .tap-arrow { font-size: 11px; color: var(--mvp-sub); margin-top: 8px; }
+
+  /* ---- 보너스 지급 순간(트로피 탭) 축하 팝업 ---- */
+  .celebrate-overlay { position: fixed; inset: 0; background: rgba(10,8,25,0.62); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 60; }
+  .celebrate-overlay.show { opacity: 1; pointer-events: auto; }
+  .celebrate-card {
+    width: min(88vw, 320px); background: #fff; border-radius: 26px; padding: 36px 26px 26px; text-align: center;
+    position: relative; box-shadow: 0 30px 70px -20px rgba(15,17,35,0.55); transform: scale(.9); transition: transform .2s;
+  }
+  .celebrate-overlay.show .celebrate-card { transform: scale(1); }
+  .celebrate-card.rank-1 { --mvp-title:#7A4A05; --mvp-amount:#E08900; --mvp-btn1:#F5A524; --mvp-btn2:#E08900; --mvp-burst: rgba(245,165,36,0.35); }
+  .celebrate-card.rank-2 { --mvp-title:#45505F; --mvp-amount:#5E6B7D; --mvp-btn1:#9FACC0; --mvp-btn2:#707E92; --mvp-burst: rgba(141,153,172,0.35); }
+  .celebrate-card.rank-3 { --mvp-title:#7A4419; --mvp-amount:#A85F22; --mvp-btn1:#D99553; --mvp-btn2:#B06B2C; --mvp-burst: rgba(201,127,60,0.35); }
+  .burst {
+    position: absolute; top: 50%; left: 50%; width: 340px; height: 340px; transform: translate(-50%, -56%);
+    background: conic-gradient(from 0deg, var(--mvp-burst) 0deg, transparent 18deg, var(--mvp-burst) 36deg, transparent 54deg, var(--mvp-burst) 72deg, transparent 90deg, var(--mvp-burst) 108deg, transparent 126deg, var(--mvp-burst) 144deg, transparent 162deg, var(--mvp-burst) 180deg, transparent 198deg, var(--mvp-burst) 216deg, transparent 234deg, var(--mvp-burst) 252deg, transparent 270deg, var(--mvp-burst) 288deg, transparent 306deg, var(--mvp-burst) 324deg, transparent 342deg);
+    border-radius: 50%; z-index: 0; animation: burstSpin 6s linear infinite;
+  }
+  @keyframes burstSpin { from { transform: translate(-50%, -56%) rotate(0deg); } to { transform: translate(-50%, -56%) rotate(360deg); } }
+  .confetti { position: absolute; inset: 0; overflow: visible; z-index: 1; pointer-events: none; }
+  .confetti span { position: absolute; font-size: 15px; }
+  .trophy-shake {
+    position: relative; z-index: 2; font-size: 64px; display: inline-block;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.3)); animation: trophyShake .5s ease-in-out 2;
+  }
+  @keyframes trophyShake {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    20% { transform: rotate(-10deg) scale(1.06); }
+    40% { transform: rotate(9deg) scale(1.1); }
+    60% { transform: rotate(-7deg) scale(1.06); }
+    80% { transform: rotate(5deg) scale(1.02); }
+  }
+  .flash-ring {
+    position: absolute; top: 50%; left: 50%; width: 130px; height: 130px; transform: translate(-50%,-50%);
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.9), var(--mvp-burst) 60%, transparent 75%);
+    z-index: 1; animation: flashPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes flashPulse { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+  .grant-title { position: relative; z-index: 2; font-size: 15px; font-weight: 800; color: var(--mvp-title); margin-top: 14px; }
+  .grant-amount { position: relative; z-index: 2; font-size: 30px; font-weight: 900; color: var(--mvp-amount); margin-top: 4px; letter-spacing: -0.5px; }
+  .grant-sub { position: relative; z-index: 2; font-size: 12px; color: var(--mvp-title); margin-top: 10px; opacity: .85; }
+  .grant-sub strong { color: var(--ink); }
+  .celebrate-card .confirm-btn {
+    position: relative; z-index: 2; width: 100%; margin-top: 22px; padding: 13px; border: none; border-radius: 14px;
+    font-size: 14.5px; font-weight: 800; font-family: inherit; cursor: pointer; color: #fff;
+    background: linear-gradient(120deg, var(--mvp-btn1), var(--mvp-btn2));
+  }
+
   .cal-wrap { padding: 20px 24px 8px; }
   .cal-head { font-size: 14.5px; font-weight: 800; margin-bottom: 12px; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
@@ -240,6 +318,7 @@
       <h1 id="calGreeting">-</h1>
       <div class="sub" id="calSub">캘린더의 파란 칸을 눌러 오늘 출석을 체크해주세요</div>
     </div>
+    <div id="mvpBonusWrap"></div>
     <div class="stat-row">
       <div class="stat-box clickable" id="statTotalDaysBox"><div class="label">누적 출석</div><div class="value" id="statTotalDays">-</div><div class="tap-hint">기록 보기 ›</div></div>
       <div class="stat-box clickable" id="statPointsBox"><div class="label">포인트</div><div class="value" id="statPoints">-</div><div class="tap-hint">내역 보기 ›</div></div>
@@ -306,7 +385,26 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790132390"></script>
+  <div class="celebrate-overlay" id="celebrateOverlay">
+    <div class="celebrate-card" id="celebrateCard">
+      <div class="burst"></div>
+      <div class="flash-ring"></div>
+      <div class="confetti">
+        <span style="left:8%; top:14%;">🎉</span>
+        <span style="right:10%; top:10%;">✨</span>
+        <span style="left:14%; bottom:18%;">⭐</span>
+        <span style="right:12%; bottom:22%;">🎊</span>
+        <span style="left:50%; top:2%;">✨</span>
+      </div>
+      <div class="trophy-shake">🏆</div>
+      <div class="grant-title" id="celebrateTitle">-</div>
+      <div class="grant-amount" id="celebrateAmount">-</div>
+      <div class="grant-sub" id="celebrateSub"></div>
+      <button type="button" class="confirm-btn" id="celebrateConfirmBtn">확인</button>
+    </div>
+  </div>
+
+  <script src="config.js?v=1790133450"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -452,6 +550,7 @@
         return;
       }
       renderCalendarView();
+      checkMvpBonus(memberId);
     }
 
     function renderCalendarView() {
@@ -677,6 +776,81 @@
     function escapeHtmlAttend(s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
+
+    // ---- 이달의 출석왕 MVP 추가 포인트(1등 100P/2등 70P/3등 50P) ----
+    // 월말 당일엔 자정까지 순위가 계속 바뀔 수 있어서, 대신 "다음 달이 시작되면(지난달 출석이 더는
+    // 안 바뀌니까) 지난달 TOP3 보너스를 받을 수 있게" 하는 방식. 등수·중복 여부는 항상 서버가
+    // (group_pt_mvp_bonus_status/claim 함수 안에서) 다시 계산해서 확인하고, 클라이언트 값은 안 믿음.
+    const MVP_RANK_LABEL = { 1: '1등', 2: '2등', 3: '3등' };
+    const MVP_RANK_MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+    async function checkMvpBonus(memberId) {
+      const wrap = document.getElementById('mvpBonusWrap');
+      try {
+        const rows = await callRpc('group_pt_mvp_bonus_status', { p_member_id: memberId });
+        const status = rows && rows[0];
+        if (status && status.available) {
+          renderMvpIdleCard(status);
+        } else {
+          wrap.innerHTML = '';
+        }
+      } catch (err) {
+        // migration_57 적용 전이거나 일시적 오류여도 캘린더 화면 자체는 그대로 써야 하므로 조용히 무시함
+        wrap.innerHTML = '';
+      }
+    }
+
+    function renderMvpIdleCard(status) {
+      const wrap = document.getElementById('mvpBonusWrap');
+      const rankLabel = MVP_RANK_LABEL[status.rank];
+      wrap.innerHTML = `<div class="mvp-card rank-${status.rank}" id="mvpCard">
+        <div class="mvp-ribbon">${MVP_RANK_MEDAL[status.rank]} ${status.bonus_month}월 출석왕 ${rankLabel}</div>
+        <div class="mvp-title">축하해요! 추가 포인트를 드려요</div>
+        <div class="mvp-sub">${rankLabel} 보너스 <strong>${status.bonus_points}P</strong>를 받아보세요</div>
+        <button type="button" class="mvp-claim-btn" id="mvpClaimBtn">🎁 보너스 포인트 받기</button>
+      </div>`;
+      document.getElementById('mvpClaimBtn').addEventListener('click', () => renderMvpTrophyStep(status));
+    }
+
+    function renderMvpTrophyStep(status) {
+      const card = document.getElementById('mvpCard');
+      const rankLabel = MVP_RANK_LABEL[status.rank];
+      card.innerHTML = `
+        <div class="glow-ring"><div class="trophy-tap" id="mvpTrophyBtn">🏆</div></div>
+        <div class="mvp-title">트로피를 눌러보세요!</div>
+        <div class="mvp-sub">${rankLabel} 보너스 ${status.bonus_points}P가 기다리고 있어요</div>
+        <div class="tap-arrow">👆 트로피를 탭하면 포인트가 지급돼요</div>`;
+      document.getElementById('mvpTrophyBtn').addEventListener('click', () => handleMvpClaim(status));
+    }
+
+    async function handleMvpClaim(status) {
+      const trophyBtn = document.getElementById('mvpTrophyBtn');
+      if (trophyBtn) trophyBtn.style.pointerEvents = 'none';
+      try {
+        const rows = await callRpc('group_pt_mvp_bonus_claim', { p_member_id: getSavedMemberId() });
+        const r = rows && rows[0];
+        if (!r || !r.ok) throw new Error((r && r.message) || '보너스 지급 중 문제가 발생했어요.');
+        openCelebrateOverlay(status, r);
+      } catch (err) {
+        const card = document.getElementById('mvpCard');
+        if (card) card.innerHTML = `<div class="mvp-title">앗, 잠깐만요</div><div class="mvp-err">${escapeHtmlAttend(err.message)}</div>`;
+      }
+    }
+
+    function openCelebrateOverlay(status, result) {
+      document.getElementById('celebrateCard').className = `celebrate-card rank-${status.rank}`;
+      document.getElementById('celebrateTitle').textContent = `${status.bonus_month}월 출석왕 ${MVP_RANK_LABEL[status.rank]} 보너스`;
+      document.getElementById('celebrateAmount').textContent = `+${result.bonus_points}P 증정!`;
+      document.getElementById('celebrateSub').innerHTML = `현재 누적 포인트 <strong>${result.new_total_points}P</strong>`;
+      document.getElementById('celebrateOverlay').classList.add('show');
+    }
+
+    document.getElementById('celebrateConfirmBtn').addEventListener('click', async () => {
+      document.getElementById('celebrateOverlay').classList.remove('show');
+      document.getElementById('mvpBonusWrap').innerHTML = '';
+      // 포인트가 바뀌었으니 캘린더 화면 숫자(포인트/보상 로드맵)도 최신으로 다시 불러옴
+      await loadCalendarView(getSavedMemberId());
+    });
 
     // ---- 진입점 ----
     (function init() {
