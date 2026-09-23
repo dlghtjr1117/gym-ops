@@ -316,20 +316,121 @@
   .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
   .legend .sw.on { background: var(--green-bg); border: 1px solid var(--green); }
   .legend .sw.pending { background: var(--brand); }
-  .roadmap { margin: 22px 24px 0; }
-  .roadmap .rm-title { font-size: 12.5px; font-weight: 800; margin-bottom: 10px; }
-  .rm-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-  .rm-item:last-child { border-bottom: none; }
-  .rm-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex: 0 0 auto; }
-  .rm-dot.done { background: var(--green-bg); color: var(--green); }
-  .rm-dot.active { background: var(--brand-bg); color: var(--brand); font-weight: 800; font-size: 10px; }
-  .rm-dot.todo { background: var(--panel); color: var(--muted); font-size: 10px; }
-  .rm-txt .name { font-size: 12.5px; font-weight: 700; }
-  .rm-txt .sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
-  .rm-badge { margin-left: auto; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
-  .rm-badge.done { background: var(--green-bg); color: var(--green); }
-  .rm-badge.active { background: #FFF3DD; color: #92400e; }
+  /* ---- 출석 리워드(보상 로드맵) - 40/70/100일 트랙 + 카드 ---- */
+  .roadmap { margin: 26px 24px 0; }
+  .roadmap .rm-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 3px; }
+  .roadmap .rm-head .t { font-size: 15.5px; font-weight: 900; letter-spacing: -0.3px; }
+  .roadmap .rm-head .t .ic { margin-right: 3px; }
+  .roadmap .rm-sub { font-size: 11px; color: var(--muted); margin: 2px 0 14px; }
+
+  .rm-track-card {
+    background: linear-gradient(150deg, #1B1E4A 0%, #2A2F6B 45%, #3D5FFF 100%);
+    border-radius: 20px; padding: 18px 16px 24px; position: relative; overflow: hidden; margin-bottom: 14px;
+  }
+  .rm-track-card::before {
+    content: ""; position: absolute; top: -50px; right: -40px; width: 160px; height: 160px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%);
+  }
+  .rm-track-top { display: flex; align-items: baseline; justify-content: space-between; color: #fff; position: relative; z-index: 1; }
+  .rm-track-top .lbl { font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; }
+  .rm-track-top .val { font-size: 19px; font-weight: 900; }
+  .rm-track-top .val span { font-size: 11.5px; font-weight: 700; color: rgba(255,255,255,0.65); }
+
+  .rm-track { position: relative; margin: 24px 6px 4px; height: 38px; }
+  .rm-track-line { position: absolute; top: 17px; left: 0; right: 0; height: 5px; background: rgba(255,255,255,0.22); border-radius: 6px; }
+  .rm-track-fill { position: absolute; top: 17px; left: 0; height: 5px; background: linear-gradient(90deg, #FFE9B0, #F5A524); border-radius: 6px; box-shadow: 0 0 10px rgba(245,165,36,0.7); transition: width .5s ease; }
+  .rm-node { position: absolute; top: 0; width: 38px; height: 38px; transform: translateX(-50%); text-align: center; }
+  .rm-node .circ {
+    width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; border: 2.5px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.12);
+  }
+  .rm-node.done .circ { background: #fff; border-color: #fff; box-shadow: 0 6px 14px -4px rgba(0,0,0,0.35); }
+  .rm-node .day { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 800; color: rgba(255,255,255,0.85); white-space: nowrap; }
+  .rm-me { position: absolute; top: -14px; width: 20px; height: 20px; transform: translateX(-50%); transition: left .5s ease; }
+  .rm-me .pin { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid var(--gold); box-shadow: 0 0 0 4px rgba(245,165,36,0.35); }
+
+  .rm-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 1.5px solid var(--line); border-radius: 18px; padding: 13px; margin-bottom: 9px; cursor: pointer; width: 100%; text-align: left; font-family: inherit; }
+  .rm-card.next { border-color: var(--gold); box-shadow: 0 10px 22px -12px rgba(245,165,36,0.55); }
+  .rm-card.locked { background: var(--panel); }
+  .rm-card.got { border-color: var(--green); background: var(--green-bg); }
+  .rm-thumb { width: 50px; height: 50px; border-radius: 15px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background: #EEF1FF; }
+  .rm-card.next .rm-thumb { background: linear-gradient(155deg, #EEF1FF, #FFF3DD); }
+  .rm-card.locked .rm-thumb { background: #E9EBF3; }
+  .rm-card.got .rm-thumb { background: #fff; }
+  .rm-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+  .rm-thumb .emoji { font-size: 22px; }
+  .rm-card.locked .rm-thumb .emoji, .rm-card.locked .rm-thumb img { filter: grayscale(1) opacity(0.5); }
+  .rm-lock-badge { position: absolute; bottom: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #A6A9BC; color: #fff; font-size: 9px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+  .rm-got-badge { position: absolute; bottom: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: var(--green); color: #fff; font-size: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+  .rm-body { flex: 1; min-width: 0; }
+  .rm-body .top-row { display: flex; align-items: center; gap: 6px; }
+  .rm-body .name { font-size: 13px; font-weight: 800; }
+  .rm-tag { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 999px; flex: 0 0 auto; }
+  .rm-tag.next { background: #FFF3DD; color: #92400e; }
+  .rm-tag.got { background: #fff; color: var(--green); }
+  .rm-body .days { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .rm-card.locked .name, .rm-card.locked .days { color: #A6A9BC; }
+  .rm-mini-track { height: 5px; border-radius: 4px; background: var(--line); margin-top: 7px; overflow: hidden; }
+  .rm-mini-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--brand), #6C8CFF); }
+  .rm-mini-fill.gold { background: linear-gradient(90deg, var(--gold), #FFD76A); }
+  .rm-mini-fill.green { background: linear-gradient(90deg, var(--green), #4ADE80); }
+  .rm-arrow { font-size: 11.5px; color: var(--muted); flex: 0 0 auto; font-weight: 700; }
+  .rm-card.next .rm-arrow { color: #C9740B; }
+  .rm-card.got .rm-arrow { color: var(--green); }
+
   .reset-link { display: block; text-align: center; padding: 24px 24px 30px; font-size: 11.5px; color: var(--muted); text-decoration: underline; background: none; border: none; font-family: inherit; width: 100%; cursor: pointer; }
+
+  /* ---- 리워드 상세 화면(트로피 상세와 비슷하게 뒤로가기 있는 전체화면) ---- */
+  .dt-appbar { display: flex; align-items: center; gap: 10px; padding: 18px 24px 4px; }
+  .dt-back { width: 30px; height: 30px; border-radius: 50%; background: var(--panel); border: none; display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--ink); cursor: pointer; }
+  .dt-appbar .t { font-size: 14.5px; font-weight: 800; }
+
+  .dt-hero {
+    margin: 14px 24px 0; border-radius: 24px; padding: 28px 18px 24px; position: relative; overflow: hidden;
+    background: radial-gradient(circle at 30% 0%, #3F4DA8 0%, #23265E 60%, #171938 100%);
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .dt-hero::before { content:""; position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background: radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%); }
+  .dt-hero::after { content:""; position:absolute; bottom:-60px; right:-40px; width:180px; height:180px; border-radius:50%; background: radial-gradient(circle, rgba(245,165,36,0.22), transparent 70%); }
+  .dt-tag { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.14); color: #FFE9B0; font-size: 10.5px; font-weight: 800; padding: 5px 11px; border-radius: 999px; margin-bottom: 15px; }
+  .dt-img-wrap { position: relative; z-index: 1; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.16), rgba(255,255,255,0.02)); display:flex; align-items:center; justify-content:center; }
+  .dt-img-wrap img { width: 116px; height: auto; filter: drop-shadow(0 18px 20px rgba(0,0,0,0.45)); }
+  .dt-img-wrap .emoji { font-size: 62px; filter: drop-shadow(0 12px 14px rgba(0,0,0,0.4)); }
+  .dt-name { position: relative; z-index: 1; color: #fff; font-size: 16.5px; font-weight: 900; margin-top: 16px; letter-spacing: -0.2px; }
+  .dt-desc { position: relative; z-index: 1; color: rgba(255,255,255,0.65); font-size: 11px; margin-top: 4px; }
+
+  .dt-body { padding: 22px 24px 30px; }
+  .dt-section-title { font-size: 13px; font-weight: 900; margin-bottom: 13px; display: flex; align-items: center; gap: 5px; }
+
+  .dt-ring-card { display: flex; align-items: center; gap: 18px; background: var(--panel); border-radius: 20px; padding: 18px; margin-bottom: 13px; }
+  .dt-ring { flex: 0 0 auto; }
+  .dt-ring-stats { flex: 1; }
+  .dt-ring-stats .big { font-size: 20px; font-weight: 900; }
+  .dt-ring-stats .big span { color: var(--brand); }
+  .dt-ring-stats .pct { font-size: 10.5px; color: var(--muted); margin-top: 2px; font-weight: 700; }
+
+  .dt-stat-row { display: flex; gap: 10px; margin-bottom: 13px; }
+  .dt-stat { flex: 1; border-radius: 16px; padding: 14px 13px; text-align: center; position: relative; overflow: hidden; }
+  .dt-stat.done { background: var(--green-bg); }
+  .dt-stat.left { background: linear-gradient(150deg, #FFF3DD, #FFE3B0); }
+  .dt-stat .k { font-size: 10px; font-weight: 800; color: var(--muted); }
+  .dt-stat.left .k { color: #92400e; }
+  .dt-stat .v { font-size: 23px; font-weight: 900; margin-top: 4px; }
+  .dt-stat.done .v { color: var(--green); }
+  .dt-stat.left .v { color: #C9740B; }
+  .dt-stat .v span { font-size: 12px; font-weight: 800; }
+  .dt-stat .spark { position: absolute; font-size: 28px; opacity: 0.16; right: -4px; bottom: -6px; }
+
+  .dt-hype { display: flex; align-items: center; gap: 10px; border-radius: 16px; padding: 13px 15px; color: #fff; }
+  .dt-hype.pace { background: linear-gradient(90deg, #3D5FFF, #6C4CFF); box-shadow: 0 14px 24px -12px rgba(61,95,255,0.55); }
+  .dt-hype.celebrate { background: linear-gradient(90deg, #16A34A, #22C55E); box-shadow: 0 14px 24px -12px rgba(22,163,74,0.5); }
+  .dt-hype.done { background: linear-gradient(90deg, #6B7280, #9AA1B4); box-shadow: 0 14px 24px -12px rgba(107,114,128,0.4); }
+  .dt-hype .ic { font-size: 19px; flex: 0 0 auto; }
+  .dt-hype .txt { font-size: 11.5px; font-weight: 800; line-height: 1.55; }
+  .dt-hype .txt .hi { color: #FFE9B0; }
+  .dt-hype.celebrate .txt .hi, .dt-hype.done .txt .hi { color: #fff; }
+
+  .dt-foot-note { text-align: center; font-size: 10px; color: var(--muted); margin-top: 15px; line-height: 1.6; }
 
   /* ---- 이달의 출석왕 화면 ---- */
   .lb-header {
@@ -484,7 +585,9 @@
       <span><span class="sw pending"></span>오늘, 탭하면 출석</span>
     </div>
     <div class="roadmap">
-      <div class="rm-title">보상 로드맵</div>
+      <div class="rm-head"><div class="t"><span class="ic">🎁</span>출석 리워드</div></div>
+      <div class="rm-sub">출석할수록 특별한 선물이 기다려요</div>
+      <div id="roadmapTrackWrap"></div>
       <div id="roadmapList"></div>
     </div>
     <button type="button" class="reset-link" id="resetIdentityBtn">본인이 아니신가요? 다시 확인하기</button>
@@ -506,6 +609,41 @@
     <div class="lb-body">
       <div class="lb-note"><span class="ic">ℹ️</span><span>매달 1일에 출석 횟수가 새로 시작돼요. 순위는 이번 달 출석 횟수만 반영하고, 오늘 기준으로 실시간 집계돼요.</span></div>
       <div id="lbMyRankWrap"></div>
+    </div>
+  </div>
+
+  <div class="view" id="viewRewardDetail">
+    <div class="dt-appbar"><button type="button" class="dt-back" id="rdBackBtn">‹</button><div class="t" id="rdBarTitle">리워드</div></div>
+
+    <div class="dt-hero">
+      <div class="dt-tag" id="rdTag">-</div>
+      <div class="dt-img-wrap" id="rdImgWrap"></div>
+      <div class="dt-name" id="rdName">-</div>
+      <div class="dt-desc" id="rdDesc"></div>
+    </div>
+
+    <div class="dt-body">
+      <div class="dt-section-title">📊 나의 출석 현황</div>
+
+      <div class="dt-ring-card">
+        <div class="dt-ring" id="rdRing"></div>
+        <div class="dt-ring-stats">
+          <div class="big" id="rdRingBig">-</div>
+          <div class="pct" id="rdRingPct">-</div>
+        </div>
+      </div>
+
+      <div class="dt-stat-row">
+        <div class="dt-stat done"><div class="k">누적 출석</div><div class="v" id="rdDoneDays">-</div><div class="spark">✅</div></div>
+        <div class="dt-stat left"><div class="k">남은 출석</div><div class="v" id="rdLeftDays">-</div><div class="spark" id="rdLeftSpark">🔥</div></div>
+      </div>
+
+      <div class="dt-hype" id="rdHype">
+        <div class="ic" id="rdHypeIc">🔥</div>
+        <div class="txt" id="rdHypeTxt">-</div>
+      </div>
+
+      <div class="dt-foot-note">리워드는 목표 달성 시 자동으로 "지급 예정" 상태가 되며,<br>매장에서 직접 수령하실 수 있어요.</div>
     </div>
   </div>
 
@@ -580,7 +718,7 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790139997"></script>
+  <script src="config.js?v=1790145073"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -811,23 +949,144 @@
       if (btn) btn.addEventListener('click', handleCheckin);
     }
 
+    // 리워드에 icon_emoji가 안 정해져 있을 때(관리자가 아직 안 채웠을 때) 대신 보여줄 기본 아이콘
+    const REWARD_ICON_FALLBACK = '🎁';
+
+    // 보상 로드맵: 위쪽 진행 트랙(40/70/100일 위치에 아이콘, 내 진행 위치 핀) + 아래쪽 리워드 카드 리스트
     function renderRoadmap() {
+      const trackWrap = document.getElementById('roadmapTrackWrap');
       const list = document.getElementById('roadmapList');
       const tiers = statusCache.tiers || [];
-      if (tiers.length === 0) { list.innerHTML = `<div class="hint" style="padding:0;">아직 설정된 보상 단계가 없어요.</div>`; return; }
-      list.innerHTML = tiers.map(t => {
-        const dotClass = t.fulfilled || t.achieved ? 'done' : (statusCache.total_days < t.days_required ? 'todo' : 'active');
-        const dotContent = t.achieved ? '✓' : `${statusCache.total_days}/${t.days_required}`;
-        const badge = t.fulfilled
-          ? `<div class="rm-badge done">수령 완료</div>`
-          : (t.achieved ? `<div class="rm-badge active">지급 예정</div>` : (statusCache.total_days < t.days_required ? '' : ''));
-        return `<div class="rm-item">
-          <div class="rm-dot ${dotClass}">${dotContent}</div>
-          <div class="rm-txt"><div class="name">${t.days_required}일 출석</div><div class="sub">${t.reward_name}</div></div>
-          ${badge}
+      if (tiers.length === 0) {
+        trackWrap.innerHTML = '';
+        list.innerHTML = `<div class="hint" style="padding:0;">아직 설정된 보상 단계가 없어요.</div>`;
+        return;
+      }
+      const totalDays = statusCache.total_days;
+      const trackMax = tiers[tiers.length - 1].days_required; // 가장 마지막(가장 많이 출석해야 받는) 단계 기준
+      const pinPct = Math.min(100, (totalDays / trackMax) * 100);
+
+      trackWrap.innerHTML = `
+        <div class="rm-track-card">
+          <div class="rm-track-top"><div class="lbl">나의 누적 출석</div><div class="val">${totalDays}<span> / ${trackMax}일</span></div></div>
+          <div class="rm-track">
+            <div class="rm-track-line"></div>
+            <div class="rm-track-fill" style="width:${pinPct}%;"></div>
+            <div class="rm-me" style="left:${pinPct}%;"><div class="pin"></div></div>
+            ${tiers.map(t => {
+              const pct = Math.min(100, (t.days_required / trackMax) * 100);
+              const nodeClass = (t.achieved || t.fulfilled) ? 'done' : '';
+              const leftStyle = pct >= 99.9 ? `left:${pct}%; transform: translateX(-100%);` : `left:${pct}%;`;
+              return `<div class="rm-node ${nodeClass}" style="${leftStyle}"><div class="circ">${escapeHtmlAttend(t.icon_emoji || REWARD_ICON_FALLBACK)}</div><div class="day">${t.days_required}일</div></div>`;
+            }).join('')}
+          </div>
         </div>`;
+
+      // "다음 목표"는 아직 못 받은 단계 중 가장 먼저 오는 단계(그 이전은 이미 달성, 그 다음은 아직 잠김)
+      const nextIndex = tiers.findIndex(t => !t.achieved);
+
+      list.innerHTML = tiers.map((t, i) => {
+        const state = (t.achieved || t.fulfilled) ? 'got' : (i === nextIndex ? 'next' : 'locked');
+        const icon = t.icon_emoji || REWARD_ICON_FALLBACK;
+        const thumbInner = t.image_url
+          ? `<img src="${t.image_url}" alt="${escapeHtmlAttend(t.reward_name)}">`
+          : `<span class="emoji">${icon}</span>`;
+        const cornerBadge = state === 'locked' ? `<div class="rm-lock-badge">🔒</div>` : (state === 'got' ? `<div class="rm-got-badge">✓</div>` : '');
+        const tag = state === 'got'
+          ? `<div class="rm-tag got">${t.fulfilled ? '수령 완료' : '지급 예정'}</div>`
+          : (state === 'next' ? `<div class="rm-tag next">다음 목표</div>` : '');
+        const pct = Math.min(100, Math.round((totalDays / t.days_required) * 100));
+        const fillClass = state === 'got' ? 'green' : (state === 'next' ? 'gold' : '');
+        const arrowTxt = state === 'next' ? `${escapeHtmlAttend(t.reward_name)} 보기 ›` : '›';
+        return `<button type="button" class="rm-card ${state}" data-tier-index="${i}">
+          <div class="rm-thumb">${thumbInner}${cornerBadge}</div>
+          <div class="rm-body">
+            <div class="top-row"><div class="name">${escapeHtmlAttend(t.reward_name)}</div>${tag}</div>
+            <div class="days">${t.days_required}일 출석 시 지급 · ${Math.min(totalDays, t.days_required)}/${t.days_required}일</div>
+            <div class="rm-mini-track"><div class="rm-mini-fill ${fillClass}" style="width:${pct}%;"></div></div>
+          </div>
+          <div class="rm-arrow">${arrowTxt}</div>
+        </button>`;
       }).join('');
+
+      list.querySelectorAll('.rm-card').forEach(card => {
+        card.addEventListener('click', () => openRewardDetail(Number(card.dataset.tierIndex)));
+      });
     }
+
+    // 지금까지의 출석 페이스(첫 출석~오늘 사이 며칠에 한 번 출석했는지)를 바탕으로 남은 일수를 몇 주 뒤에
+    // 채울 수 있을지 대략 추정 - "도파민 터지는" 동기부여 문구용이라 정확한 통계가 아니라 참고용 추정치임
+    function estimateWeeksLeft(remainingDays) {
+      const dates = statusCache.attendance_dates || [];
+      if (remainingDays <= 0 || dates.length === 0) return null;
+      const first = new Date(dates[0]);
+      const today = new Date();
+      const daysSinceFirst = Math.max(1, Math.round((today - first) / 86400000));
+      const paceDaysPerAttendance = daysSinceFirst / dates.length;
+      const estDays = Math.max(1, Math.round(remainingDays * paceDaysPerAttendance));
+      return Math.max(1, Math.round(estDays / 7));
+    }
+
+    // 리워드 카드를 누르면 뜨는 상세 화면(예: "텀블러 보기") - 큰 이미지 + 원형 진행률 + 남은 출석 현황
+    function openRewardDetail(index) {
+      const tiers = statusCache.tiers || [];
+      const t = tiers[index];
+      if (!t) return;
+      const totalDays = statusCache.total_days;
+      const icon = t.icon_emoji || REWARD_ICON_FALLBACK;
+
+      document.getElementById('rdBarTitle').textContent = t.reward_name;
+      document.getElementById('rdTag').innerHTML = `${escapeHtmlAttend(icon)} ${t.days_required}일 출석 리워드`;
+      document.getElementById('rdImgWrap').innerHTML = t.image_url
+        ? `<img src="${t.image_url}" alt="${escapeHtmlAttend(t.reward_name)}">`
+        : `<span class="emoji">${icon}</span>`;
+      document.getElementById('rdName').textContent = t.reward_name;
+      document.getElementById('rdDesc').textContent = `${t.days_required}일 출석 달성 시 증정`;
+
+      const pct = Math.min(100, Math.round((totalDays / t.days_required) * 100));
+      const r = 40, c = 2 * Math.PI * r;
+      const offset = c * (1 - pct / 100);
+      document.getElementById('rdRing').innerHTML = `
+        <svg width="92" height="92" viewBox="0 0 92 92">
+          <circle cx="46" cy="46" r="${r}" fill="none" stroke="#E7E9F2" stroke-width="10"/>
+          <circle cx="46" cy="46" r="${r}" fill="none" stroke="url(#rdg)" stroke-width="10" stroke-linecap="round"
+            stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" transform="rotate(-90 46 46)"/>
+          <defs><linearGradient id="rdg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#3D5FFF"/><stop offset="100%" stop-color="#8B6CFF"/></linearGradient></defs>
+          <text x="46" y="42" text-anchor="middle" font-size="18" font-weight="900" fill="#16192E" font-family="-apple-system,sans-serif">${pct}%</text>
+          <text x="46" y="58" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6B7280" font-family="-apple-system,sans-serif">달성률</text>
+        </svg>`;
+      document.getElementById('rdRingBig').innerHTML = `<span>${Math.min(totalDays, t.days_required)}</span> / ${t.days_required}일 출석`;
+      document.getElementById('rdRingPct').textContent = pct >= 100 ? '목표를 달성했어요! 🎉' : `목표까지 ${pct}% 달성했어요`;
+
+      document.getElementById('rdDoneDays').innerHTML = `${totalDays}<span>일</span>`;
+      const remaining = Math.max(0, t.days_required - totalDays);
+      document.getElementById('rdLeftDays').innerHTML = `${remaining}<span>일</span>`;
+      document.getElementById('rdLeftSpark').textContent = remaining <= 0 ? '🎉' : '🔥';
+
+      const hype = document.getElementById('rdHype');
+      const hypeIc = document.getElementById('rdHypeIc');
+      const hypeTxt = document.getElementById('rdHypeTxt');
+      hype.className = 'dt-hype';
+      if (t.fulfilled) {
+        hype.classList.add('done');
+        hypeIc.textContent = '✅';
+        hypeTxt.innerHTML = `이미 수령하신 리워드예요.<br>다음 목표도 함께 힘내봐요! 💪`;
+      } else if (t.achieved) {
+        hype.classList.add('celebrate');
+        hypeIc.textContent = '🎉';
+        hypeTxt.innerHTML = `<span class="hi">목표 달성!</span> 매장에서 리워드를 받아보세요.`;
+      } else {
+        hype.classList.add('pace');
+        hypeIc.textContent = '🔥';
+        const weeks = estimateWeeksLeft(remaining);
+        hypeTxt.innerHTML = weeks
+          ? `지금 페이스라면 <span class="hi">약 ${weeks}주 후</span>에 받을 수 있어요!<br>오늘도 출석하고 한 걸음 더 가까워지세요 💪`
+          : `앞으로 <span class="hi">${remaining}일</span> 더 출석하면 받을 수 있어요!<br>오늘 첫 출석을 시작해보세요 💪`;
+      }
+
+      showView('viewRewardDetail');
+    }
+    document.getElementById('rdBackBtn').addEventListener('click', () => showView('viewCalendar'));
 
     function formatLocalDate(d) {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
