@@ -144,20 +144,24 @@
   @keyframes tmHintBlink { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
   /* Stage B: 트로피 탭 → 빛줄기가 한 줄씩 뻗어나가며 폭발 → +100P 증정 */
-  .tm-rays { position: absolute; left: 50%; top: 46%; width: 0; height: 0; }
+  /* 빛줄기/플래시가 아래에 오는 문구 길이와 상관없이 항상 트로피 정중앙에서 터지도록, 트로피만 감싸는
+     작은 박스(tm-burst-zone) 기준으로 위치를 잡음(전체 Stage 박스 기준으로 잡으면 문구 줄 수에 따라
+     중심이 흔들려서 엉뚱한 위치에서 터지는 것처럼 보였던 문제를 고침) */
+  .tm-burst-zone { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; }
+  .tm-rays { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
   .ray-line {
     position: absolute; left: 0; top: 0; width: 3px; height: 0; border-radius: 3px;
     background: linear-gradient(to top, rgba(255,224,140,0) 0%, rgba(255,224,140,0.95) 55%, rgba(255,224,140,0) 100%);
     transform-origin: 50% 100%; opacity: 0; transition: height .42s cubic-bezier(.2,.8,.3,1), opacity .25s ease;
   }
-  .tm-rays.burst .ray-line { height: 240px; opacity: 1; }
+  .tm-rays.burst .ray-line { height: 190px; opacity: 1; }
   .tm-core-flash {
-    position: absolute; left: 50%; top: 46%; width: 40px; height: 40px; border-radius: 50%;
+    position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border-radius: 50%;
     transform: translate(-50%, -50%) scale(0.3); opacity: 0; pointer-events: none;
     background: radial-gradient(circle, #fff 0%, #FFE9B0 22%, #F5A524 46%, rgba(245,165,36,0) 72%);
     transition: width .55s cubic-bezier(.2,.9,.3,1), height .55s cubic-bezier(.2,.9,.3,1), opacity .4s ease, transform .55s cubic-bezier(.2,.9,.3,1);
   }
-  .tm-core-flash.burst { opacity: 1; width: 300px; height: 300px; transform: translate(-50%, -50%) scale(1); }
+  .tm-core-flash.burst { opacity: 1; width: 260px; height: 260px; transform: translate(-50%, -50%) scale(1); }
   .tm-trophy-mini { position: relative; z-index: 2; font-size: 58px; filter: drop-shadow(0 0 18px rgba(255,224,140,0.9)); }
   @keyframes tmTextIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .tm-grant-title { position: relative; z-index: 2; color: #fff; font-size: 16px; font-weight: 700; opacity: 0; margin-top: 12px; animation: tmTextIn .4s ease both; animation-delay: .58s; }
@@ -463,22 +467,24 @@
     </div>
 
     <div class="tm-stage" id="tmStageB" style="display:none;">
-      <div class="tm-rays" id="tmRays">
-        <span class="ray-line" style="transform:rotate(0deg); transition-delay:0ms;"></span>
-        <span class="ray-line" style="transform:rotate(30deg); transition-delay:25ms;"></span>
-        <span class="ray-line" style="transform:rotate(60deg); transition-delay:50ms;"></span>
-        <span class="ray-line" style="transform:rotate(90deg); transition-delay:75ms;"></span>
-        <span class="ray-line" style="transform:rotate(120deg); transition-delay:100ms;"></span>
-        <span class="ray-line" style="transform:rotate(150deg); transition-delay:125ms;"></span>
-        <span class="ray-line" style="transform:rotate(180deg); transition-delay:150ms;"></span>
-        <span class="ray-line" style="transform:rotate(210deg); transition-delay:175ms;"></span>
-        <span class="ray-line" style="transform:rotate(240deg); transition-delay:200ms;"></span>
-        <span class="ray-line" style="transform:rotate(270deg); transition-delay:225ms;"></span>
-        <span class="ray-line" style="transform:rotate(300deg); transition-delay:250ms;"></span>
-        <span class="ray-line" style="transform:rotate(330deg); transition-delay:275ms;"></span>
+      <div class="tm-burst-zone">
+        <div class="tm-rays" id="tmRays">
+          <span class="ray-line" style="transform:rotate(0deg); transition-delay:0ms;"></span>
+          <span class="ray-line" style="transform:rotate(30deg); transition-delay:25ms;"></span>
+          <span class="ray-line" style="transform:rotate(60deg); transition-delay:50ms;"></span>
+          <span class="ray-line" style="transform:rotate(90deg); transition-delay:75ms;"></span>
+          <span class="ray-line" style="transform:rotate(120deg); transition-delay:100ms;"></span>
+          <span class="ray-line" style="transform:rotate(150deg); transition-delay:125ms;"></span>
+          <span class="ray-line" style="transform:rotate(180deg); transition-delay:150ms;"></span>
+          <span class="ray-line" style="transform:rotate(210deg); transition-delay:175ms;"></span>
+          <span class="ray-line" style="transform:rotate(240deg); transition-delay:200ms;"></span>
+          <span class="ray-line" style="transform:rotate(270deg); transition-delay:225ms;"></span>
+          <span class="ray-line" style="transform:rotate(300deg); transition-delay:250ms;"></span>
+          <span class="ray-line" style="transform:rotate(330deg); transition-delay:275ms;"></span>
+        </div>
+        <div class="tm-core-flash" id="tmCoreFlash"></div>
+        <div class="tm-trophy-mini">🏆</div>
       </div>
-      <div class="tm-core-flash" id="tmCoreFlash"></div>
-      <div class="tm-trophy-mini">🏆</div>
       <div class="tm-grant-title" id="tmGrantTitle">-</div>
       <div class="tm-grant-amount" id="tmGrantAmount">-</div>
       <div class="tm-grant-sub" id="tmGrantSub"></div>
@@ -497,7 +503,7 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790136048"></script>
+  <script src="config.js?v=1790136554"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -653,7 +659,7 @@
       if (!statusCache) return;
       const hasTrophy = myHonorHistory.length > 0;
       document.getElementById('calGreeting').innerHTML =
-        `${escapeHtmlAttend(statusCache.display_name)}님${hasTrophy ? ' <span class="name-badge">🏆 출석왕</span>' : ''}, 오늘도 출석해볼까요? 😊`;
+        `${hasTrophy ? '<span class="name-badge">🏆 출석왕</span> ' : ''}${escapeHtmlAttend(statusCache.display_name)}님, 오늘도 출석해볼까요? 😊`;
     }
 
     function renderCalendarView() {
