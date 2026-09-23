@@ -177,7 +177,11 @@
   .tm-shockwave.burst { animation: tmShockOut .85s cubic-bezier(.15,.7,.3,1) both; }
   .tm-shockwave.ring2.burst { animation-delay: .09s; }
   @keyframes tmShockOut { 0% { transform: translate(-50%, -50%) scale(0.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(6.2); opacity: 0; } }
-  /* 파티클(금빛 조각들)이 흩날리는 캔버스 - 물리 기반 연출은 JS의 burstTrophyParticles()가 그림 */
+  /* 색종이(컨페티) 파티클 - LottieFiles의 전문 모션 디자이너가 만든 애니메이션(lottie-web으로 재생)을
+     트로피 중심에 겹쳐서 보여줌. 혹시라도 외부 애니메이션을 못 불러오면(네트워크 문제 등) JS단에서
+     자동으로 예전 자체 제작 파티클 효과로 대체됨(showBurstStage의 폴백 로직 참고) */
+  .tm-lottie-burst { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 320px; height: 320px; pointer-events: none; z-index: 1; }
+  /* 외부 애니메이션 로드 실패 시 대체용 파티클 캔버스(JS가 필요할 때만 붙여넣음) */
   .tm-burst-canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; height: 300px; pointer-events: none; z-index: 1; }
   .tm-core-flash {
     position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border-radius: 50%; z-index: 1;
@@ -217,6 +221,13 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 3px rgba(120,60,0,0.25);
   }
   .tm-trophy-grant { position: relative; z-index: 2; font-size: 92px; filter: drop-shadow(0 0 28px rgba(255,224,140,0.9)); opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .08s; }
+  /* Stage D: 이름 옆에 실제로 붙게 될 "출석왕" 뱃지를 확대해서 미리 보여줌(name-badge와 동일한 금속 광택 스윕 재사용) */
+  .tm-badge-preview {
+    position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+    opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .08s;
+  }
+  .tm-badge-big { font-size: 18px; padding: 8px 16px 8px 13px; gap: 5px; box-shadow: 0 8px 20px -6px rgba(245,165,36,0.7), inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 3px rgba(120,60,0,0.25); }
+  .tm-badge-name { font-size: 19px; font-weight: 800; color: #fff; }
   .tm-grant-title2 { position: relative; z-index: 2; margin-top: 16px; color: #fff; font-size: 20px; font-weight: 900; text-align: center; line-height: 1.4; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .16s; }
   .tm-grant-title2 .hi { color: #FFD76A; }
   .tm-grant-sub2 { position: relative; z-index: 2; margin-top: 8px; color: #CBD0E6; font-size: 13px; text-align: center; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .24s; }
@@ -385,6 +396,14 @@
 
   .loading-dim { opacity: .5; pointer-events: none; }
 </style>
+<!-- 트로피 터지는 연출의 파티클(색종이/컨페티) 부분을 전문 모션 디자이너가 만든 애니메이션으로 재생하기
+     위해 Lottie 렌더러(lottie-web, airbnb/lottiefiles의 핵심 오픈소스 라이브러리)를 CDN에서 불러옴.
+     참고: 이 라이브러리를 감싼 별도 패키지 @lottiefiles/lottie-player의 2.0.5~2.0.7 버전이 2024년에
+     공급망 공격(암호화폐 지갑 탈취 악성코드 삽입)을 당한 적이 있어서, 그 래퍼 패키지 대신 더 오래되고
+     널리 검증된 핵심 렌더러(lottie-web)를 무결성 해시(integrity)와 함께 불러오는 방식을 씀. -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.5/lottie.min.js"
+  integrity="sha512-0bCDSnaX8FOD9Mq8WbHcDwshXwCB5V4EP+UBu87WQgga2b7lAsuEbaSmIZjH/XEmNhJuhrPbFHemre5HZwrk9w=="
+  crossorigin="anonymous"></script>
 </head>
 <body>
   <div class="appbar"><span class="logo">C</span><span class="name">센터 그룹PT</span></div>
@@ -503,7 +522,8 @@
       <div class="tm-burst-zone">
         <div class="tm-shockwave" id="tmShockwave1"></div>
         <div class="tm-shockwave ring2" id="tmShockwave2"></div>
-        <canvas class="tm-burst-canvas" id="tmBurstCanvas" width="300" height="300"></canvas>
+        <div class="tm-lottie-burst" id="tmLottieBurst"></div>
+        <canvas class="tm-burst-canvas" id="tmBurstCanvas" width="300" height="300" style="display:none;"></canvas>
         <div class="tm-core-flash" id="tmCoreFlash"></div>
         <div class="tm-trophy-mini">🏆</div>
       </div>
@@ -523,9 +543,23 @@
       <div class="tm-grant-sub2">확인을 누르면 내 명예 훈장에 담겨요</div>
       <button type="button" class="tm-confirm-btn" id="tmConfirmC">확인</button>
     </div>
+
+    <div class="tm-stage" id="tmStageD" style="display:none;">
+      <div class="tm-glow-static"></div>
+      <div class="tm-ring1"></div>
+      <div class="tm-ring2"></div>
+      <div class="tm-ribbon">BADGE GET</div>
+      <div class="tm-badge-preview">
+        <span class="name-badge tm-badge-big">🏆 출석왕</span>
+        <span class="tm-badge-name" id="tmBadgeName">-</span>
+      </div>
+      <div class="tm-grant-title2">이름 앞에<br><span class="hi">출석왕 뱃지</span> 등록!</div>
+      <div class="tm-grant-sub2">확인하면 바로 이름 옆에 뱃지가 붙어요</div>
+      <button type="button" class="tm-confirm-btn" id="tmConfirmD">확인</button>
+    </div>
   </div>
 
-  <script src="config.js?v=1790137211"></script>
+  <script src="config.js?v=1790138421"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -948,10 +982,35 @@
     let pendingMvpResult = null;
 
     function showTmStage(stage) {
-      ['A', 'B', 'C'].forEach(s => {
+      ['A', 'B', 'C', 'D'].forEach(s => {
         document.getElementById('tmStage' + s).style.display = s === stage ? 'flex' : 'none';
       });
       document.getElementById('trophyModalClose').style.display = stage === 'A' ? 'flex' : 'none';
+    }
+
+    // ---- Lottie 컨페티 버스트: lottie-web 로딩이 끝나면 인스턴스를 한 번만 만들어두고 재생만 반복함.
+    // 라이브러리/애니메이션 로딩이 늦거나 실패하면(네트워크 문제 등) tmLottieReady가 계속 false로
+    // 남아서 showBurstStage()가 자동으로 예전 자체 파티클 효과(burstTrophyParticles)로 대체함 -
+    // 즉 외부 CDN에 문제가 생겨도 연출 자체가 아예 안 뜨는 일은 없음. ----
+    let tmLottieAnim = null;
+    let tmLottieReady = false;
+    let tmLottieFailed = false;
+    function initTmLottieBurst() {
+      if (tmLottieAnim || tmLottieFailed) return;
+      if (typeof lottie === 'undefined') { tmLottieFailed = true; return; }
+      try {
+        tmLottieAnim = lottie.loadAnimation({
+          container: document.getElementById('tmLottieBurst'),
+          renderer: 'svg',
+          loop: false,
+          autoplay: false,
+          path: 'https://assets4.lottiefiles.com/datafiles/U1I3rWEyksM9cCH/data.json'
+        });
+        tmLottieAnim.addEventListener('data_ready', () => { tmLottieReady = true; });
+        tmLottieAnim.addEventListener('data_failed', () => { tmLottieFailed = true; });
+      } catch (e) {
+        tmLottieFailed = true;
+      }
     }
 
     function openTrophyModal(status) {
@@ -962,14 +1021,17 @@
       document.getElementById('tmFlashPulse').classList.remove('burst');
       const burstCanvas = document.getElementById('tmBurstCanvas');
       if (burstCanvas) burstCanvas.getContext('2d').clearRect(0, 0, burstCanvas.width, burstCanvas.height);
+      initTmLottieBurst();
+      if (tmLottieAnim) tmLottieAnim.goToAndStop(0, true);
       showTmStage('A');
       document.getElementById('trophyModal').classList.add('show');
       document.getElementById('tmTrophyBig').onclick = () => handleMvpClaim(status);
     }
 
-    // 트로피가 터지는 순간 금빛/크림색/흰색 조각들이 물리(초기 속도+중력+공기저항)를 받으며 흩날리는
-    // 캔버스 파티클 연출. requestAnimationFrame 기반의 진짜 시간 흐름을 쓰므로 가짜 시계(page.clock)를
-    // 설치한 테스트에서는 재생되지 않음(이 모달의 다른 연출들과 동일한 제약).
+    // (폴백 전용) 트로피가 터지는 순간 금빛/크림색/흰색 조각들이 물리(초기 속도+중력+공기저항)를 받으며
+    // 흩날리는 캔버스 파티클 연출. Lottie 컨페티 애니메이션을 못 불러왔을 때만 쓰임.
+    // requestAnimationFrame 기반의 진짜 시간 흐름을 쓰므로 가짜 시계(page.clock)를 설치한 테스트에서는
+    // 재생되지 않음(이 모달의 다른 연출들과 동일한 제약).
     function burstTrophyParticles(canvas) {
       if (!canvas || !canvas.getContext) return;
       const ctx = canvas.getContext('2d');
@@ -1073,7 +1135,17 @@
         shock2.classList.add('burst');
         flash.classList.add('burst');
         flashPulse.classList.add('burst');
-        burstTrophyParticles(document.getElementById('tmBurstCanvas'));
+        const lottieBox = document.getElementById('tmLottieBurst');
+        const canvasBox = document.getElementById('tmBurstCanvas');
+        if (tmLottieReady && tmLottieAnim) {
+          lottieBox.style.display = '';
+          canvasBox.style.display = 'none';
+          tmLottieAnim.goToAndPlay(0, true);
+        } else {
+          lottieBox.style.display = 'none';
+          canvasBox.style.display = '';
+          burstTrophyParticles(canvasBox);
+        }
       });
     }
 
@@ -1086,8 +1158,16 @@
       showTmStage('C');
     });
 
-    // Stage C 확인 → 모달을 닫고, 포인트는 코인이 되어 "포인트" 칸으로, 트로피는 "명예 훈장" 칸으로 동시에 날아감
+    // Stage C 확인 → Stage D(이름 옆 "출석왕" 뱃지 등록 미리보기)로 이어짐
     document.getElementById('tmConfirmC').addEventListener('click', () => {
+      if (!pendingMvpResult) return;
+      document.getElementById('tmBadgeName').textContent = `${(statusCache && statusCache.display_name) || ''}님`;
+      showTmStage('D');
+    });
+
+    // Stage D 확인 → 모달을 닫고, 포인트는 코인이 되어 "포인트" 칸으로, 트로피는 "명예 훈장" 칸으로 동시에 날아감
+    // (트로피가 도착하면 renderGreeting()이 다시 그려지면서 실제로 이름 옆에 뱃지가 붙음 - 방금 D에서 미리 본 것과 동일)
+    document.getElementById('tmConfirmD').addEventListener('click', () => {
       if (!pendingMvpResult) return;
       const { status, result } = pendingMvpResult;
       pendingMvpResult = null;
