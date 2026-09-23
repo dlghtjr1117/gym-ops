@@ -73,6 +73,22 @@
   .stat-box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 6px; text-align: center; }
   .stat-box .label { font-size: 10.5px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
   .stat-box .value { font-size: 17px; font-weight: 800; }
+  .stat-box.clickable { cursor: pointer; }
+  .stat-box.clickable:active { background: var(--brand-bg); border-color: var(--brand); }
+  .stat-box .tap-hint { font-size: 9px; color: var(--brand); margin-top: 3px; font-weight: 700; }
+
+  /* ---- "이달의 출석왕" 진입 배너 ---- */
+  .leaderboard-banner {
+    margin: 16px 24px 4px; padding: 15px 16px; border-radius: 16px; cursor: pointer; border: none;
+    background: linear-gradient(120deg, #2A2F6B 0%, #3D5FFF 55%, #6C7CFF 100%);
+    display: flex; align-items: center; gap: 12px; box-shadow: 0 14px 26px -14px rgba(61,95,255,0.55);
+    width: calc(100% - 48px); text-align: left; font-family: inherit;
+  }
+  .leaderboard-banner .ic { font-size: 26px; flex: 0 0 auto; }
+  .leaderboard-banner .txt { flex: 1; }
+  .leaderboard-banner .t1 { display: block; font-size: 13.5px; font-weight: 800; color: #fff; }
+  .leaderboard-banner .t2 { display: block; font-size: 11px; color: rgba(255,255,255,0.78); margin-top: 3px; line-height: 1.4; }
+  .leaderboard-banner .arrow { color: #fff; font-size: 15px; opacity: .8; }
   .cal-wrap { padding: 20px 24px 8px; }
   .cal-head { font-size: 14.5px; font-weight: 800; margin-bottom: 12px; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
@@ -101,6 +117,77 @@
   .rm-badge.done { background: var(--green-bg); color: var(--green); }
   .rm-badge.active { background: #FFF3DD; color: #92400e; }
   .reset-link { display: block; text-align: center; padding: 24px 24px 30px; font-size: 11.5px; color: var(--muted); text-decoration: underline; background: none; border: none; font-family: inherit; width: 100%; cursor: pointer; }
+
+  /* ---- 이달의 출석왕 화면 ---- */
+  .lb-header {
+    background: linear-gradient(165deg, #1B1E4A 0%, #2A2F6B 45%, #3D5FFF 100%);
+    padding: 20px 24px 34px; color: #fff; position: relative; overflow: hidden;
+  }
+  .lb-header::before {
+    content: ""; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%);
+  }
+  .lb-topbar { display: flex; align-items: center; gap: 10px; }
+  .lb-back { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-size: 15px; border: none; color: #fff; cursor: pointer; }
+  .lb-topbar .name { font-weight: 800; font-size: 13.5px; color: rgba(255,255,255,0.85); }
+  .lb-titlewrap { text-align: center; margin-top: 14px; position: relative; }
+  .lb-trophy { font-size: 34px; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.25)); }
+  .lb-title { font-size: 21px; font-weight: 900; margin-top: 6px; letter-spacing: -0.3px; }
+  .lb-sub { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 5px; }
+
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: 10px; padding: 30px 20px 0; margin-top: -6px; position: relative; z-index: 1; min-height: 170px; }
+  .p-col { flex: 1; max-width: 138px; display: flex; flex-direction: column; align-items: center; position: relative; }
+  .p-medal { font-size: 22px; margin-bottom: 8px; }
+  .p-avatar-wrap { position: relative; margin-bottom: 10px; }
+  .p-avatar { border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; color: var(--brand); box-shadow: 0 10px 18px -8px rgba(0,0,0,0.35); }
+  .p-col.gold .p-avatar { width: 74px; height: 74px; font-size: 24px; border: 3px solid var(--gold); }
+  .p-col.silver .p-avatar { width: 60px; height: 60px; font-size: 20px; border: 3px solid #CBD3E1; }
+  .p-col.bronze .p-avatar { width: 60px; height: 60px; font-size: 20px; border: 3px solid #E0A872; }
+  .p-crown { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 22px; }
+  .p-name { font-size: 12.5px; font-weight: 800; color: #fff; text-align: center; }
+  .p-count { margin-top: 8px; font-size: 15.5px; font-weight: 900; color: var(--gold); }
+  .p-col.silver .p-count, .p-col.bronze .p-count { color: #fff; }
+  .p-countlabel { font-size: 9.5px; color: rgba(255,255,255,0.6); margin-top: -1px; }
+  .p-bar { width: 100%; border-radius: 14px 14px 0 0; margin-top: 14px; }
+  .p-col.gold .p-bar { height: 40px; background: linear-gradient(180deg, rgba(245,165,36,0.9), rgba(245,165,36,0.55)); }
+  .p-col.silver .p-bar { height: 28px; background: linear-gradient(180deg, rgba(255,255,255,0.34), rgba(255,255,255,0.16)); }
+  .p-col.bronze .p-bar { height: 20px; background: linear-gradient(180deg, rgba(224,168,114,0.55), rgba(224,168,114,0.3)); }
+
+  .lb-empty { padding: 34px 24px 6px; text-align: center; color: rgba(255,255,255,0.85); font-size: 13px; line-height: 1.7; }
+  .lb-empty .ic { font-size: 30px; margin-bottom: 8px; }
+
+  .lb-body { padding: 22px 24px 30px; }
+  .lb-note {
+    display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 14px; font-size: 11.5px; color: var(--muted); line-height: 1.55;
+  }
+  .lb-note .ic { font-size: 16px; flex: 0 0 auto; }
+
+  .my-rank-card {
+    margin-top: 16px; display: flex; align-items: center; gap: 12px; background: var(--brand-bg);
+    border: 1.5px solid var(--brand); border-radius: 16px; padding: 13px 15px;
+  }
+  .my-rank-num { width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; flex: 0 0 auto; }
+  .my-rank-txt .t1 { font-size: 12.5px; font-weight: 800; }
+  .my-rank-txt .t2 { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .my-rank-count { margin-left: auto; font-size: 15px; font-weight: 900; color: var(--brand); }
+
+  /* ---- 출석/포인트 기록 팝업(누적 출석·포인트 칸 클릭 시) ---- */
+  .log-card { width: min(92vw, 340px); max-height: 74vh; background: #fff; border-radius: 24px; box-shadow: 0 30px 60px -20px rgba(15,17,35,0.5); transform: scale(.92); transition: transform .18s; display: flex; flex-direction: column; overflow: hidden; }
+  .overlay.show .log-card { transform: scale(1); }
+  .log-popup { max-height: 74vh; display: flex; flex-direction: column; text-align: left; padding: 22px 0 0; }
+  .log-popup-head { display: flex; align-items: center; justify-content: space-between; padding: 0 22px 14px; border-bottom: 1px solid var(--line); }
+  .log-popup-head .t { font-size: 14.5px; font-weight: 800; }
+  .log-close { width: 26px; height: 26px; border-radius: 50%; background: var(--panel); border: none; color: var(--muted); font-size: 13px; cursor: pointer; flex: 0 0 auto; }
+  .log-list { overflow-y: auto; padding: 6px 22px; flex: 1; }
+  .log-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .log-row:last-child { border-bottom: none; }
+  .log-date { color: var(--ink); font-weight: 600; }
+  .log-right { font-weight: 800; color: var(--green); }
+  .log-right.pts { color: var(--gold); }
+  .log-empty { padding: 30px 0; text-align: center; color: var(--muted); font-size: 12.5px; }
+  .log-popup-foot { padding: 14px 22px 22px; }
+  .log-popup-foot button { width: 100%; padding: 13px; border: none; border-radius: 14px; background: var(--brand); color: #fff; font-size: 14.5px; font-weight: 800; font-family: inherit; cursor: pointer; }
 
   /* ---- 포인트 적립 팝업 ---- */
   .overlay { position: fixed; inset: 0; background: rgba(15,17,35,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 50; }
@@ -154,9 +241,17 @@
       <div class="sub" id="calSub">캘린더의 파란 칸을 눌러 오늘 출석을 체크해주세요</div>
     </div>
     <div class="stat-row">
-      <div class="stat-box"><div class="label">누적 출석</div><div class="value" id="statTotalDays">-</div></div>
-      <div class="stat-box"><div class="label">포인트</div><div class="value" id="statPoints">-</div></div>
+      <div class="stat-box clickable" id="statTotalDaysBox"><div class="label">누적 출석</div><div class="value" id="statTotalDays">-</div><div class="tap-hint">기록 보기 ›</div></div>
+      <div class="stat-box clickable" id="statPointsBox"><div class="label">포인트</div><div class="value" id="statPoints">-</div><div class="tap-hint">내역 보기 ›</div></div>
     </div>
+    <button type="button" class="leaderboard-banner" id="leaderboardBanner">
+      <span class="ic">🏆</span>
+      <span class="txt">
+        <span class="t1" id="lbBannerTitle">이달의 출석왕 보러가기</span>
+        <span class="t2">이번 달 가장 많이 출석한 TOP 3는 누구일까요?</span>
+      </span>
+      <span class="arrow">›</span>
+    </button>
     <div class="cal-wrap">
       <div class="cal-head" id="calMonthLabel">-</div>
       <div class="cal-grid" id="calGrid"></div>
@@ -172,6 +267,35 @@
     <button type="button" class="reset-link" id="resetIdentityBtn">본인이 아니신가요? 다시 확인하기</button>
   </div>
 
+  <div class="view" id="viewLeaderboard">
+    <div class="lb-header">
+      <div class="lb-topbar">
+        <button type="button" class="lb-back" id="lbBackBtn">‹</button>
+        <div class="name">센터 그룹PT</div>
+      </div>
+      <div class="lb-titlewrap">
+        <div class="lb-trophy">🏆</div>
+        <div class="lb-title" id="lbTitle">출석왕</div>
+        <div class="lb-sub" id="lbRangeSub">-</div>
+      </div>
+      <div id="lbPodiumWrap"></div>
+    </div>
+    <div class="lb-body">
+      <div class="lb-note"><span class="ic">ℹ️</span><span>매달 1일에 출석 횟수가 새로 시작돼요. 순위는 이번 달 출석 횟수만 반영하고, 오늘 기준으로 실시간 집계돼요.</span></div>
+      <div id="lbMyRankWrap"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="logOverlay">
+    <div class="log-card">
+      <div class="log-popup">
+        <div class="log-popup-head"><span class="t" id="logTitle">기록</span><button type="button" class="log-close" id="logCloseBtn">✕</button></div>
+        <div class="log-list" id="logList"></div>
+        <div class="log-popup-foot"><button type="button" id="logConfirmBtn">확인</button></div>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="overlay">
     <div class="popup" id="popupBox">
       <div class="coin" id="popupCoin">P</div>
@@ -182,11 +306,12 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790131352"></script>
+  <script src="config.js?v=1790132390"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
     const STORAGE_KEY = 'gymops_attend_member_id';
+    const POINTS_PER_CHECKIN = 10; // group_pt_checkin 함수 안의 값과 항상 같아야 함(포인트 내역 팝업 표시용)
 
     async function callRpc(fnName, payload) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
@@ -209,6 +334,8 @@
     function showView(id) {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       document.getElementById(id).classList.add('active');
+      // 이달의 출석왕 화면은 자체 헤더(뒤로가기 포함)가 있어서 위쪽 공용 appbar와 겹치지 않게 숨김
+      document.querySelector('.appbar').style.display = (id === 'viewLeaderboard') ? 'none' : '';
     }
 
     // ---- 본인 확인 화면 ----
@@ -332,6 +459,7 @@
       document.getElementById('calGreeting').textContent = `${s.display_name}님, 오늘도 출석해볼까요? 😊`;
       document.getElementById('statTotalDays').textContent = s.total_days + '일';
       document.getElementById('statPoints').textContent = s.total_points + 'P';
+      document.getElementById('lbBannerTitle').textContent = `${new Date().getMonth() + 1}월 출석왕 보러가기`;
 
       const today = new Date();
       const todayStr = formatLocalDate(today);
@@ -446,6 +574,108 @@
 
     function getSavedMemberId() {
       try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+    }
+
+    // ---- 출석/포인트 기록 팝업(캘린더 화면 "누적 출석"·"포인트" 칸 클릭 시) ----
+    // group_pt_get_member_status가 이미 attendance_dates(출석한 날짜 전체 목록)를 내려주고 있어서
+    // 별도 DB 호출 없이 그 데이터를 그대로 재사용함(출석 1회 = 항상 10P라 포인트 내역도 같은 날짜로 계산)
+    function formatDateLabel(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+      return `${m}월 ${d}일 (${wd})`;
+    }
+
+    function openLogModal(type) {
+      if (!statusCache) return;
+      const dates = (statusCache.attendance_dates || []).slice().sort((a, b) => (a < b ? 1 : -1));
+      document.getElementById('logTitle').textContent = type === 'attendance'
+        ? `출석 기록 · 총 ${dates.length}일`
+        : `포인트 적립 내역 · 총 ${dates.length * POINTS_PER_CHECKIN}P`;
+      const listEl = document.getElementById('logList');
+      if (dates.length === 0) {
+        listEl.innerHTML = `<div class="log-empty">아직 기록이 없어요. 출석하면 여기에 쌓여요!</div>`;
+      } else {
+        listEl.innerHTML = dates.map(d => {
+          const right = type === 'attendance' ? '✓ 출석' : `+${POINTS_PER_CHECKIN}P`;
+          return `<div class="log-row"><span class="log-date">${formatDateLabel(d)}</span><span class="log-right ${type === 'points' ? 'pts' : ''}">${right}</span></div>`;
+        }).join('');
+      }
+      document.getElementById('logOverlay').classList.add('show');
+    }
+    document.getElementById('statTotalDaysBox').addEventListener('click', () => openLogModal('attendance'));
+    document.getElementById('statPointsBox').addEventListener('click', () => openLogModal('points'));
+    document.getElementById('logCloseBtn').addEventListener('click', () => document.getElementById('logOverlay').classList.remove('show'));
+    document.getElementById('logConfirmBtn').addEventListener('click', () => document.getElementById('logOverlay').classList.remove('show'));
+    document.getElementById('logOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'logOverlay') document.getElementById('logOverlay').classList.remove('show');
+    });
+
+    // ---- 이달의 출석왕(이번 달 그룹PT 출석 TOP 3 + 내 순위) ----
+    document.getElementById('leaderboardBanner').addEventListener('click', loadLeaderboardView);
+    document.getElementById('lbBackBtn').addEventListener('click', () => showView('viewCalendar'));
+
+    async function loadLeaderboardView() {
+      showView('viewLeaderboard');
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      document.getElementById('lbTitle').textContent = `${month}월 출석왕`;
+      document.getElementById('lbBannerTitle').textContent = `${month}월 출석왕 보러가기`;
+      document.getElementById('lbRangeSub').textContent = `${month}/1 ~ ${month}/${now.getDate()} 기준 · 그룹PT 출석 TOP 3`;
+      document.getElementById('lbPodiumWrap').innerHTML = `<div class="lb-empty"><div class="ic">⏳</div>불러오는 중...</div>`;
+      document.getElementById('lbMyRankWrap').innerHTML = '';
+      try {
+        const rows = await callRpc('group_pt_monthly_leaderboard', { p_member_id: getSavedMemberId() });
+        renderLeaderboard(rows || []);
+      } catch (err) {
+        document.getElementById('lbPodiumWrap').innerHTML = `<div class="lb-empty"><div class="ic">⚠️</div>${err.message}</div>`;
+      }
+    }
+
+    function renderLeaderboard(rows) {
+      const top3 = rows.filter(r => r.rank <= 3).sort((a, b) => a.rank - b.rank);
+      const podiumWrap = document.getElementById('lbPodiumWrap');
+      if (top3.length === 0) {
+        podiumWrap.innerHTML = `<div class="lb-empty"><div class="ic">🏸</div>이번 달 출석 기록이 아직 없어요.<br/>제일 먼저 출석하고 1등에 도전해보세요!</div>`;
+      } else {
+        const byRank = {}; top3.forEach(r => { byRank[r.rank] = r; });
+        const medal = { 1: '🥇', 2: '🥈', 3: '🥉' };
+        const barClass = { 1: 'gold', 2: 'silver', 3: 'bronze' };
+        const order = [2, 1, 3]; // 은-금-동 순서로 배치(가운데가 1등)
+        podiumWrap.innerHTML = `<div class="podium">${order.map(rank => {
+          const r = byRank[rank];
+          if (!r) return '';
+          const initial = (r.display_name || '?').slice(0, 1);
+          const phone = r.phone_hint ? `(${r.phone_hint})` : '';
+          return `<div class="p-col ${barClass[rank]}">
+            ${rank === 1 ? '<div class="p-crown">👑</div>' : ''}
+            <div class="p-medal">${medal[rank]}</div>
+            <div class="p-avatar-wrap"><div class="p-avatar">${escapeHtmlAttend(initial)}</div></div>
+            <div class="p-name">${escapeHtmlAttend(r.display_name)}${escapeHtmlAttend(phone)}</div>
+            <div class="p-count">${r.attendance_count}회</div>
+            <div class="p-countlabel">출석</div>
+            <div class="p-bar"></div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+
+      const mine = rows.find(r => r.is_requester);
+      const myWrap = document.getElementById('lbMyRankWrap');
+      if (!getSavedMemberId()) {
+        myWrap.innerHTML = '';
+      } else if (!mine) {
+        myWrap.innerHTML = `<div class="my-rank-card"><div class="my-rank-num">-</div><div class="my-rank-txt"><div class="t1">아직 이번 달 출석 기록이 없어요</div><div class="t2">출석하고 순위에 도전해보세요!</div></div></div>`;
+      } else if (mine.rank <= 3) {
+        myWrap.innerHTML = `<div class="my-rank-card"><div class="my-rank-num">${mine.rank}</div><div class="my-rank-txt"><div class="t1">축하해요, ${mine.rank}등이에요! 🎉</div><div class="t2">이번 달 이대로 쭉 가봐요</div></div><div class="my-rank-count">${mine.attendance_count}회</div></div>`;
+      } else {
+        const gap = (top3.find(r => r.rank === 3)?.attendance_count || 0) - mine.attendance_count;
+        const gapText = gap > 0 ? `3등까지 ${gap}회 남았어요` : '조금만 더 출석하면 순위권이에요';
+        myWrap.innerHTML = `<div class="my-rank-card"><div class="my-rank-num">${mine.rank}</div><div class="my-rank-txt"><div class="t1">내 순위 · ${mine.rank}위</div><div class="t2">${gapText}</div></div><div class="my-rank-count">${mine.attendance_count}회</div></div>`;
+      }
+    }
+
+    function escapeHtmlAttend(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
     // ---- 진입점 ----
