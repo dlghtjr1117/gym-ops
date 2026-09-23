@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 신규상담 · 워크인 관리</title>
-<link rel="stylesheet" href="style.css?v=1790146388" />
+<link rel="stylesheet" href="style.css?v=1790147247" />
 <style>
   /* 이 페이지 전용 - 특이사항(메모)/성함/전화번호 칸: 엑셀 시트처럼 바로 타이핑해서 저장 */
   .sheet-input {
@@ -116,9 +116,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790146388"></script>
-  <script src="auth.js?v=1790146388"></script>
-  <script src="data.js?v=1790146388"></script>
+  <script src="config.js?v=1790147247"></script>
+  <script src="auth.js?v=1790147247"></script>
+  <script src="data.js?v=1790147247"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -137,7 +137,8 @@
       { value: 'instagram', label: '인스타', badge: 'badge-pink' },
       { value: 'meta_ads', label: '메타광고', badge: 'badge-blue' },
       { value: 'flyer', label: '전단지', badge: 'badge-teal' },
-      { value: 'walk_by', label: '지나가다', badge: 'badge-slate' }
+      { value: 'walk_by', label: '지나가다', badge: 'badge-slate' },
+      { value: 're_registration_tm', label: '재등록TM', badge: 'badge-amber' }
     ];
     const CHANNEL_LABEL = {};
     const CHANNEL_BADGE = {};
@@ -175,15 +176,32 @@
       const d = new Date(y, m - 1 + n, 1);
       return formatDateStr(d);
     }
-    // "이월" 처리하면 OT/PT 관리처럼 다음 달에 새 기록을 복사해서 만드는 대신, 이 기록 자체를
-    // 다음 달 1일로 옮기고 상태를 "고민중"으로 되돌림 - 그래서 이번 달 목록에서는 바로 사라지고
-    // 다음 달 목록에 다시 진행중인 상담으로 나타남 (요청: "이월처리하면 자동으로 다음달로 이월되고,
-    // 이월 처리했던거는 그 달에 없어지게끔")
+    // "이월" 처리하면 이 기록을 다음 달로 옮기는 게 아니라(예전 방식), OT/PT 관리와 똑같이 다음 달에
+    // "진행중(고민중)" 상태의 새 기록을 복사해서 만들고, 이번 달 기록 자체는 "이월" 상태 그대로 이번 달
+    // 시트에 남겨둠 - 그래야 이번 달에 몇 건이 이월됐는지 이번 달 시트에서도 계속 보임
+    // (요청: "이월은 어차피 다음달로 넘어가는거지만, 다음달로 넘기면서 이 달 시트에는 그냥 남아있게")
     async function carryOverConsultationToNextMonth(c) {
       const nextMonthFirstDay = firstDayOfMonthAfter(c.consult_date || formatDateStr(new Date()), 1);
       const nextMonthLabel = `${Number(nextMonthFirstDay.slice(5, 7))}월`;
-      await updateWalkinConsultation(c.id, { consult_date: nextMonthFirstDay, status: 'considering' });
-      showToast(`이월 처리됐어요. ${nextMonthLabel} 목록으로 자동으로 넘어가요.`);
+      const nmStart = nextMonthFirstDay;
+      const nmEnd = firstDayOfMonthAfter(nextMonthFirstDay, 1);
+      try {
+        const all = await fetchWalkinConsultations();
+        const dup = all.find(x => x.name === c.name && (x.phone || '') === (c.phone || '') &&
+          x.consult_date && x.consult_date >= nmStart && x.consult_date < nmEnd);
+        if (dup) {
+          showToast(`${nextMonthLabel}에 이미 같은 이름의 기록이 있어서 새로 만들지 않았어요.`);
+          return;
+        }
+        await addWalkinConsultation({
+          consult_date: nextMonthFirstDay, name: c.name, phone: c.phone || null, gender: c.gender || null,
+          channel: c.channel || null, interest_gym: !!c.interest_gym, interest_pt: !!c.interest_pt,
+          interest_group_pt: !!c.interest_group_pt, memo: c.memo || null, status: 'considering'
+        });
+        showToast(`이월 처리됐어요. ${nextMonthLabel} 목록에도 자동으로 추가됐어요.`);
+      } catch (err) {
+        alert('다음 달로 이월하는 중 문제가 생겼어요: ' + err.message);
+      }
     }
 
     function renderChannelSelect(c) {
@@ -214,26 +232,26 @@
       const value = selectEl.value;
       const c = consultAllCache.find(x => x.id === id);
       try {
-        if (value === 'rolled_over') {
-          if (c) await carryOverConsultationToNextMonth(c);
-          // 다음 달로 옮겨졌으니 이번 달 캐시(=이번 달 목록)에서는 바로 제거
-          consultAllCache = consultAllCache.filter(x => x.id !== id);
-          consultPage = 1;
-          renderStatusTabs();
-          renderConsultTable();
-          renderHeroStats();
-          return;
-        }
         await updateWalkinConsultation(id, { status: value });
         if (c) c.status = value;
         selectEl.className = 'sheet-input badge ' + (STATUS_BADGE[value] || '');
+        // 현황 칸을 바꾸면 그 줄 전체가 바로 색이 바뀌어 보이게 함(고민중=갈색/이월=보라/거부=빨강/등록=초록)
+        const row = selectEl.closest('tr');
+        if (row) row.className = 'row-cstatus-' + value;
         renderHeroStats();
         renderStatusTabs();
+        // "이월"은 상태만 바뀌는 게 아니라, 다음 달 목록에도 진행중인 상담으로 자동 복사됨(이번 달
+        // 기록은 그대로 이번 달 시트에 "이월" 상태로 남아있음)
+        if (value === 'rolled_over' && c) {
+          await carryOverConsultationToNextMonth(c);
+        }
       } catch (err) {
         alert(err.message);
         // 저장 실패 시 select에 표시된 값도 원래 상태로 되돌려서 실제 저장된 값과 안 어긋나게 함
         selectEl.value = c ? c.status : 'considering';
         selectEl.className = 'sheet-input badge ' + (STATUS_BADGE[selectEl.value] || '');
+        const row = selectEl.closest('tr');
+        if (row) row.className = 'row-cstatus-' + selectEl.value;
       }
     }
 
@@ -346,7 +364,7 @@
       });
 
       tbody.innerHTML = items.map(c => `
-        <tr>
+        <tr class="row-cstatus-${c.status || 'considering'}">
           <td><input class="sheet-input" type="date" value="${c.consult_date || ''}" data-id="${c.id}" onchange="handleFieldSave(this,'consult_date')" /></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}" data-id="${c.id}" onchange="handleNameSave(this)" /></td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(c.phone || '')}" placeholder="010-0000-0000" data-id="${c.id}" onchange="handleFieldSave(this,'phone')" /></td>

@@ -321,6 +321,15 @@ tr:last-child td { border-bottom: none; }
 .row-otstatus-missed td { background: #fee2e2; color: #0f172a; }
 .row-otstatus-done td { background: #dcfce7; color: #0f172a; }
 
+/* 신규상담·워크인 관리(consultations.html) - "등록 칸 바꾸면 그 줄 전체 색이 바로 뜨게 해줘" 요청으로
+   위 row-otstatus-*와 같은 방식(행 전체를 옅게 물들임)을 그대로 적용: 고민중=갈색(호박색), 이월=보라,
+   거부=빨강, 등록=초록. 이월/거부/등록 색은 위에서 이미 쓰던 값과 그대로 맞춰서 앱 전체에서 같은
+   상태색이 항상 같은 톤으로 보이게 함 */
+.row-cstatus-considering td { background: #fef3c7; color: #0f172a; }
+.row-cstatus-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-cstatus-declined td { background: #fee2e2; color: #0f172a; }
+.row-cstatus-registered td { background: #dcfce7; color: #0f172a; }
+
 /* 대시보드 "상담 워크인/미스" 표 (2026-09-21 가독성 개선 추가) - 같은 주차 안에서 성공/실패 두 줄이
    테두리 하나로만 구분돼 있어서 숫자만 쭉 나열되면 어느 줄이 성공이고 어느 줄이 실패인지 한눈에
    안 들어온다는 피드백으로, 위 row-otstatus-*와 같은 방식(행 전체를 옅게 물들임)으로 구분되게 함 */
@@ -345,7 +354,9 @@ tr:last-child td { border-bottom: none; }
 .row-care-missed .sheet-input:not(.badge),
 .row-otstatus-scheduled .sheet-input:not(.badge), .row-otstatus-rolled_over .sheet-input:not(.badge),
 .row-otstatus-missed .sheet-input:not(.badge), .row-otstatus-done .sheet-input:not(.badge),
-.wi-row-success .sheet-input:not(.badge), .wi-row-fail .sheet-input:not(.badge) {
+.wi-row-success .sheet-input:not(.badge), .wi-row-fail .sheet-input:not(.badge),
+.row-cstatus-considering .sheet-input:not(.badge), .row-cstatus-rolled_over .sheet-input:not(.badge),
+.row-cstatus-declined .sheet-input:not(.badge), .row-cstatus-registered .sheet-input:not(.badge) {
   color: #0f172a;
   background: transparent;
 }
