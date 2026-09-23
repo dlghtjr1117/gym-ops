@@ -135,39 +135,69 @@
   @keyframes tmOrbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
   .tm-orb::before { content: ""; position: absolute; inset: -18px; border-radius: 50%; border: 2px solid rgba(245,165,36,0.35); pointer-events: none; }
   .tm-orb::after { content: ""; position: absolute; inset: -38px; border-radius: 50%; border: 1px solid rgba(245,165,36,0.18); pointer-events: none; }
-  .tm-trophy-big { font-size: 104px; cursor: pointer; filter: drop-shadow(0 0 26px rgba(245,165,36,0.85)) drop-shadow(0 12px 20px rgba(0,0,0,0.5)); }
+  /* 트로피 바깥쪽(뱃지 링보다 더 바깥)에서 천천히 도는 은은한 금빛 헤일로 - 트로피 픽셀 영역과는
+     겹치지 않게 크게 잡아서, 페인트 순서와 상관없이 트로피를 가리지 않음. 클릭도 절대 가로채지 않도록
+     pointer-events: none 필수(예전에 ::before/::after가 클릭을 가로채던 버그가 있었음) */
+  .tm-orb-halo {
+    position: absolute; inset: -58px; border-radius: 50%; pointer-events: none; filter: blur(2px);
+    background: conic-gradient(from 0deg, rgba(245,165,36,0) 0%, rgba(255,224,140,0.55) 6%, rgba(245,165,36,0) 18%,
+      rgba(245,165,36,0) 68%, rgba(255,224,140,0.4) 80%, rgba(245,165,36,0) 90%, rgba(245,165,36,0) 100%);
+    animation: tmHaloSpin 7s linear infinite;
+  }
+  @keyframes tmHaloSpin { to { transform: rotate(360deg); } }
+  .tm-trophy-big { position: relative; z-index: 1; font-size: 104px; cursor: pointer; filter: drop-shadow(0 0 26px rgba(245,165,36,0.85)) drop-shadow(0 12px 20px rgba(0,0,0,0.5)); }
   .tm-rank-badge {
-    margin-top: 24px; background: linear-gradient(135deg,#FFD76A,#F5A524); color: #3B2200; font-weight: 800;
-    font-size: 14px; padding: 7px 18px; border-radius: 999px; box-shadow: 0 6px 18px -6px rgba(245,165,36,0.6); display: inline-block;
+    position: relative; overflow: hidden; margin-top: 24px; background: linear-gradient(135deg,#FFD76A,#F5A524); color: #3B2200; font-weight: 800;
+    font-size: 14px; padding: 7px 18px; border-radius: 999px; display: inline-block; letter-spacing: .2px;
+    box-shadow: 0 6px 18px -6px rgba(245,165,36,0.6), inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 3px rgba(120,60,0,0.25);
   }
   .tm-hint { margin-top: 16px; color: #F3EFFF; font-size: 14.5px; font-weight: 600; animation: tmHintBlink 1.6s ease-in-out infinite; }
   @keyframes tmHintBlink { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
-  /* Stage B: 트로피 탭 → 빛줄기가 한 줄씩 뻗어나가며 폭발 → +100P 증정 */
-  /* 빛줄기/플래시가 아래에 오는 문구 길이와 상관없이 항상 트로피 정중앙에서 터지도록, 트로피만 감싸는
+  /* 금색 뱃지류(순위 뱃지/리본/이름 옆 배지)에 공통으로 들어가는 고급스러운 금속 광택 스윕 */
+  .tm-rank-badge::after, .tm-ribbon::after, .name-badge::after {
+    content: ""; position: absolute; top: 0; left: -60%; width: 35%; height: 100%;
+    background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%);
+    transform: skewX(-20deg); animation: tmShimmer 3.4s ease-in-out infinite; pointer-events: none;
+  }
+  @keyframes tmShimmer { 0% { left: -60%; } 38% { left: 130%; } 100% { left: 130%; } }
+
+  /* Stage B: 트로피 탭 → 파티클 버스트 + 충격파 링 + 화면 플래시가 겹쳐지며 폭발 → +100P 증정 */
+  /* 이펙트가 아래에 오는 문구 길이와 상관없이 항상 트로피 정중앙에서 터지도록, 트로피만 감싸는
      작은 박스(tm-burst-zone) 기준으로 위치를 잡음(전체 Stage 박스 기준으로 잡으면 문구 줄 수에 따라
      중심이 흔들려서 엉뚱한 위치에서 터지는 것처럼 보였던 문제를 고침) */
   .tm-burst-zone { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; }
-  .tm-rays { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
-  .ray-line {
-    position: absolute; left: 0; top: 0; width: 3px; height: 0; border-radius: 3px;
-    background: linear-gradient(to top, rgba(255,224,140,0) 0%, rgba(255,224,140,0.95) 55%, rgba(255,224,140,0) 100%);
-    transform-origin: 50% 100%; opacity: 0; transition: height .42s cubic-bezier(.2,.8,.3,1), opacity .25s ease;
+  /* 트로피 중심에서 링 2개가 겹으로 퍼져나가는 충격파 - 파티클보다 살짝 먼저/나중에 터져서 레이어감을 줌 */
+  .tm-shockwave {
+    position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0.4); opacity: 0; pointer-events: none; z-index: 1;
+    border: 2px solid rgba(255,224,140,0.9); box-shadow: 0 0 16px rgba(245,165,36,0.45);
   }
-  .tm-rays.burst .ray-line { height: 190px; opacity: 1; }
+  .tm-shockwave.ring2 { border-color: rgba(255,255,255,0.75); border-width: 1.5px; }
+  .tm-shockwave.burst { animation: tmShockOut .85s cubic-bezier(.15,.7,.3,1) both; }
+  .tm-shockwave.ring2.burst { animation-delay: .09s; }
+  @keyframes tmShockOut { 0% { transform: translate(-50%, -50%) scale(0.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(6.2); opacity: 0; } }
+  /* 파티클(금빛 조각들)이 흩날리는 캔버스 - 물리 기반 연출은 JS의 burstTrophyParticles()가 그림 */
+  .tm-burst-canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; height: 300px; pointer-events: none; z-index: 1; }
   .tm-core-flash {
-    position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border-radius: 50%;
+    position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border-radius: 50%; z-index: 1;
     transform: translate(-50%, -50%) scale(0.3); opacity: 0; pointer-events: none;
     background: radial-gradient(circle, #fff 0%, #FFE9B0 22%, #F5A524 46%, rgba(245,165,36,0) 72%);
     transition: width .55s cubic-bezier(.2,.9,.3,1), height .55s cubic-bezier(.2,.9,.3,1), opacity .4s ease, transform .55s cubic-bezier(.2,.9,.3,1);
   }
-  .tm-core-flash.burst { opacity: 1; width: 260px; height: 260px; transform: translate(-50%, -50%) scale(1); }
+  .tm-core-flash.burst { opacity: 1; width: 230px; height: 230px; transform: translate(-50%, -50%) scale(1); }
   .tm-trophy-mini { position: relative; z-index: 2; font-size: 58px; filter: drop-shadow(0 0 18px rgba(255,224,140,0.9)); }
+  /* 터지는 순간 화면 전체가 살짝 하얗게 번쩍하는 카메라 플래시 - 폭발의 임팩트를 더해줌 */
+  .tm-flash-pulse { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 79;
+    background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.92) 0%, rgba(255,224,140,0.2) 42%, transparent 72%); }
+  .tm-flash-pulse.burst { animation: tmFlashPulse .5s ease-out both; }
+  @keyframes tmFlashPulse { 0% { opacity: 0; } 10% { opacity: .8; } 100% { opacity: 0; } }
   @keyframes tmTextIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .tm-grant-title { position: relative; z-index: 2; color: #fff; font-size: 16px; font-weight: 700; opacity: 0; margin-top: 12px; animation: tmTextIn .4s ease both; animation-delay: .58s; }
   .tm-grant-amount {
-    position: relative; z-index: 2; margin-top: 8px; font-size: 40px; font-weight: 900; opacity: 0;
+    position: relative; z-index: 2; margin-top: 8px; font-size: 40px; font-weight: 900; opacity: 0; letter-spacing: .5px;
     background: linear-gradient(135deg,#FFF3D0,#F5A524); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(245,165,36,0.55));
     animation: tmTextIn .45s ease both; animation-delay: .68s;
   }
   .tm-grant-sub { position: relative; z-index: 2; margin-top: 8px; color: #F3EFFF; font-size: 13.5px; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .78s; }
@@ -182,8 +212,9 @@
   .tm-ring1 { width: 226px; height: 226px; }
   .tm-ring2 { width: 286px; height: 286px; border-color: rgba(255,224,140,0.16); }
   .tm-ribbon {
-    position: relative; z-index: 2; display: inline-block; background: linear-gradient(135deg,#FFD76A,#F5A524); color: #3B2200; font-weight: 800; font-size: 12.5px;
+    position: relative; z-index: 2; overflow: hidden; display: inline-block; background: linear-gradient(135deg,#FFD76A,#F5A524); color: #3B2200; font-weight: 800; font-size: 12.5px;
     padding: 5px 15px; border-radius: 999px; margin-bottom: 14px; letter-spacing: .4px; opacity: 0; animation: tmTextIn .35s ease both;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 3px rgba(120,60,0,0.25);
   }
   .tm-trophy-grant { position: relative; z-index: 2; font-size: 92px; filter: drop-shadow(0 0 28px rgba(255,224,140,0.9)); opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .08s; }
   .tm-grant-title2 { position: relative; z-index: 2; margin-top: 16px; color: #fff; font-size: 20px; font-weight: 900; text-align: center; line-height: 1.4; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .16s; }
@@ -209,8 +240,9 @@
   .hc-item.new-badge .hc-circle { animation: hcPop .45s ease; }
   @keyframes hcPop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
   .name-badge {
-    display: inline-flex; align-items: center; gap: 3px; background: linear-gradient(135deg,#FFD76A,#F5A524);
+    position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 3px; background: linear-gradient(135deg,#FFD76A,#F5A524);
     color: #3B2200; font-size: 12px; font-weight: 800; padding: 3px 9px 3px 7px; border-radius: 999px; vertical-align: middle;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 2px rgba(120,60,0,0.2);
   }
 
   /* ---- 트로피 증정 확인 후: 트로피가 "명예 훈장" 칸으로 날아가는 연출(코인 연출과 같은 방식) ---- */
@@ -458,30 +490,20 @@
   </div>
 
   <div class="trophy-modal" id="trophyModal">
+    <div class="tm-flash-pulse" id="tmFlashPulse"></div>
     <button type="button" class="trophy-modal-close" id="trophyModalClose">✕</button>
 
     <div class="tm-stage" id="tmStageA">
-      <div class="tm-orb"><div class="tm-trophy-big" id="tmTrophyBig">🏆</div></div>
+      <div class="tm-orb"><div class="tm-orb-halo"></div><div class="tm-trophy-big" id="tmTrophyBig">🏆</div></div>
       <div class="tm-rank-badge" id="tmRankBadge">-</div>
       <div class="tm-hint">트로피를 눌러서 열어보세요 👆</div>
     </div>
 
     <div class="tm-stage" id="tmStageB" style="display:none;">
       <div class="tm-burst-zone">
-        <div class="tm-rays" id="tmRays">
-          <span class="ray-line" style="transform:rotate(0deg); transition-delay:0ms;"></span>
-          <span class="ray-line" style="transform:rotate(30deg); transition-delay:25ms;"></span>
-          <span class="ray-line" style="transform:rotate(60deg); transition-delay:50ms;"></span>
-          <span class="ray-line" style="transform:rotate(90deg); transition-delay:75ms;"></span>
-          <span class="ray-line" style="transform:rotate(120deg); transition-delay:100ms;"></span>
-          <span class="ray-line" style="transform:rotate(150deg); transition-delay:125ms;"></span>
-          <span class="ray-line" style="transform:rotate(180deg); transition-delay:150ms;"></span>
-          <span class="ray-line" style="transform:rotate(210deg); transition-delay:175ms;"></span>
-          <span class="ray-line" style="transform:rotate(240deg); transition-delay:200ms;"></span>
-          <span class="ray-line" style="transform:rotate(270deg); transition-delay:225ms;"></span>
-          <span class="ray-line" style="transform:rotate(300deg); transition-delay:250ms;"></span>
-          <span class="ray-line" style="transform:rotate(330deg); transition-delay:275ms;"></span>
-        </div>
+        <div class="tm-shockwave" id="tmShockwave1"></div>
+        <div class="tm-shockwave ring2" id="tmShockwave2"></div>
+        <canvas class="tm-burst-canvas" id="tmBurstCanvas" width="300" height="300"></canvas>
         <div class="tm-core-flash" id="tmCoreFlash"></div>
         <div class="tm-trophy-mini">🏆</div>
       </div>
@@ -503,7 +525,7 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790136554"></script>
+  <script src="config.js?v=1790137211"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const qrToken = params.get('t');
@@ -934,11 +956,72 @@
 
     function openTrophyModal(status) {
       document.getElementById('tmRankBadge').textContent = `${status.bonus_month}월 출석왕 ${MVP_RANK_LABEL[status.rank]}`;
-      document.getElementById('tmRays').classList.remove('burst');
+      document.getElementById('tmShockwave1').classList.remove('burst');
+      document.getElementById('tmShockwave2').classList.remove('burst');
       document.getElementById('tmCoreFlash').classList.remove('burst');
+      document.getElementById('tmFlashPulse').classList.remove('burst');
+      const burstCanvas = document.getElementById('tmBurstCanvas');
+      if (burstCanvas) burstCanvas.getContext('2d').clearRect(0, 0, burstCanvas.width, burstCanvas.height);
       showTmStage('A');
       document.getElementById('trophyModal').classList.add('show');
       document.getElementById('tmTrophyBig').onclick = () => handleMvpClaim(status);
+    }
+
+    // 트로피가 터지는 순간 금빛/크림색/흰색 조각들이 물리(초기 속도+중력+공기저항)를 받으며 흩날리는
+    // 캔버스 파티클 연출. requestAnimationFrame 기반의 진짜 시간 흐름을 쓰므로 가짜 시계(page.clock)를
+    // 설치한 테스트에서는 재생되지 않음(이 모달의 다른 연출들과 동일한 제약).
+    function burstTrophyParticles(canvas) {
+      if (!canvas || !canvas.getContext) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height, cx = W / 2, cy = H / 2;
+      const COLORS = ['#FFF6DF', '#FFE08A', '#F5A524', '#FFFFFF', '#FFD76A'];
+      const COUNT = 46;
+      const particles = [];
+      for (let i = 0; i < COUNT; i++) {
+        const angle = (Math.PI * 2 * i / COUNT) + (Math.random() - 0.5) * 0.5;
+        const speed = 3.2 + Math.random() * 4.4;
+        particles.push({
+          x: cx, y: cy,
+          vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+          size: 2.5 + Math.random() * 3.5,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          diamond: Math.random() < 0.35,
+          rot: Math.random() * Math.PI * 2,
+          vrot: (Math.random() - 0.5) * 0.3
+        });
+      }
+      const GRAVITY = 0.07, FRICTION = 0.975, DURATION = 820;
+      const start = performance.now();
+      function frame(now) {
+        const t = now - start;
+        ctx.clearRect(0, 0, W, H);
+        const life = Math.max(0, 1 - t / DURATION);
+        if (life <= 0) { ctx.clearRect(0, 0, W, H); return; }
+        particles.forEach(p => {
+          p.vx *= FRICTION; p.vy = p.vy * FRICTION + GRAVITY;
+          p.x += p.vx; p.y += p.vy; p.rot += p.vrot;
+          ctx.save();
+          ctx.globalAlpha = life;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 6;
+          if (p.diamond) {
+            const s = p.size;
+            ctx.beginPath();
+            ctx.moveTo(0, -s); ctx.lineTo(s, 0); ctx.lineTo(0, s); ctx.lineTo(-s, 0);
+            ctx.closePath(); ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        });
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
     }
 
     function closeTrophyModal() {
@@ -976,14 +1059,21 @@
       document.getElementById('tmGrantAmount').textContent = `+${result.bonus_points}P 증정!`;
       document.getElementById('tmGrantSub').innerHTML = `현재 누적 포인트 <strong>${result.new_total_points}P</strong>`;
       showTmStage('B');
-      const rays = document.getElementById('tmRays');
+      const shock1 = document.getElementById('tmShockwave1');
+      const shock2 = document.getElementById('tmShockwave2');
       const flash = document.getElementById('tmCoreFlash');
-      rays.classList.remove('burst');
+      const flashPulse = document.getElementById('tmFlashPulse');
+      shock1.classList.remove('burst');
+      shock2.classList.remove('burst');
       flash.classList.remove('burst');
-      void rays.offsetWidth; // 리플로우를 강제해서 빛줄기 트랜지션이 처음부터 다시 재생되게 함
+      flashPulse.classList.remove('burst');
+      void shock1.offsetWidth; // 리플로우를 강제해서 애니메이션이 처음부터 다시 재생되게 함
       requestAnimationFrame(() => {
-        rays.classList.add('burst');
+        shock1.classList.add('burst');
+        shock2.classList.add('burst');
         flash.classList.add('burst');
+        flashPulse.classList.add('burst');
+        burstTrophyParticles(document.getElementById('tmBurstCanvas'));
       });
     }
 
