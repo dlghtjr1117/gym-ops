@@ -5,11 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 그룹PT 출석 관리</title>
-<link rel="stylesheet" href="style.css?v=1790147247" />
+<link rel="stylesheet" href="style.css?v=1790167555" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-  .att-row-done td { background: color-mix(in srgb, var(--green-600) 7%, var(--surface)); }
-  .att-row-pending td { background: color-mix(in srgb, var(--amber-500) 9%, var(--surface)); }
+  /* color-mix()는 대시보드의 "이미지 복사" 버튼(html2canvas)이 못 읽는 색 함수라 이미지 생성이
+     실패하는 버그가 있었음(2026-09-23, dashboard.html 참고) - 이 페이지는 아직 이미지로 만드는
+     기능이 없지만, 같은 문제가 나중에 재발하지 않도록 여기도 미리 계산해둔 고정 색으로 통일함 */
+  .att-row-done td { background: #eff9f2; }
+  .att-row-pending td { background: #fef6e9; }
+  :root[data-theme="dark"] .att-row-done td { background: #162324; }
+  :root[data-theme="dark"] .att-row-pending td { background: #27241e; }
   .progress-mini-track { width: 84px; height: 7px; border-radius: 999px; background: var(--slate-200); overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 8px; }
   .progress-mini-fill { height: 100%; border-radius: 999px; background: var(--indigo-600); }
 
@@ -160,9 +165,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790147247"></script>
-  <script src="auth.js?v=1790147247"></script>
-  <script src="data.js?v=1790147247"></script>
+  <script src="config.js?v=1790167555"></script>
+  <script src="auth.js?v=1790167555"></script>
+  <script src="data.js?v=1790167555"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
