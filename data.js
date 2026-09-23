@@ -2330,3 +2330,153 @@ function findCurrentPriceForDuration(products, catKey, targetDays) {
   });
   return Number(nearest.price) || null;
 }
+
+// ---- 그룹PT 출석 관리(group-pt-attendance.html, 직원 전용 관리자 화면) ----
+// 회원님들이 직접 쓰는 화면(attend.html)은 로그인이 아예 없는 별도 화면이라 이 파일(data.js)을 쓰지 않고
+// group_pt_search_members/group_pt_validate_token/group_pt_checkin/group_pt_get_member_status 4개의
+// anon 전용 함수(migration_55)만 직접 호출함 - 여기 아래 함수들은 전부 "직원 로그인 세션이 있어야"
+// 동작하는 관리자용 함수들(오늘 QR 발급, 전체 출석부 조회, 수동 체크, 보상 단계·지급 관리)
+
+// 오늘자 출석 QR을 가져오거나(이미 발급됐으면), 없으면 새로 발급함 - "오늘의 출석 QR 열기" 버튼에서 호출.
+// token 값 자체는 DB 컬럼 기본값(gen_random_uuid())이 자동으로 채워줘서 여기서 직접 만들 필요 없음
+async function getOrCreateTodayGroupPtQrToken() {
+  const today = formatDateStr(new Date());
+  const getRes = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_qr_tokens?token_date=eq.${today}&select=*`, { headers: await authHeaders() });
+  if (!getRes.ok) await throwApiError(getRes, '오늘의 출석 QR을 불러오지 못했습니다.');
+  const existing = await getRes.json();
+  if (existing.length > 0) return existing[0];
+
+  const postRes = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_qr_tokens`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ token_date: today, created_by: currentUserIdForGroupPt() })
+  });
+  if (!postRes.ok) await throwApiError(postRes, '오늘의 출석 QR 발급에 실패했습니다.');
+  const created = await postRes.json();
+  return created[0];
+}
+
+// 이 파일 전역에 currentUserId가 이미 있는 페이지(dashboard.html 등)도 있고 없는 페이지도 있어서,
+// 안전하게 있으면 쓰고 없으면 null을 넣도록 감싸둠
+function currentUserIdForGroupPt() {
+  try { return (typeof currentUserId !== 'undefined' && currentUserId) ? currentUserId : null; } catch (e) { return null; }
+}
+
+// 그룹PT 대상 회원 전체 + 회원별 전체 출석 기록 + 보상 단계 + 보상 지급 현황을 한 번에 불러와서
+// group-pt-attendance.html이 표/카드를 그리는 데 필요한 형태로 미리 계산해줌(보상은 누적 방식이라
+// "이번 달"이 아니라 전체 기간 기준으로 계산함 - migration_55의 group_pt_checkin과 동일한 기준)
+async function fetchGroupPtAttendanceOverview() {
+  const [membersRes, attendanceRes, tiersRes, claimsRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/members?group_pt_type=not.is.null&select=id,name,phone,group_pt_type&order=name.asc`, { headers: await authHeaders() }),
+    fetch(`${SUPABASE_URL}/rest/v1/group_pt_attendance?select=*&order=attendance_date.asc`, { headers: await authHeaders() }),
+    fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_tiers?select=*&order=days_required.asc`, { headers: await authHeaders() }),
+    fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_claims?select=*`, { headers: await authHeaders() })
+  ]);
+  if (!membersRes.ok) await throwApiError(membersRes, '그룹PT 회원 목록을 불러오지 못했습니다.');
+  if (!attendanceRes.ok) await throwApiError(attendanceRes, '출석 기록을 불러오지 못했습니다.');
+  if (!tiersRes.ok) await throwApiError(tiersRes, '보상 단계를 불러오지 못했습니다.');
+  if (!claimsRes.ok) await throwApiError(claimsRes, '보상 지급 현황을 불러오지 못했습니다.');
+
+  const members = await membersRes.json();
+  const attendance = await attendanceRes.json();
+  const tiers = await tiersRes.json();
+  const claims = await claimsRes.json();
+
+  const today = formatDateStr(new Date());
+  const rows = members.map(m => {
+    const memberAttendance = attendance.filter(a => a.member_id === m.id);
+    const totalDays = memberAttendance.length;
+    const todayRow = memberAttendance.find(a => a.attendance_date === today);
+    const nextTier = tiers.find(t => t.days_required > totalDays) || null;
+    const points = totalDays * 10;
+    return {
+      member: m,
+      totalDays,
+      points,
+      checkedInToday: !!todayRow,
+      todayMethod: todayRow ? todayRow.method : null,
+      nextTier,
+      daysUntilNextTier: nextTier ? nextTier.days_required - totalDays : null
+    };
+  });
+
+  const pendingClaims = claims
+    .filter(c => !c.fulfilled)
+    .map(c => ({ ...c, member: members.find(m => m.id === c.member_id), tier: tiers.find(t => t.id === c.tier_id) }))
+    .filter(c => c.member && c.tier)
+    .sort((a, b) => (a.achieved_at < b.achieved_at ? 1 : -1));
+  const fulfilledClaims = claims
+    .filter(c => c.fulfilled)
+    .map(c => ({ ...c, member: members.find(m => m.id === c.member_id), tier: tiers.find(t => t.id === c.tier_id) }))
+    .filter(c => c.member && c.tier)
+    .sort((a, b) => (a.fulfilled_at < b.fulfilled_at ? 1 : -1));
+
+  return { rows, tiers, pendingClaims, fulfilledClaims };
+}
+
+// QR 인식이 안 될 때 직원이 대신 출석 체크(method='manual'). 이미 오늘 체크돼 있으면(unique 제약)
+// 에러가 나므로 그 경우엔 조용히 "이미 출석"으로 안내함
+async function manualCheckinGroupPt(memberId) {
+  const today = formatDateStr(new Date());
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_attendance`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ member_id: memberId, attendance_date: today, method: 'manual', checked_in_by: currentUserIdForGroupPt() })
+  });
+  if (!res.ok) {
+    const status = res.status;
+    if (status === 409) throw new Error('이미 오늘 출석 처리된 회원이에요.');
+    await throwApiError(res, '수동 출석 체크에 실패했습니다.');
+  }
+  // 방금 체크로 새로 넘어선 보상 단계가 있으면 지급 대기로 등록(회원용 checkin RPC와 동일한 로직을
+  // 관리자 수동체크 경로에도 그대로 적용 - 그래야 수동체크로도 보상 진행이 안 끊김)
+  const overview = await fetchGroupPtAttendanceOverview();
+  const row = overview.rows.find(r => r.member.id === memberId);
+  if (row) {
+    const eligibleTiers = overview.tiers.filter(t => t.days_required <= row.totalDays);
+    for (const tier of eligibleTiers) {
+      await fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_claims?on_conflict=member_id,tier_id`, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Prefer': 'resolution=ignore-duplicates' },
+        body: JSON.stringify({ member_id: memberId, tier_id: tier.id, achieved_at: today })
+      });
+    }
+  }
+  return res.json();
+}
+
+async function fulfillGroupPtRewardClaim(claimId) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_claims?id=eq.${claimId}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify({ fulfilled: true, fulfilled_at: new Date().toISOString(), fulfilled_by: currentUserIdForGroupPt() })
+  });
+  if (!res.ok) await throwApiError(res, '보상 지급 처리에 실패했습니다.');
+}
+
+async function addGroupPtRewardTier({ days_required, reward_name }) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_tiers`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ days_required, reward_name, sort_order: days_required })
+  });
+  if (!res.ok) await throwApiError(res, '보상 단계 추가에 실패했습니다.');
+  return res.json();
+}
+
+async function updateGroupPtRewardTier(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_tiers?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '보상 단계 수정에 실패했습니다.');
+}
+
+async function deleteGroupPtRewardTier(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_reward_tiers?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '보상 단계 삭제에 실패했습니다.');
+}

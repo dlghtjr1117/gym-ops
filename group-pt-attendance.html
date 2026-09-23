@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 그룹PT 출석 관리</title>
+<link rel="stylesheet" href="style.css?v=1790129422" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  .att-row-done td { background: color-mix(in srgb, var(--green-600) 7%, var(--surface)); }
+  .att-row-pending td { background: color-mix(in srgb, var(--amber-500) 9%, var(--surface)); }
+  .progress-mini-track { width: 84px; height: 7px; border-radius: 999px; background: var(--slate-200); overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 8px; }
+  .progress-mini-fill { height: 100%; border-radius: 999px; background: var(--indigo-600); }
+
+  /* 오늘의 출석 QR 전체화면 모달 */
+  .qr-modal-overlay {
+    position: fixed; inset: 0; background: linear-gradient(160deg, #eef2ff 0%, #f8fafc 55%, #ecfeff 100%);
+    display: none; align-items: center; justify-content: center; z-index: 500; flex-direction: column;
+  }
+  .qr-modal-overlay.show { display: flex; }
+  .qr-modal-close {
+    position: absolute; top: 28px; right: 34px; font-size: 13px; color: var(--slate-500);
+    border: 1px solid var(--slate-200); background: var(--surface); padding: 8px 16px; border-radius: 999px; font-weight: 600; cursor: pointer;
+  }
+  .qr-modal-live {
+    position: absolute; top: 30px; left: 40px; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 700; color: var(--green-600); background: #dcfce7; padding: 7px 14px; border-radius: 999px;
+  }
+  .qr-modal-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-600); }
+  .qr-modal-stage { text-align: center; }
+  .qr-modal-stage h1 { font-size: 34px; margin: 4px 0 6px; color: var(--slate-900); letter-spacing: -0.5px; }
+  .qr-modal-stage .date { font-size: 14px; color: var(--slate-500); margin-bottom: 26px; font-weight: 600; }
+  .qr-modal-box { display: inline-block; padding: 24px; background: var(--surface); border-radius: 26px; box-shadow: 0 24px 50px -18px rgba(30,41,59,0.28); }
+  #qrCanvasWrap { width: 300px; height: 300px; }
+  .qr-modal-footnote { margin-top: 24px; font-size: 13.5px; color: var(--slate-700); font-weight: 600; }
+  .qr-modal-footsub { margin-top: 6px; font-size: 12px; color: var(--slate-500); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="consultations.html">신규상담</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="group-pt.html">그룹PT 관리</a>
+      <a href="group-pt-attendance.html" class="active">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="section" style="margin-top:20px;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div>
+          <h2 style="margin-bottom:4px;">🤸 그룹PT 출석 관리</h2>
+          <p class="muted" style="margin:-2px 0 14px;font-size:13px; max-width:640px;">회원님들은 이 화면이 아니라, 프런트 화면에 띄운 QR을 본인 휴대폰으로 스캔해서 출석·포인트를 확인해요. 이 화면은 직원이 전체 출석 현황을 확인하고, QR 인식이 안 될 때 수동으로 체크해주거나 보상 지급을 관리하는 용도예요.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="openQrBtn" style="white-space:nowrap; padding:11px 18px; font-size:13.5px;">📱 오늘의 출석 QR 열기</button>
+      </div>
+
+      <div class="grid-4" style="margin-bottom:22px;">
+        <div class="stat-card">
+          <div class="label">오늘 출석</div>
+          <div class="value" id="statTodayCount">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">그룹PT 회원 수</div>
+          <div class="value" id="statMemberCount">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">오늘 수동체크</div>
+          <div class="value" id="statManualCount">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">보상 지급 대기</div>
+          <div class="value" id="statPendingCount" style="color:var(--red-600);">-</div>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="table-fixed">
+          <thead><tr>
+            <th style="width:14%;">회원명</th>
+            <th style="width:14%;">오늘 출석</th>
+            <th style="width:12%;">누적 출석</th>
+            <th style="width:26%;">다음 보상까지</th>
+            <th style="width:12%;">포인트</th>
+            <th style="width:12%;"></th>
+          </tr></thead>
+          <tbody id="attendanceTableBody"><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🎁 보상 지급 대기</h2>
+      <p class="muted" style="margin:-6px 0 14px;font-size:13px;">보상 일수를 달성한 회원님이에요. 실물(스티커팩·티셔츠·텀블러 등)을 전달하신 뒤 "지급 완료"를 눌러주세요.</p>
+      <table class="table-fixed">
+        <thead><tr><th style="width:18%;">회원명</th><th style="width:22%;">달성 보상</th><th style="width:16%;">달성일</th><th>상태</th><th style="width:16%;"></th></tr></thead>
+        <tbody id="rewardPendingBody"><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>⚙️ 보상 단계 설정</h2>
+      <p class="muted" style="margin:-6px 0 14px;font-size:13px;">며칠 출석 시 어떤 보상을 줄지 여기서 직접 정하고 바꿀 수 있어요.</p>
+      <table class="table-fixed" style="max-width:560px;">
+        <thead><tr><th style="width:26%;">출석일수</th><th>보상</th><th style="width:14%;"></th></tr></thead>
+        <tbody id="rewardTierBody"><tr><td colspan="3" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+      <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input type="number" min="1" id="newTierDays" placeholder="출석일수" class="sheet-input" style="width:100px; border:1px solid var(--slate-300); border-radius:8px; padding:7px 8px;" />
+        <input type="text" id="newTierName" placeholder="보상 이름 (예: 물통)" class="sheet-input" style="width:180px; border:1px solid var(--slate-300); border-radius:8px; padding:7px 8px;" />
+        <button type="button" class="btn btn-outline" id="addTierBtn" style="width:auto; padding:7px 14px; font-size:12.5px;">+ 단계 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="qr-modal-overlay" id="qrModalOverlay">
+    <div class="qr-modal-live"><span class="dot"></span><span id="qrLiveLabel">오늘 코드</span></div>
+    <button type="button" class="qr-modal-close" id="qrModalCloseBtn">✕ 닫기</button>
+    <div class="qr-modal-stage">
+      <h1>📱 오늘의 출석 QR</h1>
+      <div class="date" id="qrModalDate">-</div>
+      <div class="qr-modal-box"><div id="qrCanvasWrap"></div></div>
+      <div class="qr-modal-footnote">회원님, 이 화면을 휴대폰 카메라로 비춰주세요</div>
+      <div class="qr-modal-footsub">어제 찍은 QR이나 캡쳐해둔 화면으로는 오늘 출석이 인정되지 않아요</div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1790129422"></script>
+  <script src="auth.js?v=1790129422"></script>
+  <script src="data.js?v=1790129422"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let overviewCache = null;
+
+    async function loadOverview() {
+      try {
+        overviewCache = await fetchGroupPtAttendanceOverview();
+      } catch (err) {
+        document.getElementById('attendanceTableBody').innerHTML = `<tr><td colspan="6" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        return;
+      }
+      renderStats();
+      renderAttendanceTable();
+      renderRewardPending();
+      renderRewardTiers();
+    }
+
+    function renderStats() {
+      const { rows, pendingClaims } = overviewCache;
+      document.getElementById('statMemberCount').textContent = rows.length + '명';
+      document.getElementById('statTodayCount').textContent = rows.filter(r => r.checkedInToday).length + ' / ' + rows.length + '명';
+      document.getElementById('statManualCount').textContent = rows.filter(r => r.checkedInToday && r.todayMethod === 'manual').length + '건';
+      document.getElementById('statPendingCount').textContent = pendingClaims.length + '명';
+    }
+
+    function renderAttendanceTable() {
+      const tbody = document.getElementById('attendanceTableBody');
+      const { rows } = overviewCache;
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">회원 관리에서 "그룹PT 종류"가 채워진 회원이 아직 없어요.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const statusBadge = r.checkedInToday
+          ? (r.todayMethod === 'manual' ? `<span class="badge badge-amber">✓ 수동체크</span>` : `<span class="badge badge-green">✓ QR 출석</span>`)
+          : `<span class="badge badge-slate">미출석</span>`;
+        const nextTierHtml = r.nextTier
+          ? `<span class="progress-mini-track"><span class="progress-mini-fill" style="width:${Math.min(100, Math.round(r.totalDays / r.nextTier.days_required * 100))}%;"></span></span>${r.nextTier.days_required}일까지 <strong>${r.daysUntilNextTier}일</strong>`
+          : `<span class="muted">모든 보상 단계 달성</span>`;
+        const manualBtn = r.checkedInToday ? `<span class="muted" style="text-align:center;">-</span>` : `<button type="button" class="btn btn-outline manual-checkin-btn" data-id="${r.member.id}" style="padding:5px 10px; font-size:11.5px;">대신 체크</button>`;
+        return `<tr class="${r.checkedInToday ? 'att-row-done' : ''}">
+          <td>${escapeHtml(r.member.name)}</td>
+          <td>${statusBadge}</td>
+          <td>${r.totalDays}일</td>
+          <td>${nextTierHtml}</td>
+          <td>${r.points}P</td>
+          <td>${manualBtn}</td>
+        </tr>`;
+      }).join('');
+      tbody.querySelectorAll('.manual-checkin-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleManualCheckin(btn.dataset.id));
+      });
+    }
+
+    async function handleManualCheckin(memberId) {
+      try {
+        await manualCheckinGroupPt(memberId);
+        showToast('출석 체크되었습니다.');
+        await loadOverview();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function renderRewardPending() {
+      const tbody = document.getElementById('rewardPendingBody');
+      const { pendingClaims } = overviewCache;
+      if (pendingClaims.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted" style="padding:16px;">지급 대기 중인 보상이 없어요.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = pendingClaims.map(c => `<tr>
+        <td>${escapeHtml(c.member.name)}</td>
+        <td>🎁 ${c.tier.days_required}일 · ${escapeHtml(c.tier.reward_name)}</td>
+        <td class="muted">${c.achieved_at}</td>
+        <td><span class="badge badge-amber">지급 대기</span></td>
+        <td><button type="button" class="btn btn-primary fulfill-btn" data-id="${c.id}" style="padding:6px 12px; font-size:11.5px;">지급 완료 처리</button></td>
+      </tr>`).join('');
+      tbody.querySelectorAll('.fulfill-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await fulfillGroupPtRewardClaim(btn.dataset.id);
+            showToast('지급 완료로 처리했습니다.');
+            await loadOverview();
+          } catch (err) { alert(err.message); }
+        });
+      });
+    }
+
+    function renderRewardTiers() {
+      const tbody = document.getElementById('rewardTierBody');
+      const { tiers } = overviewCache;
+      tbody.innerHTML = tiers.map(t => `<tr>
+        <td>${t.days_required}일</td>
+        <td>${escapeHtml(t.reward_name)}</td>
+        <td class="muted" style="text-align:center;"><button type="button" class="btn-link delete-tier-btn" data-id="${t.id}" style="color:var(--red-600);">삭제</button></td>
+      </tr>`).join('');
+      tbody.querySelectorAll('.delete-tier-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('이 보상 단계를 삭제할까요? 이미 이 단계를 달성한 회원의 기록은 그대로 남아있어요.')) return;
+          try {
+            await deleteGroupPtRewardTier(btn.dataset.id);
+            await loadOverview();
+          } catch (err) { alert(err.message); }
+        });
+      });
+    }
+
+    document.getElementById('addTierBtn').addEventListener('click', async () => {
+      const daysInput = document.getElementById('newTierDays');
+      const nameInput = document.getElementById('newTierName');
+      const days = Number(daysInput.value);
+      const name = nameInput.value.trim();
+      if (!days || days <= 0) { alert('출석일수를 입력해주세요.'); return; }
+      if (!name) { alert('보상 이름을 입력해주세요.'); return; }
+      try {
+        await addGroupPtRewardTier({ days_required: days, reward_name: name });
+        daysInput.value = ''; nameInput.value = '';
+        await loadOverview();
+      } catch (err) { alert(err.message); }
+    });
+
+    // ---- 오늘의 출석 QR 모달 ----
+    let qrInstance = null;
+    async function openQrModal() {
+      const overlay = document.getElementById('qrModalOverlay');
+      overlay.classList.add('show');
+      document.getElementById('qrModalDate').textContent = '불러오는 중...';
+      try {
+        const row = await getOrCreateTodayGroupPtQrToken();
+        const today = new Date();
+        const weekday = ['일','월','화','수','목','금','토'][today.getDay()];
+        document.getElementById('qrModalDate').textContent = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일 (${weekday}) · 이 QR은 오늘 자정에 자동으로 새로 바뀌어요`;
+        document.getElementById('qrLiveLabel').textContent = `오늘 ${row.token_date.slice(5)} 코드 · 자정 자동 갱신`;
+
+        const attendUrl = `${location.origin}${location.pathname.replace('group-pt-attendance.html', 'attend.html')}?t=${encodeURIComponent(row.token)}`;
+        const qrWrap = document.getElementById('qrCanvasWrap');
+        qrWrap.innerHTML = '';
+        qrInstance = new QRCode(qrWrap, { text: attendUrl, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
+      } catch (err) {
+        document.getElementById('qrModalDate').textContent = 'QR 발급에 실패했어요: ' + err.message;
+      }
+    }
+    document.getElementById('openQrBtn').addEventListener('click', openQrModal);
+    document.getElementById('qrModalCloseBtn').addEventListener('click', () => {
+      document.getElementById('qrModalOverlay').classList.remove('show');
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+      }
+      await loadOverview();
+    })();
+  </script>
+</body>
+</html>
