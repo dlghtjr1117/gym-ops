@@ -2387,6 +2387,10 @@ async function fetchGroupPtAttendanceOverview() {
     const memberAttendance = attendance.filter(a => a.member_id === m.id);
     const totalDays = memberAttendance.length;
     const todayRow = memberAttendance.find(a => a.attendance_date === today);
+    // 가장 최근 출석 기록(오늘 출석이 없어도 "최근에 언제 왔었는지" 추적용) - created_at은 실제 출석 처리된
+    // 정확한 시각(서버 시각)이 자동으로 찍혀있어서(group_pt_attendance.created_at default now()) 별도
+    // DB 변경 없이 바로 쓸 수 있음
+    const lastRow = memberAttendance.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] || null;
     const nextTier = tiers.find(t => t.days_required > totalDays) || null;
     const points = totalDays * 10;
     return {
@@ -2395,6 +2399,8 @@ async function fetchGroupPtAttendanceOverview() {
       points,
       checkedInToday: !!todayRow,
       todayMethod: todayRow ? todayRow.method : null,
+      todayCheckedInAt: todayRow ? todayRow.created_at : null,
+      lastCheckedInAt: lastRow ? lastRow.created_at : null,
       nextTier,
       daysUntilNextTier: nextTier ? nextTier.days_required - totalDays : null
     };

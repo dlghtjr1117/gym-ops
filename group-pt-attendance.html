@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 그룹PT 출석 관리</title>
-<link rel="stylesheet" href="style.css?v=1790130971" />
+<link rel="stylesheet" href="style.css?v=1790131352" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   .att-row-done td { background: color-mix(in srgb, var(--green-600) 7%, var(--surface)); }
@@ -111,14 +111,15 @@
       <div style="overflow-x:auto;">
         <table class="table-fixed">
           <thead><tr>
-            <th style="width:14%;">회원명</th>
-            <th style="width:14%;">오늘 출석</th>
-            <th style="width:12%;">누적 출석</th>
-            <th style="width:26%;">다음 보상까지</th>
-            <th style="width:12%;">포인트</th>
+            <th style="width:13%;">회원명</th>
+            <th style="width:12%;">오늘 출석</th>
+            <th style="width:16%;">출석 일시</th>
+            <th style="width:10%;">누적 출석</th>
+            <th style="width:21%;">다음 보상까지</th>
+            <th style="width:10%;">포인트</th>
             <th style="width:12%;"></th>
           </tr></thead>
-          <tbody id="attendanceTableBody"><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          <tbody id="attendanceTableBody"><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -159,9 +160,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790130971"></script>
-  <script src="auth.js?v=1790130971"></script>
-  <script src="data.js?v=1790130971"></script>
+  <script src="config.js?v=1790131352"></script>
+  <script src="auth.js?v=1790131352"></script>
+  <script src="data.js?v=1790131352"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -177,11 +178,22 @@
       });
     });
 
+    // "09/23 10:32"처럼 출석이 정확히 언제 찍혔는지 날짜+시각을 같이 보여주기 위한 포맷터
+    function formatCheckinDateTime(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${mm}/${dd} ${hh}:${mi}`;
+    }
+
     async function loadOverview() {
       try {
         overviewCache = await fetchGroupPtAttendanceOverview();
       } catch (err) {
-        document.getElementById('attendanceTableBody').innerHTML = `<tr><td colspan="6" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        document.getElementById('attendanceTableBody').innerHTML = `<tr><td colspan="7" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
         return;
       }
       renderStats();
@@ -202,18 +214,25 @@
       const tbody = document.getElementById('attendanceTableBody');
       const { rows } = overviewCache;
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">회원 관리에서 "그룹PT 종류"가 채워진 회원이 아직 없어요.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:16px;">회원 관리에서 "그룹PT 종류"가 채워진 회원이 아직 없어요.</td></tr>`;
         return;
       }
       const visibleRows = attViewMode === 'daily' ? rows.filter(r => r.checkedInToday) : rows;
       if (visibleRows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">오늘 출석한 회원이 아직 없어요. QR로 출석하면 여기에 바로 나타나요.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:16px;">오늘 출석한 회원이 아직 없어요. QR로 출석하면 여기에 바로 나타나요.</td></tr>`;
         return;
       }
       tbody.innerHTML = visibleRows.map(r => {
         const statusBadge = r.checkedInToday
           ? (r.todayMethod === 'manual' ? `<span class="badge badge-amber">✓ 수동체크</span>` : `<span class="badge badge-green">✓ QR 출석</span>`)
           : `<span class="badge badge-slate">미출석</span>`;
+        // 오늘 체크한 회원은 정확한 출석 시각(년월일 자동 포함, 표시는 월/일 시:분), 오늘은 아직이지만
+        // 예전에 출석한 적 있는 회원은 "최근 몇 월 며칠 몇 시"를 흐리게 보여줘서 추적이 끊기지 않게 함
+        const checkinTimeHtml = r.checkedInToday
+          ? `<span style="font-weight:600;">${formatCheckinDateTime(r.todayCheckedInAt)}</span>`
+          : (r.lastCheckedInAt
+            ? `<span class="muted" style="font-size:12px;">최근 ${formatCheckinDateTime(r.lastCheckedInAt)}</span>`
+            : `<span class="muted">-</span>`);
         const nextTierHtml = r.nextTier
           ? `<span class="progress-mini-track"><span class="progress-mini-fill" style="width:${Math.min(100, Math.round(r.totalDays / r.nextTier.days_required * 100))}%;"></span></span>${r.nextTier.days_required}일까지 <strong>${r.daysUntilNextTier}일</strong>`
           : `<span class="muted">모든 보상 단계 달성</span>`;
@@ -221,6 +240,7 @@
         return `<tr class="${r.checkedInToday ? 'att-row-done' : ''}">
           <td>${escapeHtml(r.member.name)}</td>
           <td>${statusBadge}</td>
+          <td>${checkinTimeHtml}</td>
           <td>${r.totalDays}일</td>
           <td>${nextTierHtml}</td>
           <td>${r.points}P</td>
