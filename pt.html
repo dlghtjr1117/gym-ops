@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1790336916" />
+<link rel="stylesheet" href="style.css?v=1790338841" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -301,10 +301,10 @@
         </div>
         <p class="muted" style="margin:-6px 0 12px;">칸을 클릭해서 바로 입력하면 자동 저장돼요. 이번 달에 추가한 기록만 보이고, 지난 달 기록은 그대로 남아있어요 (월 이동해서 확인 가능).</p>
         <div style="overflow-x:auto;">
-          <table id="careTable" class="table-fixed sheet-table" style="min-width:1220px;">
+          <table id="careTable" class="table-fixed sheet-table" style="min-width:1320px;">
             <thead><tr>
               <th style="width:13%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
-              <th style="width:15%;">수업방향</th><th style="width:5%;">단기</th><th style="width:16%;">장기적 플랜(관리 방향)</th>
+              <th style="width:15%;">수업방향</th><th style="width:11%; word-break:keep-all;">3회차 이내 세일즈 여부</th><th style="width:16%;">장기적 플랜(관리 방향)</th>
               <th style="width:8%;">재등록예상횟수</th><th style="width:9%;">예상매출</th><th style="width:8%;">재등록확률</th><th style="width:6%;"></th>
             </tr></thead>
             <tbody><tr><td colspan="10" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
@@ -335,7 +335,7 @@
           <div class="field"><label>이름 *</label><input type="text" id="cm_name" required /></div>
           <div class="field"><label>재등록예상시기</label><input type="month" id="cm_renewal_month" /></div>
           <div class="field"><label>남은횟수 <span id="cm_remainingHint" class="muted" style="display:none;">(연동된 회원이라 자동으로 채워져요)</span></label><input type="number" id="cm_remaining_sessions" min="0" placeholder="예: 5" /></div>
-          <div class="field"><label>단기</label>
+          <div class="field"><label>3회차 이내 세일즈 여부</label>
             <select id="cm_short_term_plan">
               <option value="X" selected>X</option>
               <option value="O">O</option>
@@ -439,9 +439,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790336916"></script>
-  <script src="auth.js?v=1790336916"></script>
-  <script src="data.js?v=1790336916"></script>
+  <script src="config.js?v=1790338841"></script>
+  <script src="auth.js?v=1790338841"></script>
+  <script src="data.js?v=1790338841"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
