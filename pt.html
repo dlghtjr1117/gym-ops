@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1790335678" />
+<link rel="stylesheet" href="style.css?v=1790336916" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -439,9 +439,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1790335678"></script>
-  <script src="auth.js?v=1790335678"></script>
-  <script src="data.js?v=1790335678"></script>
+  <script src="config.js?v=1790336916"></script>
+  <script src="auth.js?v=1790336916"></script>
+  <script src="data.js?v=1790336916"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -1340,23 +1340,44 @@
       btn.disabled = false;
     }
 
+    // member_id가 연결돼 있으면 실제 회원의 잔여횟수(실시간)를 쓰고, 아니면 이 행에 저장된 값을 그대로 씀
+    // (정렬 기준으로도 같이 쓰이므로, 화면에 보이는 남은횟수와 정렬 기준이 항상 일치하도록 함수로 뺌)
+    function getCareRemaining(m) {
+      const linked = !!m.member;
+      return linked ? m.member.pt_remaining_sessions : m.pt_remaining_sessions;
+    }
+    // "남은횟수가 적을수록 위로, 그다음으로 재등록예상시기가 가까울수록 위로" 정렬해달라는 요청
+    // (2026-09-25) - 잔여횟수가 얼마 안 남았거나 재등록 시기가 임박한 회원을 스크롤 안 해도 바로
+    // 맨 위에서 보고 챙길 수 있게 함. 남은횟수/재등록예상시기가 아직 기록 안 된(빈) 행은 급하지
+    // 않다는 뜻이라 맨 아래로 보냄(둘 다 오름차순 정렬 + 빈 값은 맨 뒤로 취급하는 방식으로 구현).
+    function sortedCareCache() {
+      return careCache.slice().sort((a, b) => {
+        const ra = getCareRemaining(a);
+        const rb = getCareRemaining(b);
+        const raSort = ra == null ? Infinity : ra;
+        const rbSort = rb == null ? Infinity : rb;
+        if (raSort !== rbSort) return raSort - rbSort;
+        // "YYYY-MM" 형식이라 문자열 비교로도 시간 순서가 그대로 유지됨 - 빈 값은 맨 뒤로
+        const ma = a.pt_expected_renewal_month || '9999-99';
+        const mb = b.pt_expected_renewal_month || '9999-99';
+        return ma.localeCompare(mb);
+      });
+    }
     function renderCareTable() {
       const tbody = document.querySelector('#careTable tbody');
       if (careCache.length === 0) {
         tbody.innerHTML = '<tr><td colspan="10" class="muted" style="padding:16px;">이번 달 기록이 없습니다. "+ PT 회원 추가"로 이번 달 케어 대상 회원을 남겨보세요.</td></tr>';
         return;
       }
-      tbody.innerHTML = careCache.map(m => {
+      tbody.innerHTML = sortedCareCache().map(m => {
         const shortVal = m.pt_short_term_plan === 'O' ? 'O' : 'X';
         const careProbVal = careProbValue(m);
         const probOptions = CARE_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === careProbVal ? 'selected' : ''}>${o.label}</option>`).join('');
-        // member_id가 연결돼 있으면 실제 회원의 잔여횟수(실시간)를 쓰고, 아니면 이 행에 저장된 값을 그대로 씀
-        const linked = !!m.member;
-        const remaining = linked ? m.member.pt_remaining_sessions : m.pt_remaining_sessions;
+        const remaining = getCareRemaining(m);
         const remainingHtml = remaining == null
           ? '<span class="muted">-</span>'
           : `<span class="badge ${remaining <= 1 ? 'badge-red' : 'badge-amber'}">${remaining}회</span>`;
-        const linkHtml = linked
+        const linkHtml = !!m.member
           ? '<div class="muted" style="font-size:10.5px; margin-top:2px;">🔗 연동됨</div>'
           : `<div style="margin-top:2px;"><button type="button" class="btn-link" style="font-size:10.5px;" onclick="openCareLinkModal('${m.id}')">회원 연결</button></div>`;
         return `
