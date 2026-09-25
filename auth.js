@@ -28,6 +28,40 @@ async function signIn(email, password) {
   return data;
 }
 
+// 비밀번호 찾기: 입력한 이메일로 "비밀번호 재설정" 링크가 담긴 메일을 보내달라고 Supabase에 요청.
+// 그 이메일이 실제 가입된 계정인지 여부와 상관없이 Supabase가 200을 돌려주기 때문에(존재하지 않는
+// 이메일이라고 알려주면 "어떤 이메일이 가입되어 있는지" 유추할 수 있는 보안 문제가 생김), 이 함수도
+// 성공/실패를 구분하지 않고 그냥 요청만 보냄 - 화면 쪽에서 결과와 무관하게 항상 같은 안내 문구를 보여줌.
+// redirectTo는 메일 속 링크를 눌렀을 때 최종적으로 돌아올 주소(reset-password.html)로,
+// Supabase 프로젝트의 Authentication > URL Configuration > Redirect URLs에 미리 등록되어 있어야
+// 실제로 그 주소로 돌아옴(등록 안 돼 있으면 Supabase가 기본 Site URL로 대신 보냄).
+async function requestPasswordReset(email) {
+  const redirectTo = `${location.origin}${location.pathname.replace(/forgot-password\.html$/, '')}reset-password.html`;
+  await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+    body: JSON.stringify({ email })
+  });
+  // 응답 상태를 확인하지 않음(의도적) - 위 설명 참고
+}
+
+// 비밀번호 재설정 메일의 링크를 눌러 돌아온 상태에서, 그 링크에 담겨있던 임시 access_token으로
+// 실제 비밀번호를 새로 설정함
+async function updatePasswordWithRecoveryToken(accessToken, newPassword) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({ password: newPassword })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.msg || data.error_description || '비밀번호 변경에 실패했습니다.');
+  return data;
+}
+
 // 로그아웃
 function signOut() {
   localStorage.removeItem(AUTH_STORAGE_KEY);

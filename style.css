@@ -670,3 +670,124 @@ tr.member-row:hover td { background: var(--slate-50); }
 .report-nav input[type=date] {
   padding: 7px 10px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; outline: none;
 }
+
+/* ===== 로그인/회원가입/비밀번호 찾기 화면 전용 스타일 (login.html, forgot-password.html,
+   reset-password.html) =====
+   기존 .card/.container/.logo-badge는 앱 여기저기(설정 폼 등)에서 범용으로 쓰이고 있어서 그대로
+   손대면 다른 화면까지 영향을 줌 - 그래서 "세련된 로그인 화면"용 스타일은 .auth-* 라는 별도
+   이름으로 새로 만들고, 로그인 관련 화면에만 적용함. 배경은 var(--slate-50)를 그대로 써서 앱의
+   라이트/다크 모드 설정을 그대로 따라가고(로그인 화면만 따로 튀지 않게), 대신 실제 센터 로고
+   (에브리웨어 피트니스, 은색 지구본 마크)를 검정 그라데이션 타일에 얹어서 어떤 모드에서든
+   또렷하게 보이도록 함(로고 원본 이미지 자체가 검정 배경 위의 은색 로고라 이 방식이 자연스러움) */
+/* "화면이 큰데 카드 하나만 조그맣게 떠있어서 휑하다 - 왼쪽에 로고 크게(3), 오른쪽에 입력칸 크게(2)
+   비율로 화면을 꽉 채워달라" 요청으로 센터형 카드 레이아웃에서 좌우 분할(split-screen) 레이아웃으로
+   전면 변경함. 넓은 화면(데스크톱)에서는 왼쪽 검정 히어로 패널에 실제 센터 로고를 큼직하게,
+   오른쪽 패널에는 확대된 입력폼을 배치해서 화면 전체를 채우고, 좁은 화면(휴대폰)에서는 로고 배너가
+   위쪽에 작게 오고 아래에 폼이 오는 1단 레이아웃으로 자동 전환됨(모바일에서 6:4 비율 그대로 쓰면
+   로고가 화면을 너무 많이 잡아먹어서 폼이 안 보이므로, 모바일에서는 히어로를 고정 높이 배너로 바꿈) */
+.auth-page { min-height: 100vh; display: flex; flex-direction: column; }
+@media (min-width: 880px) {
+  .auth-page { flex-direction: row; height: 100vh; }
+}
+
+.auth-hero {
+  position: relative; overflow: hidden; flex: none;
+  background: radial-gradient(ellipse at 50% 30%, #232329 0%, #0a0a0d 65%), #0a0a0d;
+  display: flex; align-items: center; justify-content: center;
+  padding: 44px 24px; min-height: 240px;
+}
+@media (min-width: 880px) {
+  .auth-hero { flex: 3 1 0; height: 100vh; padding: 60px; }
+}
+.auth-hero-inner { position: relative; z-index: 1; text-align: center; max-width: 480px; }
+.auth-hero-logo { width: min(78vw, 260px); height: auto; display: block; margin: 0 auto; }
+@media (min-width: 880px) {
+  .auth-hero-logo { width: min(30vw, 420px); }
+}
+.auth-hero-tagline {
+  margin: 22px 0 0; font-size: 14px; color: rgba(255,255,255,0.55); font-weight: 500;
+  display: none;
+}
+@media (min-width: 880px) {
+  .auth-hero-tagline { display: block; font-size: 16px; }
+}
+
+.auth-form-panel {
+  flex: 1 1 auto; display: flex; align-items: center; justify-content: center;
+  background: var(--slate-50); padding: 36px 22px 48px;
+}
+@media (min-width: 880px) {
+  .auth-form-panel { flex: 2 1 0; height: 100vh; overflow-y: auto; padding: 60px; }
+}
+.auth-form-inner { width: 100%; max-width: 420px; }
+
+/* "로그인 위에 EVERYWHERE / FITNESS 문구를 크고 굵게, 그 아래에 로그인/이메일/비밀번호가 오게 해줘"
+   요청으로 기존의 작은 한 줄짜리 .auth-eyebrow 대신 두 줄짜리 큰 브랜드 문구로 바꿈. 처음엔
+   FITNESS를 EVERYWHERE보다 작게 뒀는데, "FITNESS도 똑같이 크게 해줘" 피드백을 받아 두 줄 모두
+   동일한 크기·굵기로 통일함 */
+.auth-brand {
+  margin: 0 0 22px; line-height: 1.05; text-transform: uppercase; color: var(--slate-900);
+}
+.auth-brand span { display: block; font-size: 30px; font-weight: 800; letter-spacing: 0.01em; }
+.auth-brand span:last-child { margin-top: 4px; }
+@media (min-width: 880px) {
+  .auth-brand span { font-size: 38px; }
+}
+
+.auth-header { margin-bottom: 30px; }
+.auth-header h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; }
+.auth-header p { font-size: 14.5px; color: var(--slate-500); margin: 0; line-height: 1.5; }
+
+.auth-field { margin-bottom: 20px; }
+.auth-field-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+.auth-field label { font-size: 14px; font-weight: 600; color: var(--slate-700); }
+.auth-field input {
+  width: 100%; box-sizing: border-box; padding: 16px 18px; font-size: 16px;
+  border: 1px solid var(--slate-300); border-radius: 14px; outline: none; background: var(--surface); color: var(--slate-900);
+  transition: border-color .15s, box-shadow .15s;
+}
+.auth-field input:focus { border-color: var(--indigo-600); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+:root[data-theme="dark"] .auth-field input:focus { box-shadow: 0 0 0 3px rgba(220,38,38,0.18); }
+
+.auth-forgot-link { font-size: 13.5px; color: var(--indigo-600); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.auth-forgot-link:hover { text-decoration: underline; }
+
+.auth-password-wrap { position: relative; }
+.auth-password-wrap input { padding-right: 50px; }
+.auth-toggle-pw {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; border: none; background: transparent; border-radius: 8px;
+  color: var(--slate-400); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+}
+.auth-toggle-pw:hover { background: var(--slate-50); color: var(--slate-700); }
+
+.auth-btn {
+  width: 100%; padding: 16px; font-size: 16px; font-weight: 700; border: none; border-radius: 14px;
+  background: var(--indigo-600); color: var(--white); cursor: pointer; margin-top: 6px;
+  box-shadow: 0 10px 22px -8px rgba(79,70,229,0.55); transition: background .15s, transform .1s;
+}
+.auth-btn:hover { background: var(--indigo-700); }
+.auth-btn:active { transform: translateY(1px); }
+.auth-btn[disabled] { opacity: 0.6; cursor: not-allowed; transform: none; }
+:root[data-theme="dark"] .auth-btn { box-shadow: 0 10px 22px -8px rgba(220,38,38,0.5); }
+
+.auth-hint { text-align: center; font-size: 13px; color: var(--slate-400); margin-top: 26px; }
+.auth-hint a { color: var(--indigo-600); font-weight: 600; text-decoration: none; }
+.auth-hint a:hover { text-decoration: underline; }
+
+.auth-back-link {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--slate-500);
+  text-decoration: none; margin-bottom: 22px; font-weight: 600;
+}
+.auth-back-link:hover { color: var(--slate-700); }
+
+.auth-note {
+  font-size: 12.5px; color: var(--slate-500); background: var(--surface); border: 1px solid var(--slate-200);
+  border-radius: 12px; padding: 12px 14px; margin-top: 20px; line-height: 1.55;
+}
+
+.auth-success-icon {
+  width: 56px; height: 56px; border-radius: 50%; background: #f0fdf4; color: #16a34a;
+  display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px;
+}
+:root[data-theme="dark"] .auth-success-icon { background: rgba(74,222,128,0.15); }
