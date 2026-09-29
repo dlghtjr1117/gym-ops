@@ -20,12 +20,6 @@
     display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;
     background:#eef2ff; color:var(--indigo-700); margin-top:3px;
   }
-  .unpriced-warning {
-    background: #fef3c7; border: 1px solid #fde68a; color: #92400e; border-radius: 12px;
-    padding: 12px 16px; font-size: 13px; margin-top: 16px; display: none; line-height: 1.6;
-  }
-  .unpriced-warning b { font-weight: 700; }
-  .unpriced-warning ul { margin: 6px 0 0; padding-left: 18px; }
   .settings-table input.sheet-input { width: 100%; padding: 6px 8px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 6px; }
   .settings-table input.sheet-input:focus { border-color: var(--indigo-600); outline: none; }
   .rate-field { display: flex; align-items: center; gap: 6px; }
@@ -39,7 +33,6 @@
   .session-list-table { width: 100%; margin-top: 10px; font-size: 12.5px; }
   .session-list-table th, .session-list-table td { padding: 5px 8px; text-align: left; border-bottom: 1px solid var(--slate-100); }
   .session-list-table td.num { text-align: right; }
-  .session-list-table tr.unpriced-row td { color: #b45309; }
   .legend-note { font-size: 11.5px; color: var(--slate-400); display:flex; align-items:center; gap:6px; margin: -4px 0 12px; }
   .legend-dot { display:inline-block; width:9px; height:9px; border-radius:3px; background:#3b82f6; }
   .tier-ref-table { width:100%; font-size:12.5px; }
@@ -97,7 +90,7 @@
       <div class="hero-grid" id="payrollHeroGrid">
         <div class="hero-card hero-blue">
           <div class="hero-icon">🏋️</div>
-          <div class="hero-label">개인PT 소진 매출(출석 기준)</div>
+          <div class="hero-label">개인PT 확정 매출(PT관리 화면과 동일)</div>
           <div class="hero-value hero-value-money"><span id="heroConsumedRevenue">0</span><span class="hero-unit">원</span></div>
           <div class="hero-sub" id="heroConsumedSub">불러오는 중...</div>
         </div>
@@ -115,19 +108,13 @@
         </div>
       </div>
 
-      <div id="unpricedWarning" class="unpriced-warning">
-        ⚠️ <b><span id="unpricedCount">0</span>건</b>은 결제 내역에 회차수가 정해진 PT 이용권이 연결되어 있지 않아
-        회당단가를 계산할 수 없었어요(출석 처리는 됐지만, 매출/급여 계산에서는 빠져 있어요).
-        <a href="sales.html" class="btn-link" style="font-size:12.5px;">매출 입력에서 상품 연결 확인하기 →</a>
-        <div id="unpricedList"></div>
-      </div>
-
       <div class="section">
         <h2>트레이너별 급여</h2>
         <p class="muted" style="margin:-6px 0 6px; font-size:12px;">
-          개인PT 소진매출 = 이번 달 <b>출석</b> 처리된 세션마다 그 시점 결제금액÷회차수를 곱해서 합산(결석/노쇼는 매출 제외) ·
-          그 소진매출이 속하는 구간(아래 "1:1 PT 급여 구간표")에서 기본급·정률·OT보너스(또는 성과금)를 자동으로 가져옴 ·
-          개인PT 확정수업료 = 수당(소진매출×구간정률) → 부가세 10% 제외 → 카드결제 회원분만 카드수수료 제외 ·
+          개인PT 확정매출 = PT 관리(pt.html) 화면의 "확정 매출"과 완전히 같은 숫자(이번 달 신규/재등록 "등록" 처리된
+          상담의 계약금액 합계) · 그 확정매출이 속하는 구간(아래 "1:1 PT 급여 구간표")에서 기본급·정률·OT보너스(또는 성과금)를
+          자동으로 가져옴 · 개인PT 확정수업료 = 수당(확정매출×구간정률) → 부가세 10% 제외 → 카드결제분 비중만큼 카드수수료 제외
+          (카드결제 비중은 이번 달 실제 PT 신규/재등록 매출 기준, 해당 매출이 없으면 카드수수료 0원) ·
           최종급여 = (개인PT확정수업료+구간기본급+OT보너스/성과금+그룹PT확정수업료) − 프리랜서세(사업소득세+지방소득세)
         </p>
         <div class="legend-note"><span class="legend-dot"></span>파란 입력칸(그룹PT확정수업료)은 매달 직접 입력하는 값이에요(아래 그룹PT 구간표를 참고해서 입력해주세요). 입력 후 "이번 달 급여 확정 저장"을 눌러야 저장돼요.</div>
@@ -138,7 +125,7 @@
             <thead><tr>
               <th style="width:10%;">트레이너</th>
               <th class="num" style="width:9%;">소진(출석/결석)</th>
-              <th class="num" style="width:12%;">소진매출 · 구간</th>
+              <th class="num" style="width:12%;">확정매출 · 구간</th>
               <th class="num" style="width:11%;">개인PT<br/>확정수업료</th>
               <th class="num" style="width:13%;">구간 기본급<br/>+OT보너스/성과금</th>
               <th class="num" style="width:12%;">그룹PT<br/>확정수업료</th>
@@ -156,11 +143,11 @@
       </div>
 
       <div class="section">
-        <h2>1:1 PT 급여 구간표 <span class="muted" style="font-weight:400; font-size:12px;">· 전체 트레이너 공통, 당월 소진매출 기준</span></h2>
+        <h2>1:1 PT 급여 구간표 <span class="muted" style="font-weight:400; font-size:12px;">· 전체 트레이너 공통, 당월 확정매출 기준</span></h2>
         <p class="muted" style="margin:-6px 0 12px; font-size:12px;">각 트레이너가 실제로 적용받은 구간은 파란색으로 표시돼요. 구간표 자체를 수정하고 싶으시면 말씀해주세요(지금은 조회만 가능).</p>
         <div style="overflow-x:auto;">
           <table class="tier-ref-table" id="ptTierRefTable">
-            <thead><tr><th>구간</th><th>소진매출 범위</th><th>기본급</th><th>정률</th><th>OT보너스</th><th>성과금</th></tr></thead>
+            <thead><tr><th>구간</th><th>확정매출 범위</th><th>기본급</th><th>정률</th><th>OT보너스</th><th>성과금</th></tr></thead>
             <tbody id="ptTierRefTbody"><tr><td colspan="6" class="muted" style="padding:12px;">불러오는 중...</td></tr></tbody>
           </table>
         </div>
@@ -224,7 +211,7 @@
       <div class="formula-box" id="detailFormula"></div>
       <div style="max-height:280px; overflow-y:auto;">
         <table class="session-list-table" id="detailSessionTable">
-          <thead><tr><th>날짜</th><th>회원명</th><th>상태</th><th class="num">회당단가</th></tr></thead>
+          <thead><tr><th>날짜</th><th>회원명</th><th>상태</th></tr></thead>
           <tbody id="detailSessionTbody"></tbody>
         </table>
       </div>
@@ -243,6 +230,8 @@
     let ptTiersCache = [];          // pt_payroll_tiers 전체(전체 트레이너 공통)
     let groupTiersCache = [];       // group_pt_payroll_tiers 전체(참고용)
     let otDoneCountsCache = {};     // trainer_id -> 이 달 OT완료 건수(OT1+OT2)
+    let confirmedRevenueCache = {}; // trainer_id -> 확정매출(PT관리 화면과 동일 숫자, get_pt_trainer_leaderboard())
+    let cardSplitCache = {};        // trainer_id -> { cardRevenue, otherRevenue }(카드수수료 비중 계산용, sales 기준)
     let confirmedRecordsCache = {}; // trainer_id -> record(확정 저장된 값 - 있으면 입력칸 초기값으로 씀)
     let draftInputs = {};           // trainer_id -> { group_confirmed_fee } (이번 화면에서 입력 중인 값)
     let calcCache = {};             // trainer_id -> 계산 결과(모달/저장에서 재사용)
@@ -281,10 +270,12 @@
       return tier.max_revenue == null ? `${min} 이상` : `${min} ~ ${max}`;
     }
 
-    function computeOneTrainer(t, consumption) {
-      const cons = consumption[t.id] || { attended: 0, absent: 0, unpriced: 0, revenue: 0, cardRevenue: 0, otherRevenue: 0 };
+    function computeOneTrainer(t, attendance) {
+      const att = attendance[t.id] || { attended: 0, absent: 0 };
+      const confirmedRevenue = confirmedRevenueCache[t.id] || 0;
+      const cardSplit = cardSplitCache[t.id] || { cardRevenue: 0, otherRevenue: 0 };
       const settings = salarySettingsCache[t.id] || { card_fee_rate: 0 };
-      const tier = findPtTier(ptTiersCache, cons.revenue);
+      const tier = findPtTier(ptTiersCache, confirmedRevenue);
       const otDoneCount = otDoneCountsCache[t.id] || 0;
       const confirmed = confirmedRecordsCache[t.id];
       // 입력칸 초기값: 이번 화면에서 이미 입력한 값(draftInputs) > 이 달에 확정 저장된 값 > 0
@@ -293,8 +284,9 @@
       }
       const draft = draftInputs[t.id];
       const result = computeTrainerPayroll({
-        consumedRevenue: cons.revenue,
-        cardRevenue: cons.cardRevenue,
+        confirmedRevenue,
+        cardRevenue: cardSplit.cardRevenue,
+        otherRevenue: cardSplit.otherRevenue,
         tier,
         otDoneCount,
         vatRate: Number(payrollSettingsCache.vat_rate) || 0,
@@ -303,7 +295,7 @@
         businessTaxRate: Number(payrollSettingsCache.business_tax_rate) || 0,
         localTaxMultiplier: Number(payrollSettingsCache.local_tax_multiplier) || 0
       });
-      return { cons, settings, tier, otDoneCount, draft, result, confirmed };
+      return { att, confirmedRevenue, settings, tier, otDoneCount, draft, result, confirmed };
     }
 
     async function reloadAll() {
@@ -314,9 +306,10 @@
 
       const { startStr, endStr, monthStr } = getMonthRange();
       // 서로 무관한 요청은 한꺼번에 보냄
-      const [bookingsR, salesR, settingsR, payrollSettingsR, ptTiersR, groupTiersR, otR, recordsR, membersR] = await Promise.allSettled([
+      const [bookingsR, confirmedRevR, cardSalesR, settingsR, payrollSettingsR, ptTiersR, groupTiersR, otR, recordsR, membersR] = await Promise.allSettled([
         fetchPtBookingsForMonth(startStr, endStr),
-        fetchPtSalesForPricing(endStr),
+        fetchConfirmedRevenueForMonth(startStr, endStr),
+        fetchTrainerPtSalesForCardRatio(startStr, endStr),
         fetchTrainerSalarySettings(),
         fetchPayrollSettings(),
         fetchPtPayrollTiers(),
@@ -326,15 +319,16 @@
         fetchMembers()
       ]);
 
-      if (bookingsR.status !== 'fulfilled' || salesR.status !== 'fulfilled') {
-        const err = bookingsR.status !== 'fulfilled' ? bookingsR.reason : salesR.reason;
+      if (bookingsR.status !== 'fulfilled' || confirmedRevR.status !== 'fulfilled') {
+        const err = bookingsR.status !== 'fulfilled' ? bookingsR.reason : confirmedRevR.reason;
         document.getElementById('errorBox').textContent = err.message;
         document.getElementById('errorBox').style.display = 'block';
         document.getElementById('payrollTbody').innerHTML = '<tr><td colspan="9" class="error-text" style="display:table-cell;">불러오기 실패</td></tr>';
         return;
       }
       const bookings = bookingsR.value;
-      const ptSales = salesR.value;
+      confirmedRevenueCache = confirmedRevR.value;
+      cardSplitCache = cardSalesR.status === 'fulfilled' ? computeTrainerCardRevenueSplit(cardSalesR.value) : {};
       salarySettingsCache = {};
       (settingsR.status === 'fulfilled' ? settingsR.value : []).forEach(r => { salarySettingsCache[r.trainer_id] = r; });
       payrollSettingsCache = payrollSettingsR.status === 'fulfilled' ? payrollSettingsR.value : payrollSettingsCache;
@@ -350,41 +344,35 @@
       document.getElementById('rateBusinessTax').value = payrollSettingsCache.business_tax_rate;
       document.getElementById('rateLocalTaxMultiplier').value = payrollSettingsCache.local_tax_multiplier;
 
-      const pricingIndex = buildPtPricingIndex(ptSales);
-      const consumption = computeTrainerConsumption(bookings, pricingIndex);
+      // 출석/결석 건수만 필요 - 단가 정보는 더 이상 급여 계산에 안 쓰지만 화면 표시용으로 남겨둠
+      const attendance = computeTrainerConsumption(bookings, {});
 
-      // 상세 모달용 - 부킹마다 회원 이름 + 상태 + 그 시점 단가를 미리 계산해둠
+      // 상세 모달용 - 부킹마다 회원 이름 + 상태를 미리 계산해둠(단가는 더 이상 표시 안 함)
       bookingsWithMemberName = bookings.map(b => {
         const dateStr = formatDateStr(new Date(b.start_at));
-        const entry = b.status === 'absent' ? null : findPricingEntryForSession(pricingIndex, b.member_id, dateStr);
         const m = membersById[b.member_id];
-        return { trainer_id: b.trainer_id, dateStr, status: b.status, memberName: m ? m.name : '(알 수 없음)', price: entry ? entry.unitPrice : null };
+        return { trainer_id: b.trainer_id, dateStr, status: b.status, memberName: m ? m.name : '(알 수 없음)' };
       }).sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
       const trainers = staffCache.filter(s => s.role === 'trainer');
       calcCache = {};
-      let totalRevenue = 0, totalClassFee = 0, totalFinal = 0, totalUnpriced = 0;
-      const unpricedMembers = new Set();
+      let totalRevenue = 0, totalClassFee = 0, totalFinal = 0;
 
       const rowsHtml = trainers.map(t => {
-        const calc = computeOneTrainer(t, consumption);
+        const calc = computeOneTrainer(t, attendance);
         calcCache[t.id] = calc;
-        const { cons, tier, otDoneCount, draft, result, confirmed } = calc;
-        totalRevenue += cons.revenue;
+        const { att, confirmedRevenue, tier, otDoneCount, draft, result, confirmed } = calc;
+        totalRevenue += confirmedRevenue;
         totalClassFee += result.individualConfirmedFee;
         totalFinal += result.finalSalary;
-        totalUnpriced += cons.unpriced;
-        if (cons.unpriced > 0) {
-          bookingsWithMemberName.filter(b => b.trainer_id === t.id && b.status !== 'absent' && b.price == null).forEach(b => unpricedMembers.add(b.memberName));
-        }
         const bonusLabel = tier && tier.ot_bonus_threshold != null
           ? `OT보너스 ${result.otBonusAmount > 0 ? '달성' : `미달성(${otDoneCount}/${tier.ot_bonus_threshold}회)`}`
           : '성과금';
         return `
         <tr data-trainer-id="${t.id}">
           <td>${escapeHtml(t.name)}${confirmed ? '<div class="confirmed-badge">✅ 확정됨</div>' : ''}</td>
-          <td class="num">${cons.attended} / ${cons.absent}${cons.unpriced > 0 ? `<span class="muted" style="font-size:11px;"><br/>단가미확인 ${cons.unpriced}</span>` : ''}</td>
-          <td class="num">${formatWon(Math.round(cons.revenue))}${tier ? `<div class="tier-badge">${tier.tier_order}구간</div>` : ''}</td>
+          <td class="num">${att.attended} / ${att.absent}</td>
+          <td class="num">${formatWon(Math.round(confirmedRevenue))}${tier ? `<div class="tier-badge">${tier.tier_order}구간</div>` : ''}</td>
           <td class="num">${formatWon(Math.round(result.individualConfirmedFee))}</td>
           <td class="num">${formatWon(result.basePay + result.otBonusAmount + result.performanceBonus)}<div class="muted" style="font-size:10.5px;">기본급 ${formatWon(result.basePay)} · ${bonusLabel}</div></td>
           <td class="num"><input type="text" inputmode="numeric" class="inline-money" data-trainer-id="${t.id}" data-field="group_confirmed_fee" value="${(Number(draft.group_confirmed_fee) || 0).toLocaleString('ko-KR')}" onchange="handleDraftInputChange(this)" /></td>
@@ -399,14 +387,6 @@
       document.getElementById('heroClassFee').textContent = Math.round(totalClassFee).toLocaleString('ko-KR');
       document.getElementById('heroFinalSalary').textContent = Math.round(totalFinal).toLocaleString('ko-KR');
       document.getElementById('heroConsumedSub').textContent = `트레이너 ${trainers.length}명 · 출석 ${bookings.filter(b => b.status === 'attended').length}건 · 결석 ${bookings.filter(b => b.status === 'absent').length}건`;
-
-      if (totalUnpriced > 0) {
-        document.getElementById('unpricedCount').textContent = totalUnpriced;
-        document.getElementById('unpricedList').innerHTML = `<ul>${Array.from(unpricedMembers).map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>`;
-        document.getElementById('unpricedWarning').style.display = 'block';
-      } else {
-        document.getElementById('unpricedWarning').style.display = 'none';
-      }
 
       renderTierRefTables(trainers);
       renderSettingsTable(trainers);
@@ -445,10 +425,10 @@
 
       const t = staffCache.find(s => s.id === trainerId);
       if (!t) return;
-      const consumption = {};
+      const attendance = {};
       const prevCalc = calcCache[trainerId];
-      if (prevCalc) consumption[trainerId] = prevCalc.cons;
-      const calc = computeOneTrainer(t, consumption);
+      if (prevCalc) attendance[trainerId] = prevCalc.att;
+      const calc = computeOneTrainer(t, attendance);
       calcCache[trainerId] = calc;
       const row = document.querySelector(`#payrollTbody tr[data-trainer-id="${trainerId}"]`);
       if (!row) return;
@@ -511,9 +491,9 @@
           await upsertTrainerPayrollRecord({
             trainer_id: t.id,
             period_month: monthStr,
-            individual_consumed_sessions: calc.cons.attended,
-            individual_unpriced_sessions: calc.cons.unpriced,
-            individual_consumed_revenue: Math.round(calc.cons.revenue),
+            individual_consumed_sessions: calc.att.attended,
+            individual_unpriced_sessions: 0,
+            individual_consumed_revenue: Math.round(calc.confirmedRevenue),
             tier_order: calc.tier ? calc.tier.tier_order : null,
             tier_base_pay: Math.round(calc.result.basePay),
             tier_rate: calc.result.rate,
@@ -552,8 +532,8 @@
       const calc = calcCache[trainerId];
       if (!calc) return;
       document.getElementById('detailTitle').textContent = `${trainerName(trainerId)} · ${monthLabelText()} 급여 상세`;
-      document.getElementById('detailSub').textContent = `출석 ${calc.cons.attended}회 · 결석 ${calc.cons.absent}회 (단가미확인 ${calc.cons.unpriced}건)`;
-      const r = calc.result, c = calc.cons, tier = calc.tier, s = calc.settings, d = calc.draft;
+      document.getElementById('detailSub').textContent = `출석 ${calc.att.attended}회 · 결석 ${calc.att.absent}회`;
+      const r = calc.result, tier = calc.tier, s = calc.settings, d = calc.draft;
       const tierLine = tier
         ? `${tier.tier_order}구간 (${tierRangeLabel(tier)}) · 기본급 ${formatWon(Number(tier.base_pay) || 0)} · 정률 ${tier.rate}%`
         : '해당 구간 없음';
@@ -562,10 +542,10 @@
         : `성과금(매출 구간 고정): ${formatWon(r.performanceBonus)}`;
       document.getElementById('detailFormula').innerHTML = `
         <div class="row" style="font-weight:700;"><span>적용 구간</span><span>${tierLine}</span></div>
-        <div class="row"><span>당월 소진 매출(출석만)</span><span>${formatWon(Math.round(c.revenue))}</span></div>
+        <div class="row"><span>당월 확정 매출(PT관리 화면과 동일)</span><span>${formatWon(Math.round(calc.confirmedRevenue))}</span></div>
         <div class="row"><span>당월 수당 (× 정률 ${r.rate}%)</span><span>${formatWon(Math.round(r.grossCommission))}</span></div>
         <div class="row sub"><span>− 부가세(${payrollSettingsCache.vat_rate}%)</span><span>${formatWon(Math.round(r.vatAmount))}</span></div>
-        <div class="row sub"><span>− 카드수수료(카드결제분에만 ${s.card_fee_rate || 0}%)</span><span>${formatWon(Math.round(r.cardFeeAmount))}</span></div>
+        <div class="row sub"><span>− 카드수수료(카드결제분 비중 × ${s.card_fee_rate || 0}%)</span><span>${formatWon(Math.round(r.cardFeeAmount))}</span></div>
         <div class="row total"><span>개인PT 확정수업료</span><span>${formatWon(Math.round(r.individualConfirmedFee))}</span></div>
         <div class="row" style="margin-top:8px;"><span>+ 구간 기본급</span><span>${formatWon(r.basePay)}</span></div>
         <div class="row"><span style="max-width:70%;">+ ${bonusLine}</span><span></span></div>
@@ -578,12 +558,11 @@
       const sessions = bookingsWithMemberName.filter(b => b.trainer_id === trainerId);
       const statusLabel = { attended: '출석', absent: '결석(매출 제외)' };
       document.getElementById('detailSessionTbody').innerHTML = sessions.map(s2 => `
-        <tr class="${s2.status !== 'absent' && s2.price == null ? 'unpriced-row' : ''}">
+        <tr>
           <td>${escapeHtml(s2.dateStr)}</td>
           <td>${escapeHtml(s2.memberName)}</td>
           <td>${statusLabel[s2.status] || s2.status}</td>
-          <td class="num">${s2.status === 'absent' ? '-' : (s2.price == null ? '단가 미확인' : formatWon(Math.round(s2.price)))}</td>
-        </tr>`).join('') || '<tr><td colspan="4" class="muted">이번 달 소진 세션이 없습니다.</td></tr>';
+        </tr>`).join('') || '<tr><td colspan="3" class="muted">이번 달 소진 세션이 없습니다.</td></tr>';
       document.getElementById('detailOverlay').style.display = 'flex';
     }
     document.getElementById('closeDetailBtn').addEventListener('click', () => { document.getElementById('detailOverlay').style.display = 'none'; });

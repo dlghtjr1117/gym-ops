@@ -2495,32 +2495,37 @@ async function deleteGroupPtRewardTier(id) {
 
 // ==================================================================
 // ---- 트레이너 급여(payroll.html) ----
-// migration_67 참고(migration_66을 대체함). 호석님이 실제 쓰시는 1:1 PT/그룹PT 페이롤 구간표
-// 이미지를 확인하고 나서 아래 공식으로 확정함:
-//   1) 회당단가 = 그 PT 결제 건의 금액(sales.amount) ÷ 그 상품의 회차수(products.sessions)
-//   2) 당월 소진 매출 = "출석"으로 처리된 세션만 카운트(결석/노쇼는 잔여횟수는 깎이지만 매출·수당
-//      계산에서는 제외 - 호석님 확인 완료). 세션마다 그 날짜 기준 가장 최근 결제 건의 단가를 곱해서 합산.
-//   3) 이 당월 소진 매출이 속하는 구간(pt_payroll_tiers, 전체 트레이너 공통 9단계)을 찾아서
-//      [기본급] + [소진매출 × 그 구간 정률(%)]을 적용. 1~4구간은 "이 달 OT 완료 건수(OT1+OT2 합,
+// migration_67 참고. 호석님이 실제 쓰시는 1:1 PT/그룹PT 페이롤 구간표 이미지를 확인하고 나서 아래
+// 공식으로 확정함:
+//   1) 구간을 나누는 기준 매출 = "확정매출"(PT 관리(pt.html) 화면의 그 값과 완전히 같은 숫자 -
+//      get_pt_trainer_leaderboard()가 돌려주는 confirmed_total, 즉 이번 달 신규/재등록으로
+//      "등록" 처리된 상담 건들의 계약 금액 합계, pt_leads.expected_amount 기준). *v4에서 바뀐 부분*:
+//      원래는 "이번 달 출석한 세션 수 × 회당단가"로 계산하는 "소진매출"을 썼는데, 그러면 PT 관리
+//      화면에 뜨는 숫자와 안 맞아서(트레이너가 이번 달에 많이 팔았어도 아직 수업을 안 했으면 소진매출은
+//      낮게 나옴) 헷갈린다는 피드백을 받고, PT 관리 화면과 완전히 같은 숫자를 쓰도록 바꿈(호석님 확인:
+//      "PT관리의 확정 매출로 전환"). 새 함수·표 없이 이미 있는 get_pt_trainer_leaderboard()(migration_48)
+//      RPC를 그대로 재사용함.
+//   2) 이 확정매출이 속하는 구간(pt_payroll_tiers, 전체 트레이너 공통 9단계)을 찾아서
+//      [기본급] + [확정매출 × 그 구간 정률(%)]을 적용. 1~4구간은 "이 달 OT 완료 건수(OT1+OT2 합,
 //      get_ot_performance_leaderboard() 그대로 재사용)가 구간의 기준 이상이면" OT보너스,
-//      5~9구간은 매출과 무관하게 구간별 성과금을 고정 지급(둘 다 구간표에 들어있어서 자동 계산됨 -
-//      예전엔 이 기본급/보너스를 "영업지원금"/"매출커미션"이라는 이름으로 매달 직접 입력했었는데,
-//      실제로는 이 구간표에서 나온 값이었다는 걸 확인받아서 자동 계산으로 바꿈).
-//   4) 확정 수업료(개인PT) = (소진매출×정률)에서 "부가세 10% 먼저 제외 → 카드수수료 제외" 순서로
-//      계산. 카드수수료는 전체 수당에 일괄 적용이 아니라, sales.payment_method가 'card'인 결제
-//      건의 수당분에만 비례 적용(이체/현금 결제 건은 수수료 없음).
-//   5) 그룹PT 확정수업료는 이번 버전에서도 매달 직접 입력(그룹수업 진행 기록이 앱에 아직 없어서
+//      5~9구간은 매출과 무관하게 구간별 성과금을 고정 지급(둘 다 구간표에 들어있어서 자동 계산됨).
+//   3) 확정 수업료(개인PT) = (확정매출×정률)에서 "부가세 10% 먼저 제외 → 카드수수료 제외" 순서로
+//      계산. 카드수수료 비중은 확정매출(pt_leads 기준)에는 결제수단 정보가 없어서, 별도로 이번 달
+//      실제 PT 신규/재등록 매출(sales, category=pt_new/pt_renewal)을 결제수단별로 집계한 카드/기타
+//      비율을 구해서 적용함(sales 쪽에 해당 트레이너 매출이 하나도 안 잡히면 카드수수료는 0원 -
+//      트레이너에게 불리하지 않은 쪽 기본값).
+//   4) 그룹PT 확정수업료는 이번 버전에서도 매달 직접 입력(그룹수업 진행 기록이 앱에 아직 없어서
 //      그룹PT 매출을 자동집계할 수 없음) - 다만 그룹PT 구간표(group_pt_payroll_tiers)를 화면에
 //      참고용으로 보여줘서, 관리자가 이번 달 그룹PT 매출 구간에 맞는 회당 단가를 보고 직접 계산해
 //      넣을 수 있게 함.
-//   6) 세전 합계 = 개인PT 확정수업료 + 기본급 + OT보너스/성과금 + 그룹PT 확정수업료(직접입력)
-//   7) 사업소득세 = ROUNDDOWN(세전합계 × 3%, -1원단위) / 지방소득세 = ROUNDDOWN(사업소득세 × 10%, -1원단위)
+//   5) 세전 합계 = 개인PT 확정수업료 + 기본급 + OT보너스/성과금 + 그룹PT 확정수업료(직접입력)
+//   6) 사업소득세 = ROUNDDOWN(세전합계 × 3%, -1원단위) / 지방소득세 = ROUNDDOWN(사업소득세 × 10%, -1원단위)
 //      (표준 프리랜서 원천징수 3.3% 구조 - 업로드해주신 엑셀 Sheet1 수식 그대로)
-//   8) 최종 급여 = 세전합계 − 사업소득세 − 지방소득세
+//   7) 최종 급여 = 세전합계 − 사업소득세 − 지방소득세
 // 새 테이블을 최소한으로 두고(구간표 2개 + 확정기록 1개) 이미 있는 sales(결제금액·결제수단)·
-// products(회차수)·pt_bookings(출석/결석 기록)·get_ot_performance_leaderboard()를 그대로 활용 -
-// 아래 fetch 함수들은 원본 데이터만 가져오고, 실제 계산은 이 파일 아래쪽의 순수 함수(buildPtPricingIndex
-// 등)에서 함(테스트하기 쉽게 화면 코드와 분리).
+// pt_bookings(출석/결석 기록, 이제 정보 표시용으로만 씀)·get_pt_trainer_leaderboard()·
+// get_ot_performance_leaderboard()를 그대로 활용 - 아래 fetch 함수들은 원본 데이터만 가져오고,
+// 실제 계산은 이 파일 아래쪽의 순수 함수에서 함(테스트하기 쉽게 화면 코드와 분리).
 // ==================================================================
 
 // 이번 달(지점장이 고른 트레이너/월) PT 스케줄 전체를 트레이너 구분 없이 한 번에 가져옴(지점장만
@@ -2584,6 +2589,33 @@ async function fetchOtDoneCountsForMonth(monthStartStr, monthEndStr) {
   const byTrainer = {};
   rows.forEach(r => { byTrainer[r.trainer_id] = (Number(r.ot1_success) || 0) + (Number(r.ot2_success) || 0); });
   return byTrainer;
+}
+
+// PT 관리(pt.html)의 "확정 매출" 카드·순위표와 완전히 같은 숫자(트레이너별 confirmed_total)를 그대로
+// 재사용 - migration_48의 get_pt_trainer_leaderboard(). 급여 구간을 나누는 기준 매출로 씀(v4).
+async function fetchConfirmedRevenueForMonth(monthStartStr, monthEndStr) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_pt_trainer_leaderboard`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_month_start: monthStartStr, p_month_end: monthEndStr })
+  });
+  if (!res.ok) await throwApiError(res, '확정 매출을 불러오지 못했습니다.');
+  const rows = await res.json();
+  const byTrainer = {};
+  rows.forEach(r => { byTrainer[r.trainer_id] = Number(r.confirmed_total) || 0; });
+  return byTrainer;
+}
+
+// 카드수수료 비중만 뽑아 쓰기 위한 이번 달 실제 PT 신규/재등록 매출(sales, 결제수단 포함) - 확정매출
+// (pt_leads 기준)에는 결제수단 정보가 없어서 별도로 가져옴. 매출 총액 자체는 이제 안 씀.
+async function fetchTrainerPtSalesForCardRatio(startStr, endStr) {
+  const { rows, error } = await fetchAllRows(
+    `sales?category=in.(pt_new,pt_renewal)&sale_date=gte.${startStr}&sale_date=lt.${endStr}` +
+    `&select=staff_id,amount,payment_method`,
+    await authHeaders()
+  );
+  if (error) await throwApiError(error, '카드수수료 계산용 매출 내역을 불러오지 못했습니다.');
+  return rows;
 }
 
 // trainer_id가 이미 있으면 덮어쓰기(upsert) - migration_65의 primary key(trainer_id)를 그대로 이용
@@ -2699,6 +2731,20 @@ function roundDownToTen(n) {
   return Math.floor(n / 10) * 10;
 }
 
+// fetchTrainerPtSalesForCardRatio() 결과를 트레이너별 카드/기타 매출로 나눠 합산 - 카드수수료 비중
+// 계산에만 씀(확정매출 자체는 pt_leads 기준을 따로 씀). member_id/product 정보는 필요 없어서 안 봄.
+function computeTrainerCardRevenueSplit(salesRows) {
+  const byTrainer = {};
+  for (const s of salesRows || []) {
+    if (!s.staff_id || s.amount == null) continue;
+    if (!byTrainer[s.staff_id]) byTrainer[s.staff_id] = { cardRevenue: 0, otherRevenue: 0 };
+    const t = byTrainer[s.staff_id];
+    if (s.payment_method === 'card') t.cardRevenue += Number(s.amount) || 0;
+    else t.otherRevenue += Number(s.amount) || 0;
+  }
+  return byTrainer;
+}
+
 // 당월 소진매출(원)이 속하는 구간을 pt_payroll_tiers에서 찾음. tier_order 오름차순으로 정렬해서
 // [min_revenue, max_revenue] 범위(max_revenue가 null이면 그 이상 전부)에 맞는 첫 구간을 반환.
 // 구간표가 비어있거나(설정 전) 일치하는 구간이 없으면(이론상 1구간 min이 0이라 항상 걸리지만,
@@ -2714,27 +2760,29 @@ function findPtTier(tiers, revenue) {
   return sorted[sorted.length - 1];
 }
 
-// 개인PT 소진매출 -> 구간 판정(기본급/정률/OT보너스/성과금) -> 확정수업료 -> (그룹PT 합산) ->
-// 세전합계 -> 최종급여까지 공식 그대로 계산 (호석님 확인 완료):
-//   당월 수당 = 소진매출 × 구간 정률
+// 확정매출(PT관리 화면과 같은 숫자) -> 구간 판정(기본급/정률/OT보너스/성과금) -> 확정수업료 ->
+// (그룹PT 합산) -> 세전합계 -> 최종급여까지 공식 그대로 계산 (호석님 확인 완료):
+//   당월 수당 = 확정매출 × 구간 정률
 //   확정수업료 = 수당 -> 부가세 10% 먼저 제외 -> 그 나머지에서 카드결제 비중만큼 카드수수료 제외
 //   OT보너스 = 1~4구간이고 그 달 OT완료건수가 구간 기준 이상이면 구간의 ot_bonus_amount, 아니면 0
 //   성과금 = 5~9구간이면 구간의 performance_bonus(매출과 무관하게 고정 지급), 1~4구간이면 0
 //   세전합계 = 확정수업료(개인PT) + 구간 기본급 + OT보너스 + 성과금 + 그룹PT확정수업료(직접입력)
 //   사업소득세 = ROUNDDOWN(세전합계 × 3%, -1) / 지방소득세 = ROUNDDOWN(사업소득세 × localTaxMultiplier%, -1)
 //   최종급여 = 세전합계 − 사업소득세 − 지방소득세
+// cardRevenue/otherRevenue는 confirmedRevenue와 같은 출처가 아니라(카드수수료 계산용 별도 sales
+// 집계) 카드 비중만 이 둘의 합으로 구해서 씀 - 매칭되는 sales가 없으면(둘 다 0) 카드수수료는 0원.
 function computeTrainerPayroll({
-  consumedRevenue, cardRevenue, tier, otDoneCount, vatRate, cardFeeRate,
+  confirmedRevenue, cardRevenue, otherRevenue, tier, otDoneCount, vatRate, cardFeeRate,
   groupConfirmedFee, businessTaxRate, localTaxMultiplier
 }) {
   const rate = tier ? Number(tier.rate) || 0 : 0;
   const basePay = tier ? Number(tier.base_pay) || 0 : 0;
 
-  const grossCommission = consumedRevenue * (rate / 100);
+  const grossCommission = confirmedRevenue * (rate / 100);
   const vatAmount = grossCommission * (vatRate / 100);
   const postVat = grossCommission - vatAmount;
-  // 카드결제 비중은 "소진매출 중 카드결제분 비율"을 그대로 부가세 차감 후 금액에 적용
-  const cardRatio = consumedRevenue > 0 ? cardRevenue / consumedRevenue : 0;
+  const totalSalesTracked = (Number(cardRevenue) || 0) + (Number(otherRevenue) || 0);
+  const cardRatio = totalSalesTracked > 0 ? (Number(cardRevenue) || 0) / totalSalesTracked : 0;
   const cardFeeAmount = postVat * cardRatio * (cardFeeRate / 100);
   const individualConfirmedFee = postVat - cardFeeAmount;
 
@@ -2761,6 +2809,7 @@ function computeTrainerPayroll({
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession,
-    computeTrainerConsumption, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr
+    computeTrainerConsumption, computeTrainerCardRevenueSplit, findPtTier, computeTrainerPayroll,
+    roundDownToTen, formatDateStr
   };
 }
