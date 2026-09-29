@@ -1,0 +1,793 @@
+/* 공통 스타일 - 외부 CDN 없이 순수 CSS만 사용 (오프라인에서도 항상 동일하게 보임) */
+:root {
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+  --slate-50: #f8fafc;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-700: #334155;
+  --slate-900: #0f172a;
+  --white: #ffffff;
+  /* "카드/표/모달 등 바탕면" 전용 변수 - --white와 분리한 이유는 --white가 동시에 "색깔 있는
+     배경 위의 흰 글씨"(버튼/뱃지/히어로 카드 등) 용도로도 쓰이는데, 다크 모드에서는 바탕면은
+     어두운색으로 바뀌어야 하지만 그 위의 흰 글씨는 계속 흰색이어야 해서 서로 다르게 취급해야 함 */
+  --surface: var(--white);
+  --green-600: #16a34a;
+  --red-600: #dc2626;
+  --amber-500: #f59e0b;
+  /* "재등록 예정"/"OT 예정" 뱃지(badge-blue) 전용 색 - 원래는 --indigo-700을 그냥 같이 썼는데,
+     다크 모드에서 --indigo-600/700을 브랜드 포인트색(크림슨 레드)으로 바꾸면서 이 뱃지까지
+     같이 빨갛게 변해버리면 "파란 뱃지"라는 이름과 의미가 깨져서, 브랜드색과 분리한 전용 변수로 둠 */
+  --blue-600: #4338ca;
+}
+
+/* ---- 다크 모드: 네이비블랙 + 레드 그라데이션 ----
+   화면 우측 상단 "🌙 다크" 버튼(auth.js에서 자동으로 삽입)으로 켜고 끌 수 있음. <html>에
+   data-theme="dark"가 붙으면 아래 값들로 바뀌는데, 대부분의 색이 위 :root 변수를 그대로 쓰고
+   있어서 이 블록 하나로 전체 화면(카드/표/버튼/입력칸/모달 등)이 자동으로 다크 모드가 됨.
+   원래는 눈이 편한 중간 톤 회색(다크그레이) 배경이었는데, 2026-09-05에 "더 세련되고 고급스럽게,
+   레드 톤으로" 요청을 받아 훨씬 짙은 네이비블랙 배경 + 카드에 은은한 레드 그라데이션/글로우를
+   쓰는 톤으로 리뉴얼함(회원님이 직접 골라준 시안 그대로 적용).
+   상태 뱃지(빨강/노랑/초록 등)는 여전히 일부러 안 건드렸음 - 어두운 배경 위에 밝은 색 칩으로
+   그대로 떠 있어도 잘 보이고 구분도 잘 되기 때문(과거에 테마별 변수를 썼다가 배경·글자색이 둘 다
+   밝아져서 안 보였던 버그가 있었음). 히어로 카드 그라데이션(hero-blue/purple/teal)과 홈 배너,
+   기본 버튼/탭의 "선택됨" 상태는 이 블록 아래쪽에서 레드 계열로 따로 재정의함. 위험/경고를 뜻하는
+   --red-600(에러 문구, 미납 표시 등)은 브랜드 포인트색과 헷갈리지 않도록 밝은 연분홍 계열로 유지 */
+:root[data-theme="dark"] {
+  --indigo-600: #dc2626;
+  --indigo-700: #ef4444;
+  --blue-600: #818cf8;
+  --slate-50: #0b0e16;
+  --slate-100: #1b202a;
+  --slate-200: #232a35;
+  --slate-300: #2c3340;
+  --slate-400: #6b7385;
+  --slate-500: #93a0b2;
+  --slate-700: #c7ccd6;
+  --slate-900: #f5f6f8;
+  --surface: #12151d;
+  --green-600: #4ade80;
+  --red-600: #fca5a5;
+  --amber-500: #fbbf24;
+}
+/* 상단 메뉴 활성 탭 / 홈 화면 타일 아이콘은 원래 옅은 인디고색(#eef2ff)을 하드코딩해 둔 곳이라,
+   다크 모드에서 포인트색이 크림슨으로 바뀌어도 자동으로 안 따라와서 따로 맞춰줌 */
+:root[data-theme="dark"] .topnav a.active,
+:root[data-theme="dark"] .home-tile-icon {
+  background: rgba(220,38,38,0.16);
+}
+/* 입력칸 포커스 링도 원래 인디고색으로 하드코딩돼 있어서, 다크 모드에서는 크림슨 포커스 링으로 맞춰줌 */
+:root[data-theme="dark"] .field input:focus,
+:root[data-theme="dark"] .field select:focus,
+:root[data-theme="dark"] .search-bar input:focus {
+  box-shadow: 0 0 0 3px rgba(220,38,38,0.22);
+}
+/* 날짜/시각 입력칸의 달력·시계 아이콘은 브라우저가 고정된 어두운색으로 그리는데, 다크 모드
+   바탕에서는 안 보여서 색을 뒤집어줌 */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+}
+/* 다크 모드 전용 - 히어로 카드 그라데이션을 라이트 모드의 파랑/보라/청록/초록/주황 대신 전부 같은
+   빨강 계열로 통일함(2026-09-05, "레드톤으로 세련되게" → "헷갈려도 상관없으니 그냥 다 빨간색으로
+   통일해달라" → PT 관리의 hero-amber(목표까지 남은 매출)·hero-green(확정 매출)처럼 아직 안 바뀐
+   카드가 더 있다는 피드백까지 받고서 hero-*로 시작하는 모든 그라데이션 클래스를 전부 이 한 색으로
+   맞춤). hero-amber는 원래 style.css가 아니라 pt.html 자체 <style>에만 정의돼 있던 클래스라
+   처음엔 빠져 있었음 - 여기 공용 파일에 다크 모드 재정의를 추가해서 값을 덮어씀.
+   홈 배너도 원래 hero-blue와 같은 인디고 그라데이션을 하드코딩해서 썼던 곳이라 같이 맞춰줌.
+   기본 버튼과 필터·리포트 탭의 "선택됨" 상태도 밋밋한 단색 대신 같은 그라데이션으로 */
+:root[data-theme="dark"] .hero-blue,
+:root[data-theme="dark"] .hero-purple,
+:root[data-theme="dark"] .hero-teal,
+:root[data-theme="dark"] .hero-green,
+:root[data-theme="dark"] .hero-amber,
+:root[data-theme="dark"] .home-banner { background: linear-gradient(135deg, #7f1d1d, #dc2626 55%, #f87171); }
+/* 2026-09-06 라이트 모드 파스텔 리스킨에서 새로 추가한 장식 요소들 - 다크 모드는 이 요청과
+   무관하게 원래 확정된 "올 레드 그라데이션" 모습 그대로 유지해야 해서 여기서 되돌림 */
+:root[data-theme="dark"] .hero-card::before { display: none; }
+:root[data-theme="dark"] .hero-card .hero-icon { background: transparent; }
+:root[data-theme="dark"] .hero-label { opacity: .95; }
+:root[data-theme="dark"] .hero-unit { opacity: .85; }
+:root[data-theme="dark"] .hero-sub { opacity: .9; }
+:root[data-theme="dark"] .hero-ring-bg { stroke: rgba(255,255,255,0.28); }
+:root[data-theme="dark"] .hero-ring-fg { stroke: #ffffff; }
+:root[data-theme="dark"] .btn-primary { background: linear-gradient(135deg, #7f1d1d, #dc2626 60%, #f87171); box-shadow: 0 6px 16px -4px rgba(220,38,38,0.5); }
+:root[data-theme="dark"] .btn-primary:hover { background: linear-gradient(135deg, #991b1b, #ef4444 60%, #fca5a5); }
+:root[data-theme="dark"] .filter-tab.active,
+:root[data-theme="dark"] .report-tab.active {
+  background: linear-gradient(135deg, #7f1d1d, #dc2626);
+  border-color: transparent;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  background: var(--slate-50);
+  color: var(--slate-900);
+  /* 2026-09-21 가독성 개선: 줄간격 기본값이 없어서(브라우저 기본값 ~1.15) 두 줄 이상 되는 문구가
+     답답하게 붙어 보였음 - 전 화면 공통으로 살짝 더 여유 있게. 표 셀처럼 한 줄짜리 짧은 글자는
+     줄간격 영향이 거의 없어서 밀도가 오히려 좋아지는 곳(표)은 이 값 때문에 손해 보지 않음 */
+  line-height: 1.5;
+}
+
+/* 입력칸/셀렉트/텍스트영역은 페이지마다 배경색을 따로 안 정해준 곳이 많아서(브라우저 기본값인
+   흰 배경을 그대로 썼음), 다크 모드에서도 흰 박스로 남지 않도록 여기서 한 번에 정해줌 */
+input, select, textarea {
+  background: var(--surface);
+  color: var(--slate-900);
+}
+
+.container { max-width: 400px; margin: 0 auto; padding: 24px; }
+.center-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--slate-200);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+
+.logo-badge {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: var(--indigo-600); color: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 20px; margin: 0 auto 12px;
+}
+
+.text-center { text-align: center; }
+h1.title { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+p.subtitle { font-size: 13px; color: var(--slate-500); margin: 0; }
+
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; }
+.field input, .field select {
+  width: 100%; padding: 10px 12px; font-size: 14px;
+  border: 1px solid var(--slate-300); border-radius: 8px; outline: none;
+}
+.field input:focus, .field select:focus { border-color: var(--indigo-600); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; padding: 11px; font-size: 14px; font-weight: 600;
+  border-radius: 8px; border: none; cursor: pointer; text-decoration: none;
+}
+.btn-primary { background: var(--indigo-600); color: var(--white); }
+.btn-primary:hover { background: var(--indigo-700); }
+.btn-outline { background: var(--surface); color: var(--slate-700); border: 1px solid var(--slate-300); }
+.btn-outline:hover { background: var(--slate-50); }
+
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+.divider .line { flex: 1; height: 1px; background: var(--slate-200); }
+.divider span { font-size: 12px; color: var(--slate-400); }
+.hint { text-align: center; font-size: 12px; color: var(--slate-400); margin-top: 20px; }
+.hint b { color: var(--indigo-600); }
+.hint a { color: var(--indigo-600); font-weight: 600; text-decoration: none; }
+
+/* error-text/success-text도 badge-red/green과 같은 이유로 배경은 고정된 연한 색을 쓰고
+   글자색만 하드코딩함(테마별 변수를 쓰면 다크 모드에서 배경과 글자색이 둘 다 밝아져서 잘 안 보임) */
+.error-text { background: #fef2f2; color: #dc2626; font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
+.success-text { background: #f0fdf4; color: #16a34a; font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
+.btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+/* 등록/저장 등이 완료됐을 때 화면 위에 잠깐 떴다 사라지는 완료 알림
+   ("등록됐는지 안됐는지 구분이 안 된다"는 피드백으로 추가함 - 한 번 반짝하고 사라지는 효과 포함)
+   배경색은 흰 글씨(color:#fff)와 항상 대비가 잘 되어야 해서, 테마별로 밝아지는 변수 대신 진하고
+   채도 높은 고정 색을 씀(다크 모드라고 토스트 알림 색까지 바뀔 필요는 없어서) */
+.toast {
+  position: fixed; top: 24px; left: 50%; z-index: 500;
+  background: #16a34a; color: #fff; font-size: 14px; font-weight: 700;
+  padding: 14px 24px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  pointer-events: none; animation: toast-pop 2.2s ease forwards;
+}
+@keyframes toast-pop {
+  0%   { opacity: 0; transform: translate(-50%, -6px) scale(0.9); }
+  12%  { opacity: 1; transform: translate(-50%, 0) scale(1.06); } /* 살짝 크게 튀면서 "깜빡" 느낌 */
+  22%  { transform: translate(-50%, 0) scale(1); }
+  82%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 0) scale(0.96); }
+}
+/* 삭제 등 "되돌릴 수 없는" 작업 완료 알림은 초록색 대신 빨간색으로 (showToast(msg, 'danger')) */
+.toast-danger { background: #dc2626; }
+.btn-link { background: none; border: none; padding: 0; font-size: 12px; color: var(--slate-500); cursor: pointer; text-decoration: underline; }
+
+/* 우측 상단 다크 모드 전환 버튼 (auth.js가 자동으로 삽입) */
+.theme-toggle-btn {
+  font-size: 12px; font-weight: 600; color: var(--slate-700);
+  background: var(--surface); border: 1px solid var(--slate-300); border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; white-space: nowrap;
+}
+.theme-toggle-btn:hover { background: var(--slate-50); }
+
+/* 대시보드용 */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--slate-200); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.topbar .brand { font-weight: 700; font-size: 15px; display:flex; align-items:center; gap:8px; }
+.topbar .user-badge { font-size: 12px; color: var(--slate-500); background: var(--slate-50); padding: 4px 10px; border-radius: 999px; }
+/* 메뉴 항목이 하나씩 늘어나면서(그룹PT 관리 추가 등) 노트북 화면 너비에서 글자가 "대시보 드"처럼
+   단어 중간에서 줄바꿈되는 문제가 있었음(2026-09-09) - 휴대폰 전용이었던 "가로 스크롤" 처리를
+   모든 화면 너비에 공통으로 적용해서, 다 안 들어가면 줄바꿈 대신 메뉴 줄만 옆으로 스크롤되게 함 */
+.topnav {
+  display: flex; gap: 4px; overflow-x: auto; flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.topnav::-webkit-scrollbar { display: none; }
+.topnav a {
+  font-size: 13px; font-weight: 600; color: var(--slate-500); text-decoration: none;
+  padding: 6px 12px; border-radius: 8px; white-space: nowrap; flex: 0 0 auto;
+}
+.topnav a:hover { background: var(--slate-50); color: var(--slate-900); }
+.topnav a.active { background: #eef2ff; color: var(--indigo-600); }
+@media (max-width: 720px) {
+  .topbar { padding: 12px 14px; }
+  .topnav { width: 100%; }
+}
+.panel { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 18px; margin-top: 16px; }
+.panel h3 { font-size: 14px; margin: 0 0 14px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 12px; align-items: end; }
+.form-grid .field { margin-bottom: 0; }
+.muted { color: var(--slate-500); font-size: 12px; }
+/* 2026-09-21: 처음엔 1000px -> 1600px로만 넓혔었는데, "대시보드·회원관리·매출입력·만료회원 등
+   모든 페이지를 전체 화면으로 넓혀달라"는 추가 요청으로 최대 폭 제한 자체를 없앰(전 페이지가 이
+   .wrap 클래스 하나를 같이 쓰고 있어서 여기 한 줄만 고치면 모든 화면에 다 적용됨).
+   화면 양 끝에 글자가 완전히 붙는 건 답답해 보여서 좌우 40px 여백만 남기고 나머지는 다 씀. */
+.wrap { max-width: none; margin: 0 auto; padding: 20px 40px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } }
+/* 대시보드 전용 - "문의 경로" / "상담 워크인/미스" 처럼 폭이 좁아도 충분한 작은 표 두 개를
+   나란히 배치할 때 씀(2026-09-21 추가). 화면이 좁아지면(각 칸이 380px도 못 채울 정도) 다시
+   세로로 쌓이게 함 - minmax(380px, 1fr) 오토핏이라 1200px 정도부터 자연스럽게 한 줄로 바뀜. */
+.dash-2col { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px; align-items: start; margin-top: 32px; }
+.dash-2col > .section { margin-top: 0; }
+.stat-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 16px; }
+.stat-card .label { font-size: 12px; color: var(--slate-500); margin-bottom: 6px; }
+.stat-card .value { font-size: 22px; font-weight: 700; }
+.stat-card .delta { font-size: 12px; margin-top: 4px; }
+.delta.up { color: var(--green-600); }
+.delta.down { color: var(--red-600); }
+/* 2026-09-21 가독성 개선: 섹션 사이 간격을 넓혀서(24px -> 32px) 어디까지가 한 섹션인지 더 잘
+   구분되게 하고, 제목(h2)도 살짝 키워서 각 섹션의 "시작점"이 눈에 더 잘 띄게 함 */
+.section { margin-top: 32px; }
+.section h2 { font-size: 16px; font-weight: 700; margin: 0 0 14px; letter-spacing: -0.01em; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; }
+/* 표 글자 크기(13px->13.5px)와 셀 여백(10px 14px -> 12px 16px)을 살짝 넓혀서 숫자/글자가 빽빽하게
+   붙어 보이던 걸 줄임. 다만 회원 목록처럼 줄 수가 아주 많은 표는 .table-fixed가 따로 자기만의 셀
+   높이/여백을 갖고 있어서(아래 참고) 이 변경의 영향을 받지 않음 - 한 화면에 많은 행을 보여줘야 하는
+   표까지 다 늘어나면 오히려 스크롤이 늘어나서 더 안 좋아지기 때문 */
+th, td { text-align: left; padding: 12px 16px; font-size: 13.5px; border-bottom: 1px solid var(--slate-200); }
+th { color: var(--slate-500); font-weight: 600; background: var(--slate-50); }
+tr:last-child td { border-bottom: none; }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+/* badge-red/green/blue는 원래 배경은 고정된 연한 색, 글자색만 var(--red-600) 등 테마별 변수를 썼는데
+   -- 다크 모드에서 그 변수들이 "어두운 배경 위에서 잘 보이는 밝은 색"으로 바뀌다 보니, 정작 이 뱃지들처럼
+   배경이 항상 연한 채로 고정된 곳에서는 오히려 글자가 배경과 비슷하게 밝아져서 잘 안 보이는 문제가
+   있었음(예: 크림슨 다크 모드에서 "만료 D+3" 뱃지의 연분홍 글자가 연분홍 배경 위에서 거의 안 보임).
+   badge-amber/orange/yellow/purple처럼 배경·글자색을 둘 다 고정 값으로 박아둬서, 라이트/다크 모드
+   상관없이 항상 똑같이(원래 라이트 모드 때 보이던 진한 색 그대로) 잘 보이게 고침 */
+.badge-red { background: #fee2e2; color: #dc2626; }
+.badge-amber { background: #fef3c7; color: #92400e; }
+.badge-green { background: #dcfce7; color: #16a34a; }
+.badge-slate { background: var(--slate-200); color: var(--slate-700); }
+.badge-blue { background: #e0e7ff; color: #4338ca; }
+.badge-orange { background: #ffedd5; color: #c2410c; }
+.badge-yellow { background: #fef9c3; color: #854d0e; }
+.badge-purple { background: #f3e8ff; color: #7e22ce; }
+.badge-teal { background: #ccfbf1; color: #0f766e; }
+.badge-pink { background: #fce7f3; color: #be185d; }
+
+/* 회원 검색 드롭다운(이름/전화번호 뒷자리로 검색해서 목록에서 클릭해 고르는 UI) - PT 스케줄, PT 회원 관리 등에서 공용으로 씀 */
+.member-search-results {
+  position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 20;
+  background: var(--surface); border: 1px solid var(--slate-200); border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08); max-height: 220px; overflow-y: auto;
+}
+.member-search-item { padding: 9px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--slate-100); }
+.member-search-item:last-child { border-bottom: none; }
+.member-search-item:hover, .member-search-item.active { background: var(--slate-50); }
+.member-search-item .msi-name { font-weight: 700; }
+.member-search-item .msi-sub { color: var(--slate-500); font-size: 11.5px; margin-top: 1px; }
+.member-search-selected { margin-top: 6px; font-size: 12px; color: var(--green-600); font-weight: 600; display: none; }
+
+/* PT 관리 - 주차별 매출 기록에서 확률(단계)에 따라 그 행 전체를 옅게 물들임
+   (뱃지 하나만 색이 있으면 눈에 잘 안 띈다는 피드백으로, 행 전체를 같은 색 계열로 표시함).
+   배경은 항상 연한 색으로 고정이라, badge-*와 같은 이유로 글자색도 원래 라이트 모드 때 보이던
+   진한 남색(#0f172a)으로 고정해둠 - 안 그러면 다크 모드에서 글자색이 밝아지면서 이 연한 배경
+   위에서 거의 안 보이게 됨(PT 관리 화면 "글씨가 아예 안 보인다" 피드백으로 발견/수정, 2026-09-05) */
+.row-prob-p25 td { background: var(--slate-100, #f1f5f9); }
+.row-prob-p50 td { background: #fef9c3; color: #0f172a; }
+.row-prob-p75 td { background: #ffedd5; color: #0f172a; }
+.row-prob-p100 td { background: #dcfce7; color: #0f172a; }
+.row-prob-registered td { background: #dcfce7; color: #0f172a; }
+.row-prob-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-prob-missed td { background: #fee2e2; color: #0f172a; }
+
+/* PT 관리 - PT 회원 관리(재등록확률)에서도 동일하게 행 전체를 물들임 */
+.row-care-p25 td { background: var(--slate-100, #f1f5f9); }
+.row-care-p50 td { background: #fef9c3; color: #0f172a; }
+.row-care-p75 td { background: #ffedd5; color: #0f172a; }
+.row-care-registered td { background: #dcfce7; color: #0f172a; }
+.row-care-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-care-missed td { background: #fee2e2; color: #0f172a; }
+
+/* PT 관리 - OT 관리(OT1/OT2 현황)도 동일하게 행 전체를 물들임: 예정=주황, 이월=보라, 미스=빨강, 완료=초록 */
+.row-otstatus-scheduled td { background: #ffedd5; color: #0f172a; }
+.row-otstatus-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-otstatus-missed td { background: #fee2e2; color: #0f172a; }
+.row-otstatus-done td { background: #dcfce7; color: #0f172a; }
+
+/* 신규상담·워크인 관리(consultations.html) - "등록 칸 바꾸면 그 줄 전체 색이 바로 뜨게 해줘" 요청으로
+   위 row-otstatus-*와 같은 방식(행 전체를 옅게 물들임)을 그대로 적용: 고민중=갈색(호박색), 이월=보라,
+   거부=빨강, 등록=초록. 이월/거부/등록 색은 위에서 이미 쓰던 값과 그대로 맞춰서 앱 전체에서 같은
+   상태색이 항상 같은 톤으로 보이게 함 */
+.row-cstatus-considering td { background: #fef3c7; color: #0f172a; }
+.row-cstatus-rolled_over td { background: #f3e8ff; color: #0f172a; }
+.row-cstatus-declined td { background: #fee2e2; color: #0f172a; }
+.row-cstatus-registered td { background: #dcfce7; color: #0f172a; }
+
+/* 대시보드 "상담 워크인/미스" 표 (2026-09-21 가독성 개선 추가) - 같은 주차 안에서 성공/실패 두 줄이
+   테두리 하나로만 구분돼 있어서 숫자만 쭉 나열되면 어느 줄이 성공이고 어느 줄이 실패인지 한눈에
+   안 들어온다는 피드백으로, 위 row-otstatus-*와 같은 방식(행 전체를 옅게 물들임)으로 구분되게 함 */
+.wi-row-success td { background: #f0fdf4; color: #0f172a; }
+.wi-row-fail td { background: #fef2f2; color: #0f172a; }
+
+/* 위 행들의 셀 대부분은 실제로는 td 글자가 아니라 그 안의 입력칸(.sheet-input - 날짜/이름/금액/
+   횟수/메모처럼 바로 타이핑해서 저장하는 "엑셀 시트" 스타일 칸)이라서, 바로 위 td { color: #0f172a }
+   만으로는 안 고쳐짐 - <input>/<select>는 배경은 투명이라 행 색이 비치지만, 글자색은 부모(td)가
+   아니라 전역 규칙(input, select { color: var(--slate-900) })을 직접 물려받아서 다크 모드에서
+   다시 밝아짐(td 배경 고정 문제를 고쳤는데도 "글씨가 안 보인다"는 게 이 부분 때문이었음, 2026-09-05
+   재확인). 확률/상태 뱃지 select(.badge 포함)는 이미 badge-*로 색이 정해져 있어서 건드리지 않음.
+   2026-09-06 추가 재확인: 글자색은 고쳤지만 배경색은 안 고쳐서, 다크 모드에서는 이 입력칸들이 전역
+   규칙(input, select { background: var(--surface) }, 다크 모드에서는 어두운 남색)을 그대로 물려받아
+   "금액 칸을 클릭하면 새까맣게 떠서 안 보인다"는 문제가 있었음 - 배경을 투명으로 바꿔서 행의 파스텔
+   색이 그대로 비치게 함(라이트/다크 모드 둘 다 적용) */
+.row-prob-p50 .sheet-input:not(.badge), .row-prob-p75 .sheet-input:not(.badge),
+.row-prob-p100 .sheet-input:not(.badge), .row-prob-registered .sheet-input:not(.badge),
+.row-prob-rolled_over .sheet-input:not(.badge), .row-prob-missed .sheet-input:not(.badge),
+.row-care-p50 .sheet-input:not(.badge), .row-care-p75 .sheet-input:not(.badge),
+.row-care-registered .sheet-input:not(.badge), .row-care-rolled_over .sheet-input:not(.badge),
+.row-care-missed .sheet-input:not(.badge),
+.row-otstatus-scheduled .sheet-input:not(.badge), .row-otstatus-rolled_over .sheet-input:not(.badge),
+.row-otstatus-missed .sheet-input:not(.badge), .row-otstatus-done .sheet-input:not(.badge),
+.wi-row-success .sheet-input:not(.badge), .wi-row-fail .sheet-input:not(.badge),
+.row-cstatus-considering .sheet-input:not(.badge), .row-cstatus-rolled_over .sheet-input:not(.badge),
+.row-cstatus-declined .sheet-input:not(.badge), .row-cstatus-registered .sheet-input:not(.badge) {
+  color: #0f172a;
+  background: transparent;
+}
+
+/* 만료회원·TM 표에서 뱃지처럼 보이는 TM상태 <select> (클릭하면 바로 상태 변경) */
+select.tm-status-select {
+  border: none; cursor: pointer; outline: none; max-width: 100%;
+  -webkit-appearance: auto; appearance: auto;
+}
+
+/* 대시보드 히어로 카드
+   2026-09-06: 라이트 모드는 "블루-퍼플 그라데이션"(참고 이미지 톤) + "소프트 파스텔 카드"(부드러운
+   느낌, 아이콘 뱃지) 두 시안을 섞은 스타일로 교체함 - 카드 배경은 은은한 파스텔 그라데이션, 카드
+   위쪽엔 색깔별 진한 블루/퍼플 계열 그라데이션 띠(::before)를 얇게 얹고, 아이콘은 동그란 뱃지
+   모양으로. 글자색은 --slate-900(라이트=짙은 네이비, 다크=거의 흰색)을 그대로 써서 다크 모드
+   전용 규칙을 따로 안 만들어도 자동으로 맞음. 다만 라이트 모드 전용으로 새로 추가한 장식
+   요소(위쪽 그라데이션 띠, 아이콘 뱃지 배경, 링 색상, 라벨/보조문구 옅기)는 기존에 회원님이
+   확정한 다크 모드의 "전부 레드 그라데이션" 룩을 안 건드리도록 아래 다크 모드 블록에서 원래
+   값으로 되돌려둠 */
+.hero-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 4px; }
+.hero-card {
+  border-radius: 20px; padding: 22px 24px; color: var(--slate-900); position: relative;
+  box-shadow: 0 10px 26px -16px rgba(15,23,42,0.28); transition: transform .18s ease, box-shadow .18s ease;
+  overflow: hidden;
+}
+.hero-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+}
+#heroMembership, #heroGroupPt { cursor: pointer; }
+#heroMembership:hover, #heroGroupPt:hover { transform: translateY(-3px); box-shadow: 0 16px 30px -14px rgba(15,23,42,0.22); }
+.hero-blue { background: linear-gradient(150deg, #eaf1ff, #dbe8ff); }
+.hero-blue::before { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.hero-purple { background: linear-gradient(150deg, #f2ebff, #e7dbff); }
+.hero-purple::before { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+.hero-green { background: linear-gradient(150deg, #e7fbf3, #d7f5e7); text-align: center; }
+.hero-green::before { background: linear-gradient(90deg, #6ee7b7, #059669); }
+.hero-teal { background: linear-gradient(150deg, #e6fbfa, #d2f4f0); }
+.hero-teal::before { background: linear-gradient(90deg, #5eead4, #0d9488); }
+.hero-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 12px; background: rgba(255,255,255,0.65);
+  font-size: 19px; margin-bottom: 10px;
+}
+.hero-label { font-size: 13px; font-weight: 700; opacity: .68; margin-bottom: 10px; }
+.hero-value { font-size: 38px; font-weight: 800; line-height: 1; }
+/* 매출 금액처럼 자릿수가 많은 숫자가 카드 폭을 넘지 않도록 살짝 작게 */
+.hero-value-money { font-size: 26px; word-break: keep-all; }
+.hero-unit { font-size: 15px; font-weight: 600; margin-left: 4px; opacity: .7; }
+.hero-sub { font-size: 12px; opacity: .72; margin-top: 10px; }
+.hero-ring-wrap { position: relative; width: 108px; height: 108px; margin: 2px auto 8px; }
+.hero-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.hero-ring-bg { fill: none; stroke: rgba(5,150,105,0.18); stroke-width: 10; }
+.hero-ring-fg { fill: none; stroke: #059669; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(.22,.9,.3,1); }
+.hero-ring-value { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; }
+.hero-ring-percent { font-size: 15px; font-weight: 700; margin-left: 2px; }
+@media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; } }
+
+/* "이번 달 매출(항상 고정)"처럼 히어로 카드가 한 화면에 두 줄 이상 반복될 때, 아래 줄은 덜
+   강조되도록 만든 보조(2차) 스타일 - 원래는 위/아래 6장이 색깔·굵기가 완전히 똑같아서 작은 라벨
+   글자를 안 읽으면 구분이 안 되는 "카드 벽" 문제가 있었음(2026-09-05, 대시보드 디자인 개선 요청).
+   배경은 --surface를 그대로 써서 라이트/다크 모드 카드 배경에 자연히 맞춰지고, 왼쪽의 얇은 색
+   바만으로 어떤 항목인지 표시함(hero-blue/purple/teal과 같은 순서·의미).
+   (2026-09-07: 잠깐 hero-card와 같은 파스텔 그라데이션 스타일로 바꿨다가, "그건 내가 말한 게
+   아니다 - 트레이너 상세 모달 안의 6개 지표 박스를 바꿔달란 거였다"는 피드백을 받아 원래대로
+   되돌림. 대신 트레이너 상세 모달의 .trainer-stat-box를 이 스타일로 바꿈 - 아래 참고) */
+.hero-card-secondary {
+  background: var(--surface); border: 1px solid var(--slate-200); color: var(--slate-900);
+  border-radius: 14px; padding: 16px 18px 16px 20px; position: relative;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.hero-card-secondary::before {
+  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 4px;
+}
+.hero-card-secondary.accent-blue::before { background: #4f46e5; }
+.hero-card-secondary.accent-purple::before { background: #9333ea; }
+.hero-card-secondary.accent-teal::before { background: #14b8a6; }
+/* 다크 모드에서는 위 hero-blue/purple/teal과 같은 빨강으로 통일(2026-09-05, "그냥 다 빨간색으로") */
+:root[data-theme="dark"] .hero-card-secondary.accent-blue::before,
+:root[data-theme="dark"] .hero-card-secondary.accent-purple::before,
+:root[data-theme="dark"] .hero-card-secondary.accent-teal::before { background: linear-gradient(180deg, #f87171, #dc2626); }
+.hero-card-secondary .hero-icon { opacity: .85; }
+.hero-card-secondary .hero-label { color: var(--slate-500); opacity: 1; }
+.hero-card-secondary .hero-value-money { font-size: 21px; color: var(--slate-900); }
+.hero-card-secondary .hero-sub { color: var(--slate-500); opacity: 1; }
+.hero-card-secondary.clickable { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+.hero-card-secondary.clickable:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+.hero-card-secondary.clickable:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
+.hero-card-secondary .hero-toggle-hint { color: var(--indigo-600); font-weight: 600; opacity: 1; }
+
+/* 대시보드 "트레이너 성과 지표" 섹션 (2026-09-05 추가, 2026-09-06 클릭 상세 + 다크 모드 레드 톤 추가,
+   2026-09-21 가독성/일관성 개선 - 흰 배경+색 테두리만으로는 맨 위 파랑/보라/민트 히어로 카드와
+   톤이 따로 놀아서 "색상이 일관성 없다"는 피드백을 받음. 그래서 히어로 카드와 같은 문법(옅은
+   그라데이션 배경 + 위쪽 얇은 진한색 띠)을 금/은/동에 맞는 색으로 그대로 적용해서, 이 페이지의
+   "중요한 카드"는 전부 같은 스타일 언어를 쓰도록 통일함. 다크 모드는 기존처럼 이 앱의 "히어로
+   카드는 전부 같은 빨강" 원칙(2026-09-05)을 그대로 따름(구분은 메달 이모지·순위 숫자로 충분). */
+#staffPerfTop3Grid .stat-card {
+  border-radius: 20px; position: relative; overflow: hidden; border-color: transparent;
+  box-shadow: 0 10px 26px -16px rgba(15,23,42,0.28);
+}
+#staffPerfTop3Grid .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+#staffPerfTop3Grid .stat-card.rank-1 { background: linear-gradient(150deg, #fffaeb, #fef0c7); }
+#staffPerfTop3Grid .stat-card.rank-1::before { background: linear-gradient(90deg, #fbbf24, #d97706); }
+#staffPerfTop3Grid .stat-card.rank-2 { background: linear-gradient(150deg, #f8fafc, #e7ecf2); }
+#staffPerfTop3Grid .stat-card.rank-2::before { background: linear-gradient(90deg, #cbd5e1, #64748b); }
+#staffPerfTop3Grid .stat-card.rank-3 { background: linear-gradient(150deg, #fff3ea, #fde0c8); }
+#staffPerfTop3Grid .stat-card.rank-3::before { background: linear-gradient(90deg, #fb923c, #b45309); }
+#staffPerfTop3Grid .stat-card .label { opacity: .7; }
+#staffPerfTop3Grid .stat-card .value { font-size: 20px; }
+#staffPerfTop3Grid .stat-card.clickable,
+#staffPerfTableBody tr.clickable-row { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+#staffPerfTop3Grid .stat-card.clickable:hover { box-shadow: 0 16px 30px -14px rgba(15,23,42,0.22); transform: translateY(-3px); }
+#staffPerfTop3Grid .stat-card.clickable:focus-visible,
+#staffPerfTableBody tr.clickable-row:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: -2px; }
+#staffPerfTableBody tr.clickable-row:hover td { background: var(--slate-50); }
+
+:root[data-theme="dark"] #staffPerfSummaryGrid .stat-card {
+  background: linear-gradient(135deg, rgba(127,29,29,0.32), rgba(220,38,38,0.08));
+  border-color: rgba(220,38,38,0.35);
+}
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.rank-1,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.rank-2,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.rank-3 {
+  border-left: none;
+  background: linear-gradient(135deg, #7f1d1d, #dc2626 65%, #f87171);
+}
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card::before { display: none; }
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card .label,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card .value,
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card .delta.muted {
+  color: #fff;
+}
+:root[data-theme="dark"] #staffPerfTop3Grid .stat-card.clickable:hover { filter: brightness(1.08); box-shadow: 0 4px 14px rgba(220,38,38,0.35); }
+:root[data-theme="dark"] #staffPerfTableBody tr.clickable-row:hover td { background: rgba(220,38,38,0.12); }
+
+/* 만료회원 · TM 표에서 "확인함" 표시된 행 (연하게 처리해서 훑어봤음을 눈에 띄게) */
+tr.row-checked td { background: var(--slate-50); color: var(--slate-400); }
+tr.row-checked .tm-status-select { opacity: .75; }
+
+/* 만료회원 · TM 페이지 상품 필터 탭 */
+.filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.filter-tab {
+  border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700);
+  font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+}
+.filter-tab:hover { background: var(--slate-50); }
+.filter-tab.active { background: var(--indigo-600); border-color: var(--indigo-600); color: var(--white); }
+
+/* 업무 리스트 페이지에서 뱃지처럼 보이는 상태 <select> (TM상태 select와 동일한 스타일) */
+select.status-select {
+  border: none; cursor: pointer; outline: none;
+  -webkit-appearance: auto; appearance: auto;
+}
+/* 업무 리스트에서 "완료" 처리된 업무 행은 흐리게 표시 */
+tr.row-done td { background: var(--slate-50); color: var(--slate-400); }
+tr.row-done .status-select { opacity: .75; }
+
+/* 청소 체크리스트: 완료된 항목 흐리게 + 취소선 */
+.checklist-row:last-child { border-bottom: none !important; }
+.checklist-row.row-done { background: var(--slate-50); color: var(--slate-400); }
+.checklist-row.row-done > div > div:first-child { text-decoration: line-through; }
+
+/* 업무 리스트: 일일/요일별 주간/개인 업무 묶음 - 제목 줄을 누르면 펼쳐짐(마이크로소프트 투두 스타일) */
+.task-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; cursor: pointer; user-select: none;
+}
+.task-group-header:hover { background: var(--slate-50); }
+.task-group-body { border-top: 1px solid var(--slate-200); }
+
+/* 회원 검색창 */
+.search-bar { margin-bottom: 14px; }
+.search-bar input {
+  width: 100%; max-width: 320px; padding: 10px 14px; font-size: 14px;
+  border: 1px solid var(--slate-300); border-radius: 8px; outline: none;
+}
+.search-bar input:focus { border-color: var(--indigo-600); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+
+/* 회원 목록에서 클릭하면 상세 모달이 열리는 행 */
+tr.member-row { cursor: pointer; }
+tr.member-row:hover td { background: var(--slate-50); }
+
+/* 회원 상세 모달 (기본정보 수정 + 이용권 판매) */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,0.5);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 16px; overflow-y: auto; z-index: 100;
+}
+.modal-box {
+  background: var(--surface); border-radius: 16px; padding: 24px;
+  width: 100%; max-width: 1040px; box-shadow: 0 20px 50px -12px rgba(15,23,42,0.35);
+}
+.modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; gap: 12px; }
+.modal-header h3 { font-size: 17px; margin: 0 0 4px; }
+.modal-close {
+  background: none; border: none; font-size: 22px; line-height: 1;
+  color: var(--slate-400); cursor: pointer; padding: 4px;
+}
+.modal-close:hover { color: var(--slate-700); }
+.modal-section { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--slate-200); }
+.modal-section:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+.modal-section h4 { font-size: 13px; font-weight: 700; color: var(--slate-700); margin: 0 0 12px; }
+@media (max-width: 520px) { .modal-box { padding: 18px; } }
+
+/* 회원 상세 모달의 이용권 판매(장바구니 방식) 3단 레이아웃 */
+.sale-cart-layout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 860px) { .sale-cart-layout { grid-template-columns: 1fr; } }
+.sale-col { border: 1px solid var(--slate-200); border-radius: 10px; padding: 12px; background: var(--slate-50); }
+.sale-col-title { font-size: 12px; font-weight: 700; color: var(--slate-500); margin-bottom: 8px; }
+.sale-product-list, .sale-cart-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.sale-product-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--surface); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+  cursor: pointer;
+}
+.sale-product-row:hover { background: var(--slate-50); border-color: var(--slate-300); }
+.sale-product-row .name { font-weight: 600; }
+.sale-product-row .price { color: var(--slate-500); margin-top: 2px; }
+.sale-cart-row { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+.sale-cart-row .row-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.sale-cart-row .name { font-weight: 600; }
+.sale-cart-row input[type=number] {
+  width: 100px; padding: 4px 6px; font-size: 12px; border: 1px solid var(--slate-300); border-radius: 6px;
+}
+.sale-col .field { margin-bottom: 10px; }
+.sale-total { font-size: 14px; font-weight: 700; margin: 4px 0 10px; text-align: right; }
+
+/* 이용권 판매 결제 단계 (시작일/종료일 확인 + 상세설정) */
+.checkout-items { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding-right: 2px; }
+.checkout-item { border: 1px solid var(--slate-200); border-radius: 10px; padding: 12px; background: var(--slate-50); }
+.checkout-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.checkout-item-head .name { font-weight: 700; font-size: 13px; }
+.checkout-item-head .price { font-weight: 700; font-size: 13px; color: var(--indigo-600); }
+.checkout-item-body { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+.checkout-item-body .field { margin-bottom: 0; }
+.checkout-item-body input[disabled] { background: var(--slate-100, #f1f5f9); color: var(--slate-500); }
+@media (max-width: 640px) { .checkout-item-body { grid-template-columns: 1fr; } }
+
+/* 홈 화면 (로그인 직후 첫 화면) - 큰 아이콘 타일 그리드로 자주 쓰는 메뉴만 모아둠.
+   나중에 모바일 앱과 연동할 때도 이 화면을 홈으로 그대로 쓸 예정 */
+.home-banner {
+  background: linear-gradient(135deg, #4338ca, #4f46e5 55%, #818cf8);
+  color: var(--white); border-radius: 18px; padding: 22px 26px; margin-bottom: 22px;
+  box-shadow: 0 10px 30px -14px rgba(15,23,42,0.35);
+}
+.home-banner .greeting { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.home-banner .sub { font-size: 13px; opacity: .9; }
+/* 2026-09-21 가독성 개선: 고정 4열이라 타일이 5개(4+1)면 마지막 줄에 하나만 덩그러니 남아
+   화면이 넓어질수록 오른쪽이 휑하게 비어보였음 - auto-fit으로 바꿔서 타일 개수에 맞게 한 줄에
+   고르게 나눠 채워지게 함(타일이 늘어나도 계속 자연스럽게 맞춰짐) */
+.home-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;
+}
+@media (max-width: 720px) { .home-grid { grid-template-columns: repeat(2, 1fr); } }
+.home-tile {
+  background: var(--surface); border: 1px solid var(--slate-200); border-radius: 16px;
+  padding: 26px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  text-decoration: none; color: var(--slate-900); cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.home-tile:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -14px rgba(15,23,42,0.25); border-color: var(--slate-300); }
+.home-tile-icon {
+  width: 52px; height: 52px; border-radius: 14px; background: #eef2ff; color: var(--indigo-600);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.home-tile-label { font-size: 14px; font-weight: 700; text-align: center; }
+.home-tile-sub { font-size: 11px; color: var(--slate-400); text-align: center; margin-top: -6px; }
+.home-tile.is-soon { cursor: default; opacity: .7; }
+.home-tile.is-soon:hover { transform: none; box-shadow: none; border-color: var(--slate-200); }
+.home-tile.is-soon .home-tile-icon { background: var(--slate-100, #f1f5f9); color: var(--slate-400); }
+.home-tile-badge {
+  font-size: 10px; font-weight: 700; color: var(--slate-500); background: var(--slate-100, #f1f5f9);
+  padding: 2px 8px; border-radius: 999px;
+}
+
+/* 대시보드 매출 보고(일간/주간/월간 탭) - 이 탭 바는 항상 어두운 배경 고정이라(다크 모드에서도 바뀌면
+   안 됨) var(--slate-900) 대신 원래 라이트 모드 값(#0f172a)을 직접 써서, --slate-900이 다크 모드에서
+   글자색(밝은색)으로 바뀌어도 이 배경은 영향을 안 받게 함 */
+.report-tabs { display: flex; background: #0f172a; border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.report-tab {
+  flex: 1; border: none; background: transparent; color: rgba(255,255,255,0.65);
+  font-size: 13px; font-weight: 700; padding: 12px 10px; cursor: pointer;
+}
+.report-tab:hover { color: rgba(255,255,255,0.9); }
+.report-tab.active { background: var(--indigo-600); color: var(--white); }
+.report-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.report-nav-arrow {
+  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--slate-300); background: var(--surface);
+  color: var(--slate-700); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.report-nav-arrow:hover { background: var(--slate-50); }
+.report-nav-arrow[disabled] { opacity: .4; cursor: not-allowed; }
+.report-nav-arrow[disabled]:hover { background: var(--surface); }
+
+/* 페이지를 넘겨도 표의 칸 너비·행 높이가 그대로 유지되도록 하는 표 (회원 목록, 만료회원·TM 등).
+   table-layout:fixed로 칸 너비를 내용 길이와 무관하게 고정하고, 행 높이도 내용과 무관하게 항상
+   동일하게 고정함. 이름/전화번호처럼 짧아야 하는 칸은 한 줄로만 보여주고(길면 "..." + title 툴팁),
+   이용권/그룹PT처럼 상품명이 길어질 수 있는 칸은 최대 2줄까지는 그대로 다 보여줘서 정보가 잘려서
+   안 보이는 일이 없도록 함 (그래도 2줄을 넘어가는 아주 긴 이름만 "..."으로 줄임) */
+.table-fixed { table-layout: fixed; width: 100%; }
+.table-fixed th, .table-fixed td {
+  overflow: hidden; vertical-align: middle;
+  height: 60px; box-sizing: border-box; padding: 6px 12px;
+}
+.table-fixed td.cell-1line { white-space: nowrap; text-overflow: ellipsis; }
+.mcell { display: flex; flex-direction: column; justify-content: center; gap: 3px; height: 100%; min-width: 0; }
+.mcell-label {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.3; word-break: break-word;
+}
+.report-period-label { font-size: 15px; font-weight: 700; min-width: 160px; }
+.report-nav input[type=date] {
+  padding: 7px 10px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; outline: none;
+}
+
+/* ===== 로그인/회원가입/비밀번호 찾기 화면 전용 스타일 (login.html, forgot-password.html,
+   reset-password.html) =====
+   기존 .card/.container/.logo-badge는 앱 여기저기(설정 폼 등)에서 범용으로 쓰이고 있어서 그대로
+   손대면 다른 화면까지 영향을 줌 - 그래서 "세련된 로그인 화면"용 스타일은 .auth-* 라는 별도
+   이름으로 새로 만들고, 로그인 관련 화면에만 적용함. 배경은 var(--slate-50)를 그대로 써서 앱의
+   라이트/다크 모드 설정을 그대로 따라가고(로그인 화면만 따로 튀지 않게), 대신 실제 센터 로고
+   (에브리웨어 피트니스, 은색 지구본 마크)를 검정 그라데이션 타일에 얹어서 어떤 모드에서든
+   또렷하게 보이도록 함(로고 원본 이미지 자체가 검정 배경 위의 은색 로고라 이 방식이 자연스러움) */
+/* "화면이 큰데 카드 하나만 조그맣게 떠있어서 휑하다 - 왼쪽에 로고 크게(3), 오른쪽에 입력칸 크게(2)
+   비율로 화면을 꽉 채워달라" 요청으로 센터형 카드 레이아웃에서 좌우 분할(split-screen) 레이아웃으로
+   전면 변경함. 넓은 화면(데스크톱)에서는 왼쪽 검정 히어로 패널에 실제 센터 로고를 큼직하게,
+   오른쪽 패널에는 확대된 입력폼을 배치해서 화면 전체를 채우고, 좁은 화면(휴대폰)에서는 로고 배너가
+   위쪽에 작게 오고 아래에 폼이 오는 1단 레이아웃으로 자동 전환됨(모바일에서 6:4 비율 그대로 쓰면
+   로고가 화면을 너무 많이 잡아먹어서 폼이 안 보이므로, 모바일에서는 히어로를 고정 높이 배너로 바꿈) */
+.auth-page { min-height: 100vh; display: flex; flex-direction: column; }
+@media (min-width: 880px) {
+  .auth-page { flex-direction: row; height: 100vh; }
+}
+
+.auth-hero {
+  position: relative; overflow: hidden; flex: none;
+  background: radial-gradient(ellipse at 50% 30%, #232329 0%, #0a0a0d 65%), #0a0a0d;
+  display: flex; align-items: center; justify-content: center;
+  padding: 44px 24px; min-height: 240px;
+}
+@media (min-width: 880px) {
+  .auth-hero { flex: 3 1 0; height: 100vh; padding: 60px; }
+}
+.auth-hero-inner { position: relative; z-index: 1; text-align: center; max-width: 480px; }
+.auth-hero-logo { width: min(78vw, 260px); height: auto; display: block; margin: 0 auto; }
+@media (min-width: 880px) {
+  .auth-hero-logo { width: min(30vw, 420px); }
+}
+.auth-hero-tagline {
+  margin: 22px 0 0; font-size: 14px; color: rgba(255,255,255,0.55); font-weight: 500;
+  display: none;
+}
+@media (min-width: 880px) {
+  .auth-hero-tagline { display: block; font-size: 16px; }
+}
+
+.auth-form-panel {
+  flex: 1 1 auto; display: flex; align-items: center; justify-content: center;
+  background: var(--slate-50); padding: 36px 22px 48px;
+}
+@media (min-width: 880px) {
+  .auth-form-panel { flex: 2 1 0; height: 100vh; overflow-y: auto; padding: 60px; }
+}
+.auth-form-inner { width: 100%; max-width: 420px; }
+
+/* "로그인 위에 EVERYWHERE / FITNESS 문구를 크고 굵게, 그 아래에 로그인/이메일/비밀번호가 오게 해줘"
+   요청으로 기존의 작은 한 줄짜리 .auth-eyebrow 대신 두 줄짜리 큰 브랜드 문구로 바꿈. 처음엔
+   FITNESS를 EVERYWHERE보다 작게 뒀는데, "FITNESS도 똑같이 크게 해줘" 피드백을 받아 두 줄 모두
+   동일한 크기·굵기로 통일함 */
+.auth-brand {
+  margin: 0 0 22px; line-height: 1.05; text-transform: uppercase; color: var(--slate-900);
+}
+.auth-brand span { display: block; font-size: 30px; font-weight: 800; letter-spacing: 0.01em; }
+.auth-brand span:last-child { margin-top: 4px; }
+@media (min-width: 880px) {
+  .auth-brand span { font-size: 38px; }
+}
+
+.auth-header { margin-bottom: 30px; }
+.auth-header h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; }
+.auth-header p { font-size: 14.5px; color: var(--slate-500); margin: 0; line-height: 1.5; }
+
+.auth-field { margin-bottom: 20px; }
+.auth-field-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+.auth-field label { font-size: 14px; font-weight: 600; color: var(--slate-700); }
+.auth-field input {
+  width: 100%; box-sizing: border-box; padding: 16px 18px; font-size: 16px;
+  border: 1px solid var(--slate-300); border-radius: 14px; outline: none; background: var(--surface); color: var(--slate-900);
+  transition: border-color .15s, box-shadow .15s;
+}
+.auth-field input:focus { border-color: var(--indigo-600); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+:root[data-theme="dark"] .auth-field input:focus { box-shadow: 0 0 0 3px rgba(220,38,38,0.18); }
+
+.auth-forgot-link { font-size: 13.5px; color: var(--indigo-600); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.auth-forgot-link:hover { text-decoration: underline; }
+
+.auth-password-wrap { position: relative; }
+.auth-password-wrap input { padding-right: 50px; }
+.auth-toggle-pw {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; border: none; background: transparent; border-radius: 8px;
+  color: var(--slate-400); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+}
+.auth-toggle-pw:hover { background: var(--slate-50); color: var(--slate-700); }
+
+.auth-btn {
+  width: 100%; padding: 16px; font-size: 16px; font-weight: 700; border: none; border-radius: 14px;
+  background: var(--indigo-600); color: var(--white); cursor: pointer; margin-top: 6px;
+  box-shadow: 0 10px 22px -8px rgba(79,70,229,0.55); transition: background .15s, transform .1s;
+}
+.auth-btn:hover { background: var(--indigo-700); }
+.auth-btn:active { transform: translateY(1px); }
+.auth-btn[disabled] { opacity: 0.6; cursor: not-allowed; transform: none; }
+:root[data-theme="dark"] .auth-btn { box-shadow: 0 10px 22px -8px rgba(220,38,38,0.5); }
+
+.auth-hint { text-align: center; font-size: 13px; color: var(--slate-400); margin-top: 26px; }
+.auth-hint a { color: var(--indigo-600); font-weight: 600; text-decoration: none; }
+.auth-hint a:hover { text-decoration: underline; }
+
+.auth-back-link {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--slate-500);
+  text-decoration: none; margin-bottom: 22px; font-weight: 600;
+}
+.auth-back-link:hover { color: var(--slate-700); }
+
+.auth-note {
+  font-size: 12.5px; color: var(--slate-500); background: var(--surface); border: 1px solid var(--slate-200);
+  border-radius: 12px; padding: 12px 14px; margin-top: 20px; line-height: 1.55;
+}
+
+.auth-success-icon {
+  width: 56px; height: 56px; border-radius: 50%; background: #f0fdf4; color: #16a34a;
+  display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px;
+}
+:root[data-theme="dark"] .auth-success-icon { background: rgba(74,222,128,0.15); }

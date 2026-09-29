@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - OT 관리</title>
+<link rel="stylesheet" href="style.css?v=1790338841" />
+<style>
+  /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
+  .sheet-input {
+    width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid transparent;
+    border-radius: 6px; background: transparent;
+  }
+  .sheet-input:hover { border-color: var(--slate-300); }
+  .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
+  select.sheet-input { cursor: pointer; }
+  select.sheet-input.badge-red { background: #fee2e2; }
+  select.sheet-input.badge-amber { background: #fef3c7; }
+  select.sheet-input.badge-green { background: #dcfce7; }
+  select.sheet-input.badge-blue { background: #e0e7ff; }
+  select.sheet-input.badge-orange { background: #ffedd5; }
+  select.sheet-input.badge-yellow { background: #fef9c3; }
+  select.sheet-input.badge-purple { background: #f3e8ff; }
+  select.sheet-input.badge-teal { background: #ccfbf1; }
+  .sheet-table td, .sheet-table th { padding: 6px 8px; }
+  /* .mini-stat-box는 pt.html에도 있지만 공용 style.css가 아니라 그 페이지 전용 <style>에만 있어서
+     이 페이지에도 똑같이 옮겨옴(안 옮기면 카드 테두리·배경 없이 글자만 뜸) */
+  .mini-stat-box { border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+  .mini-stat-box .mini-title { font-size: 12px; font-weight: 700; color: var(--slate-500); margin-bottom: 6px; }
+  .mini-stat-box .mini-value { font-family: inherit; font-size: 22px; font-weight: 800; margin-top: 2px; }
+
+  /* 트레이너별 OT 현황 카드 (지점장 전용 "카드형" 보기) - 한 눈에 진행 인원 · 성공률 · 미응답을
+     비교할 수 있도록 만든 이 페이지 전용 카드. hero-card-secondary와 비슷한 결이지만, 그 자체가
+     클릭 가능한 <button>이어야 해서(트레이너 상세로 드릴다운) 버튼 기본 스타일을 리셋하고 새로 만듦 */
+  .ot-trainer-card {
+    all: unset; display: flex; flex-direction: column; gap: 16px; width: 100%; box-sizing: border-box;
+    cursor: pointer; background: var(--surface); border: 1px solid var(--slate-200); border-radius: 16px;
+    padding: 20px 22px; box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+    transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+  }
+  .ot-trainer-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-2px); border-color: var(--indigo-600); }
+  .ot-trainer-card:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
+  .ot-trainer-card.has-alert { border-color: #fca5a5; }
+  /* 2026-09-21: .wrap이 넓어진 만큼, 카드가 2개로 고정되어 억지로 늘어나지 않고 화면 폭에 맞춰
+     3~4개까지 자동으로 늘어나도록 auto-fit으로 변경(카드 1개 최소 폭 340px 기준) - 좁은 화면에서는
+     기존처럼 자연스럽게 1개씩 쌓임(별도 media query 불필요) */
+  .ot-trainer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+  .ot-avatar {
+    width: 40px; height: 40px; border-radius: 999px; background: var(--indigo-600); color: var(--white);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0;
+  }
+  .ot-avatar.is-trainer { background: var(--slate-700); }
+  .bar-track { position: relative; height: 7px; border-radius: 99px; background: var(--slate-200); overflow: hidden; }
+  .bar-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 99px; }
+  .ot-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--slate-500); }
+  .ot-legend .dot { width: 8px; height: 8px; border-radius: 99px; display: inline-block; margin-right: 5px; }
+  .backlink {
+    display: inline-flex; align-items: center; gap: 6px; border: none; background: transparent;
+    color: var(--slate-500); font-size: 13.5px; font-weight: 700; cursor: pointer; padding: 6px 0; margin-bottom: 4px;
+  }
+  .backlink:hover { color: var(--indigo-600); }
+  .ot-detail-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+  @media (max-width: 900px) { .ot-detail-stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .ot-stat-group-title { font-size: 12px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: .02em; margin: 22px 0 10px; }
+  .ot-stat-group-title:first-child { margin-top: 0; }
+
+  /* OT1 / OT2를 세로로 쌓지 않고 나란히 2단 배치 (2026-09-21 추가)
+     시행착오: 처음엔 1.15fr/1fr로 화면 남는 폭을 그리드가 다 채우게 했더니, 표 자체는
+     680px/600px면 충분한데 973px/846px까지 늘어나면서 특이사항 칸 뒤나 select 화살표 앞에
+     불필요하게 큰 빈 공간이 생김 → 그래서 표 폭을 아예 고정(820px/640px)으로 바꿨더니 이번엔
+     반대로 오른쪽에 안 쓰는 빈 공간이 넓게 남게 됨(둘 다 피드백 받음: "불필요하게 너무 넓다"
+     다음엔 "이 빈 공간도 활용하면 될 것 같은데"). 결론: 화면이 넓어지면 남는 공간을 놀리지 않고
+     쓰되, 그 공간을 "필요한 칸"(특이사항 - 메모가 길수록 좋음)에만 몰아주고 "불필요한 칸"
+     (날짜·이름·현황·예상등록률처럼 내용 길이가 짧고 고정적인 칸)은 그리드가 늘어나도 커지지
+     않게 함 - 아래 표의 th에서 특이사항만 width를 안 주고(= 남는 폭을 전부 가져감), 나머지는
+     전부 px로 고정폭을 줘서 해결. 그래서 그리드는 다시 늘어나게(fr) 두어도 안전함 */
+  .ot12-2col {
+    display: grid;
+    grid-template-columns: minmax(820px, 1.15fr) minmax(640px, 1fr);
+    gap: 20px;
+    align-items: start;
+    margin-top: 26px;
+  }
+  @media (max-width: 1500px) {
+    .ot12-2col { grid-template-columns: 1fr; }
+  }
+  .ot12-col h3 { font-size: 14px; margin: 0; }
+  .ot12-col-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px; gap: 8px; }
+  .ot12-col table.table-fixed th, .ot12-col table.table-fixed td { padding: 6px 8px; font-size: 12px; }
+  .ot12-col .sheet-input { font-size: 12px; }
+
+  /* "트레이너별 OT 성과 순위" 섹션 (2026-09-21 추가) - pt.html "트레이너 매출 순위"(lb-row)와
+     같은 결로 맞추되, 금액 막대 1개 대신 성공/실패/진행중 3색 세그먼트 막대를 씀 */
+  .otp-row {
+    display: flex; align-items: center; gap: 14px; padding: 12px 6px; border-radius: 12px;
+    cursor: pointer; border: none; background: none; width: 100%; text-align: left; box-sizing: border-box;
+  }
+  .otp-row:hover, .otp-row:focus-visible { background: var(--slate-50); outline: none; }
+  .otp-rank { width: 30px; flex-shrink: 0; text-align: center; font-size: 15px; font-weight: 800; color: var(--slate-400); }
+  .otp-rank.is-top { font-size: 20px; }
+  .otp-avatar {
+    width: 34px; height: 34px; border-radius: 999px; background: var(--indigo-600); color: var(--white);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12.5px; flex-shrink: 0;
+  }
+  .otp-main { flex: 1 1 auto; min-width: 0; }
+  .otp-name-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .otp-name { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .otp-rate { font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+  .otp-bar-track {
+    display: flex; position: relative; height: 8px; border-radius: 99px; background: var(--slate-200);
+    overflow: hidden; gap: 2px;
+  }
+  .otp-bar-seg { display: block; height: 100%; transition: width 0.4s ease; }
+  .otp-seg-success { background: #16a34a; }
+  .otp-seg-fail { background: #dc2626; }
+  .otp-seg-pending { background: var(--slate-300); }
+  .otp-subline { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 11.5px; color: var(--slate-500); flex-wrap: wrap; }
+  .otp-subline .dot { width: 7px; height: 7px; border-radius: 99px; display: inline-block; margin-right: 4px; }
+  .otp-chevron { color: var(--slate-300); font-size: 16px; flex-shrink: 0; }
+  .otp-tabs { display: flex; align-items: center; gap: 2px; background: var(--slate-50); border-radius: 12px; padding: 4px; }
+  .otp-tabs button { border: none; }
+
+  /* 표 맨 아래 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 (신규상담 화면과 같은 관례) */
+  .add-row-trigger td {
+    cursor: pointer; color: var(--indigo-600); font-weight: 700; text-align: center;
+    padding: 11px 12px; border-top: 1px dashed var(--slate-300);
+  }
+  .add-row-trigger:hover td { background: var(--slate-50); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="consultations.html">신규상담</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="group-pt.html">그룹PT 관리</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html" class="active">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- 월 선택 (트레이너 선택은 없음 - 지점장은 카드를 눌러 드릴다운, 트레이너는 본인 현황만 보임) -->
+    <div class="report-nav">
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <h1 style="margin:0; font-size:19px; font-weight:800;">OT 관리</h1>
+        <span class="muted" id="pageSubText">트레이너별 OT 진행 인원 · 성공률 · 미응답 현황을 한눈에 확인해요</span>
+      </div>
+      <div style="flex:1;"></div>
+      <button type="button" class="report-nav-arrow" id="monthPrevBtn">◀</button>
+      <div class="report-period-label" id="monthLabel">-</div>
+      <button type="button" class="report-nav-arrow" id="monthNextBtn">▶</button>
+    </div>
+
+    <!-- 전체(트레이너 전원 합산) 요약 카드 4개 -->
+    <div class="hero-grid" id="overallHeroGrid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="hero-card hero-blue">
+        <div class="hero-icon">🎯</div>
+        <div class="hero-label">이번 달 OT1 진행</div>
+        <div class="hero-value"><span id="ovOt1Total">0</span><span class="hero-unit">건</span></div>
+        <div class="hero-sub" id="ovOt1TotalSub">-</div>
+      </div>
+      <div class="hero-card hero-green">
+        <div class="hero-icon">✅</div>
+        <div class="hero-label">OT1 전체 성공률</div>
+        <div class="hero-value"><span id="ovOt1Rate">-</span></div>
+        <div class="hero-sub" id="ovOt1RateSub">-</div>
+      </div>
+      <div class="hero-card hero-teal">
+        <div class="hero-icon">🔁</div>
+        <div class="hero-label">OT2 전체 성공률</div>
+        <div class="hero-value"><span id="ovOt2Rate">-</span></div>
+        <div class="hero-sub" id="ovOt2RateSub">-</div>
+      </div>
+      <div class="hero-card hero-amber">
+        <div class="hero-icon">📵</div>
+        <div class="hero-label">미응답 합계</div>
+        <div class="hero-value"><span id="ovNoResponse">0</span><span class="hero-unit">건</span></div>
+        <div class="hero-sub" id="ovNoResponseSub">-</div>
+      </div>
+    </div>
+
+    <!-- 트레이너별 OT 성과 순위(리더보드) - 지점장 화면 전용 (2026-09-21 추가).
+         pt.html "트레이너 매출 순위"와 달리 이 순위는 개별 회원 정보가 아니라 건수 집계라
+         공개 범위를 넓힐 이유가 적어서, 기존 카드 그리드와 같은 자리(지점장 목록 화면)에만 둠.
+         트레이너 본인 화면에는 노출하지 않음(본인 상세는 detailView에서 이미 확인 가능). -->
+    <div class="hero-card-secondary accent-blue" id="otPerfPanel" style="display:none; margin-top:18px; padding:18px 22px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:14px; margin:0;">📊 트레이너별 OT 성과 순위 <span class="muted" style="font-weight:400;">(이번 달, 성공률 기준)</span></h3>
+        <div class="otp-tabs" id="otpMetricTabs">
+          <button type="button" class="filter-tab active" data-metric="combined">통합(OT1+OT2)</button>
+          <button type="button" class="filter-tab" data-metric="ot1">OT1만</button>
+          <button type="button" class="filter-tab" data-metric="ot2">OT2만</button>
+        </div>
+      </div>
+      <p class="muted" style="margin:0 0 10px;">막대를 누르면 그 선생님의 OT 상세 현황으로 바로 이동해요.</p>
+      <div class="ot-legend" style="margin-bottom:10px; padding-bottom:12px; border-bottom:1px solid var(--slate-100);">
+        <span><span class="dot" style="background:#16a34a;"></span>성공</span>
+        <span><span class="dot" style="background:#dc2626;"></span>실패(미스)</span>
+        <span><span class="dot" style="background:var(--slate-300);"></span>진행중(예정 · 이월)</span>
+      </div>
+      <div id="otpBars"></div>
+      <div id="otpEmpty" class="muted" style="display:none; padding:10px 2px;">아직 이번 달 OT 기록이 없어요.</div>
+    </div>
+
+    <!-- ==== 지점장: 카드형 / 표로 보기 목록 화면 ==== -->
+    <div id="listView" style="display:none; margin-top:26px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+        <div class="ot-legend">
+          <span><span class="dot" style="background:#16a34a;"></span>우수 (70% 이상)</span>
+          <span><span class="dot" style="background:#d97706;"></span>주의 (40~69%)</span>
+          <span><span class="dot" style="background:#dc2626;"></span>위험 (40% 미만)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:2px; background:var(--slate-50); border-radius:12px; padding:4px;">
+          <button type="button" class="filter-tab" id="viewCardBtn" style="border:none;">카드형</button>
+          <button type="button" class="filter-tab" id="viewTableBtn" style="border:none;">표로 보기</button>
+        </div>
+      </div>
+
+      <div class="ot-trainer-grid" id="trainerCardGrid"></div>
+
+      <div style="overflow-x:auto; display:none;" id="trainerTableWrap">
+        <table id="trainerTable" class="table-fixed sheet-table" style="min-width:960px;">
+          <thead><tr>
+            <th style="width:16%;">트레이너</th>
+            <th style="width:9%; text-align:right;">OT1 진행</th><th style="width:9%; text-align:right;">OT1 완료</th><th style="width:10%; text-align:right;">OT1 성공률</th>
+            <th style="width:9%; text-align:right;">OT2 진행</th><th style="width:9%; text-align:right;">OT2 완료</th><th style="width:10%; text-align:right;">OT2 성공률</th>
+            <th style="width:9%; text-align:right;">미응답</th>
+          </tr></thead>
+          <tbody id="trainerTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==== 트레이너 상세 (지점장이 카드를 클릭했을 때 / 트레이너 본인 화면은 항상 이 상태) ==== -->
+    <div id="detailView" style="display:none; margin-top:22px;">
+      <button type="button" class="backlink" id="backToListBtn" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        트레이너 목록으로
+      </button>
+
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <div class="ot-avatar" id="detailAvatar">-</div>
+        <div>
+          <div style="font-size:18px; font-weight:800;" id="detailName">-</div>
+          <div class="muted" id="detailRole">-</div>
+        </div>
+      </div>
+
+      <div id="detailPersonalGroup">
+        <div class="ot-stat-group-title" id="detailPersonalTitle">개인 성과</div>
+        <div class="ot-detail-stats">
+          <div class="mini-stat-box"><div class="mini-title">이번 달 OT1 진행</div><div class="mini-value" id="dpOt1Total">0건</div></div>
+          <div class="mini-stat-box"><div class="mini-title">OT1 성공률</div><div class="mini-value" id="dpOt1Rate">-</div></div>
+          <div class="mini-stat-box"><div class="mini-title">OT2 성공률</div><div class="mini-value" id="dpOt2Rate">-</div></div>
+          <div class="mini-stat-box"><div class="mini-title">미응답 합계</div><div class="mini-value" id="dpNoResponse">0건</div></div>
+        </div>
+      </div>
+
+      <div id="detailOverallGroup" style="display:none;">
+        <div class="ot-stat-group-title" id="detailOverallTitle">전체 성과</div>
+        <div class="ot-detail-stats">
+          <div class="mini-stat-box"><div class="mini-title">이번 달 OT1 진행</div><div class="mini-value" id="doOt1Total">0건</div></div>
+          <div class="mini-stat-box"><div class="mini-title">OT1 성공률</div><div class="mini-value" id="doOt1Rate">-</div></div>
+          <div class="mini-stat-box"><div class="mini-title">OT2 성공률</div><div class="mini-value" id="doOt2Rate">-</div></div>
+          <div class="mini-stat-box"><div class="mini-title">미응답 합계</div><div class="mini-value" id="doNoResponse">0건</div></div>
+        </div>
+      </div>
+
+      <!-- 2026-09-21: OT1/OT2를 세로로 쌓지 않고 나란히 2단으로 배치함("OT1 아래에 OT2가 있는데
+           그럴 필요 없을 것 같다"는 요청 - OT2는 대부분 OT1보다 기록이 적어서 아래로 스크롤해야만
+           보이던 걸, 한 화면에서 바로 비교하게 함). 두 표 모두 칸을 좁게 압축(font-size 12px, 셀
+           패딩도 줄임)하고 OT1 표는 min-width:680px / OT2는 min-width:600px로 좁혀서 웬만한 넓은
+           화면(1400px+)에서는 한 줄에 나란히 들어가고, 그보다 좁아지면(노트북 등) 자동으로 다시
+           세로로 쌓임 - 사용자 승인받은 목업(2026-09-21) 그대로 반영 -->
+      <div class="ot12-2col">
+        <div class="ot12-col">
+          <div class="ot12-col-header">
+            <h3 style="font-size:14px; margin:0;">OT1 (최초 체험)</h3>
+            <button type="button" class="btn btn-primary" id="openAddOt1Btn" style="width:auto; padding:7px 14px; font-size:12.5px;">+ OT1 기록 추가</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="ot1Table" class="table-fixed sheet-table" style="min-width:820px;">
+              <thead><tr>
+                <th style="width:140px;">OT1날짜</th><th style="width:85px;">연락일</th><th style="width:85px;">이름</th>
+                <th>특이사항</th><th style="width:100px;">현황</th><th style="width:105px;">예상등록률</th><th style="width:140px;">OT2예정일</th><th style="width:55px;"></th>
+              </tr></thead>
+              <tbody><tr><td colspan="8" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ot12-col">
+          <div class="ot12-col-header">
+            <h3 style="font-size:14px; margin:0;">OT2 (2차 팔로우업)</h3>
+            <span class="muted" style="font-size:11.5px;">OT1 표에서 "OT2예정일"을 넣으면 자동으로 여기 생겨요</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="ot2Table" class="table-fixed sheet-table" style="min-width:640px;">
+              <thead><tr>
+                <th style="width:140px;">OT2날짜</th><th style="width:85px;">이름</th>
+                <th>특이사항</th><th style="width:100px;">현황</th><th style="width:105px;">예상등록률</th><th style="width:55px;"></th>
+              </tr></thead>
+              <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-top:26px;">
+        <h3 style="font-size:14px; margin:0 0 2px;">OT 연락 미응답 <span class="muted" style="font-weight:400;">(OT 잡으려고 연락드렸는데 응답이 없으셨던 분)</span></h3>
+        <button type="button" class="btn btn-primary" id="openAddOtNoResponseBtn" style="width:auto; padding-left:16px; padding-right:16px; flex-shrink:0;">+ 미응답 기록 추가</button>
+      </div>
+      <p class="muted" style="margin:2px 0 10px;">아직 OT 일정조차 못 잡은 분들을 따로 남겨두는 표예요. 칸을 클릭해서 바로 입력하면 자동 저장되고, 나중에 연락이 닿아서 수업 날짜가 정해지면 "OT1 날짜 확정" 칸에 날짜를 넣어주세요 — 자동으로 위 OT1 표로 옮겨지고 이 목록에서는 사라져요.</p>
+      <div style="overflow-x:auto;">
+        <table id="otNoResponseTable" class="table-fixed sheet-table" style="min-width:820px;">
+          <thead><tr>
+            <th style="width:12%;">연락드린날짜</th><th style="width:12%;">이름</th><th style="width:48%;">특이사항</th>
+            <th style="width:16%;">OT1 날짜 확정</th><th style="width:12%;"></th>
+          </tr></thead>
+          <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1790338841"></script>
+  <script src="auth.js?v=1790338841"></script>
+  <script src="data.js?v=1790338841"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let currentUserId = null;
+    let isManagerFlag = false;
+    let staffCache = [];
+    let trainersList = [];       // 트레이너 전원 + 지점장 (pt.html 트레이너 선택 드롭다운과 같은 순서)
+    let leadsAllCache = [];      // 이 계정이 볼 수 있는 pt_leads 전체 (지점장=전원, 트레이너=RLS로 본인 것만)
+    let noResponseAllCache = []; // 이 계정이 볼 수 있는 pt_ot_no_response 전체
+
+    let monthAnchor = new Date();
+    let selectedTrainerId = null; // null = 목록 화면(지점장 전용), 값 있으면 그 트레이너 상세
+    let viewMode = 'card';        // 'card' | 'table' (목록 화면에서만 씀)
+    let otPerfCache = [];         // "트레이너별 OT 성과 순위" - migration_51 RPC 결과 캐시
+    let otpMetric = 'combined';   // 'combined' | 'ot1' | 'ot2' (순위표 상단 탭)
+
+    const OT_STATUS_OPTIONS = [
+      { value: 'scheduled', label: '예정' }, { value: 'rolled_over', label: '이월' }, { value: 'missed', label: '미스' }, { value: 'done', label: '완료' }
+    ];
+    const OT_STATUS_BADGE = { scheduled: 'badge-orange', rolled_over: 'badge-purple', missed: 'badge-red', done: 'badge-green' };
+    const OT_PROB_OPTIONS = [
+      { value: '', label: '미설정' }, { value: '25', label: '25%' }, { value: '50', label: '50%' }, { value: '75', label: '75%' }, { value: '100', label: '등록완료' }
+    ];
+    const OT_PROB_BADGE = { '': '', '25': 'badge-slate', '50': 'badge-yellow', '75': 'badge-orange', '100': 'badge-green' };
+
+    function getMonthRange() {
+      const start = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
+      const end = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1);
+      return { start, end, startStr: formatDateStr(start), endStr: formatDateStr(end), monthStr: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}` };
+    }
+    function monthLabelText() {
+      const { start } = getMonthRange();
+      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
+    }
+    function weekOfMonth(dateStr) {
+      const day = Number(dateStr.slice(8, 10));
+      return Math.min(5, Math.ceil(day / 7));
+    }
+    function firstDayOfMonthAfter(dateStr, n) {
+      const [y, m] = dateStr.split('-').map(Number);
+      const d = new Date(y, m - 1 + n, 1);
+      return formatDateStr(d);
+    }
+    function staffName(id) { const s = staffCache.find(x => x.id === id); return s ? s.name : '-'; }
+    function staffRoleLabel(id) { const s = staffCache.find(x => x.id === id); return s && s.role === 'manager' ? '지점장' : '트레이너'; }
+    function initials(name) { return (name || '-').slice(0, 2); }
+
+    function shiftMonth(dir) {
+      monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1);
+      reloadAll();
+    }
+    document.getElementById('monthPrevBtn').addEventListener('click', () => shiftMonth(-1));
+    document.getElementById('monthNextBtn').addEventListener('click', () => shiftMonth(1));
+
+    // "이월" 처리된 OT 기록을 다음 달에도 자동으로 이어서 만들어줌 (pt.html의 같은 함수와 동일한 로직 -
+    // OT 날짜는 이번 달 특정 일정에 묶여있던 값이라 새로 잡을 수 있게 비워서 넘김)
+    async function carryOverLeadToNextMonth(lead) {
+      const nextMonthFirstDay = firstDayOfMonthAfter(lead.contact_date || formatDateStr(new Date()), 1);
+      const nextMonthLabel = `${Number(nextMonthFirstDay.slice(5, 7))}월`;
+      const nmStart = nextMonthFirstDay;
+      const nmEnd = firstDayOfMonthAfter(nextMonthFirstDay, 1);
+      try {
+        const all = await fetchPtLeads();
+        const dup = all.find(l => l.trainer_id === lead.trainer_id && l.name === lead.name &&
+          ((l.contact_date && l.contact_date >= nmStart && l.contact_date < nmEnd) ||
+           (l.ot_date && l.ot_date >= nmStart && l.ot_date < nmEnd)));
+        if (dup) {
+          showToast(`${nextMonthLabel}에 이미 같은 이름의 기록이 있어서 새로 만들지 않았어요.`);
+          return;
+        }
+        await addPtLead({
+          trainer_id: lead.trainer_id, name: lead.name, phone: lead.phone || null, source: lead.source || null,
+          week_no: 1, contact_date: nextMonthFirstDay,
+          expected_amount: lead.expected_amount != null ? lead.expected_amount : null,
+          sessions: lead.sessions != null ? lead.sessions : null,
+          ot_date: null, ot_status: null, ot2_date: null, ot2_status: null,
+          memo: lead.memo || null, stage: 'in_progress', probability: 50
+        });
+        showToast(`이월 처리됐어요. ${nextMonthLabel} 주차별 매출 기록에도 자동으로 추가됐어요.`);
+      } catch (err) {
+        alert('다음 달로 이월하는 중 문제가 생겼어요: ' + err.message);
+      }
+    }
+
+    // ---- 집계 ----
+    function computeTrainerStats(tid, startStr, endStr, monthStr) {
+      const ot1 = leadsAllCache.filter(l => l.trainer_id === tid && l.ot_date && l.ot_date >= startStr && l.ot_date < endStr);
+      const ot1Done = ot1.filter(l => l.ot_status === 'done');
+      const ot2 = leadsAllCache.filter(l => l.trainer_id === tid && l.ot2_date && l.ot2_date >= startStr && l.ot2_date < endStr);
+      const ot2Done = ot2.filter(l => l.ot2_status === 'done');
+      const noResponse = noResponseAllCache.filter(r => r.trainer_id === tid && r.period_month === monthStr);
+      return {
+        ot1Total: ot1.length, ot1Done: ot1Done.length, ot1Rate: ot1.length ? Math.round((ot1Done.length / ot1.length) * 100) : null,
+        ot2Total: ot2.length, ot2Done: ot2Done.length, ot2Rate: ot2.length ? Math.round((ot2Done.length / ot2.length) * 100) : null,
+        noResponse: noResponse.length
+      };
+    }
+    function computeOverallStats(startStr, endStr, monthStr) {
+      const totals = { ot1Total: 0, ot1Done: 0, ot2Total: 0, ot2Done: 0, noResponse: 0 };
+      trainersList.forEach(t => {
+        const s = computeTrainerStats(t.id, startStr, endStr, monthStr);
+        totals.ot1Total += s.ot1Total; totals.ot1Done += s.ot1Done;
+        totals.ot2Total += s.ot2Total; totals.ot2Done += s.ot2Done;
+        totals.noResponse += s.noResponse;
+      });
+      return {
+        ...totals,
+        ot1Rate: totals.ot1Total ? Math.round((totals.ot1Done / totals.ot1Total) * 100) : null,
+        ot2Rate: totals.ot2Total ? Math.round((totals.ot2Done / totals.ot2Total) * 100) : null
+      };
+    }
+    function rateInfo(rate) {
+      if (rate == null) return { cls: 'badge-slate', label: '-' };
+      if (rate >= 70) return { cls: 'badge-green', label: `${rate}% 우수` };
+      if (rate >= 40) return { cls: 'badge-amber', label: `${rate}% 주의` };
+      return { cls: 'badge-red', label: `${rate}% 위험` };
+    }
+    function rateColorHex(rate) {
+      if (rate == null) return 'var(--slate-300)';
+      if (rate >= 70) return '#16a34a';
+      if (rate >= 40) return '#d97706';
+      return '#dc2626';
+    }
+
+    // ---- 트레이너별 OT 성과 순위(리더보드) - migration_51 ----
+    // (실제 fetch는 reloadCoreData()에서 다른 핵심 데이터와 함께 일괄 처리함)
+    // otpMetric에 따라 성공/실패/진행중/합계를 뽑아냄 ('combined'은 OT1+OT2를 더한 값)
+    function otpMetricValues(row) {
+      if (otpMetric === 'ot1') {
+        return { total: row.ot1_total, success: row.ot1_success, fail: row.ot1_fail, pending: row.ot1_pending };
+      }
+      if (otpMetric === 'ot2') {
+        return { total: row.ot2_total, success: row.ot2_success, fail: row.ot2_fail, pending: row.ot2_pending };
+      }
+      return {
+        total: row.ot1_total + row.ot2_total,
+        success: row.ot1_success + row.ot2_success,
+        fail: row.ot1_fail + row.ot2_fail,
+        pending: row.ot1_pending + row.ot2_pending
+      };
+    }
+    function renderOtPerformanceLeaderboard() {
+      const container = document.getElementById('otpBars');
+      const emptyEl = document.getElementById('otpEmpty');
+      const rows = otPerfCache
+        .map(r => ({ r, v: otpMetricValues(r) }))
+        .filter(x => x.v.total > 0)
+        .map(x => ({ ...x, rate: Math.round((x.v.success / x.v.total) * 100) }))
+        .sort((a, b) => b.rate - a.rate || b.v.total - a.v.total);
+
+      if (rows.length === 0) {
+        container.innerHTML = '';
+        emptyEl.style.display = '';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      container.innerHTML = rows.map((x, i) => {
+        const { r, v, rate } = x;
+        const info = rateInfo(rate);
+        const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}위`;
+        const successPct = (v.success / v.total) * 100;
+        const failPct = (v.fail / v.total) * 100;
+        const pendingPct = (v.pending / v.total) * 100;
+        return `
+        <button type="button" class="otp-row" data-trainer-id="${r.trainer_id}">
+          <span class="otp-rank ${i < 3 ? 'is-top' : ''}">${rankLabel}</span>
+          <span class="otp-avatar">${escapeHtml(initials(r.trainer_name))}</span>
+          <span class="otp-main">
+            <span class="otp-name-row">
+              <span class="otp-name">${escapeHtml(r.trainer_name)}</span>
+              <span class="otp-rate" style="color:${rateColorHex(rate)};">${rate}% <span class="badge ${info.cls}" style="margin-left:4px;">${rate >= 70 ? '우수' : rate >= 40 ? '주의' : '위험'}</span></span>
+            </span>
+            <span class="otp-bar-track">
+              <span class="otp-bar-seg otp-seg-success" style="width:${successPct}%;"></span>
+              <span class="otp-bar-seg otp-seg-fail" style="width:${failPct}%;"></span>
+              <span class="otp-bar-seg otp-seg-pending" style="width:${pendingPct}%;"></span>
+            </span>
+            <span class="otp-subline">
+              <span>총 ${v.total}건</span>
+              <span><span class="dot" style="background:#16a34a;"></span>성공 ${v.success}</span>
+              <span><span class="dot" style="background:#dc2626;"></span>실패 ${v.fail}</span>
+              <span><span class="dot" style="background:var(--slate-300);"></span>진행중 ${v.pending}</span>
+            </span>
+          </span>
+          <span class="otp-chevron">›</span>
+        </button>`;
+      }).join('');
+      container.querySelectorAll('.otp-row').forEach(row => {
+        row.addEventListener('click', () => {
+          selectedTrainerId = row.dataset.trainerId;
+          render();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+    }
+    document.getElementById('otpMetricTabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-metric]');
+      if (!btn) return;
+      otpMetric = btn.dataset.metric;
+      document.querySelectorAll('#otpMetricTabs button').forEach(b => b.classList.toggle('active', b === btn));
+      renderOtPerformanceLeaderboard();
+    });
+
+    // ---- 렌더 ----
+    function render() {
+      const { startStr, endStr, monthStr } = getMonthRange();
+      document.getElementById('monthLabel').textContent = monthLabelText();
+
+      const overall = computeOverallStats(startStr, endStr, monthStr);
+      document.getElementById('ovOt1Total').textContent = overall.ot1Total;
+      document.getElementById('ovOt1TotalSub').textContent = `트레이너 ${trainersList.length}명 합산`;
+      document.getElementById('ovOt1Rate').textContent = overall.ot1Rate == null ? '-' : `${overall.ot1Rate}%`;
+      document.getElementById('ovOt1RateSub').textContent = `${overall.ot1Done}건 완료 / ${overall.ot1Total}건 중`;
+      document.getElementById('ovOt2Rate').textContent = overall.ot2Rate == null ? '-' : `${overall.ot2Rate}%`;
+      document.getElementById('ovOt2RateSub').textContent = `${overall.ot2Done}건 완료 / ${overall.ot2Total}건 중`;
+      document.getElementById('ovNoResponse').textContent = overall.noResponse;
+      document.getElementById('ovNoResponseSub').textContent = overall.noResponse > 0
+        ? trainersList.filter(t => computeTrainerStats(t.id, startStr, endStr, monthStr).noResponse > 0)
+            .map(t => `${t.name} ${computeTrainerStats(t.id, startStr, endStr, monthStr).noResponse}건`).join(' · ')
+        : '없음';
+
+      if (isManagerFlag && selectedTrainerId === null) {
+        document.getElementById('listView').style.display = '';
+        document.getElementById('detailView').style.display = 'none';
+        document.getElementById('otPerfPanel').style.display = '';
+        document.getElementById('pageSubText').textContent = '트레이너별 OT 진행 인원 · 성공률 · 미응답 현황을 한눈에 확인해요';
+        renderListView(startStr, endStr, monthStr);
+        renderOtPerformanceLeaderboard();
+      } else {
+        document.getElementById('listView').style.display = 'none';
+        document.getElementById('detailView').style.display = '';
+        document.getElementById('otPerfPanel').style.display = 'none';
+        const tid = isManagerFlag ? selectedTrainerId : currentUserId;
+        document.getElementById('backToListBtn').style.display = isManagerFlag ? '' : 'none';
+        document.getElementById('detailOverallGroup').style.display = isManagerFlag ? '' : 'none';
+        document.getElementById('detailPersonalTitle').textContent = isManagerFlag ? '개인 성과' : '이번 달 OT 현황';
+        document.getElementById('pageSubText').textContent = isManagerFlag
+          ? '카드를 눌러 다른 트레이너의 OT 현황도 볼 수 있어요'
+          : '내 OT1 · OT2 진행 현황이에요';
+        renderDetailView(tid, startStr, endStr, monthStr, overall);
+      }
+    }
+
+    function renderListView(startStr, endStr, monthStr) {
+      document.getElementById('viewCardBtn').classList.toggle('active', viewMode === 'card');
+      document.getElementById('viewTableBtn').classList.toggle('active', viewMode === 'table');
+      document.getElementById('trainerCardGrid').style.display = viewMode === 'card' ? '' : 'none';
+      document.getElementById('trainerTableWrap').style.display = viewMode === 'table' ? '' : 'none';
+
+      const grid = document.getElementById('trainerCardGrid');
+      grid.innerHTML = trainersList.map(t => {
+        const s = computeTrainerStats(t.id, startStr, endStr, monthStr);
+        const ot1 = rateInfo(s.ot1Rate), ot2 = rateInfo(s.ot2Rate);
+        return `
+        <button type="button" class="ot-trainer-card ${s.noResponse > 0 ? 'has-alert' : ''}" data-trainer-id="${t.id}">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div class="ot-avatar ${t.role === 'trainer' ? 'is-trainer' : ''}">${escapeHtml(initials(t.name))}</div>
+              <div style="display:flex; flex-direction:column; gap:2px; text-align:left;">
+                <span style="font-size:15.5px; font-weight:800;">${escapeHtml(t.name)}</span>
+                <span class="badge ${t.role === 'manager' ? 'badge-blue' : 'badge-slate'}">${t.role === 'manager' ? '지점장' : '트레이너'}</span>
+              </div>
+            </div>
+            ${s.noResponse > 0 ? `<span class="badge badge-red">미응답 ${s.noResponse}건</span>` : '<span class="muted" style="font-size:12px;">미응답 없음</span>'}
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+            <div style="display:flex; flex-direction:column; gap:6px; text-align:left;">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; row-gap:4px;">
+                <span style="font-size:12.5px; color:var(--slate-500); font-weight:700;">OT1 (최초체험)</span>
+                <span class="badge ${ot1.cls}">${ot1.label}</span>
+              </div>
+              <div class="bar-track"><div class="bar-fill" style="width:${s.ot1Rate || 0}%; background:${rateColorHex(s.ot1Rate)};"></div></div>
+              <span style="font-size:12px; color:var(--slate-500);">완료 ${s.ot1Done} / 진행 ${s.ot1Total}건</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px; text-align:left;">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; row-gap:4px;">
+                <span style="font-size:12.5px; color:var(--slate-500); font-weight:700;">OT2 (2차 팔로우업)</span>
+                <span class="badge ${ot2.cls}">${ot2.label}</span>
+              </div>
+              <div class="bar-track"><div class="bar-fill" style="width:${s.ot2Rate || 0}%; background:${rateColorHex(s.ot2Rate)};"></div></div>
+              <span style="font-size:12px; color:var(--slate-500);">완료 ${s.ot2Done} / 진행 ${s.ot2Total}건</span>
+            </div>
+          </div>
+        </button>`;
+      }).join('');
+      grid.querySelectorAll('.ot-trainer-card').forEach(card => {
+        card.addEventListener('click', () => { selectedTrainerId = card.dataset.trainerId; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      });
+
+      const tbody = document.getElementById('trainerTableBody');
+      tbody.innerHTML = trainersList.map(t => {
+        const s = computeTrainerStats(t.id, startStr, endStr, monthStr);
+        const ot1 = rateInfo(s.ot1Rate), ot2 = rateInfo(s.ot2Rate);
+        return `
+        <tr>
+          <td style="font-weight:700;">${escapeHtml(t.name)} <span class="muted" style="font-weight:500; font-size:12px;">· ${t.role === 'manager' ? '지점장' : '트레이너'}</span></td>
+          <td style="text-align:right;">${s.ot1Total}건</td>
+          <td style="text-align:right;">${s.ot1Done}건</td>
+          <td style="text-align:right;"><span class="badge ${ot1.cls}">${ot1.label}</span></td>
+          <td style="text-align:right;">${s.ot2Total}건</td>
+          <td style="text-align:right;">${s.ot2Done}건</td>
+          <td style="text-align:right;"><span class="badge ${ot2.cls}">${ot2.label}</span></td>
+          <td style="text-align:right;">${s.noResponse > 0 ? `<span class="badge badge-red">${s.noResponse}건</span>` : '<span class="muted">-</span>'}</td>
+        </tr>`;
+      }).join('');
+    }
+    document.getElementById('viewCardBtn').addEventListener('click', () => { viewMode = 'card'; render(); });
+    document.getElementById('viewTableBtn').addEventListener('click', () => { viewMode = 'table'; render(); });
+    document.getElementById('backToListBtn').addEventListener('click', () => { selectedTrainerId = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+    function fillStatGroup(prefix, s) {
+      document.getElementById(prefix + 'Ot1Total').textContent = `${s.ot1Total}건`;
+      const ot1El = document.getElementById(prefix + 'Ot1Rate');
+      ot1El.textContent = s.ot1Rate == null ? '-' : `${s.ot1Rate}%`;
+      ot1El.style.color = rateColorHex(s.ot1Rate);
+      const ot2El = document.getElementById(prefix + 'Ot2Rate');
+      ot2El.textContent = s.ot2Rate == null ? '-' : `${s.ot2Rate}%`;
+      ot2El.style.color = rateColorHex(s.ot2Rate);
+      const nrEl = document.getElementById(prefix + 'NoResponse');
+      nrEl.textContent = `${s.noResponse}건`;
+      nrEl.style.color = s.noResponse > 0 ? '#dc2626' : '';
+    }
+
+    function renderDetailView(tid, startStr, endStr, monthStr, overall) {
+      const staffRow = staffCache.find(s => s.id === tid);
+      document.getElementById('detailAvatar').textContent = initials(staffName(tid));
+      document.getElementById('detailAvatar').className = 'ot-avatar ' + (staffRow && staffRow.role === 'trainer' ? 'is-trainer' : '');
+      document.getElementById('detailName').textContent = staffName(tid);
+      document.getElementById('detailRole').textContent = staffRoleLabel(tid);
+      document.getElementById('detailPersonalTitle').textContent = (isManagerFlag ? '개인 성과 · ' : '') + (isManagerFlag ? staffName(tid) : '이번 달 OT 현황');
+      document.getElementById('detailOverallTitle').textContent = `전체 성과 · 트레이너 ${trainersList.length}명 합산`;
+
+      const personal = computeTrainerStats(tid, startStr, endStr, monthStr);
+      fillStatGroup('dp', personal);
+      fillStatGroup('do', overall);
+
+      renderOt1Table(tid, startStr, endStr);
+      renderOt2Table(tid, startStr, endStr);
+      renderOtNoResponseTable(tid, monthStr);
+    }
+
+    // ---- OT1 표 ----
+    function renderOt1Table(tid, startStr, endStr) {
+      const tbody = document.querySelector('#ot1Table tbody');
+      const items = leadsAllCache
+        .filter(l => l.trainer_id === tid && l.ot_date && l.ot_date >= startStr && l.ot_date < endStr)
+        .slice()
+        .sort((a, b) => (a.ot_date < b.ot_date ? -1 : a.ot_date > b.ot_date ? 1 : 0));
+      const addRowHtml = `
+        <tr class="add-row-trigger" onclick="handleQuickAddOt1()">
+          <td colspan="8">+ 추가하기</td>
+        </tr>`;
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:16px;">이번 달 OT1 예정/진행 기록이 없습니다.</td></tr>' + addRowHtml;
+        return;
+      }
+      tbody.innerHTML = items.map(l => {
+        const status = l.ot_status || 'scheduled';
+        const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
+        const probVal = l.ot_expected_probability != null ? String(l.ot_expected_probability) : '';
+        const probOptions = OT_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === probVal ? 'selected' : ''}>${o.label}</option>`).join('');
+        return `
+        <tr class="row-otstatus-${status}">
+          <td><input class="sheet-input" type="date" value="${l.ot_date || ''}" data-lead-id="${l.id}" onchange="handleOtLeadFieldSave(this,'ot_date',false)" /></td>
+          <td class="cell-1line">${l.contact_date || '-'}</td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.name)}" data-lead-id="${l.id}" title="${escapeHtml(l.name)}" onchange="handleOtNameFieldSave(this)" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleOtLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
+          <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot_status')">${options}</select></td>
+          <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot_expected_probability')">${probOptions}</select></td>
+          <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtLead('${l.id}')">삭제</button></td>
+        </tr>`;
+      }).join('') + addRowHtml;
+    }
+    function renderOt2Table(tid, startStr, endStr) {
+      const tbody = document.querySelector('#ot2Table tbody');
+      const items = leadsAllCache
+        .filter(l => l.trainer_id === tid && l.ot2_date && l.ot2_date >= startStr && l.ot2_date < endStr)
+        .slice()
+        .sort((a, b) => (a.ot2_date < b.ot2_date ? -1 : a.ot2_date > b.ot2_date ? 1 : 0));
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:16px;">이번 달 OT2(2차 팔로우업) 기록이 없습니다. OT1 표 오른쪽에서 OT2 예정일을 넣으면 여기 나타나요.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(l => {
+        const status = l.ot2_status || 'scheduled';
+        const options = OT_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === status ? 'selected' : ''}>${o.label}</option>`).join('');
+        const probVal = l.ot2_expected_probability != null ? String(l.ot2_expected_probability) : '';
+        const probOptions = OT_PROB_OPTIONS.map(o => `<option value="${o.value}" ${o.value === probVal ? 'selected' : ''}>${o.label}</option>`).join('');
+        return `
+        <tr class="row-otstatus-${status}">
+          <td><input class="sheet-input" type="date" value="${l.ot2_date || ''}" data-lead-id="${l.id}" onchange="handleOt2DateSave(this)" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.name)}" data-lead-id="${l.id}" title="${escapeHtml(l.name)}" onchange="handleOtNameFieldSave(this)" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-lead-id="${l.id}" onchange="handleOtLeadFieldSave(this,'memo',false)" placeholder="특이사항" /></td>
+          <td><select class="badge ${OT_STATUS_BADGE[status]} sheet-input" data-lead-id="${l.id}" onchange="handleOtStatusFieldSave(this,'ot2_status')">${options}</select></td>
+          <td><select class="sheet-input badge ${OT_PROB_BADGE[probVal] || ''}" data-lead-id="${l.id}" onchange="handleOtProbSave(this,'ot2_expected_probability')">${probOptions}</select></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtLead('${l.id}')">삭제</button></td>
+        </tr>`;
+      }).join('');
+    }
+    async function handleOtLeadFieldSave(inputEl, field) {
+      const id = inputEl.dataset.leadId;
+      const value = inputEl.value.trim() || null;
+      try {
+        await updatePtLead(id, { [field]: value });
+        const l = leadsAllCache.find(x => x.id === id);
+        if (l) l[field] = value;
+      } catch (err) { alert(err.message); }
+    }
+    // 이름은 pt_leads에서 not null 컬럼이라 빈 값으로 저장하면 안 돼서 별도 핸들러로 처리
+    async function handleOtNameFieldSave(inputEl) {
+      const id = inputEl.dataset.leadId;
+      const value = inputEl.value.trim();
+      const l = leadsAllCache.find(x => x.id === id);
+      if (!value) {
+        alert('이름은 비워둘 수 없습니다.');
+        inputEl.value = l ? l.name : '';
+        return;
+      }
+      try {
+        await updatePtLead(id, { name: value });
+        if (l) l.name = value;
+        inputEl.title = value;
+      } catch (err) {
+        alert(err.message);
+        inputEl.value = l ? l.name : '';
+      }
+    }
+    async function handleDeleteOtLead(id) {
+      if (!confirm('이 OT 기록을 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+      try {
+        await deletePtLead(id);
+        await reloadCoreData();
+        render();
+        showToast('OT 기록이 삭제되었습니다.', 'danger');
+      } catch (err) { alert(err.message); }
+    }
+    async function handleOtStatusFieldSave(selectEl, field) {
+      const id = selectEl.dataset.leadId;
+      const value = selectEl.value;
+      try {
+        await updatePtLead(id, { [field]: value });
+        const l = leadsAllCache.find(x => x.id === id);
+        if (l) l[field] = value;
+        selectEl.className = 'badge ' + (OT_STATUS_BADGE[value] || '') + ' sheet-input';
+        const row = selectEl.closest('tr');
+        if (row) row.className = 'row-otstatus-' + value;
+        if (value === 'rolled_over' && l) {
+          await carryOverLeadToNextMonth(l);
+          await reloadCoreData();
+        }
+        render();
+      } catch (err) { alert(err.message); }
+    }
+    async function handleOtProbSave(selectEl, field) {
+      const id = selectEl.dataset.leadId;
+      const raw = selectEl.value;
+      const value = raw === '' ? null : Number(raw);
+      try {
+        await updatePtLead(id, { [field]: value });
+        const l = leadsAllCache.find(x => x.id === id);
+        if (l) l[field] = value;
+        selectEl.className = 'sheet-input badge ' + (OT_PROB_BADGE[raw] || '');
+      } catch (err) { alert(err.message); }
+    }
+    async function handleOt2DateSave(inputEl) {
+      const id = inputEl.dataset.leadId;
+      const value = inputEl.value || null;
+      try {
+        const patch = { ot2_date: value };
+        const lead = leadsAllCache.find(l => l.id === id);
+        if (value && lead && !lead.ot2_status) patch.ot2_status = 'scheduled';
+        await updatePtLead(id, patch);
+        if (lead) Object.assign(lead, patch);
+        render();
+      } catch (err) { alert(err.message); }
+    }
+
+    // ---- OT1 기록 추가 ----
+    // "+ OT1 기록 추가" 버튼(상단)이나 표 맨 아래 "+ 추가하기" 줄, 둘 중 아무거나 눌러도 모달 없이
+    // 바로 빈 줄(이름은 "새 회원"으로 임시로 채워서 저장 - pt_leads에서 이름이 필수값이라 완전히
+    // 빈 채로는 저장이 안 돼서)을 OT1 표에 추가하고, 그 줄의 이름 칸에 바로 커서를 놓고 전체
+    // 선택해줘서 이어서 타이핑하면 바로 덮어써짐 (신규상담 화면과 같은 관례로 통일)
+    let quickAddOt1InProgress = false;
+    async function handleQuickAddOt1() {
+      if (quickAddOt1InProgress) return;
+      quickAddOt1InProgress = true;
+      try {
+        const tid = isManagerFlag ? selectedTrainerId : currentUserId;
+        const { startStr, endStr } = getMonthRange();
+        const today = formatDateStr(new Date());
+        // 지금 보고 있는 달이 실제 이번 달이면 오늘 날짜로, 과거/미래 달을 보고 있으면 그 달 1일로 -
+        // 그래야 새로 추가한 줄이 지금 보고 있는 목록에 바로 나타남
+        const defaultOtDate = (today >= startStr && today < endStr) ? today : startStr;
+        const created = await addPtLead({
+          trainer_id: tid,
+          name: '새 회원',
+          source: '오티',
+          contact_date: today,
+          week_no: weekOfMonth(today),
+          ot_date: defaultOtDate,
+          ot_status: 'scheduled',
+          memo: null
+        });
+        const rec = Array.isArray(created) ? created[0] : created;
+        await reloadCoreData();
+        render();
+        showToast('OT1 기록이 추가되었습니다.');
+        const nameInput = document.querySelector(`#ot1Table input[data-lead-id="${rec.id}"][onchange="handleOtNameFieldSave(this)"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        quickAddOt1InProgress = false;
+      }
+    }
+    document.getElementById('openAddOt1Btn').addEventListener('click', handleQuickAddOt1);
+
+    // ---- OT 연락 미응답 ----
+    function renderOtNoResponseTable(tid, monthStr) {
+      const tbody = document.querySelector('#otNoResponseTable tbody');
+      const items = noResponseAllCache.filter(r => r.trainer_id === tid && r.period_month === monthStr);
+      const addRowHtml = `
+        <tr class="add-row-trigger" onclick="handleQuickAddOtNoResponse()">
+          <td colspan="5">+ 추가하기</td>
+        </tr>`;
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">이번 달 미응답 기록이 없습니다.</td></tr>' + addRowHtml;
+        return;
+      }
+      tbody.innerHTML = items.map(r => `
+        <tr>
+          <td><input class="sheet-input" type="date" value="${r.contact_date || ''}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'contact_date')" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(r.name)}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'name')" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(r.memo || '')}" data-id="${r.id}" onchange="handleOtNoResponseFieldSave(this,'memo')" placeholder="특이사항" /></td>
+          <td><input class="sheet-input" type="date" data-id="${r.id}" title="날짜를 정하면 OT1로 자동 이동돼요" onblur="handlePromoteToOt1(this)" /></td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteOtNoResponse('${r.id}')">삭제</button></td>
+        </tr>`).join('') + addRowHtml;
+    }
+    async function handlePromoteToOt1(inputEl) {
+      const id = inputEl.dataset.id;
+      const otDate = inputEl.value;
+      if (!otDate) return;
+      const row = noResponseAllCache.find(r => r.id === id);
+      if (!row) return;
+      if (!confirm(`${row.name}님을 ${otDate}일 OT1로 옮길까요? 미응답 목록에서는 사라져요.`)) {
+        inputEl.value = '';
+        return;
+      }
+      inputEl.disabled = true;
+      try {
+        await addPtLead({
+          trainer_id: row.trainer_id,
+          name: row.name,
+          source: '오티',
+          contact_date: row.contact_date || formatDateStr(new Date()),
+          week_no: weekOfMonth(row.contact_date || formatDateStr(new Date())),
+          ot_date: otDate,
+          ot_status: 'scheduled',
+          memo: row.memo || null
+        });
+        await deletePtOtNoResponse(id);
+        await reloadCoreData();
+        render();
+        showToast(`${row.name}님이 OT1로 이동되었습니다.`);
+      } catch (err) {
+        alert(err.message);
+        inputEl.disabled = false;
+      }
+    }
+    async function handleOtNoResponseFieldSave(inputEl, field) {
+      const id = inputEl.dataset.id;
+      const value = inputEl.value.trim ? inputEl.value.trim() : inputEl.value;
+      try {
+        await updatePtOtNoResponse(id, { [field]: value || null });
+        const r = noResponseAllCache.find(x => x.id === id);
+        if (r) r[field] = value || null;
+      } catch (err) { alert(err.message); }
+    }
+    async function handleDeleteOtNoResponse(id) {
+      if (!confirm('이 기록을 삭제할까요?')) return;
+      try {
+        await deletePtOtNoResponse(id);
+        await reloadCoreData();
+        render();
+        showToast('기록이 삭제되었습니다.', 'danger');
+      } catch (err) { alert(err.message); }
+    }
+    // "+ 미응답 기록 추가" 버튼(상단)이나 표 맨 아래 "+ 추가하기" 줄, 둘 중 아무거나 눌러도 모달
+    // 없이 바로 빈 줄(이름은 "새 상담"으로 임시로 채워서 저장 - pt_ot_no_response에서 이름이
+    // 필수값이라 완전히 빈 채로는 저장이 안 돼서)을 표에 추가하고, 그 줄의 이름 칸에 바로 커서를
+    // 놓고 전체 선택해줘서 이어서 타이핑하면 바로 덮어써짐
+    let quickAddNrInProgress = false;
+    async function handleQuickAddOtNoResponse() {
+      if (quickAddNrInProgress) return;
+      quickAddNrInProgress = true;
+      try {
+        const tid = isManagerFlag ? selectedTrainerId : currentUserId;
+        const created = await addPtOtNoResponse({
+          trainer_id: tid,
+          period_month: getMonthRange().monthStr,
+          name: '새 상담',
+          contact_date: formatDateStr(new Date()),
+          memo: null
+        });
+        const rec = Array.isArray(created) ? created[0] : created;
+        await reloadCoreData();
+        render();
+        showToast('미응답 기록이 추가되었습니다.');
+        const nameInput = document.querySelector(`#otNoResponseTable input[data-id="${rec.id}"][onchange="handleOtNoResponseFieldSave(this,'name')"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        quickAddNrInProgress = false;
+      }
+    }
+    document.getElementById('openAddOtNoResponseBtn').addEventListener('click', handleQuickAddOtNoResponse);
+
+    // ---- 로드 ----
+    async function reloadCoreData() {
+      const { startStr, endStr } = getMonthRange();
+      const tasks = [fetchPtLeads(), fetchPtOtNoResponse()];
+      // "트레이너별 OT 성과 순위"는 지점장 화면에만 노출되므로, 트레이너 계정에서는 불필요한
+      // RPC 호출을 만들지 않도록 지점장일 때만 같이 불러옴
+      if (isManagerFlag) tasks.push(fetchOtPerformanceLeaderboard(startStr, endStr));
+      const [leadsResult, noResponseResult, otPerfResult] = await Promise.allSettled(tasks);
+      leadsAllCache = leadsResult.status === 'fulfilled' ? leadsResult.value : [];
+      noResponseAllCache = noResponseResult.status === 'fulfilled' ? noResponseResult.value : [];
+      if (isManagerFlag) otPerfCache = (otPerfResult && otPerfResult.status === 'fulfilled') ? otPerfResult.value : [];
+    }
+    async function reloadAll() {
+      await reloadCoreData();
+      render();
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (!profile) return;
+      document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+      applyRoleNav(profile);
+      currentUserId = profile.id;
+      isManagerFlag = profile.role === 'manager';
+
+      try { staffCache = await fetchStaff(); } catch (err) { staffCache = []; }
+      trainersList = staffCache.filter(s => s.role === 'trainer').concat(staffCache.filter(s => s.role === 'manager'));
+      if (!isManagerFlag && !trainersList.some(t => t.id === currentUserId)) {
+        // 만약 본인 프로필이 위 목록에 없으면(드문 경우) 최소한 본인 이름은 표시되도록 보강
+        const me = staffCache.find(s => s.id === currentUserId);
+        if (me) trainersList = [me];
+      }
+
+      await reloadCoreData();
+      render();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 신규상담 · 워크인 관리</title>
+<link rel="stylesheet" href="style.css?v=1790338841" />
+<style>
+  /* 이 페이지 전용 - 특이사항(메모)/성함/전화번호 칸: 엑셀 시트처럼 바로 타이핑해서 저장 */
+  .sheet-input {
+    width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid transparent;
+    border-radius: 6px; background: transparent;
+  }
+  .sheet-input:hover { border-color: var(--slate-300); }
+  .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
+  .interest-check { width: 17px; height: 17px; cursor: pointer; }
+  /* 표 맨 아래 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 */
+  .add-row-trigger td {
+    cursor: pointer; color: var(--indigo-600); font-weight: 700; text-align: center;
+    padding: 11px 12px; border-top: 1px dashed var(--slate-300);
+  }
+  .add-row-trigger:hover td { background: var(--slate-50); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="consultations.html" class="active">신규상담</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="group-pt.html">그룹PT 관리</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="report-nav">
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <h1 style="margin:0; font-size:19px; font-weight:800;">신규상담 · 워크인 관리</h1>
+        <span class="muted">전화 상담 · 워크인으로 들어온 신규 문의를 담당자 구분 없이 다 같이 기록/관리해요</span>
+      </div>
+      <div style="flex:1;"></div>
+      <button type="button" class="report-nav-arrow" id="monthPrevBtn">◀</button>
+      <div class="report-period-label" id="monthLabel">-</div>
+      <button type="button" class="report-nav-arrow" id="monthNextBtn">▶</button>
+      <button type="button" class="btn btn-primary" id="openAddConsultBtn" style="width:auto; padding-left:16px; padding-right:16px; flex-shrink:0;">+ 상담 기록 추가</button>
+    </div>
+
+    <div class="hero-grid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="hero-card hero-blue">
+        <div class="hero-icon">📞</div>
+        <div class="hero-label">이번 달 상담 · 워크인</div>
+        <div class="hero-value"><span id="heroTotalCount">0</span><span class="hero-unit">건</span></div>
+        <div class="hero-sub" id="heroTotalSub">불러오는 중...</div>
+      </div>
+      <div class="hero-card hero-purple">
+        <div class="hero-icon">⏳</div>
+        <div class="hero-label">진행중 (고민중 · 이월)</div>
+        <div class="hero-value"><span id="heroPendingCount">0</span><span class="hero-unit">건</span></div>
+        <div class="hero-sub" id="heroPendingSub">불러오는 중...</div>
+      </div>
+      <div class="hero-card hero-green">
+        <div class="hero-label">이번 달 등록률</div>
+        <div class="hero-ring-wrap">
+          <svg class="hero-ring" viewBox="0 0 120 120">
+            <circle class="hero-ring-bg" cx="60" cy="60" r="52" />
+            <circle class="hero-ring-fg" id="registerRingFg" cx="60" cy="60" r="52" />
+          </svg>
+          <div class="hero-ring-value"><span id="registerRateValue">-</span><span class="hero-ring-percent">%</span></div>
+        </div>
+        <div class="hero-sub" id="registerSub">불러오는 중...</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>상담 · 워크인 기록</h2>
+      <div id="statusTabs" class="filter-tabs"></div>
+      <div style="overflow-x:auto;">
+      <table id="consultTable" class="table-fixed" style="min-width:1095px;">
+        <thead><tr>
+          <th style="width:140px;">날짜</th>
+          <th style="width:100px;">성함</th>
+          <th style="width:130px;">전화번호</th>
+          <th style="width:70px; white-space:nowrap;">성별</th>
+          <th style="width:140px;">유입경로</th>
+          <th style="width:56px; white-space:nowrap;">헬스</th>
+          <th style="width:50px; white-space:nowrap;">PT</th>
+          <th style="width:70px; white-space:nowrap;">그룹PT</th>
+          <th>특이사항</th>
+          <th style="width:100px; white-space:nowrap;">현황</th>
+          <th style="width:55px;"></th>
+        </tr></thead>
+        <tbody><tr><td colspan="11" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+      </div>
+      <div class="report-nav" id="consultPagination" style="justify-content:flex-end; margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1790338841"></script>
+  <script src="auth.js?v=1790338841"></script>
+  <script src="data.js?v=1790338841"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let consultAllCache = [];   // 이번 달 범위의 전체 기록 (필터 전)
+    let activeStatusFilter = 'all';
+    let consultPage = 1;
+    const CONSULT_PAGE_SIZE = 15;
+    let monthAnchor = new Date();
+
+    const CHANNEL_OPTIONS = [
+      { value: 'naver_place', label: '네이버 플레이스', badge: 'badge-green' },
+      { value: 'carrot', label: '당근', badge: 'badge-orange' },
+      { value: 'blog', label: '블로그', badge: 'badge-yellow' },
+      { value: 'referral', label: '지인소개', badge: 'badge-purple' },
+      { value: 'instagram', label: '인스타', badge: 'badge-pink' },
+      { value: 'meta_ads', label: '메타광고', badge: 'badge-blue' },
+      { value: 'flyer', label: '전단지', badge: 'badge-teal' },
+      { value: 'walk_by', label: '지나가다', badge: 'badge-slate' },
+      { value: 're_registration_tm', label: '재등록TM', badge: 'badge-amber' }
+    ];
+    const CHANNEL_LABEL = {};
+    const CHANNEL_BADGE = {};
+    CHANNEL_OPTIONS.forEach(o => { CHANNEL_LABEL[o.value] = o.label; CHANNEL_BADGE[o.value] = o.badge; });
+
+    const STATUS_OPTIONS = [
+      { value: 'considering', label: '고민중', badge: 'badge-amber' },
+      { value: 'rolled_over', label: '이월', badge: 'badge-purple' },
+      { value: 'declined', label: '거부', badge: 'badge-red' },
+      { value: 'registered', label: '등록', badge: 'badge-green' }
+    ];
+    const STATUS_LABEL = {};
+    const STATUS_BADGE = {};
+    STATUS_OPTIONS.forEach(o => { STATUS_LABEL[o.value] = o.label; STATUS_BADGE[o.value] = o.badge; });
+
+    function getMonthRange() {
+      const start = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
+      const end = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1);
+      return { start, end, startStr: formatDateStr(start), endStr: formatDateStr(end) };
+    }
+    function monthLabelText() {
+      const { start } = getMonthRange();
+      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
+    }
+    function shiftMonth(dir) {
+      monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1);
+      consultPage = 1;
+      reloadAll();
+    }
+    document.getElementById('monthPrevBtn').addEventListener('click', () => shiftMonth(-1));
+    document.getElementById('monthNextBtn').addEventListener('click', () => shiftMonth(1));
+
+    function firstDayOfMonthAfter(dateStr, n) {
+      const [y, m] = dateStr.split('-').map(Number);
+      const d = new Date(y, m - 1 + n, 1);
+      return formatDateStr(d);
+    }
+    // "이월" 처리하면 이 기록을 다음 달로 옮기는 게 아니라(예전 방식), OT/PT 관리와 똑같이 다음 달에
+    // "진행중(고민중)" 상태의 새 기록을 복사해서 만들고, 이번 달 기록 자체는 "이월" 상태 그대로 이번 달
+    // 시트에 남겨둠 - 그래야 이번 달에 몇 건이 이월됐는지 이번 달 시트에서도 계속 보임
+    // (요청: "이월은 어차피 다음달로 넘어가는거지만, 다음달로 넘기면서 이 달 시트에는 그냥 남아있게")
+    async function carryOverConsultationToNextMonth(c) {
+      const nextMonthFirstDay = firstDayOfMonthAfter(c.consult_date || formatDateStr(new Date()), 1);
+      const nextMonthLabel = `${Number(nextMonthFirstDay.slice(5, 7))}월`;
+      const nmStart = nextMonthFirstDay;
+      const nmEnd = firstDayOfMonthAfter(nextMonthFirstDay, 1);
+      try {
+        const all = await fetchWalkinConsultations();
+        const dup = all.find(x => x.name === c.name && (x.phone || '') === (c.phone || '') &&
+          x.consult_date && x.consult_date >= nmStart && x.consult_date < nmEnd);
+        if (dup) {
+          showToast(`${nextMonthLabel}에 이미 같은 이름의 기록이 있어서 새로 만들지 않았어요.`);
+          return;
+        }
+        await addWalkinConsultation({
+          consult_date: nextMonthFirstDay, name: c.name, phone: c.phone || null, gender: c.gender || null,
+          channel: c.channel || null, interest_gym: !!c.interest_gym, interest_pt: !!c.interest_pt,
+          interest_group_pt: !!c.interest_group_pt, memo: c.memo || null, status: 'considering'
+        });
+        showToast(`이월 처리됐어요. ${nextMonthLabel} 목록에도 자동으로 추가됐어요.`);
+      } catch (err) {
+        alert('다음 달로 이월하는 중 문제가 생겼어요: ' + err.message);
+      }
+    }
+
+    function renderChannelSelect(c) {
+      const cur = c.channel || '';
+      const opts = ['<option value="">선택</option>'].concat(
+        CHANNEL_OPTIONS.map(o => `<option value="${o.value}" ${o.value === cur ? 'selected' : ''}>${o.label}</option>`)
+      ).join('');
+      return `<select class="sheet-input badge ${CHANNEL_BADGE[cur] || ''}" data-id="${c.id}" onchange="handleChannelChange(this)">${opts}</select>`;
+    }
+    async function handleChannelChange(selectEl) {
+      const id = selectEl.dataset.id;
+      const value = selectEl.value || null;
+      try {
+        await updateWalkinConsultation(id, { channel: value });
+        const c = consultAllCache.find(x => x.id === id);
+        if (c) c.channel = value;
+        selectEl.className = 'sheet-input badge ' + (CHANNEL_BADGE[value] || '');
+      } catch (err) { alert(err.message); }
+    }
+
+    function renderStatusSelect(c) {
+      const cur = c.status || 'considering';
+      const opts = STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === cur ? 'selected' : ''}>${o.label}</option>`).join('');
+      return `<select class="sheet-input badge ${STATUS_BADGE[cur] || ''}" data-id="${c.id}" onchange="handleStatusChange(this)">${opts}</select>`;
+    }
+    async function handleStatusChange(selectEl) {
+      const id = selectEl.dataset.id;
+      const value = selectEl.value;
+      const c = consultAllCache.find(x => x.id === id);
+      try {
+        await updateWalkinConsultation(id, { status: value });
+        if (c) c.status = value;
+        selectEl.className = 'sheet-input badge ' + (STATUS_BADGE[value] || '');
+        // 현황 칸을 바꾸면 그 줄 전체가 바로 색이 바뀌어 보이게 함(고민중=갈색/이월=보라/거부=빨강/등록=초록)
+        const row = selectEl.closest('tr');
+        if (row) row.className = 'row-cstatus-' + value;
+        renderHeroStats();
+        renderStatusTabs();
+        // "이월"은 상태만 바뀌는 게 아니라, 다음 달 목록에도 진행중인 상담으로 자동 복사됨(이번 달
+        // 기록은 그대로 이번 달 시트에 "이월" 상태로 남아있음)
+        if (value === 'rolled_over' && c) {
+          await carryOverConsultationToNextMonth(c);
+        }
+      } catch (err) {
+        alert(err.message);
+        // 저장 실패 시 select에 표시된 값도 원래 상태로 되돌려서 실제 저장된 값과 안 어긋나게 함
+        selectEl.value = c ? c.status : 'considering';
+        selectEl.className = 'sheet-input badge ' + (STATUS_BADGE[selectEl.value] || '');
+        const row = selectEl.closest('tr');
+        if (row) row.className = 'row-cstatus-' + selectEl.value;
+      }
+    }
+
+    // 이름은 not null 컬럼이라 빈 값으로 저장하면 안 돼서 별도 처리 (ot.html 패턴과 동일)
+    async function handleNameSave(inputEl) {
+      const id = inputEl.dataset.id;
+      const value = inputEl.value.trim();
+      const c = consultAllCache.find(x => x.id === id);
+      if (!value) {
+        alert('성함은 비워둘 수 없습니다.');
+        inputEl.value = c ? c.name : '';
+        return;
+      }
+      try {
+        await updateWalkinConsultation(id, { name: value });
+        if (c) c.name = value;
+        inputEl.title = value;
+      } catch (err) { alert(err.message); if (c) inputEl.value = c.name; }
+    }
+
+    async function handleFieldSave(inputEl, field) {
+      const id = inputEl.dataset.id;
+      const value = inputEl.value.trim() || null;
+      try {
+        await updateWalkinConsultation(id, { [field]: value });
+        const c = consultAllCache.find(x => x.id === id);
+        if (c) c[field] = value;
+      } catch (err) { alert(err.message); }
+    }
+
+    async function handleGenderSave(selectEl) {
+      const id = selectEl.dataset.id;
+      const value = selectEl.value || null;
+      try {
+        await updateWalkinConsultation(id, { gender: value });
+        const c = consultAllCache.find(x => x.id === id);
+        if (c) c.gender = value;
+      } catch (err) { alert(err.message); }
+    }
+
+    async function handleInterestToggle(checkboxEl, field) {
+      const id = checkboxEl.dataset.id;
+      const checked = checkboxEl.checked;
+      checkboxEl.disabled = true;
+      try {
+        await updateWalkinConsultation(id, { [field]: checked });
+        const c = consultAllCache.find(x => x.id === id);
+        if (c) c[field] = checked;
+      } catch (err) {
+        alert(err.message);
+        checkboxEl.checked = !checked;
+      } finally {
+        checkboxEl.disabled = false;
+      }
+    }
+
+    async function handleDeleteConsult(id) {
+      if (!confirm('이 상담 기록을 삭제할까요?')) return;
+      try {
+        await deleteWalkinConsultation(id);
+        await reloadAll();
+        showToast('기록이 삭제되었습니다.', 'danger');
+      } catch (err) { alert(err.message); }
+    }
+
+    function renderStatusTabs() {
+      const counts = {};
+      consultAllCache.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
+      const tabs = [{ key: 'all', label: `전체 (${consultAllCache.length})` }]
+        .concat(STATUS_OPTIONS.map(o => ({ key: o.value, label: `${o.label} (${counts[o.value] || 0})` })));
+      document.getElementById('statusTabs').innerHTML = tabs.map(t =>
+        `<button type="button" class="filter-tab${t.key === activeStatusFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+      ).join('');
+      document.querySelectorAll('#statusTabs .filter-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeStatusFilter = btn.dataset.key;
+          consultPage = 1;
+          renderStatusTabs();
+          renderConsultTable();
+        });
+      });
+    }
+
+    // 표 맨 아래에 붙는 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 (페이지네이션과
+    // 무관하게 항상 마지막에 붙여서, 지금 보고 있는 페이지 바로 아래에서 바로 추가할 수 있게 함)
+    const ADD_ROW_HTML = `
+        <tr class="add-row-trigger" onclick="handleQuickAddConsult()">
+          <td colspan="11">+ 추가하기</td>
+        </tr>`;
+
+    function renderConsultTable() {
+      const tbody = document.querySelector('#consultTable tbody');
+      const paginationEl = document.getElementById('consultPagination');
+      const allItems = activeStatusFilter === 'all'
+        ? consultAllCache
+        : consultAllCache.filter(c => c.status === activeStatusFilter);
+
+      if (allItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="muted" style="padding:16px;">해당하는 상담 기록이 없습니다.</td></tr>' + ADD_ROW_HTML;
+        paginationEl.innerHTML = '';
+        return;
+      }
+      const totalPages = Math.max(1, Math.ceil(allItems.length / CONSULT_PAGE_SIZE));
+      consultPage = Math.min(Math.max(1, consultPage), totalPages);
+      const startIdx = (consultPage - 1) * CONSULT_PAGE_SIZE;
+      const items = allItems.slice(startIdx, startIdx + CONSULT_PAGE_SIZE);
+      renderPagination(paginationEl, consultPage, allItems.length, CONSULT_PAGE_SIZE, (newPage) => {
+        consultPage = newPage;
+        renderConsultTable();
+      });
+
+      tbody.innerHTML = items.map(c => `
+        <tr class="row-cstatus-${c.status || 'considering'}">
+          <td><input class="sheet-input" type="date" value="${c.consult_date || ''}" data-id="${c.id}" onchange="handleFieldSave(this,'consult_date')" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}" data-id="${c.id}" onchange="handleNameSave(this)" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(c.phone || '')}" placeholder="010-0000-0000" data-id="${c.id}" onchange="handleFieldSave(this,'phone')" /></td>
+          <td>
+            <select class="sheet-input" data-id="${c.id}" onchange="handleGenderSave(this)">
+              <option value="" ${!c.gender ? 'selected' : ''}>-</option>
+              <option value="male" ${c.gender === 'male' ? 'selected' : ''}>남</option>
+              <option value="female" ${c.gender === 'female' ? 'selected' : ''}>여</option>
+            </select>
+          </td>
+          <td>${renderChannelSelect(c)}</td>
+          <td style="text-align:center;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_gym ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_gym')" /></td>
+          <td style="text-align:center;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_pt ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_pt')" /></td>
+          <td style="text-align:center;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_group_pt ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_group_pt')" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(c.memo || '')}" placeholder="특이사항" data-id="${c.id}" onchange="handleFieldSave(this,'memo')" /></td>
+          <td>${renderStatusSelect(c)}</td>
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteConsult('${c.id}')">삭제</button></td>
+        </tr>
+      `).join('') + ADD_ROW_HTML;
+    }
+
+    function renderHeroStats() {
+      const total = consultAllCache.length;
+      const pending = consultAllCache.filter(c => c.status === 'considering' || c.status === 'rolled_over').length;
+      const registered = consultAllCache.filter(c => c.status === 'registered').length;
+      const rate = total > 0 ? Math.round((registered / total) * 100) : 0;
+
+      animateCount(document.getElementById('heroTotalCount'), total);
+      document.getElementById('heroTotalSub').textContent = total > 0 ? `${monthLabelText()} 기준` : '이번 달 기록된 상담이 없어요';
+
+      animateCount(document.getElementById('heroPendingCount'), pending);
+      document.getElementById('heroPendingSub').textContent = pending > 0 ? '팔로업이 필요해요' : '진행중인 건이 없어요';
+
+      document.getElementById('registerSub').textContent = total > 0 ? `${total}건 중 ${registered}건 등록` : '이번 달 기록된 상담이 없어요';
+      const circumference = 2 * Math.PI * 52;
+      const ringEl = document.getElementById('registerRingFg');
+      ringEl.style.strokeDasharray = `${circumference}`;
+      if (total === 0) {
+        ringEl.style.strokeDashoffset = `${circumference}`;
+        document.getElementById('registerRateValue').textContent = '-';
+        return;
+      }
+      const offset = circumference * (1 - rate / 100);
+      requestAnimationFrame(() => { ringEl.style.strokeDashoffset = `${offset}`; });
+      animateCount(document.getElementById('registerRateValue'), rate);
+    }
+
+    async function reloadAll() {
+      const tbody = document.querySelector('#consultTable tbody');
+      document.getElementById('monthLabel').textContent = monthLabelText();
+      try {
+        const { startStr, endStr } = getMonthRange();
+        const all = await fetchWalkinConsultations();
+        consultAllCache = all.filter(c => c.consult_date >= startStr && c.consult_date < endStr);
+        renderStatusTabs();
+        renderConsultTable();
+        renderHeroStats();
+      } catch (err) {
+        document.getElementById('statusTabs').innerHTML = '';
+        tbody.innerHTML = `<tr><td colspan="11" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        document.getElementById('heroTotalSub').textContent = err.message;
+      }
+    }
+
+    // "+ 상담 기록 추가"(상단 버튼)나 표 맨 아래 "+ 추가하기" 줄, 둘 중 아무거나 눌러도 모달 없이
+    // 바로 빈 줄(이름은 "새 상담"으로 임시로 채워서 저장 - DB에서 이름이 필수값이라 완전히 빈 채로는
+    // 저장이 안 돼서)을 표에 추가하고, 그 줄의 성함 칸에 바로 커서를 놓고 전체 선택해줘서 이어서
+    // 타이핑하면 바로 덮어써짐 ("모달 뜨는 게 불편하다"는 피드백으로 인라인 방식으로 바꿈 -
+    // OT/PT 관리의 모달 방식과는 다르게 이 화면만 이렇게 처리함)
+    let quickAddInProgress = false; // 두 트리거를 빠르게 연타해도 중복으로 추가되지 않게 막음
+    async function handleQuickAddConsult() {
+      if (quickAddInProgress) return;
+      quickAddInProgress = true;
+      const btn = document.getElementById('openAddConsultBtn');
+      btn.disabled = true;
+      try {
+        const { startStr, endStr } = getMonthRange();
+        const today = formatDateStr(new Date());
+        // 지금 보고 있는 달이 실제 이번 달이면 오늘 날짜로, 과거/미래 달을 보고 있으면 그 달 1일로 -
+        // 그래야 새로 추가한 줄이 지금 보고 있는 목록에 바로 나타남
+        const defaultDate = (today >= startStr && today < endStr) ? today : startStr;
+        const created = await addWalkinConsultation({
+          consult_date: defaultDate,
+          name: '새 상담',
+          phone: null,
+          gender: null,
+          channel: null,
+          interest_gym: false,
+          interest_pt: false,
+          interest_group_pt: false,
+          memo: null,
+          status: 'considering',
+          created_by: currentUserId
+        });
+        const rec = Array.isArray(created) ? created[0] : created;
+        consultAllCache.push(rec); // 목록 맨 위가 아니라 맨 아래에 새 줄이 생기게 (맨 위에 생기면 헷갈린다는 피드백)
+        activeStatusFilter = 'all'; // 다른 상태 탭을 보고 있어서 방금 추가한 줄이 안 보이는 일 없게
+        // 맨 아래에 추가했으니, 페이지가 여러 장이면 1페이지가 아니라 마지막 페이지로 이동해야
+        // 방금 추가한 줄이 화면에 보이고 포커스도 걸림
+        consultPage = Math.max(1, Math.ceil(consultAllCache.length / CONSULT_PAGE_SIZE));
+        renderStatusTabs();
+        renderConsultTable();
+        renderHeroStats();
+        const nameInput = document.querySelector(`input[data-id="${rec.id}"][onchange="handleNameSave(this)"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        quickAddInProgress = false;
+        btn.disabled = false;
+      }
+    }
+    document.getElementById('openAddConsultBtn').addEventListener('click', handleQuickAddConsult);
+
+    let currentUserId = null;
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+        currentUserId = profile.id;
+      }
+      reloadAll();
+    })();
+  </script>
+</body>
+</html>

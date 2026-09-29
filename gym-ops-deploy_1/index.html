@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- index.html은 사이트 루트 주소(https://gym-ops.vercel.app/)로 들어왔을 때 Vercel이 기본으로
+     보여주는 파일이라, 실제 로그인 화면인 login.html과는 별개의 파일임. 예전에는 이 파일 안에
+     login.html과 똑같은 로그인 폼을 따로 복사해뒀었는데, login.html만 계속 수정하고 이 파일은
+     안 건드리다 보니 둘이 서로 다른 모습으로 벌어져버렸음(2026-09-25, 로그인 화면 리디자인 후
+     루트 주소로 들어가면 예전 화면이 그대로 보이던 버그의 원인). 앞으로 같은 문제가 다시 생기지
+     않도록, 이 파일은 실제 로그인 폼을 따로 갖지 않고 login.html로 그냥 넘겨주기만 하게 바꿈 -
+     이제 로그인 화면은 login.html 한 곳에서만 관리하면 됨. -->
+<meta http-equiv="refresh" content="0; url=login.html" />
+<title>센터 매출 관리 - 로그인</title>
+<script>location.replace('login.html');</script>
+</head>
+<body></body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 매출 입력</title>
+<link rel="stylesheet" href="style.css?v=1790338841" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="consultations.html">신규상담</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html" class="active">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="group-pt.html">그룹PT 관리</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- 2026-09-21 가독성 개선: 입력 폼(.form-grid)은 auto-fit 그리드라 화면이 넓어진 만큼 칸 하나하나가
+         너무 넓게 늘어나서 오히려 입력칸처럼 안 보이던 문제 - 폼을 담은 패널 자체를 적당한 폭으로 잡음 -->
+    <div class="panel" style="max-width:900px;">
+      <h3>매출 등록</h3>
+      <div id="addErrorBox" class="error-text"></div>
+      <div id="addSuccessBox" class="success-text"></div>
+      <form id="addSaleForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>회원</label><select id="s_member" required><option value="">선택</option></select></div>
+          <div class="field"><label>상품 (선택)</label><select id="s_product"><option value="">직접 입력</option></select></div>
+          <div class="field"><label>항목</label>
+            <select id="s_category">
+              <option value="membership_new">신규 회원권</option>
+              <option value="membership_renewal">회원권 재등록</option>
+              <option value="pt_new">신규 PT</option>
+              <option value="pt_renewal">PT 재등록</option>
+              <option value="group_pt_new">신규 그룹PT</option>
+              <option value="group_pt_renewal">그룹PT 재등록</option>
+              <option value="locker">락커</option>
+              <option value="clothes">운동복</option>
+              <option value="day_pass">일일권</option>
+              <option value="membership_transfer">양도</option>
+              <option value="uncategorized">미분류(확인필요)</option>
+            </select>
+          </div>
+          <div class="field"><label>금액(원)</label><input type="text" inputmode="numeric" class="money-input" id="s_amount" required /></div>
+          <div class="field"><label>날짜</label><input type="date" id="s_date" required /></div>
+          <div class="field"><label>시각</label><input type="time" id="s_time" /></div>
+          <div class="field"><label>판매 담당자</label><select id="s_staff"></select></div>
+          <div class="field"><label>결제 수단</label>
+            <select id="s_payment">
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+              <option value="transfer">계좌이체</option>
+              <option value="kiosk">키오스크</option>
+            </select>
+          </div>
+          <div class="field"><label>메모</label><input type="text" id="s_memo" placeholder="선택 입력" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>최근 매출 내역</h2>
+      <div style="overflow-x:auto;">
+      <table id="salesTable" style="max-width:1200px;">
+        <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th><th id="salesDeleteColHeader" style="display:none;"></th></tr></thead>
+        <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+      </div>
+      <div class="report-nav" style="margin-top:10px; justify-content:flex-end;">
+        <button type="button" class="report-nav-arrow" id="salesPrevBtn">◀</button>
+        <div class="muted" id="salesPageLabel">-</div>
+        <button type="button" class="report-nav-arrow" id="salesNextBtn">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 매출 수정 모달 - 2026-09-07: 원래 "삭제"만 있고 "수정"이 없어서 담당자/항목을 잘못 고른 매출을
+       고칠 방법이 없었던 문제를 확인하고 새로 추가함. 지점장만 버튼이 보이고(RLS로도 막혀있음), 등록
+       폼과 같은 항목을 그대로 재사용해서 값만 바꿔서 저장함 -->
+  <div class="modal-overlay" id="editSaleOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 style="margin:0;">매출 수정</h3>
+        <button type="button" class="modal-close" id="es_closeBtn">&times;</button>
+      </div>
+      <div id="editErrorBox" class="error-text"></div>
+      <form id="editSaleForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field"><label>회원</label><select id="es_member" required></select></div>
+          <div class="field"><label>항목</label>
+            <select id="es_category">
+              <option value="membership_new">신규 회원권</option>
+              <option value="membership_renewal">회원권 재등록</option>
+              <option value="pt_new">신규 PT</option>
+              <option value="pt_renewal">PT 재등록</option>
+              <option value="group_pt_new">신규 그룹PT</option>
+              <option value="group_pt_renewal">그룹PT 재등록</option>
+              <option value="locker">락커</option>
+              <option value="clothes">운동복</option>
+              <option value="day_pass">일일권</option>
+              <option value="membership_transfer">양도</option>
+              <option value="uncategorized">미분류(확인필요)</option>
+            </select>
+          </div>
+          <div class="field"><label>금액(원)</label><input type="text" inputmode="numeric" class="money-input" id="es_amount" required /></div>
+          <div class="field"><label>날짜</label><input type="date" id="es_date" required /></div>
+          <div class="field"><label>시각</label><input type="time" id="es_time" /></div>
+          <div class="field"><label>판매 담당자</label><select id="es_staff"></select></div>
+          <div class="field"><label>결제 수단</label>
+            <select id="es_payment">
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+              <option value="transfer">계좌이체</option>
+              <option value="kiosk">키오스크</option>
+            </select>
+          </div>
+          <div class="field"><label>메모</label><input type="text" id="es_memo" placeholder="선택 입력" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">저장</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js?v=1790338841"></script>
+  <script src="auth.js?v=1790338841"></script>
+  <script src="data.js?v=1790338841"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+    // "시각"은 정확히 몇 시 몇 분에 결제됐는지 기록하는 용도라, 로컬 시각 기준으로 채워야 함
+    // (toISOString은 UTC라 시간대가 어긋나서 직접 계산함 - members.html의 nowTimeStr()과 동일한 방식)
+    function nowTimeStr() {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    document.getElementById('s_date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('s_time').value = nowTimeStr();
+
+    let currentUserId = null;
+    let productsCache = [];
+    let isManagerFlag = false;
+
+    async function loadMemberOptions() {
+      const sel = document.getElementById('s_member');
+      try {
+        const members = await fetchMembers();
+        members.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id; opt.textContent = m.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) { /* 무시: 회원 없으면 옵션이 비어있음 */ }
+    }
+
+    // 상품(이용권)을 고르면 가격이 자동으로 채워지고, "항목"도 그 상품 카테고리에 맞는
+    // 재등록 항목으로 미리 선택해둠 (신규로 파는 거면 직접 "신규 ○○"로 바꾸면 됨)
+    // PRODUCT_CATEGORY_TO_SALE_CATEGORY는 data.js에 공용으로 정의되어 있음 (회원 상세 모달과 공유)
+
+    async function loadProductOptions() {
+      const sel = document.getElementById('s_product');
+      try {
+        productsCache = await fetchProducts(true);
+        const catLabel = key => (EXPIRY_CATEGORIES.find(c => c.key === key) || {}).label || key;
+        EXPIRY_CATEGORIES.forEach(cat => {
+          const inCat = productsCache.filter(p => p.category === cat.key);
+          if (inCat.length === 0) return;
+          const group = document.createElement('optgroup');
+          group.label = catLabel(cat.key);
+          inCat.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.price != null ? `${p.name} (${formatWon(p.price)})` : p.name;
+            group.appendChild(opt);
+          });
+          sel.appendChild(group);
+        });
+      } catch (e) { /* 무시: 상품 목록 없어도 직접 입력으로 매출 등록은 가능 */ }
+    }
+
+    document.getElementById('s_product').addEventListener('change', (e) => {
+      const product = productsCache.find(p => p.id === e.target.value);
+      if (!product) return;
+      if (product.price != null) setMoneyInputValue('s_amount', product.price);
+      const saleCategory = PRODUCT_CATEGORY_TO_SALE_CATEGORY[product.category];
+      if (saleCategory) document.getElementById('s_category').value = saleCategory;
+    });
+
+    // ---- 최근 매출 내역 (10건씩 페이지 넘김) ----
+    // 한 번에 넉넉히(100건) 불러온 뒤 화면에서 10건씩 잘라서 보여줌 (페이지 넘길 때마다 서버에 다시 요청할 필요 없게,
+    // 대시보드의 "최근 매출 내역"과 동일한 방식)
+    let salesAll = [];
+    let salesPage = 1;
+    const SALES_PAGE_SIZE = 10;
+
+    function renderSalesPage() {
+      const tbody = document.querySelector('#salesTable tbody');
+      const totalPages = Math.max(1, Math.ceil(salesAll.length / SALES_PAGE_SIZE));
+      salesPage = Math.min(Math.max(1, salesPage), totalPages);
+
+      if (salesAll.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 7 : 6}" class="muted" style="padding:16px;">등록된 매출이 없습니다.</td></tr>`;
+      } else {
+        const startIdx = (salesPage - 1) * SALES_PAGE_SIZE;
+        const pageItems = salesAll.slice(startIdx, startIdx + SALES_PAGE_SIZE);
+        tbody.innerHTML = pageItems.map(s => `
+          <tr>
+            <td>${s.sale_date}</td>
+            <td>${s.member ? s.member.name : '-'}</td>
+            <td>${saleDisplayItemWithCategory(s)}</td>
+            <td>${s.staff ? s.staff.name : '-'}</td>
+            <td>${s.payment_method ? PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method : '-'}</td>
+            <td style="text-align:right;">${formatWon(s.amount)}</td>
+            ${isManagerFlag ? `<td style="white-space:nowrap;">
+              <button type="button" class="btn-link edit-sale-btn" data-id="${s.id}">수정</button>
+              <button type="button" class="btn-link delete-sale-btn" data-id="${s.id}" style="color:var(--red-600);">삭제</button>
+            </td>` : ''}
+          </tr>
+        `).join('');
+        if (isManagerFlag) {
+          tbody.querySelectorAll('.delete-sale-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              if (!confirm('이 매출 기록을 삭제할까요?\n이 매출로 자동 갱신됐던 회원의 이용권 만료일 등은 되돌아가지 않으니, 필요하면 회원 정보에서 직접 수정해주세요.')) return;
+              try {
+                await deleteSale(btn.dataset.id);
+                loadSales();
+              } catch (err) {
+                alert(err.message);
+              }
+            });
+          });
+          tbody.querySelectorAll('.edit-sale-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const sale = salesAll.find(s => s.id === btn.dataset.id);
+              if (sale) openEditSale(sale);
+            });
+          });
+        }
+      }
+
+      document.getElementById('salesPageLabel').textContent = `${salesPage} / ${totalPages}`;
+      document.getElementById('salesPrevBtn').disabled = salesPage <= 1;
+      document.getElementById('salesNextBtn').disabled = salesPage >= totalPages;
+    }
+
+    document.getElementById('salesPrevBtn').addEventListener('click', () => {
+      salesPage -= 1;
+      renderSalesPage();
+    });
+    document.getElementById('salesNextBtn').addEventListener('click', () => {
+      salesPage += 1;
+      renderSalesPage();
+    });
+
+    async function loadSales(resetToFirstPage = false) {
+      const tbody = document.querySelector('#salesTable tbody');
+      try {
+        salesAll = await fetchRecentSales(100);
+        if (resetToFirstPage) salesPage = 1;
+        renderSalesPage();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="${isManagerFlag ? 7 : 6}" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+      }
+    }
+
+    // 판매 담당자 select 채우기: 트레이너는 RLS상 본인만 조회되고, 지점장은 전체 직원 중에서 고를 수 있음
+    async function loadStaffOptions() {
+      const sel = document.getElementById('s_staff');
+      sel.innerHTML = '';
+      try {
+        const staff = await fetchStaff();
+        staff.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          if (s.id === currentUserId) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        if (!sel.value && currentUserId) {
+          sel.innerHTML += `<option value="${currentUserId}" selected>나</option>`;
+        }
+      } catch (e) {
+        if (currentUserId) sel.innerHTML = `<option value="${currentUserId}" selected>나</option>`;
+      }
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+        currentUserId = profile.id;
+        if (profile.role === 'manager') {
+          isManagerFlag = true;
+          document.getElementById('salesDeleteColHeader').style.display = '';
+        }
+      }
+      loadMemberOptions();
+      loadProductOptions();
+      loadStaffOptions();
+      loadSales();
+    })();
+
+    document.getElementById('addSaleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addErrorBox');
+      const successBox = document.getElementById('addSuccessBox');
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      try {
+        await addSale({
+          member_id: document.getElementById('s_member').value,
+          staff_id: document.getElementById('s_staff').value || currentUserId,
+          category: document.getElementById('s_category').value,
+          product_id: document.getElementById('s_product').value || null,
+          amount: moneyInputValue('s_amount'),
+          sale_date: document.getElementById('s_date').value,
+          sale_time: document.getElementById('s_time').value || null,
+          payment_method: document.getElementById('s_payment').value || null,
+          memo: document.getElementById('s_memo').value.trim() || null
+        });
+        successBox.textContent = '매출이 등록되었습니다.';
+        successBox.style.display = 'block';
+        // 날짜 칸은 방금 등록에 쓴 값을 그대로 유지함(오늘 날짜로 강제로 되돌리지 않음) - 예를 들어 어제(9/3)
+        // 날짜로 여러 명을 몰아서 등록할 때, 한 번 9/3으로 바꾸고 나면 계속 9/3이 유지돼서 매번 다시
+        // 바꿀 필요가 없음. (전에는 등록할 때마다 오늘 날짜로 리셋돼서, 두 번째 사람부터 날짜를 다시
+        // 안 바꾸면 실수로 오늘 날짜로 등록되는 문제가 있었음)
+        const usedDate = document.getElementById('s_date').value;
+        document.getElementById('addSaleForm').reset();
+        document.getElementById('s_date').value = usedDate || new Date().toISOString().slice(0, 10);
+        document.getElementById('s_time').value = nowTimeStr();
+        if (currentUserId) document.getElementById('s_staff').value = currentUserId; // reset()은 담당자를 첫 옵션으로 되돌리므로 다시 본인으로 맞춰줌
+        loadSales(true); // 방금 등록한 매출이 바로 보이도록 1페이지로 리셋
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    // ---- 매출 수정 모달 ----
+    // 등록 폼(s_member/s_staff)에 이미 채워진 옵션 목록을 그대로 복사해서 씀 - 매번 다시 불러올 필요 없음
+    let editingSaleId = null;
+    function openEditSale(sale) {
+      editingSaleId = sale.id;
+      document.getElementById('editErrorBox').style.display = 'none';
+      document.getElementById('es_member').innerHTML = document.getElementById('s_member').innerHTML;
+      document.getElementById('es_staff').innerHTML = document.getElementById('s_staff').innerHTML;
+      document.getElementById('es_member').value = sale.member_id || '';
+      document.getElementById('es_staff').value = sale.staff_id || '';
+      document.getElementById('es_category').value = sale.category || 'uncategorized';
+      setMoneyInputValue('es_amount', sale.amount);
+      document.getElementById('es_date').value = sale.sale_date || '';
+      document.getElementById('es_time').value = sale.sale_time || '';
+      document.getElementById('es_payment').value = sale.payment_method || 'card';
+      document.getElementById('es_memo').value = sale.memo || '';
+      document.getElementById('editSaleOverlay').style.display = 'flex';
+    }
+    function closeEditSale() {
+      document.getElementById('editSaleOverlay').style.display = 'none';
+      editingSaleId = null;
+    }
+    document.getElementById('es_closeBtn').addEventListener('click', closeEditSale);
+    document.getElementById('editSaleOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'editSaleOverlay') closeEditSale();
+    });
+    document.getElementById('editSaleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!editingSaleId) return;
+      const errorBox = document.getElementById('editErrorBox');
+      errorBox.style.display = 'none';
+      try {
+        await updateSale(editingSaleId, {
+          member_id: document.getElementById('es_member').value,
+          staff_id: document.getElementById('es_staff').value || currentUserId,
+          category: document.getElementById('es_category').value,
+          amount: moneyInputValue('es_amount'),
+          sale_date: document.getElementById('es_date').value,
+          sale_time: document.getElementById('es_time').value || null,
+          payment_method: document.getElementById('es_payment').value || null,
+          memo: document.getElementById('es_memo').value.trim() || null
+        });
+        closeEditSale();
+        loadSales();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>센터 그룹PT 출석</title>
+<!--
+  이 페이지는 gym-ops의 다른 모든 화면과 달리 "로그인 없이" 인터넷에 열려있는 회원용 화면이에요.
+  그래서 auth.js/data.js를 쓰지 않고(그 둘은 직원 로그인 세션이 있다고 가정하는 코드라서), config.js의
+  SUPABASE_URL/SUPABASE_ANON_KEY 상수만 재사용해서 anon 전용 함수들만 직접 호출해요.
+  - group_pt_search_members : 이름/전화번호 뒷자리로 본인 찾기(최초 1회)
+  - group_pt_validate_token : 지금 URL의 ?t= 값이 "오늘" 발급된 QR이 맞는지 확인
+  - group_pt_checkin        : 실제 출석 체크(서버가 직접 오늘 날짜·토큰을 다시 검증함)
+  - group_pt_get_member_status : 캘린더/포인트/보상 로드맵/포인트 상점 상품 목록 조회
+  - group_pt_redeem_item    : 포인트 상점에서 실제로 포인트를 차감하고 상품을 교환(migration_64)
+-->
+<style>
+  :root {
+    --brand: #3D5FFF; --brand-dark: #2A46E0; --brand-bg: #EEF1FF;
+    --ink: #16192E; --muted: #6B7280; --line: #E7E9F2; --panel: #F6F7FB;
+    --green: #16A34A; --green-bg: #E7F8ED; --gold: #F5A524;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    color: var(--ink); max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative;
+  }
+  .appbar { display: flex; align-items: center; gap: 8px; padding: 20px 24px 4px; }
+  .appbar .logo { width: 26px; height: 26px; border-radius: 8px; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+  .appbar .name { font-weight: 800; font-size: 16px; letter-spacing: -0.3px; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---- QR 없이 들어온 경우 ---- */
+  .plain-msg { padding: 80px 30px; text-align: center; }
+  .plain-msg .ic { font-size: 40px; margin-bottom: 14px; }
+  .plain-msg h1 { font-size: 18px; margin: 0 0 8px; }
+  .plain-msg p { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 0; }
+
+  /* ---- 본인 확인 ---- */
+  .hero { padding: 18px 24px 4px; }
+  .hero h1 { margin: 0 0 4px; font-size: 21px; font-weight: 800; line-height: 1.35; }
+  .hero .sub { font-size: 13px; color: var(--muted); }
+  .tabs { display: flex; gap: 8px; padding: 18px 24px 6px; }
+  .tab { flex: 1; text-align: center; padding: 11px 0; border-radius: 999px; font-size: 13.5px; font-weight: 700; border: 1.5px solid var(--line); color: var(--muted); background: #fff; cursor: pointer; }
+  .tab.active { background: var(--brand-bg); color: var(--brand); border-color: var(--brand-bg); }
+  .field-wrap { padding: 12px 24px 4px; }
+  .field { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px; padding: 13px 16px; }
+  .field .ic { color: var(--muted); font-size: 15px; }
+  .field input { border: none; background: transparent; outline: none; font-size: 15px; width: 100%; font-family: inherit; color: var(--ink); }
+  .search-hint { padding: 8px 26px 0; font-size: 11.5px; color: var(--muted); }
+  .result-wrap { margin: 14px 24px 0; display: flex; flex-direction: column; gap: 8px; }
+  .m-card { display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-radius: 16px; border: 1.5px solid var(--line); background: #fff; cursor: pointer; text-align: left; width: 100%; font-family: inherit; }
+  .m-card:active, .m-card.selected { border-color: var(--brand); background: var(--brand-bg); }
+  .m-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--panel); color: var(--ink); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex: 0 0 auto; }
+  .m-card.selected .m-avatar { background: var(--brand); color: #fff; }
+  .m-name { font-size: 14.5px; font-weight: 800; }
+  .m-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .m-check { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 1.5px solid var(--line); flex: 0 0 auto; }
+  .m-card.selected .m-check { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .cta { padding: 22px 24px 24px; }
+  .cta button { width: 100%; padding: 15px; border: none; border-radius: 16px; background: var(--brand); color: #fff; font-size: 15px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .cta button[disabled] { opacity: .45; }
+  .hint { padding: 0 24px 20px; font-size: 11.5px; color: var(--muted); text-align: center; line-height: 1.6; }
+  .err-text { padding: 0 24px; font-size: 12.5px; color: #DC2626; margin-top: 6px; }
+
+  /* ---- 캘린더 화면 ---- */
+  .cal-hero { padding: 18px 24px 4px; }
+  .cal-hero h1 { margin: 0 0 4px; font-size: 20px; font-weight: 800; line-height: 1.35; }
+  .cal-hero .sub { font-size: 12.5px; color: var(--muted); }
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px 24px 4px; }
+  .stat-box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 6px; text-align: center; position: relative; overflow: hidden; }
+  .stat-box .label { font-size: 10.5px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+  .stat-box .value { font-size: 17px; font-weight: 800; }
+  .stat-box.clickable { cursor: pointer; }
+  .stat-box.clickable:active { background: var(--brand-bg); border-color: var(--brand); }
+  .stat-box .tap-hint { font-size: 9px; color: var(--brand); margin-top: 3px; font-weight: 700; }
+
+  /* 포인트 칸: 눌렀을 때 "포인트 상점"으로 들어가는 걸 알 수 있게 상점처럼 보이도록 골드 톤으로 꾸밈 */
+  .stat-box.shop { background: linear-gradient(150deg, #FFF6E2 0%, #FFE7B8 100%); border: 1.2px solid #F3CE8A; }
+  .stat-box.shop::before { content: ""; position: absolute; top: -26px; right: -20px; width: 74px; height: 74px; border-radius: 50%; background: radial-gradient(circle, rgba(245,165,36,0.35), transparent 70%); }
+  .stat-box.shop .shop-badge { position: absolute; top: 6px; left: 8px; font-size: 8px; font-weight: 900; color: #fff; background: linear-gradient(135deg, #FF8A3D, var(--gold)); padding: 2px 6px; border-radius: 999px; letter-spacing: 0.2px; box-shadow: 0 3px 6px -2px rgba(245,165,36,0.6); }
+  .stat-box.shop .label { color: #9A6B12; display: flex; align-items: center; justify-content: center; gap: 3px; margin-top: 10px; }
+  .stat-box.shop .value { color: #7A4E0A; }
+  .stat-box.shop .tap-hint { color: #C4780A; }
+  .stat-box.shop .bag-ic { font-size: 12px; }
+
+  /* ---- "이달의 출석왕" 진입 배너 ---- */
+  .leaderboard-banner {
+    margin: 16px 24px 4px; padding: 15px 16px; border-radius: 16px; cursor: pointer; border: none;
+    background: linear-gradient(120deg, #2A2F6B 0%, #3D5FFF 55%, #6C7CFF 100%);
+    display: flex; align-items: center; gap: 12px; box-shadow: 0 14px 26px -14px rgba(61,95,255,0.55);
+    width: calc(100% - 48px); text-align: left; font-family: inherit;
+  }
+  .leaderboard-banner .ic { font-size: 26px; flex: 0 0 auto; }
+  .leaderboard-banner .txt { flex: 1; }
+  .leaderboard-banner .t1 { display: block; font-size: 13.5px; font-weight: 800; color: #fff; }
+  .leaderboard-banner .t2 { display: block; font-size: 11px; color: rgba(255,255,255,0.78); margin-top: 3px; line-height: 1.4; }
+  .leaderboard-banner .arrow { color: #fff; font-size: 15px; opacity: .8; }
+
+  /* ---- 이달의 출석왕 MVP 추가 포인트 카드(캘린더 화면 상단, 지난달 TOP3인데 아직 안 받았을 때만 표시) ---- */
+  .mvp-card {
+    border-radius: 20px; padding: 18px 18px 16px; text-align: center; position: relative; overflow: hidden;
+    margin: 14px 24px 0; background: linear-gradient(150deg, var(--mvp-c1) 0%, var(--mvp-c2) 60%, var(--mvp-c3) 100%);
+    border: 1.5px solid var(--mvp-border); box-shadow: 0 14px 28px -16px rgba(0,0,0,0.18);
+  }
+  .mvp-card.rank-1 { --mvp-c1:#FFF6E0; --mvp-c2:#FFEFC7; --mvp-c3:#FFE6A8; --mvp-border:#F6D584; --mvp-ribbon:#F5A524; --mvp-title:#7A4A05; --mvp-sub:#92660F; --mvp-amount:#E08900; --mvp-btn1:#F5A524; --mvp-btn2:#E08900; }
+  .mvp-card.rank-2 { --mvp-c1:#F6F8FC; --mvp-c2:#EAEFF6; --mvp-c3:#DFE6EF; --mvp-border:#C7D0DE; --mvp-ribbon:#8D99AC; --mvp-title:#45505F; --mvp-sub:#5B6674; --mvp-amount:#5E6B7D; --mvp-btn1:#9FACC0; --mvp-btn2:#707E92; }
+  .mvp-card.rank-3 { --mvp-c1:#FBEEE2; --mvp-c2:#F5DFC9; --mvp-c3:#EFD0AE; --mvp-border:#E0B37F; --mvp-ribbon:#C97F3C; --mvp-title:#7A4419; --mvp-sub:#8A5A28; --mvp-amount:#A85F22; --mvp-btn1:#D99553; --mvp-btn2:#B06B2C; }
+  .mvp-ribbon {
+    display: inline-flex; align-items: center; gap: 5px; background: var(--mvp-ribbon); color: #fff; font-size: 10.5px;
+    font-weight: 800; padding: 4px 12px; border-radius: 999px; margin-bottom: 10px;
+  }
+  .mvp-title { font-size: 15px; font-weight: 900; color: var(--mvp-title); margin-bottom: 4px; }
+  .mvp-sub { font-size: 12px; color: var(--mvp-sub); margin-bottom: 14px; }
+  .mvp-sub strong { font-size: 15px; color: var(--mvp-amount); }
+  .mvp-claim-btn {
+    width: 100%; padding: 13px; border: none; border-radius: 14px; font-size: 14.5px; font-weight: 800;
+    font-family: inherit; cursor: pointer; color: #fff;
+    background: linear-gradient(120deg, var(--mvp-btn1), var(--mvp-btn2)); box-shadow: 0 10px 18px -8px rgba(0,0,0,0.28);
+  }
+  .mvp-err { font-size: 12.5px; color: #DC2626; font-weight: 700; padding: 4px 0 2px; }
+  /* ---- MVP 보너스 받기 전체화면 트로피 모달(검은 배경 + 큰 트로피 → 탭하면 빛줄기 폭발 → 트로피 증정) ---- */
+  /* 1/2/3등 색깔 테마 - 명예 훈장(hc-circle.r1/r2/r3)과 완전히 같은 색을 재사용해서
+     "카드→트로피 모달→명예 훈장"까지 순위 색깔이 끊기지 않고 이어지게 함.
+     기본값(변수 미지정 시)은 1등=금색이고, .tm-rank-2/.tm-rank-3 클래스가 붙으면 은색/동색으로 바뀜. */
+  .trophy-modal {
+    position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .22s;
+    background: radial-gradient(circle at 50% 42%, rgba(28,22,48,0.9) 0%, rgba(7,5,16,0.96) 62%, rgba(2,2,6,0.985) 100%);
+    --tm-hi: #FFE9B0; --tm-hi-rgb: 255,233,176; --tm-c1: #FFD76A; --tm-c2: #F5A524; --tm-c2-rgb: 245,165,36; --tm-text: #3B2200;
+    --tm-icon-filter: none;
+  }
+  /* 🏆 이모지 자체는 계속 트로피 그대로 쓰되, CSS 필터로 색을 은색/동색으로 물들임(이모지는
+     color 속성으로는 색이 안 바뀌어서 grayscale/sepia/hue-rotate 조합으로 색상을 재조정함) */
+  .trophy-modal.tm-rank-2 {
+    --tm-hi: #F1F4F9; --tm-hi-rgb: 241,244,249; --tm-c1: #DCE3EC; --tm-c2: #ADB8C9; --tm-c2-rgb: 173,184,201; --tm-text: #2B3242;
+    --tm-icon-filter: grayscale(0.9) brightness(1.18) contrast(0.92);
+  }
+  .trophy-modal.tm-rank-3 {
+    --tm-hi: #F0D2B0; --tm-hi-rgb: 240,210,176; --tm-c1: #E2A468; --tm-c2: #C97F3C; --tm-c2-rgb: 201,127,60; --tm-text: #4A2A0E;
+    --tm-icon-filter: brightness(0) saturate(100%) invert(56%) sepia(62%) saturate(1200%) hue-rotate(342deg) brightness(89%) contrast(88%);
+  }
+  .trophy-modal.show { opacity: 1; pointer-events: auto; }
+  .trophy-modal-close {
+    position: absolute; top: 20px; right: 20px; width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.65); border: none; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 3;
+  }
+  .tm-stage { position: relative; flex-direction: column; align-items: center; justify-content: center; padding: 0 30px; text-align: center; width: 100%; }
+
+  /* Stage A: 정중앙에 크게 뜨는 트로피 */
+  .tm-orb {
+    width: 220px; height: 220px; border-radius: 50%; position: relative; margin: 0 auto;
+    background: radial-gradient(circle at 50% 45%, rgba(var(--tm-c2-rgb),0.55), rgba(var(--tm-c2-rgb),0.08) 60%, transparent 72%);
+    display: flex; align-items: center; justify-content: center; animation: tmOrbPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes tmOrbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+  .tm-orb::before { content: ""; position: absolute; inset: -18px; border-radius: 50%; border: 2px solid rgba(var(--tm-c2-rgb),0.35); pointer-events: none; }
+  .tm-orb::after { content: ""; position: absolute; inset: -38px; border-radius: 50%; border: 1px solid rgba(var(--tm-c2-rgb),0.18); pointer-events: none; }
+  /* 트로피 바깥쪽(뱃지 링보다 더 바깥)에서 천천히 도는 은은한 헤일로(순위에 따라 금/은/동으로 바뀜) - 트로피
+     픽셀 영역과는 겹치지 않게 크게 잡아서, 페인트 순서와 상관없이 트로피를 가리지 않음. 클릭도 절대
+     가로채지 않도록 pointer-events: none 필수(예전에 ::before/::after가 클릭을 가로채던 버그가 있었음) */
+  .tm-orb-halo {
+    position: absolute; inset: -58px; border-radius: 50%; pointer-events: none; filter: blur(2px);
+    background: conic-gradient(from 0deg, rgba(var(--tm-c2-rgb),0) 0%, rgba(var(--tm-hi-rgb),0.55) 6%, rgba(var(--tm-c2-rgb),0) 18%,
+      rgba(var(--tm-c2-rgb),0) 68%, rgba(var(--tm-hi-rgb),0.4) 80%, rgba(var(--tm-c2-rgb),0) 90%, rgba(var(--tm-c2-rgb),0) 100%);
+    animation: tmHaloSpin 7s linear infinite;
+  }
+  @keyframes tmHaloSpin { to { transform: rotate(360deg); } }
+  .tm-trophy-big { position: relative; z-index: 1; font-size: 104px; cursor: pointer; filter: var(--tm-icon-filter) drop-shadow(0 0 26px rgba(var(--tm-c2-rgb),0.85)) drop-shadow(0 12px 20px rgba(0,0,0,0.5)); }
+  .tm-rank-badge {
+    position: relative; overflow: hidden; margin-top: 24px; background: linear-gradient(135deg,var(--tm-c1),var(--tm-c2)); color: var(--tm-text); font-weight: 800;
+    font-size: 14px; padding: 7px 18px; border-radius: 999px; display: inline-block; letter-spacing: .2px;
+    box-shadow: 0 6px 18px -6px rgba(var(--tm-c2-rgb),0.6), inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 3px rgba(0,0,0,0.2);
+  }
+  .tm-hint { margin-top: 16px; color: #F3EFFF; font-size: 14.5px; font-weight: 600; animation: tmHintBlink 1.6s ease-in-out infinite; }
+  @keyframes tmHintBlink { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+  /* 금색 뱃지류(순위 뱃지/리본/이름 옆 배지)에 공통으로 들어가는 고급스러운 금속 광택 스윕 */
+  .tm-rank-badge::after, .tm-ribbon::after, .name-badge::after {
+    content: ""; position: absolute; top: 0; left: -60%; width: 35%; height: 100%;
+    background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%);
+    transform: skewX(-20deg); animation: tmShimmer 3.4s ease-in-out infinite; pointer-events: none;
+  }
+  @keyframes tmShimmer { 0% { left: -60%; } 38% { left: 130%; } 100% { left: 130%; } }
+
+  /* Stage B: 트로피 탭 → 파티클 버스트 + 충격파 링 + 화면 플래시가 겹쳐지며 폭발 → 포인트 증정(1등150P/2등100P/3등70P) */
+  /* 이펙트가 아래에 오는 문구 길이와 상관없이 항상 트로피 정중앙에서 터지도록, 트로피만 감싸는
+     작은 박스(tm-burst-zone) 기준으로 위치를 잡음(전체 Stage 박스 기준으로 잡으면 문구 줄 수에 따라
+     중심이 흔들려서 엉뚱한 위치에서 터지는 것처럼 보였던 문제를 고침) */
+  .tm-burst-zone { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; }
+  /* 트로피 중심에서 링 2개가 겹으로 퍼져나가는 충격파 - 파티클보다 살짝 먼저/나중에 터져서 레이어감을 줌 */
+  .tm-shockwave {
+    position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0.4); opacity: 0; pointer-events: none; z-index: 1;
+    border: 2px solid rgba(var(--tm-hi-rgb),0.9); box-shadow: 0 0 16px rgba(var(--tm-c2-rgb),0.45);
+  }
+  .tm-shockwave.ring2 { border-color: rgba(255,255,255,0.75); border-width: 1.5px; }
+  .tm-shockwave.burst { animation: tmShockOut .85s cubic-bezier(.15,.7,.3,1) both; }
+  .tm-shockwave.ring2.burst { animation-delay: .09s; }
+  @keyframes tmShockOut { 0% { transform: translate(-50%, -50%) scale(0.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(6.2); opacity: 0; } }
+  /* 색종이(컨페티) 파티클 - LottieFiles의 전문 모션 디자이너가 만든 애니메이션(lottie-web으로 재생)을
+     트로피 중심에 겹쳐서 보여줌. 혹시라도 외부 애니메이션을 못 불러오면(네트워크 문제 등) JS단에서
+     자동으로 예전 자체 제작 파티클 효과로 대체됨(showBurstStage의 폴백 로직 참고) */
+  .tm-lottie-burst { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 320px; height: 320px; pointer-events: none; z-index: 1; }
+  /* 외부 애니메이션 로드 실패 시 대체용 파티클 캔버스(JS가 필요할 때만 붙여넣음) */
+  .tm-burst-canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; height: 300px; pointer-events: none; z-index: 1; }
+  .tm-core-flash {
+    position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border-radius: 50%; z-index: 1;
+    transform: translate(-50%, -50%) scale(0.3); opacity: 0; pointer-events: none;
+    background: radial-gradient(circle, #fff 0%, var(--tm-hi) 22%, var(--tm-c2) 46%, rgba(var(--tm-c2-rgb),0) 72%);
+    transition: width .55s cubic-bezier(.2,.9,.3,1), height .55s cubic-bezier(.2,.9,.3,1), opacity .4s ease, transform .55s cubic-bezier(.2,.9,.3,1);
+  }
+  .tm-core-flash.burst { opacity: 1; width: 230px; height: 230px; transform: translate(-50%, -50%) scale(1); }
+  .tm-trophy-mini { position: relative; z-index: 2; font-size: 58px; filter: var(--tm-icon-filter) drop-shadow(0 0 18px rgba(var(--tm-hi-rgb),0.9)); }
+  /* 터지는 순간 화면 전체가 살짝 번쩍하는 카메라 플래시 - 폭발의 임팩트를 더해줌(순위 색조가 살짝 섞임) */
+  .tm-flash-pulse { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 79;
+    background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.92) 0%, rgba(var(--tm-hi-rgb),0.2) 42%, transparent 72%); }
+  .tm-flash-pulse.burst { animation: tmFlashPulse .5s ease-out both; }
+  @keyframes tmFlashPulse { 0% { opacity: 0; } 10% { opacity: .8; } 100% { opacity: 0; } }
+  @keyframes tmTextIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .tm-grant-title { position: relative; z-index: 2; color: #fff; font-size: 16px; font-weight: 700; opacity: 0; margin-top: 12px; animation: tmTextIn .4s ease both; animation-delay: .58s; }
+  .tm-grant-amount {
+    position: relative; z-index: 2; margin-top: 8px; font-size: 40px; font-weight: 900; opacity: 0; letter-spacing: .5px;
+    background: linear-gradient(135deg,var(--tm-hi),var(--tm-c2)); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(var(--tm-c2-rgb),0.55));
+    animation: tmTextIn .45s ease both; animation-delay: .68s;
+  }
+  .tm-grant-sub { position: relative; z-index: 2; margin-top: 8px; color: #F3EFFF; font-size: 13.5px; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .78s; }
+  .tm-grant-sub strong { color: #fff; }
+
+  /* Stage C: 트로피 증정 화면 */
+  .tm-glow-static {
+    position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); width: 360px; height: 360px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(var(--tm-c2-rgb),0.4) 0%, rgba(var(--tm-c2-rgb),0.1) 45%, rgba(var(--tm-c2-rgb),0) 70%);
+  }
+  .tm-ring1, .tm-ring2 { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); border-radius: 50%; border: 1px solid rgba(var(--tm-hi-rgb),0.3); }
+  .tm-ring1 { width: 226px; height: 226px; }
+  .tm-ring2 { width: 286px; height: 286px; border-color: rgba(var(--tm-hi-rgb),0.16); }
+  .tm-ribbon {
+    position: relative; z-index: 2; overflow: hidden; display: inline-block; background: linear-gradient(135deg,var(--tm-c1),var(--tm-c2)); color: var(--tm-text); font-weight: 800; font-size: 12.5px;
+    padding: 5px 15px; border-radius: 999px; margin-bottom: 14px; letter-spacing: .4px; opacity: 0; animation: tmTextIn .35s ease both;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 3px rgba(0,0,0,0.2);
+  }
+  .tm-trophy-grant { position: relative; z-index: 2; font-size: 92px; filter: var(--tm-icon-filter) drop-shadow(0 0 28px rgba(var(--tm-hi-rgb),0.9)); opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .08s; }
+  /* Stage D: 이름 옆에 실제로 붙게 될 "출석왕" 뱃지를 확대해서 미리 보여줌(name-badge와 동일한 금속 광택 스윕 재사용) */
+  .tm-badge-preview {
+    position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+    opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .08s;
+  }
+  .tm-badge-big { font-size: 18px; padding: 8px 16px 8px 13px; gap: 5px; box-shadow: 0 8px 20px -6px rgba(var(--tm-c2-rgb, 245,165,36),0.7), inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 3px rgba(0,0,0,0.2); }
+  .tm-badge-name { font-size: 19px; font-weight: 800; color: #fff; }
+  .tm-grant-title2 { position: relative; z-index: 2; margin-top: 16px; color: #fff; font-size: 20px; font-weight: 900; text-align: center; line-height: 1.4; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .16s; }
+  .tm-grant-title2 .hi { color: var(--tm-hi); }
+  .tm-grant-sub2 { position: relative; z-index: 2; margin-top: 8px; color: #CBD0E6; font-size: 13px; text-align: center; opacity: 0; animation: tmTextIn .4s ease both; animation-delay: .24s; }
+
+  .tm-confirm-btn {
+    position: relative; z-index: 2; margin-top: 26px; background: linear-gradient(135deg,var(--tm-c1),var(--tm-c2)); color: var(--tm-text);
+    font-weight: 800; font-size: 14.5px; padding: 13px 40px; border-radius: 999px; border: none; font-family: inherit; cursor: pointer;
+    opacity: 0; animation: tmTextIn .35s ease both; animation-delay: .3s;
+  }
+
+  /* ---- 명예 훈장(그동안 받은 MVP 트로피 모음) + 이름 옆 출석왕 배지 ---- */
+  .honor-case { margin: 14px 24px 0; border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; background: linear-gradient(180deg, #FFFDF6, #fff); }
+  .honor-case .hc-title { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .honor-case .hc-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .hc-item { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 52px; }
+  .hc-circle { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 23px; box-shadow: 0 6px 14px -6px rgba(245,165,36,0.7); }
+  .hc-circle.r1 { background: radial-gradient(circle at 40% 35%, #FFE9B0, #F5A524 70%); }
+  .hc-circle.r2 { background: radial-gradient(circle at 40% 35%, #F1F4F9, #ADB8C9 70%); }
+  .hc-circle.r3 { background: radial-gradient(circle at 40% 35%, #F0D2B0, #C97F3C 70%); }
+  .hc-item .hc-lbl { font-size: 9.5px; color: var(--muted); font-weight: 600; text-align: center; line-height: 1.3; }
+  .hc-item.new-badge .hc-circle { animation: hcPop .45s ease; }
+  @keyframes hcPop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+  /* --tm-c1/--tm-c2/--tm-text는 트로피 모달의 순위 색(금/은/동)과 완전히 같은 변수 이름을 재사용함.
+     트로피 모달 안(Stage D 미리보기)에서는 자동으로 그 순위 색을 물려받고, 모달 밖(이름 옆 상시
+     뱃지)에서는 기본값(금색)을 쓰다가 JS가 붙여주는 .rank-2/.rank-3 클래스로 은색/동색이 됨 */
+  .name-badge {
+    position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 3px;
+    background: linear-gradient(135deg, var(--tm-c1, #FFD76A), var(--tm-c2, #F5A524));
+    color: var(--tm-text, #3B2200); font-size: 12px; font-weight: 800; padding: 3px 9px 3px 7px; border-radius: 999px; vertical-align: middle;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 2px rgba(0,0,0,0.2);
+  }
+  .name-badge.rank-2 { --tm-c1: #DCE3EC; --tm-c2: #ADB8C9; --tm-text: #2B3242; }
+  .name-badge.rank-3 { --tm-c1: #E2A468; --tm-c2: #C97F3C; --tm-text: #4A2A0E; }
+
+  /* ---- 트로피 증정 확인 후: 트로피가 "명예 훈장" 칸으로 날아가는 연출(코인 연출과 같은 방식) ---- */
+  .trophy-fly {
+    position: fixed; font-size: 42px; transform: translate(0,0) scale(1); opacity: 1;
+    transition: transform .78s cubic-bezier(.2,.7,.3,1), opacity .78s ease-in;
+    filter: drop-shadow(0 4px 10px rgba(245,165,36,0.6)); z-index: 71;
+  }
+
+  /* ---- 축하 팝업 "확인" 이후: 코인이 포인트 칸으로 날아가며 숫자가 올라가는 연출 ---- */
+  .coin-fly-layer { position: fixed; inset: 0; pointer-events: none; z-index: 70; }
+  .coin-fly {
+    position: fixed; font-size: 22px; transform: translate(0, 0) scale(1); opacity: 1;
+    transition: transform 0.65s cubic-bezier(.2,.7,.3,1), opacity 0.65s ease-in;
+    filter: drop-shadow(0 4px 8px rgba(224,137,0,0.5));
+  }
+  @keyframes pointsImpact {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.14); }
+    55% { transform: scale(0.96); }
+    100% { transform: scale(1); }
+  }
+  .points-impact {
+    animation: pointsImpact 0.6s ease;
+    box-shadow: 0 0 0 3px rgba(245,165,36,0.35), 0 10px 20px -8px rgba(245,165,36,0.55);
+  }
+
+  .cal-wrap { padding: 20px 24px 8px; }
+  .cal-head { font-size: 14.5px; font-weight: 800; margin-bottom: 12px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-wd { text-align: center; font-size: 10.5px; color: var(--muted); padding-bottom: 4px; font-weight: 600; }
+  .cal-cell { aspect-ratio: 1; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #A6A9BC; background: var(--panel); }
+  .cal-cell.blank { visibility: hidden; }
+  .cal-cell.attended { background: var(--green-bg); color: var(--green); font-weight: 800; font-size: 15px; }
+  .cal-cell.today-pending { background: var(--brand); color: #fff; font-weight: 800; font-size: 11px; cursor: pointer; box-shadow: 0 8px 16px -8px rgba(61,95,255,0.6); border: none; font-family: inherit; }
+  .cal-cell.today-muted { background: #fff; border: 1.5px dashed var(--line); color: var(--muted); font-weight: 700; }
+  .legend { display: flex; gap: 14px; padding: 12px 24px 0; font-size: 10.5px; color: var(--muted); flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .legend .sw.on { background: var(--green-bg); border: 1px solid var(--green); }
+  .legend .sw.pending { background: var(--brand); }
+  /* ---- 출석 리워드(보상 로드맵) - 40/70/100일 트랙 + 카드 ---- */
+  .roadmap { margin: 26px 24px 0; }
+  .roadmap .rm-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 3px; }
+  .roadmap .rm-head .t { font-size: 15.5px; font-weight: 900; letter-spacing: -0.3px; }
+  .roadmap .rm-head .t .ic { margin-right: 3px; }
+  .roadmap .rm-sub { font-size: 11px; color: var(--muted); margin: 2px 0 14px; }
+
+  .rm-track-card {
+    background: linear-gradient(150deg, #1B1E4A 0%, #2A2F6B 45%, #3D5FFF 100%);
+    border-radius: 20px; padding: 18px 16px 24px; position: relative; overflow: hidden; margin-bottom: 14px;
+  }
+  .rm-track-card::before {
+    content: ""; position: absolute; top: -50px; right: -40px; width: 160px; height: 160px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%);
+  }
+  .rm-track-top { display: flex; align-items: baseline; justify-content: space-between; color: #fff; position: relative; z-index: 1; }
+  .rm-track-top .lbl { font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; }
+  .rm-track-top .val { font-size: 19px; font-weight: 900; }
+  .rm-track-top .val span { font-size: 11.5px; font-weight: 700; color: rgba(255,255,255,0.65); }
+
+  .rm-track { position: relative; margin: 24px 6px 4px; height: 38px; }
+  .rm-track-line { position: absolute; top: 17px; left: 0; right: 0; height: 5px; background: rgba(255,255,255,0.22); border-radius: 6px; }
+  .rm-track-fill { position: absolute; top: 17px; left: 0; height: 5px; background: linear-gradient(90deg, #FFE9B0, #F5A524); border-radius: 6px; box-shadow: 0 0 10px rgba(245,165,36,0.7); transition: width .5s ease; }
+  .rm-node { position: absolute; top: 0; width: 38px; height: 38px; transform: translateX(-50%); text-align: center; }
+  .rm-node .circ {
+    width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; border: 2.5px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.12);
+  }
+  .rm-node.done .circ { background: #fff; border-color: #fff; box-shadow: 0 6px 14px -4px rgba(0,0,0,0.35); }
+  .rm-node .day { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 800; color: rgba(255,255,255,0.85); white-space: nowrap; }
+  .rm-me { position: absolute; top: -14px; width: 20px; height: 20px; transform: translateX(-50%); transition: left .5s ease; }
+  .rm-me .pin { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid var(--gold); box-shadow: 0 0 0 4px rgba(245,165,36,0.35); }
+
+  .rm-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 1.5px solid var(--line); border-radius: 18px; padding: 13px; margin-bottom: 9px; cursor: pointer; width: 100%; text-align: left; font-family: inherit; }
+  .rm-card.next { border-color: var(--gold); box-shadow: 0 10px 22px -12px rgba(245,165,36,0.55); }
+  .rm-card.locked { background: var(--panel); }
+  .rm-card.got { border-color: var(--green); background: var(--green-bg); }
+  .rm-thumb { width: 50px; height: 50px; border-radius: 15px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background: #EEF1FF; }
+  .rm-card.next .rm-thumb { background: linear-gradient(155deg, #EEF1FF, #FFF3DD); }
+  .rm-card.locked .rm-thumb { background: #E9EBF3; }
+  .rm-card.got .rm-thumb { background: #fff; }
+  .rm-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+  .rm-thumb .emoji { font-size: 22px; }
+  .rm-card.locked .rm-thumb .emoji, .rm-card.locked .rm-thumb img { filter: grayscale(1) opacity(0.5); }
+  .rm-lock-badge { position: absolute; bottom: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #A6A9BC; color: #fff; font-size: 9px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+  .rm-got-badge { position: absolute; bottom: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: var(--green); color: #fff; font-size: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+  .rm-body { flex: 1; min-width: 0; }
+  .rm-body .top-row { display: flex; align-items: center; gap: 6px; }
+  .rm-body .name { font-size: 13px; font-weight: 800; }
+  .rm-tag { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 999px; flex: 0 0 auto; }
+  .rm-tag.next { background: #FFF3DD; color: #92400e; }
+  .rm-tag.got { background: #fff; color: var(--green); }
+  .rm-body .days { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .rm-card.locked .name, .rm-card.locked .days { color: #A6A9BC; }
+  .rm-mini-track { height: 5px; border-radius: 4px; background: var(--line); margin-top: 7px; overflow: hidden; }
+  .rm-mini-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--brand), #6C8CFF); }
+  .rm-mini-fill.gold { background: linear-gradient(90deg, var(--gold), #FFD76A); }
+  .rm-mini-fill.green { background: linear-gradient(90deg, var(--green), #4ADE80); }
+  .rm-arrow { font-size: 11.5px; color: var(--muted); flex: 0 0 auto; font-weight: 700; }
+  .rm-card.next .rm-arrow { color: #C9740B; }
+  .rm-card.got .rm-arrow { color: var(--green); }
+
+  .reset-link { display: block; text-align: center; padding: 24px 24px 30px; font-size: 11.5px; color: var(--muted); text-decoration: underline; background: none; border: none; font-family: inherit; width: 100%; cursor: pointer; }
+
+  /* ---- 리워드 상세 화면(트로피 상세와 비슷하게 뒤로가기 있는 전체화면) ---- */
+  .dt-appbar { display: flex; align-items: center; gap: 10px; padding: 18px 24px 4px; }
+  .dt-back { width: 30px; height: 30px; border-radius: 50%; background: var(--panel); border: none; display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--ink); cursor: pointer; }
+  .dt-appbar .t { font-size: 14.5px; font-weight: 800; }
+
+  .dt-hero {
+    margin: 14px 24px 0; border-radius: 24px; padding: 28px 18px 24px; position: relative; overflow: hidden;
+    background: radial-gradient(circle at 30% 0%, #3F4DA8 0%, #23265E 60%, #171938 100%);
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .dt-hero::before { content:""; position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background: radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%); }
+  .dt-hero::after { content:""; position:absolute; bottom:-60px; right:-40px; width:180px; height:180px; border-radius:50%; background: radial-gradient(circle, rgba(245,165,36,0.22), transparent 70%); }
+  .dt-tag { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.14); color: #FFE9B0; font-size: 10.5px; font-weight: 800; padding: 5px 11px; border-radius: 999px; margin-bottom: 15px; }
+  .dt-img-wrap { position: relative; z-index: 1; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.16), rgba(255,255,255,0.02)); display:flex; align-items:center; justify-content:center; }
+  .dt-img-wrap img { width: 116px; height: auto; filter: drop-shadow(0 18px 20px rgba(0,0,0,0.45)); }
+  .dt-img-wrap .emoji { font-size: 62px; filter: drop-shadow(0 12px 14px rgba(0,0,0,0.4)); }
+  .dt-name { position: relative; z-index: 1; color: #fff; font-size: 16.5px; font-weight: 900; margin-top: 16px; letter-spacing: -0.2px; }
+  .dt-desc { position: relative; z-index: 1; color: rgba(255,255,255,0.65); font-size: 11px; margin-top: 4px; }
+
+  .dt-body { padding: 22px 24px 30px; }
+  .dt-section-title { font-size: 13px; font-weight: 900; margin-bottom: 13px; display: flex; align-items: center; gap: 5px; }
+
+  .dt-ring-card { display: flex; align-items: center; gap: 18px; background: var(--panel); border-radius: 20px; padding: 18px; margin-bottom: 13px; }
+  .dt-ring { flex: 0 0 auto; }
+  .dt-ring-stats { flex: 1; }
+  .dt-ring-stats .big { font-size: 20px; font-weight: 900; }
+  .dt-ring-stats .big span { color: var(--brand); }
+  .dt-ring-stats .pct { font-size: 10.5px; color: var(--muted); margin-top: 2px; font-weight: 700; }
+
+  .dt-stat-row { display: flex; gap: 10px; margin-bottom: 13px; }
+  .dt-stat { flex: 1; border-radius: 16px; padding: 14px 13px; text-align: center; position: relative; overflow: hidden; }
+  .dt-stat.done { background: var(--green-bg); }
+  .dt-stat.left { background: linear-gradient(150deg, #FFF3DD, #FFE3B0); }
+  .dt-stat .k { font-size: 10px; font-weight: 800; color: var(--muted); }
+  .dt-stat.left .k { color: #92400e; }
+  .dt-stat .v { font-size: 23px; font-weight: 900; margin-top: 4px; }
+  .dt-stat.done .v { color: var(--green); }
+  .dt-stat.left .v { color: #C9740B; }
+  .dt-stat .v span { font-size: 12px; font-weight: 800; }
+  .dt-stat .spark { position: absolute; font-size: 28px; opacity: 0.16; right: -4px; bottom: -6px; }
+
+  .dt-hype { display: flex; align-items: center; gap: 10px; border-radius: 16px; padding: 13px 15px; color: #fff; }
+  .dt-hype.pace { background: linear-gradient(90deg, #3D5FFF, #6C4CFF); box-shadow: 0 14px 24px -12px rgba(61,95,255,0.55); }
+  .dt-hype.celebrate { background: linear-gradient(90deg, #16A34A, #22C55E); box-shadow: 0 14px 24px -12px rgba(22,163,74,0.5); }
+  .dt-hype.done { background: linear-gradient(90deg, #6B7280, #9AA1B4); box-shadow: 0 14px 24px -12px rgba(107,114,128,0.4); }
+  .dt-hype .ic { font-size: 19px; flex: 0 0 auto; }
+  .dt-hype .txt { font-size: 11.5px; font-weight: 800; line-height: 1.55; }
+  .dt-hype .txt .hi { color: #FFE9B0; }
+  .dt-hype.celebrate .txt .hi, .dt-hype.done .txt .hi { color: #fff; }
+
+  .dt-foot-note { text-align: center; font-size: 10px; color: var(--muted); margin-top: 15px; line-height: 1.6; }
+
+  /* ---- 이달의 출석왕 화면 ---- */
+  .lb-header {
+    background: linear-gradient(165deg, #1B1E4A 0%, #2A2F6B 45%, #3D5FFF 100%);
+    padding: 20px 24px 34px; color: #fff; position: relative; overflow: hidden;
+  }
+  .lb-header::before {
+    content: ""; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%);
+  }
+  .lb-topbar { display: flex; align-items: center; gap: 10px; }
+  .lb-back { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-size: 15px; border: none; color: #fff; cursor: pointer; }
+  .lb-topbar .name { font-weight: 800; font-size: 13.5px; color: rgba(255,255,255,0.85); }
+  .lb-titlewrap { text-align: center; margin-top: 14px; position: relative; }
+  .lb-trophy { font-size: 34px; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.25)); }
+  .lb-title { font-size: 21px; font-weight: 900; margin-top: 6px; letter-spacing: -0.3px; }
+  .lb-sub { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 5px; }
+
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: 10px; padding: 30px 20px 0; margin-top: -6px; position: relative; z-index: 1; min-height: 170px; }
+  .p-col { flex: 1; max-width: 138px; display: flex; flex-direction: column; align-items: center; position: relative; }
+  .p-medal { font-size: 22px; margin-bottom: 8px; }
+  .p-avatar-wrap { position: relative; margin-bottom: 10px; }
+  .p-avatar { border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; color: var(--brand); box-shadow: 0 10px 18px -8px rgba(0,0,0,0.35); }
+  .p-col.gold .p-avatar { width: 74px; height: 74px; font-size: 24px; border: 3px solid var(--gold); }
+  .p-col.silver .p-avatar { width: 60px; height: 60px; font-size: 20px; border: 3px solid #CBD3E1; }
+  .p-col.bronze .p-avatar { width: 60px; height: 60px; font-size: 20px; border: 3px solid #E0A872; }
+  .p-crown { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 22px; }
+  .p-name { font-size: 12.5px; font-weight: 800; color: #fff; text-align: center; }
+  .p-count { margin-top: 8px; font-size: 15.5px; font-weight: 900; color: var(--gold); }
+  .p-col.silver .p-count, .p-col.bronze .p-count { color: #fff; }
+  .p-countlabel { font-size: 9.5px; color: rgba(255,255,255,0.6); margin-top: -1px; }
+  .p-bar { width: 100%; border-radius: 14px 14px 0 0; margin-top: 14px; }
+  .p-col.gold .p-bar { height: 40px; background: linear-gradient(180deg, rgba(245,165,36,0.9), rgba(245,165,36,0.55)); }
+  .p-col.silver .p-bar { height: 28px; background: linear-gradient(180deg, rgba(255,255,255,0.34), rgba(255,255,255,0.16)); }
+  .p-col.bronze .p-bar { height: 20px; background: linear-gradient(180deg, rgba(224,168,114,0.55), rgba(224,168,114,0.3)); }
+
+  .lb-empty { padding: 34px 24px 6px; text-align: center; color: rgba(255,255,255,0.85); font-size: 13px; line-height: 1.7; }
+  .lb-empty .ic { font-size: 30px; margin-bottom: 8px; }
+
+  .lb-body { padding: 22px 24px 30px; }
+  .lb-note {
+    display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 14px; font-size: 11.5px; color: var(--muted); line-height: 1.55;
+  }
+  .lb-note .ic { font-size: 16px; flex: 0 0 auto; }
+
+  .my-rank-card {
+    margin-top: 16px; display: flex; align-items: center; gap: 12px; background: var(--brand-bg);
+    border: 1.5px solid var(--brand); border-radius: 16px; padding: 13px 15px;
+  }
+  .my-rank-num { width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; flex: 0 0 auto; }
+  .my-rank-txt .t1 { font-size: 12.5px; font-weight: 800; }
+  .my-rank-txt .t2 { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .my-rank-count { margin-left: auto; font-size: 15px; font-weight: 900; color: var(--brand); }
+
+  /* ---- 출석/포인트 기록 팝업(누적 출석·포인트 칸 클릭 시) ---- */
+  .log-card { width: min(92vw, 340px); max-height: 74vh; background: #fff; border-radius: 24px; box-shadow: 0 30px 60px -20px rgba(15,17,35,0.5); transform: scale(.92); transition: transform .18s; display: flex; flex-direction: column; overflow: hidden; }
+  .overlay.show .log-card { transform: scale(1); }
+  .log-popup { max-height: 74vh; display: flex; flex-direction: column; text-align: left; padding: 22px 0 0; }
+  .log-popup-head { padding: 0 22px 14px; border-bottom: 1px solid var(--line); }
+  .log-popup-head-top { display: flex; align-items: center; justify-content: space-between; }
+  .log-popup-head .t { font-size: 14.5px; font-weight: 800; }
+  .log-popup-head .sum { margin-top: 7px; display: flex; gap: 8px; }
+  .log-popup-head .sum .chip { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+  .log-popup-head .sum .chip.days { background: var(--brand-bg); color: var(--brand); }
+  .log-popup-head .sum .chip.pts { background: #FFF3DC; color: #B4790C; }
+  .log-close { width: 26px; height: 26px; border-radius: 50%; background: var(--panel); border: none; color: var(--muted); font-size: 13px; cursor: pointer; flex: 0 0 auto; }
+  .log-list { overflow-y: auto; padding: 6px 22px; flex: 1; }
+  .log-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .log-row:last-child { border-bottom: none; }
+  .log-date { color: var(--ink); font-weight: 600; }
+  .log-right { display: flex; align-items: center; gap: 6px; }
+  .log-right .b1 { font-weight: 800; color: var(--green); font-size: 12px; background: var(--green-bg); padding: 3px 8px; border-radius: 8px; }
+  .log-right .b2 { font-weight: 800; color: #B4790C; font-size: 12px; background: #FFF3DC; padding: 3px 8px; border-radius: 8px; }
+  .log-empty { padding: 30px 0; text-align: center; color: var(--muted); font-size: 12.5px; }
+  .log-popup-foot { padding: 14px 22px 22px; }
+  .log-popup-foot button { width: 100%; padding: 13px; border: none; border-radius: 14px; background: var(--brand); color: #fff; font-size: 14.5px; font-weight: 800; font-family: inherit; cursor: pointer; }
+
+  /* ---- 포인트 적립 팝업 ---- */
+  .overlay { position: fixed; inset: 0; background: rgba(15,17,35,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 50; }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .popup { width: min(88vw, 300px); background: #fff; border-radius: 24px; padding: 30px 26px 26px; text-align: center; box-shadow: 0 30px 60px -20px rgba(15,17,35,0.5); transform: scale(.92); transition: transform .18s; overflow: visible; }
+  .overlay.show .popup { transform: scale(1); }
+  .coin-wrap { position: relative; width: 78px; height: 78px; margin: 0 auto 16px; }
+  .coin { width: 78px; height: 78px; border-radius: 50%; background: linear-gradient(150deg, #FFE9B8, var(--gold)); display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 800; color: #fff; box-shadow: 0 12px 22px -10px rgba(245,165,36,0.6); position: relative; z-index: 2; }
+  .popup.is-error .coin { background: linear-gradient(150deg, #fee2e2, #fca5a5); }
+  .coin-glow { position: absolute; inset: -20px; border-radius: 50%; background: radial-gradient(circle, rgba(245,165,36,0.5), transparent 70%); opacity: 0; z-index: 0; }
+  .coin-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--gold); opacity: 0; z-index: 1; }
+  .coin-spark { position: absolute; top: 50%; left: 50%; font-size: 13px; opacity: 0; z-index: 3; }
+  .popup.checkin-pop .coin { animation: coinPopIn .55s cubic-bezier(.34,1.56,.64,1); }
+  .popup.checkin-pop .coin-glow { animation: coinGlowBurst .9s ease-out; }
+  .popup.checkin-pop .coin-ring { animation: coinRingBurst .7s ease-out; }
+  .popup.checkin-pop .coin-spark { animation: coinSparkOut .7s ease-out .05s both; }
+  .popup.checkin-pop .coin-spark:nth-child(4) { --tx: 34px; --ty: -30px; animation-delay: .02s; }
+  .popup.checkin-pop .coin-spark:nth-child(5) { --tx: -36px; --ty: -26px; animation-delay: .06s; }
+  .popup.checkin-pop .coin-spark:nth-child(6) { --tx: 40px; --ty: 10px; animation-delay: .1s; }
+  .popup.checkin-pop .coin-spark:nth-child(7) { --tx: -42px; --ty: 8px; animation-delay: .04s; }
+  .popup.checkin-pop .coin-spark:nth-child(8) { --tx: 18px; --ty: 40px; animation-delay: .12s; }
+  .popup.checkin-pop .coin-spark:nth-child(9) { --tx: -18px; --ty: 42px; animation-delay: .08s; }
+  @keyframes coinPopIn { 0% { transform: scale(0) rotate(-30deg); } 60% { transform: scale(1.18) rotate(10deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes coinGlowBurst { 0% { opacity: 0; transform: scale(.4); } 35% { opacity: 1; } 100% { opacity: 0; transform: scale(1.7); } }
+  @keyframes coinRingBurst { 0% { opacity: .9; transform: scale(.5); } 100% { opacity: 0; transform: scale(2.1); } }
+  @keyframes coinSparkOut { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.3); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1); } }
+  .popup .big { font-size: 19px; font-weight: 800; margin-bottom: 6px; }
+  .popup.checkin-pop .big { animation: popupTextIn .4s ease .15s both; }
+  .popup .plus { font-size: 26px; font-weight: 900; color: var(--gold); margin-bottom: 10px; }
+  .popup.checkin-pop .plus { animation: popupTextIn .4s ease .25s both; }
+  @keyframes popupTextIn { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: translateY(0); } }
+  .popup .total { font-size: 12.5px; color: var(--muted); margin-bottom: 22px; }
+  .popup .total strong { color: var(--ink); }
+  .popup button { width: 100%; padding: 13px; border: none; border-radius: 14px; background: var(--brand); color: #fff; font-size: 14.5px; font-weight: 800; font-family: inherit; cursor: pointer; }
+
+  .loading-dim { opacity: .5; pointer-events: none; }
+
+  /* ---- 출석 체크 시 캘린더 칸에 도장 찍히는 연출 ---- */
+  .cal-cell { transition: background-color .35s ease, color .35s ease; }
+  .cal-cell.stamp-pulse { animation: calStampPulse .5s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes calStampPulse { 0% { transform: scale(1); } 45% { transform: scale(1.28); box-shadow: 0 0 0 6px rgba(22,163,74,0.18); } 100% { transform: scale(1); box-shadow: none; } }
+  .cal-stamp-mark { display: inline-block; animation: calStampMarkIn .5s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes calStampMarkIn { 0% { transform: scale(2.6) rotate(-22deg); opacity: 0; } 55% { transform: scale(0.85) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+
+  /* ---- 포인트 상점 화면 ---- */
+  .shop-balance { margin: 14px 24px 4px; padding: 20px 20px 22px; border-radius: 22px; position: relative; overflow: hidden;
+    background: linear-gradient(150deg, #2E2410 0%, #6B4B0F 55%, #F5A524 130%); color: #fff; }
+  .shop-balance::before { content: ""; position: absolute; top: -40px; right: -30px; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.22), transparent 70%); }
+  .shop-balance .lbl { font-size: 11.5px; color: rgba(255,255,255,0.75); font-weight: 700; display: flex; align-items: center; gap: 5px; position: relative; z-index: 1; }
+  .shop-balance .amt { font-size: 30px; font-weight: 900; margin-top: 6px; letter-spacing: -0.5px; position: relative; z-index: 1; }
+  .shop-balance .amt span { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.7); }
+  .shop-balance .hint { margin-top: 10px; font-size: 10.5px; color: rgba(255,255,255,0.65); position: relative; z-index: 1; }
+
+  .shop-sec-title { margin: 22px 24px 10px; font-size: 13px; font-weight: 900; display: flex; align-items: center; gap: 5px; }
+  .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 24px 30px; }
+  .shop-item { background: #fff; border: 1.3px solid var(--line); border-radius: 18px; padding: 14px 12px 13px; text-align: center; }
+  .shop-item .ic-wrap { width: 52px; height: 52px; margin: 0 auto 8px; border-radius: 16px; background: var(--panel); display: flex; align-items: center; justify-content: center; font-size: 26px; }
+  .shop-item .nm { font-size: 12.5px; font-weight: 800; line-height: 1.3; min-height: 32px; display: flex; align-items: center; justify-content: center; }
+  .shop-item .pr { font-size: 13.5px; font-weight: 900; color: #B4790C; margin: 4px 0 10px; }
+  .shop-item .redeem-btn { width: 100%; padding: 8px 0; border-radius: 10px; border: none; font-family: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
+  .shop-item .redeem-btn.ok { background: var(--brand); color: #fff; }
+  .shop-item .redeem-btn.no { background: var(--panel); color: var(--muted); cursor: default; }
+  .shop-empty { margin: 30px 24px; text-align: center; color: var(--muted); font-size: 12.5px; }
+
+  /* 교환 확인 팝업 */
+  .confirm-card { width: min(84vw, 300px); background: #fff; border-radius: 22px; padding: 26px 22px 20px; text-align: center; box-shadow: 0 30px 60px -20px rgba(15,17,35,0.5); transform: scale(.92); transition: transform .18s; }
+  .overlay.show .confirm-card { transform: scale(1); }
+  .confirm-card .ic-big { font-size: 40px; margin-bottom: 10px; }
+  .confirm-card .ttl { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+  .confirm-card .price { font-size: 13px; color: #B4790C; font-weight: 800; margin-bottom: 18px; }
+  .confirm-card .btn-row { display: flex; gap: 8px; }
+  .confirm-card .btn-row button { flex: 1; padding: 12px 0; border-radius: 12px; border: none; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+  .confirm-card .btn-row .cancel { background: var(--panel); color: var(--muted); }
+  .confirm-card .btn-row .go { background: var(--brand); color: #fff; }
+
+  /* 교환 완료 팝업(기존 출석 체크 완료 팝업과 같은 코인 톤을 재사용해서 "포인트가 쓰였다"는 느낌을 통일) */
+  .redeem-done-coin { width: 66px; height: 66px; border-radius: 50%; margin: 0 auto 14px; background: linear-gradient(150deg, #FFE9B8, var(--gold)); display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 12px 22px -10px rgba(245,165,36,0.6); }
+  .popup .desc { font-size: 12px; color: var(--muted); margin: 0 0 4px; line-height: 1.5; }
+  .popup .minus { font-size: 13px; font-weight: 800; color: #DC2626; margin: 6px 0 20px; }
+</style>
+<!-- 트로피 터지는 연출의 파티클(색종이/컨페티) 부분을 전문 모션 디자이너가 만든 애니메이션으로 재생하기
+     위해 Lottie 렌더러(lottie-web, airbnb/lottiefiles의 핵심 오픈소스 라이브러리)를 CDN에서 불러옴.
+     참고: 이 라이브러리를 감싼 별도 패키지 @lottiefiles/lottie-player의 2.0.5~2.0.7 버전이 2024년에
+     공급망 공격(암호화폐 지갑 탈취 악성코드 삽입)을 당한 적이 있어서, 그 래퍼 패키지 대신 더 오래되고
+     널리 검증된 핵심 렌더러(lottie-web)를 무결성 해시(integrity)와 함께 불러오는 방식을 씀. -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.5/lottie.min.js"
+  integrity="sha512-0bCDSnaX8FOD9Mq8WbHcDwshXwCB5V4EP+UBu87WQgga2b7lAsuEbaSmIZjH/XEmNhJuhrPbFHemre5HZwrk9w=="
+  crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="appbar"><span class="logo">C</span><span class="name">센터 그룹PT</span></div>
+
+  <div class="view" id="viewNoToken">
+    <div class="plain-msg">
+      <div class="ic">📱</div>
+      <h1>QR을 스캔해서 들어와주세요</h1>
+      <p>프런트에 있는 "오늘의 출석 QR"을<br/>휴대폰 카메라로 비춰주시면 돼요</p>
+    </div>
+  </div>
+
+  <div class="view" id="viewIdentify">
+    <div class="hero">
+      <h1>본인 확인 후<br/>출석 체크를 진행해요</h1>
+      <div class="sub">이름 또는 전화번호 뒷자리 4자리로 찾아주세요</div>
+    </div>
+    <div class="tabs">
+      <button type="button" class="tab active" id="tabName">이름으로 찾기</button>
+      <button type="button" class="tab" id="tabPhone">전화번호 뒷자리</button>
+    </div>
+    <div class="field-wrap">
+      <div class="field"><span class="ic">🔍</span><input id="searchInput" placeholder="이름을 입력해주세요" /></div>
+    </div>
+    <div class="search-hint" id="searchHint"></div>
+    <div class="result-wrap" id="resultWrap"></div>
+    <div class="err-text" id="identifyErr" style="display:none;"></div>
+    <div class="cta"><button type="button" id="confirmIdentityBtn" disabled>본인 확인하고 계속하기</button></div>
+    <div class="hint">본인이 아닌 다른 회원님을 선택하면 출석이 잘못 기록될 수 있어요</div>
+  </div>
+
+  <div class="view" id="viewCalendar">
+    <div class="cal-hero">
+      <h1 id="calGreeting">-</h1>
+      <div class="sub" id="calSub">캘린더의 파란 칸을 눌러 오늘 출석을 체크해주세요</div>
+    </div>
+    <div id="honorCaseWrap"></div>
+    <div id="mvpBonusWrap"></div>
+    <div class="stat-row">
+      <div class="stat-box clickable" id="statTotalDaysBox"><div class="label">누적 출석</div><div class="value" id="statTotalDays">-</div><div class="tap-hint">기록 보기 ›</div></div>
+      <div class="stat-box clickable shop" id="statPointsBox"><span class="shop-badge">SHOP</span><div class="label"><span class="bag-ic">🛍️</span>포인트</div><div class="value" id="statPoints">-</div><div class="tap-hint">상점 구경하기 ›</div></div>
+    </div>
+    <button type="button" class="leaderboard-banner" id="leaderboardBanner">
+      <span class="ic">🏆</span>
+      <span class="txt">
+        <span class="t1" id="lbBannerTitle">이달의 출석왕 보러가기</span>
+        <span class="t2">이번 달 가장 많이 출석한 TOP 3는 누구일까요?</span>
+      </span>
+      <span class="arrow">›</span>
+    </button>
+    <div class="cal-wrap">
+      <div class="cal-head" id="calMonthLabel">-</div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+    <div class="legend">
+      <span><span class="sw on"></span>출석 완료</span>
+      <span><span class="sw pending"></span>오늘, 탭하면 출석</span>
+    </div>
+    <div class="roadmap">
+      <div class="rm-head"><div class="t"><span class="ic">🎁</span>출석 리워드</div></div>
+      <div class="rm-sub">출석할수록 특별한 선물이 기다려요</div>
+      <div id="roadmapTrackWrap"></div>
+      <div id="roadmapList"></div>
+    </div>
+    <button type="button" class="reset-link" id="resetIdentityBtn">본인이 아니신가요? 다시 확인하기</button>
+  </div>
+
+  <div class="view" id="viewLeaderboard">
+    <div class="lb-header">
+      <div class="lb-topbar">
+        <button type="button" class="lb-back" id="lbBackBtn">‹</button>
+        <div class="name">센터 그룹PT</div>
+      </div>
+      <div class="lb-titlewrap">
+        <div class="lb-trophy">🏆</div>
+        <div class="lb-title" id="lbTitle">출석왕</div>
+        <div class="lb-sub" id="lbRangeSub">-</div>
+      </div>
+      <div id="lbPodiumWrap"></div>
+    </div>
+    <div class="lb-body">
+      <div class="lb-note"><span class="ic">ℹ️</span><span>매달 1일에 출석 횟수가 새로 시작돼요. 순위는 이번 달 출석 횟수만 반영하고, 오늘 기준으로 실시간 집계돼요.</span></div>
+      <div id="lbMyRankWrap"></div>
+    </div>
+  </div>
+
+  <div class="view" id="viewRewardDetail">
+    <div class="dt-appbar"><button type="button" class="dt-back" id="rdBackBtn">‹</button><div class="t" id="rdBarTitle">리워드</div></div>
+
+    <div class="dt-hero">
+      <div class="dt-tag" id="rdTag">-</div>
+      <div class="dt-img-wrap" id="rdImgWrap"></div>
+      <div class="dt-name" id="rdName">-</div>
+      <div class="dt-desc" id="rdDesc"></div>
+    </div>
+
+    <div class="dt-body">
+      <div class="dt-section-title">📊 나의 출석 현황</div>
+
+      <div class="dt-ring-card">
+        <div class="dt-ring" id="rdRing"></div>
+        <div class="dt-ring-stats">
+          <div class="big" id="rdRingBig">-</div>
+          <div class="pct" id="rdRingPct">-</div>
+        </div>
+      </div>
+
+      <div class="dt-stat-row">
+        <div class="dt-stat done"><div class="k">누적 출석</div><div class="v" id="rdDoneDays">-</div><div class="spark">✅</div></div>
+        <div class="dt-stat left"><div class="k">남은 출석</div><div class="v" id="rdLeftDays">-</div><div class="spark" id="rdLeftSpark">🔥</div></div>
+      </div>
+
+      <div class="dt-hype" id="rdHype">
+        <div class="ic" id="rdHypeIc">🔥</div>
+        <div class="txt" id="rdHypeTxt">-</div>
+      </div>
+
+      <div class="dt-foot-note">리워드는 목표 달성 시 자동으로 "지급 예정" 상태가 되며,<br>매장에서 직접 수령하실 수 있어요.</div>
+    </div>
+  </div>
+
+  <div class="view" id="viewPointShop">
+    <div class="dt-appbar"><button type="button" class="dt-back" id="shopBackBtn">‹</button><div class="t">포인트 상점</div></div>
+    <div class="shop-balance">
+      <div class="lbl">🛍️ 내 포인트</div>
+      <div class="amt" id="shopBalanceAmt">-<span>P</span></div>
+      <div class="hint">출석하고 모은 포인트로 다양한 선물로 교환해보세요</div>
+    </div>
+    <div class="shop-sec-title">🎁 교환 가능한 선물</div>
+    <div class="shop-grid" id="shopGrid"></div>
+  </div>
+
+  <div class="overlay" id="shopConfirmOverlay">
+    <div class="confirm-card">
+      <div class="ic-big" id="shopConfirmIc">🎁</div>
+      <div class="ttl" id="shopConfirmTtl">-</div>
+      <div class="price" id="shopConfirmPrice">-</div>
+      <div class="btn-row">
+        <button type="button" class="cancel" id="shopConfirmCancel">취소</button>
+        <button type="button" class="go" id="shopConfirmGo">교환하기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="shopDoneOverlay">
+    <div class="popup">
+      <div class="redeem-done-coin" id="shopDoneIc">🎁</div>
+      <div class="big" id="shopDoneTitle">교환 완료! 🎉</div>
+      <div class="desc" id="shopDoneDesc"></div>
+      <div class="minus" id="shopDoneMinus"></div>
+      <button type="button" id="shopDoneConfirmBtn">확인</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="logOverlay">
+    <div class="log-card">
+      <div class="log-popup">
+        <div class="log-popup-head">
+          <div class="log-popup-head-top"><span class="t">출석 기록</span><button type="button" class="log-close" id="logCloseBtn">✕</button></div>
+          <div class="sum"><span class="chip days" id="logDaysChip">-</span><span class="chip pts" id="logPtsChip">-</span></div>
+        </div>
+        <div class="log-list" id="logList"></div>
+        <div class="log-popup-foot"><button type="button" id="logConfirmBtn">확인</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="popup" id="popupBox">
+      <div class="coin-wrap">
+        <div class="coin-glow"></div>
+        <div class="coin-ring"></div>
+        <div class="coin" id="popupCoin">P</div>
+        <div class="coin-spark">✨</div>
+        <div class="coin-spark">✨</div>
+        <div class="coin-spark">⭐</div>
+        <div class="coin-spark">✨</div>
+        <div class="coin-spark">⭐</div>
+        <div class="coin-spark">✨</div>
+      </div>
+      <div class="big" id="popupTitle">출석 체크 완료!</div>
+      <div class="plus" id="popupPlus">+10P 적립</div>
+      <div class="total" id="popupTotal"></div>
+      <button id="confirmBtn">확인</button>
+    </div>
+  </div>
+
+  <div class="trophy-modal" id="trophyModal">
+    <div class="tm-flash-pulse" id="tmFlashPulse"></div>
+    <button type="button" class="trophy-modal-close" id="trophyModalClose">✕</button>
+
+    <div class="tm-stage" id="tmStageA">
+      <div class="tm-orb"><div class="tm-orb-halo"></div><div class="tm-trophy-big" id="tmTrophyBig">🏆</div></div>
+      <div class="tm-rank-badge" id="tmRankBadge">-</div>
+      <div class="tm-hint">트로피를 눌러서 열어보세요 👆</div>
+    </div>
+
+    <div class="tm-stage" id="tmStageB" style="display:none;">
+      <div class="tm-burst-zone">
+        <div class="tm-shockwave" id="tmShockwave1"></div>
+        <div class="tm-shockwave ring2" id="tmShockwave2"></div>
+        <div class="tm-lottie-burst" id="tmLottieBurst"></div>
+        <canvas class="tm-burst-canvas" id="tmBurstCanvas" width="300" height="300" style="display:none;"></canvas>
+        <div class="tm-core-flash" id="tmCoreFlash"></div>
+        <div class="tm-trophy-mini" id="tmTrophyMini">🏆</div>
+      </div>
+      <div class="tm-grant-title" id="tmGrantTitle">-</div>
+      <div class="tm-grant-amount" id="tmGrantAmount">-</div>
+      <div class="tm-grant-sub" id="tmGrantSub"></div>
+      <button type="button" class="tm-confirm-btn" id="tmConfirmB">확인</button>
+    </div>
+
+    <div class="tm-stage" id="tmStageC" style="display:none;">
+      <div class="tm-glow-static"></div>
+      <div class="tm-ring1"></div>
+      <div class="tm-ring2"></div>
+      <div class="tm-ribbon">TROPHY GET</div>
+      <div class="tm-trophy-grant" id="tmTrophyGrant">🏆</div>
+      <div class="tm-grant-title2" id="tmGrantTitle2">-</div>
+      <div class="tm-grant-sub2">확인을 누르면 내 명예 훈장에 담겨요</div>
+      <button type="button" class="tm-confirm-btn" id="tmConfirmC">확인</button>
+    </div>
+
+    <div class="tm-stage" id="tmStageD" style="display:none;">
+      <div class="tm-glow-static"></div>
+      <div class="tm-ring1"></div>
+      <div class="tm-ring2"></div>
+      <div class="tm-ribbon">BADGE GET</div>
+      <div class="tm-badge-preview">
+        <span class="name-badge tm-badge-big">🏆 출석왕</span>
+        <span class="tm-badge-name" id="tmBadgeName">-</span>
+      </div>
+      <div class="tm-grant-title2">이름 앞에<br><span class="hi">출석왕 뱃지</span> 등록!</div>
+      <div class="tm-grant-sub2">확인하면 바로 이름 옆에 뱃지가 붙어요</div>
+      <button type="button" class="tm-confirm-btn" id="tmConfirmD">확인</button>
+    </div>
+  </div>
+
+  <script src="config.js?v=1790338841"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const qrToken = params.get('t');
+    const STORAGE_KEY = 'gymops_attend_member_id';
+    const POINTS_PER_CHECKIN = 10; // group_pt_checkin 함수 안의 값과 항상 같아야 함(포인트 내역 팝업 표시용)
+    // 테스트 계정(이호석, 010-6227-7915) 전용: URL에 ?testRank=2 또는 ?testRank=3을 붙이면 1등이 아니라
+    // 2등/3등 화면도 미리 볼 수 있음(예: attend.html?testRank=2). 일반 회원에게는 전혀 영향 없음 -
+    // 서버(group_pt_mvp_bonus_status/claim) 쪽에서도 테스트 계정일 때만 이 값을 사용함.
+    const testRankParam = params.get('testRank');
+    const TEST_RANK = ['1', '2', '3'].includes(testRankParam) ? Number(testRankParam) : null;
+
+    async function callRpc(fnName, payload) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify(payload || {})
+      });
+      if (!res.ok) {
+        let msg = '요청 처리 중 문제가 발생했어요.';
+        try { const j = await res.json(); if (j && j.message) msg = j.message; } catch (e) {}
+        throw new Error(msg);
+      }
+      return res.json();
+    }
+
+    function showView(id) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      // 이달의 출석왕 화면은 자체 헤더(뒤로가기 포함)가 있어서 위쪽 공용 appbar와 겹치지 않게 숨김
+      document.querySelector('.appbar').style.display = (id === 'viewLeaderboard') ? 'none' : '';
+    }
+
+    // ---- 본인 확인 화면 ----
+    let searchMode = 'name'; // 'name' | 'phone'
+    let selectedCandidate = null;
+    let searchDebounce = null;
+
+    document.getElementById('tabName').addEventListener('click', () => {
+      searchMode = 'name';
+      document.getElementById('tabName').classList.add('active');
+      document.getElementById('tabPhone').classList.remove('active');
+      document.getElementById('searchInput').placeholder = '이름을 입력해주세요';
+      document.getElementById('searchInput').value = '';
+      resetSearchResults();
+    });
+    document.getElementById('tabPhone').addEventListener('click', () => {
+      searchMode = 'phone';
+      document.getElementById('tabPhone').classList.add('active');
+      document.getElementById('tabName').classList.remove('active');
+      document.getElementById('searchInput').placeholder = '전화번호 뒷자리 4자리';
+      document.getElementById('searchInput').value = '';
+      resetSearchResults();
+    });
+
+    function resetSearchResults() {
+      selectedCandidate = null;
+      document.getElementById('resultWrap').innerHTML = '';
+      document.getElementById('confirmIdentityBtn').disabled = true;
+      document.getElementById('identifyErr').style.display = 'none';
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      resetSearchResults();
+      const q = e.target.value.trim();
+      clearTimeout(searchDebounce);
+      const minLen = searchMode === 'phone' ? 4 : 2;
+      if (q.length < minLen) {
+        document.getElementById('searchHint').textContent = searchMode === 'phone' ? '뒷자리 4자리를 입력해주세요' : '2글자 이상 입력해주세요';
+        return;
+      }
+      document.getElementById('searchHint').textContent = '';
+      searchDebounce = setTimeout(() => runSearch(q), 300);
+    });
+
+    async function runSearch(q) {
+      try {
+        const rows = await callRpc('group_pt_search_members', { p_query: q });
+        renderSearchResults(rows);
+      } catch (err) {
+        document.getElementById('identifyErr').textContent = err.message;
+        document.getElementById('identifyErr').style.display = 'block';
+      }
+    }
+
+    function renderSearchResults(rows) {
+      const wrap = document.getElementById('resultWrap');
+      if (!rows || rows.length === 0) {
+        wrap.innerHTML = `<div class="hint" style="padding:8px 0;">일치하는 회원을 찾지 못했어요. 프런트 직원에게 문의해주세요.</div>`;
+        return;
+      }
+      wrap.innerHTML = rows.map(r => `
+        <button type="button" class="m-card" data-id="${r.member_id}" data-name="${r.display_name}" data-class="${r.class_label || ''}">
+          <div class="m-avatar">${(r.display_name || '?').slice(0,1)}</div>
+          <div><div class="m-name">${r.display_name}</div><div class="m-sub">${r.class_label || '그룹PT'}${r.phone_hint ? ' · ' + r.phone_hint : ''}</div></div>
+          <div class="m-check"></div>
+        </button>
+      `).join('');
+      wrap.querySelectorAll('.m-card').forEach(card => {
+        card.addEventListener('click', () => {
+          wrap.querySelectorAll('.m-card').forEach(c => { c.classList.remove('selected'); c.querySelector('.m-check').textContent = ''; });
+          card.classList.add('selected');
+          card.querySelector('.m-check').textContent = '✓';
+          selectedCandidate = { id: card.dataset.id, name: card.dataset.name };
+          document.getElementById('confirmIdentityBtn').disabled = false;
+        });
+      });
+    }
+
+    document.getElementById('confirmIdentityBtn').addEventListener('click', () => {
+      if (!selectedCandidate) return;
+      try { localStorage.setItem(STORAGE_KEY, selectedCandidate.id); } catch (e) {}
+      loadCalendarView(selectedCandidate.id);
+    });
+
+    document.getElementById('resetIdentityBtn').addEventListener('click', () => {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      if (!qrToken) { showView('viewNoToken'); return; }
+      resetSearchResults();
+      document.getElementById('searchInput').value = '';
+      showView('viewIdentify');
+    });
+
+    // ---- 캘린더 화면 ----
+    let statusCache = null;
+    let hasValidTodayToken = false;
+
+    async function loadCalendarView(memberId) {
+      showView('viewCalendar');
+      document.getElementById('calGreeting').textContent = '불러오는 중...';
+      try {
+        const [statusRows, valid, historyRows] = await Promise.all([
+          callRpc('group_pt_get_member_status', { p_member_id: memberId }),
+          qrToken ? callRpc('group_pt_validate_token', { p_token: qrToken }) : Promise.resolve(false),
+          callRpc('group_pt_mvp_bonus_history', { p_member_id: memberId }).catch(() => [])
+        ]);
+        statusCache = (statusRows && statusRows[0]) || null;
+        hasValidTodayToken = !!valid;
+        myHonorHistory = historyRows || [];
+        // 서버가 최신순(bonus_year desc, bonus_month desc)으로 내려주므로 0번째가 제일 최근 - 이름
+        // 옆 "출석왕" 뱃지 색(금/은/동)은 제일 최근에 받은 순위를 기준으로 함
+        myLatestBadgeRank = myHonorHistory.length ? myHonorHistory[0].rank : null;
+      } catch (err) {
+        document.getElementById('calGreeting').textContent = '불러오지 못했어요';
+        document.getElementById('calSub').textContent = err.message;
+        return;
+      }
+      if (!statusCache) {
+        document.getElementById('calGreeting').textContent = '회원 정보를 찾을 수 없어요';
+        return;
+      }
+      renderCalendarView();
+      renderHonorCase();
+      checkMvpBonus(memberId);
+    }
+
+    function renderGreeting() {
+      if (!statusCache) return;
+      const hasTrophy = myHonorHistory.length > 0;
+      // 뱃지도 트로피 모달과 똑같은 색상 변수(--tm-c1/--tm-c2/--tm-text)를 쓰는 name-badge 클래스를
+      // 재사용하기 때문에, rank-2/rank-3 클래스만 붙여주면 은색/동색으로 저절로 바뀜(1등이거나
+      // 순위를 모르면 기본값인 금색 그대로)
+      const badgeRankClass = myLatestBadgeRank === 2 ? ' rank-2' : myLatestBadgeRank === 3 ? ' rank-3' : '';
+      document.getElementById('calGreeting').innerHTML =
+        `${hasTrophy ? `<span class="name-badge${badgeRankClass}">🏆 출석왕</span> ` : ''}${escapeHtmlAttend(statusCache.display_name)}님, 오늘도 출석해볼까요? 😊`;
+    }
+
+    function renderCalendarView() {
+      const s = statusCache;
+      renderGreeting();
+      document.getElementById('statTotalDays').textContent = s.total_days + '일';
+      // "포인트" 칸에는 지금까지 적립한 총합이 아니라 상점에서 실제로 쓸 수 있는 잔여 포인트(적립 - 교환)를 보여줌
+      document.getElementById('statPoints').textContent = (s.available_points ?? s.total_points) + 'P';
+      document.getElementById('lbBannerTitle').textContent = `${new Date().getMonth() + 1}월 출석왕 보러가기`;
+
+      const today = new Date();
+      const todayStr = formatLocalDate(today);
+      const attendedSet = new Set(s.attendance_dates || []);
+      const alreadyToday = attendedSet.has(todayStr);
+      const showTodayBtn = hasValidTodayToken && !alreadyToday;
+
+      document.getElementById('calSub').textContent = showTodayBtn
+        ? '캘린더의 파란 칸을 눌러 오늘 출석을 체크해주세요'
+        : (alreadyToday ? '오늘 출석은 이미 완료됐어요. 내일 또 만나요!' : 'QR을 다시 스캔하면 오늘 출석 체크를 할 수 있어요');
+
+      const monthStr = todayStr.slice(0, 7);
+      const [y, m] = monthStr.split('-').map(Number);
+      const totalDays = new Date(y, m, 0).getDate();
+      const firstWeekday = new Date(y, m - 1, 1).getDay();
+      document.getElementById('calMonthLabel').textContent = `${y}년 ${m}월`;
+
+      const grid = document.getElementById('calGrid');
+      grid.innerHTML = '';
+      ['일','월','화','수','목','금','토'].forEach(w => {
+        const d = document.createElement('div'); d.className = 'cal-wd'; d.textContent = w; grid.appendChild(d);
+      });
+      for (let i = 0; i < firstWeekday; i++) {
+        const d = document.createElement('div'); d.className = 'cal-cell blank'; grid.appendChild(d);
+      }
+      for (let day = 1; day <= totalDays; day++) {
+        const dateStr = `${monthStr}-${String(day).padStart(2, '0')}`;
+        const el = document.createElement(dateStr === todayStr && showTodayBtn ? 'button' : 'div');
+        el.type = dateStr === todayStr && showTodayBtn ? 'button' : undefined;
+        if (attendedSet.has(dateStr)) {
+          el.className = 'cal-cell attended';
+          el.textContent = '✓';
+        } else if (dateStr === todayStr) {
+          if (showTodayBtn) {
+            el.className = 'cal-cell today-pending';
+            el.textContent = '출석';
+            el.id = 'todayCheckinBtn';
+          } else {
+            el.className = 'cal-cell today-muted';
+            el.textContent = String(day);
+          }
+        } else {
+          el.className = 'cal-cell';
+          el.textContent = String(day);
+          if (dateStr > todayStr) el.style.color = '#D3D5E2';
+        }
+        grid.appendChild(el);
+      }
+      renderRoadmap();
+
+      const btn = document.getElementById('todayCheckinBtn');
+      if (btn) btn.addEventListener('click', handleCheckin);
+    }
+
+    // 리워드에 icon_emoji가 안 정해져 있을 때(관리자가 아직 안 채웠을 때) 대신 보여줄 기본 아이콘
+    const REWARD_ICON_FALLBACK = '🎁';
+
+    // 보상 로드맵: 위쪽 진행 트랙(40/70/100일 위치에 아이콘, 내 진행 위치 핀) + 아래쪽 리워드 카드 리스트
+    function renderRoadmap() {
+      const trackWrap = document.getElementById('roadmapTrackWrap');
+      const list = document.getElementById('roadmapList');
+      const tiers = statusCache.tiers || [];
+      if (tiers.length === 0) {
+        trackWrap.innerHTML = '';
+        list.innerHTML = `<div class="hint" style="padding:0;">아직 설정된 보상 단계가 없어요.</div>`;
+        return;
+      }
+      const totalDays = statusCache.total_days;
+      const trackMax = tiers[tiers.length - 1].days_required; // 가장 마지막(가장 많이 출석해야 받는) 단계 기준
+      const pinPct = Math.min(100, (totalDays / trackMax) * 100);
+
+      trackWrap.innerHTML = `
+        <div class="rm-track-card">
+          <div class="rm-track-top"><div class="lbl">나의 누적 출석</div><div class="val">${totalDays}<span> / ${trackMax}일</span></div></div>
+          <div class="rm-track">
+            <div class="rm-track-line"></div>
+            <div class="rm-track-fill" style="width:${pinPct}%;"></div>
+            <div class="rm-me" style="left:${pinPct}%;"><div class="pin"></div></div>
+            ${tiers.map(t => {
+              const pct = Math.min(100, (t.days_required / trackMax) * 100);
+              const nodeClass = (t.achieved || t.fulfilled) ? 'done' : '';
+              const leftStyle = pct >= 99.9 ? `left:${pct}%; transform: translateX(-100%);` : `left:${pct}%;`;
+              return `<div class="rm-node ${nodeClass}" style="${leftStyle}"><div class="circ">${escapeHtmlAttend(t.icon_emoji || REWARD_ICON_FALLBACK)}</div><div class="day">${t.days_required}일</div></div>`;
+            }).join('')}
+          </div>
+        </div>`;
+
+      // "다음 목표"는 아직 못 받은 단계 중 가장 먼저 오는 단계(그 이전은 이미 달성, 그 다음은 아직 잠김)
+      const nextIndex = tiers.findIndex(t => !t.achieved);
+
+      list.innerHTML = tiers.map((t, i) => {
+        const state = (t.achieved || t.fulfilled) ? 'got' : (i === nextIndex ? 'next' : 'locked');
+        const icon = t.icon_emoji || REWARD_ICON_FALLBACK;
+        const thumbInner = t.image_url
+          ? `<img src="${t.image_url}" alt="${escapeHtmlAttend(t.reward_name)}">`
+          : `<span class="emoji">${icon}</span>`;
+        const cornerBadge = state === 'locked' ? `<div class="rm-lock-badge">🔒</div>` : (state === 'got' ? `<div class="rm-got-badge">✓</div>` : '');
+        const tag = state === 'got'
+          ? `<div class="rm-tag got">${t.fulfilled ? '수령 완료' : '지급 예정'}</div>`
+          : (state === 'next' ? `<div class="rm-tag next">다음 목표</div>` : '');
+        const pct = Math.min(100, Math.round((totalDays / t.days_required) * 100));
+        const fillClass = state === 'got' ? 'green' : (state === 'next' ? 'gold' : '');
+        const arrowTxt = state === 'next' ? `${escapeHtmlAttend(t.reward_name)} 보기 ›` : '›';
+        return `<button type="button" class="rm-card ${state}" data-tier-index="${i}">
+          <div class="rm-thumb">${thumbInner}${cornerBadge}</div>
+          <div class="rm-body">
+            <div class="top-row"><div class="name">${escapeHtmlAttend(t.reward_name)}</div>${tag}</div>
+            <div class="days">${t.days_required}일 출석 시 지급 · ${Math.min(totalDays, t.days_required)}/${t.days_required}일</div>
+            <div class="rm-mini-track"><div class="rm-mini-fill ${fillClass}" style="width:${pct}%;"></div></div>
+          </div>
+          <div class="rm-arrow">${arrowTxt}</div>
+        </button>`;
+      }).join('');
+
+      list.querySelectorAll('.rm-card').forEach(card => {
+        card.addEventListener('click', () => openRewardDetail(Number(card.dataset.tierIndex)));
+      });
+    }
+
+    // 지금까지의 출석 페이스(첫 출석~오늘 사이 며칠에 한 번 출석했는지)를 바탕으로 남은 일수를 몇 주 뒤에
+    // 채울 수 있을지 대략 추정 - "도파민 터지는" 동기부여 문구용이라 정확한 통계가 아니라 참고용 추정치임
+    function estimateWeeksLeft(remainingDays) {
+      const dates = statusCache.attendance_dates || [];
+      if (remainingDays <= 0 || dates.length === 0) return null;
+      const first = new Date(dates[0]);
+      const today = new Date();
+      const daysSinceFirst = Math.max(1, Math.round((today - first) / 86400000));
+      const paceDaysPerAttendance = daysSinceFirst / dates.length;
+      const estDays = Math.max(1, Math.round(remainingDays * paceDaysPerAttendance));
+      return Math.max(1, Math.round(estDays / 7));
+    }
+
+    // 리워드 카드를 누르면 뜨는 상세 화면(예: "텀블러 보기") - 큰 이미지 + 원형 진행률 + 남은 출석 현황
+    function openRewardDetail(index) {
+      const tiers = statusCache.tiers || [];
+      const t = tiers[index];
+      if (!t) return;
+      const totalDays = statusCache.total_days;
+      const icon = t.icon_emoji || REWARD_ICON_FALLBACK;
+
+      document.getElementById('rdBarTitle').textContent = t.reward_name;
+      document.getElementById('rdTag').innerHTML = `${escapeHtmlAttend(icon)} ${t.days_required}일 출석 리워드`;
+      document.getElementById('rdImgWrap').innerHTML = t.image_url
+        ? `<img src="${t.image_url}" alt="${escapeHtmlAttend(t.reward_name)}">`
+        : `<span class="emoji">${icon}</span>`;
+      document.getElementById('rdName').textContent = t.reward_name;
+      document.getElementById('rdDesc').textContent = `${t.days_required}일 출석 달성 시 증정`;
+
+      const pct = Math.min(100, Math.round((totalDays / t.days_required) * 100));
+      const r = 40, c = 2 * Math.PI * r;
+      const offset = c * (1 - pct / 100);
+      document.getElementById('rdRing').innerHTML = `
+        <svg width="92" height="92" viewBox="0 0 92 92">
+          <circle cx="46" cy="46" r="${r}" fill="none" stroke="#E7E9F2" stroke-width="10"/>
+          <circle cx="46" cy="46" r="${r}" fill="none" stroke="url(#rdg)" stroke-width="10" stroke-linecap="round"
+            stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" transform="rotate(-90 46 46)"/>
+          <defs><linearGradient id="rdg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#3D5FFF"/><stop offset="100%" stop-color="#8B6CFF"/></linearGradient></defs>
+          <text x="46" y="42" text-anchor="middle" font-size="18" font-weight="900" fill="#16192E" font-family="-apple-system,sans-serif">${pct}%</text>
+          <text x="46" y="58" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6B7280" font-family="-apple-system,sans-serif">달성률</text>
+        </svg>`;
+      document.getElementById('rdRingBig').innerHTML = `<span>${Math.min(totalDays, t.days_required)}</span> / ${t.days_required}일 출석`;
+      document.getElementById('rdRingPct').textContent = pct >= 100 ? '목표를 달성했어요! 🎉' : `목표까지 ${pct}% 달성했어요`;
+
+      document.getElementById('rdDoneDays').innerHTML = `${totalDays}<span>일</span>`;
+      const remaining = Math.max(0, t.days_required - totalDays);
+      document.getElementById('rdLeftDays').innerHTML = `${remaining}<span>일</span>`;
+      document.getElementById('rdLeftSpark').textContent = remaining <= 0 ? '🎉' : '🔥';
+
+      const hype = document.getElementById('rdHype');
+      const hypeIc = document.getElementById('rdHypeIc');
+      const hypeTxt = document.getElementById('rdHypeTxt');
+      hype.className = 'dt-hype';
+      if (t.fulfilled) {
+        hype.classList.add('done');
+        hypeIc.textContent = '✅';
+        hypeTxt.innerHTML = `이미 수령하신 리워드예요.<br>다음 목표도 함께 힘내봐요! 💪`;
+      } else if (t.achieved) {
+        hype.classList.add('celebrate');
+        hypeIc.textContent = '🎉';
+        hypeTxt.innerHTML = `<span class="hi">목표 달성!</span> 매장에서 리워드를 받아보세요.`;
+      } else {
+        hype.classList.add('pace');
+        hypeIc.textContent = '🔥';
+        const weeks = estimateWeeksLeft(remaining);
+        hypeTxt.innerHTML = weeks
+          ? `지금 페이스라면 <span class="hi">약 ${weeks}주 후</span>에 받을 수 있어요!<br>오늘도 출석하고 한 걸음 더 가까워지세요 💪`
+          : `앞으로 <span class="hi">${remaining}일</span> 더 출석하면 받을 수 있어요!<br>오늘 첫 출석을 시작해보세요 💪`;
+      }
+
+      showView('viewRewardDetail');
+    }
+    document.getElementById('rdBackBtn').addEventListener('click', () => showView('viewCalendar'));
+
+    function formatLocalDate(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    let lastCheckinResult = null; // 확인 버튼을 눌렀을 때 "도장 찍기 + 코인 날아가기" 연출에 쓸 값 보관
+
+    async function handleCheckin() {
+      const btn = document.getElementById('todayCheckinBtn');
+      if (btn) btn.classList.add('loading-dim');
+      try {
+        const rows = await callRpc('group_pt_checkin', { p_member_id: getSavedMemberId(), p_token: qrToken });
+        const r = rows && rows[0];
+        if (!r) throw new Error('알 수 없는 오류가 발생했어요.');
+        lastCheckinResult = r.ok ? r : null;
+        openPopup(r);
+      } catch (err) {
+        lastCheckinResult = null;
+        openPopup({ ok: false, message: err.message });
+      }
+    }
+
+    function openPopup(result) {
+      const popup = document.getElementById('popupBox');
+      popup.classList.toggle('is-error', !result.ok);
+      // checkin-pop 클래스를 지웠다가 다시 붙여야 같은 세션에서 두 번째 출석 팝업에서도 애니메이션이
+      // 처음부터 다시 재생됨(클래스가 이미 붙어있는 상태에서 다시 add해봤자 CSS 애니메이션은 안 다시 실행됨)
+      popup.classList.remove('checkin-pop');
+      if (result.ok) { void popup.offsetWidth; popup.classList.add('checkin-pop'); }
+      document.getElementById('popupCoin').textContent = result.ok ? 'P' : '!';
+      document.getElementById('popupTitle').textContent = result.ok ? '출석 완료! 🎉' : '앗, 잠깐만요';
+      document.getElementById('popupPlus').textContent = result.ok ? `+${result.points_earned}P 적립` : (result.message || '문제가 발생했어요');
+      document.getElementById('popupPlus').style.color = result.ok ? '' : '#DC2626';
+      // result.total_points는 checkin 함수가 돌려주는 "평생 누적 적립" 값이라 상점에서 이미 쓴 포인트가
+      // 반영 안 돼있음 - statusCache(체크인 전 잔여 포인트)에 이번 적립분만 더해서 실제 잔여 포인트로 보여줌
+      const availAfter = result.ok ? (statusCache ? (statusCache.available_points ?? statusCache.total_points) : result.total_points - result.points_earned) + result.points_earned : 0;
+      document.getElementById('popupTotal').innerHTML = result.ok ? `현재 사용 가능 포인트 <strong>${availAfter}P</strong>` : '';
+      document.getElementById('overlay').classList.add('show');
+      document.getElementById('overlay').dataset.wasOk = result.ok ? '1' : '0';
+    }
+
+    document.getElementById('confirmBtn').addEventListener('click', async () => {
+      document.getElementById('overlay').classList.remove('show');
+      const wasOk = document.getElementById('overlay').dataset.wasOk === '1';
+      if (wasOk && lastCheckinResult) {
+        playCheckinCelebration(lastCheckinResult);
+      } else if (wasOk) {
+        // 혹시 값이 유실됐으면 안전하게 그냥 새로고침만
+        await loadCalendarView(getSavedMemberId());
+      } else {
+        const btn = document.getElementById('todayCheckinBtn');
+        if (btn) btn.classList.remove('loading-dim');
+      }
+    });
+
+    // 확인 버튼을 누른 직후: ① 오늘 칸에 체크 도장이 실시간으로 찍히고 ② 코인이 포인트 칸으로 날아가며
+    // 숫자가 올라가고 ③ 누적 출석 숫자도 함께 반짝임 - 전부 끝나면 조용히 서버 최신 데이터로 다시 동기화함
+    // (화면에 보이는 값들은 이미 group_pt_checkin이 돌려준 값이랑 똑같아서, 다시 불러와도 티 안 나게 자연스럽게 이어짐)
+    function playCheckinCelebration(result) {
+      const todayCell = document.getElementById('todayCheckinBtn');
+      if (todayCell) {
+        todayCell.disabled = true;
+        todayCell.removeAttribute('id'); // 출석 완료 칸은 더 이상 "출석하기" 버튼이 아니므로 id도 정리
+        todayCell.classList.remove('today-pending');
+        todayCell.classList.add('attended', 'stamp-pulse');
+        todayCell.innerHTML = '<span class="cal-stamp-mark">✓</span>';
+        setTimeout(() => todayCell.classList.remove('stamp-pulse'), 520);
+      }
+
+      playCoinBurstToPoints();
+      // 화면에 보여주는 숫자는 "사용 가능 포인트"(잔여) 기준 - 상점에서 이미 포인트를 쓴 적이 있어도
+      // 정확하게 이어지도록, checkin 전 statusCache.available_points에 이번 적립분만 더함
+      const prevAvail = statusCache ? (statusCache.available_points ?? statusCache.total_points) : (result.total_points - result.points_earned);
+      const newAvail = prevAvail + result.points_earned;
+      if (statusCache) statusCache.available_points = newAvail;
+      animatePointsCountUp(prevAvail, newAvail);
+
+      const daysBox = document.getElementById('statTotalDaysBox');
+      const daysEl = document.getElementById('statTotalDays');
+      setTimeout(() => {
+        if (daysEl) daysEl.textContent = result.total_days + '일';
+        if (daysBox) {
+          daysBox.classList.add('points-impact');
+          setTimeout(() => daysBox.classList.remove('points-impact'), 650);
+        }
+      }, 300);
+
+      // 화면에 보여준 값과 서버 값이 이미 같으니, 조용히 다시 불러와서 명예의 전당/로드맵 등
+      // 나머지 화면 요소까지 최신 상태로 맞춰둠(사용자 눈에는 끊김 없이 자연스럽게 보임)
+      setTimeout(() => { loadCalendarView(getSavedMemberId()); }, 1600);
+    }
+
+    function getSavedMemberId() {
+      try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+    }
+
+    // ---- 출석 기록 팝업(캘린더 화면 "누적 출석" 칸 클릭 시) ----
+    // group_pt_get_member_status가 이미 attendance_dates(출석한 날짜 전체 목록)를 내려주고 있어서
+    // 별도 DB 호출 없이 그 데이터를 그대로 재사용함(출석 1회 = 항상 10P라 포인트 내역도 같은 날짜로 계산).
+    // "출석일수 뿐만 아니라 옆에 몇 포인트 추가됐는지 함께 뜨게" 요청에 따라 날짜/출석/포인트를
+    // 한 줄에 같이 보여주고, 헤더에도 총 출석일수·총 적립 포인트를 칩으로 같이 보여줌
+    function formatDateLabel(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+      return `${m}월 ${d}일 (${wd})`;
+    }
+
+    function openAttendanceLogModal() {
+      if (!statusCache) return;
+      const dates = (statusCache.attendance_dates || []).slice().sort((a, b) => (a < b ? 1 : -1));
+      document.getElementById('logDaysChip').textContent = `총 ${dates.length}일 출석`;
+      document.getElementById('logPtsChip').textContent = `${dates.length * POINTS_PER_CHECKIN}P 적립`;
+      const listEl = document.getElementById('logList');
+      if (dates.length === 0) {
+        listEl.innerHTML = `<div class="log-empty">아직 기록이 없어요. 출석하면 여기에 쌓여요!</div>`;
+      } else {
+        listEl.innerHTML = dates.map(d => `<div class="log-row"><span class="log-date">${formatDateLabel(d)}</span><span class="log-right"><span class="b1">✓ 출석</span><span class="b2">+${POINTS_PER_CHECKIN}P</span></span></div>`).join('');
+      }
+      document.getElementById('logOverlay').classList.add('show');
+    }
+    document.getElementById('statTotalDaysBox').addEventListener('click', openAttendanceLogModal);
+    document.getElementById('logCloseBtn').addEventListener('click', () => document.getElementById('logOverlay').classList.remove('show'));
+    document.getElementById('logConfirmBtn').addEventListener('click', () => document.getElementById('logOverlay').classList.remove('show'));
+    document.getElementById('logOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'logOverlay') document.getElementById('logOverlay').classList.remove('show');
+    });
+
+    // ---- 포인트 상점("포인트" 칸 클릭 시 진입) ----
+    // 회원의 잔여 포인트(statusCache.available_points)와 진열 상품(statusCache.shop_items)은 이미
+    // group_pt_get_member_status가 같이 내려주므로 별도 로딩 없이 바로 그림
+    document.getElementById('statPointsBox').addEventListener('click', () => {
+      showView('viewPointShop');
+      renderPointShopView();
+    });
+    document.getElementById('shopBackBtn').addEventListener('click', () => showView('viewCalendar'));
+
+    function renderPointShopView() {
+      if (!statusCache) return;
+      const avail = statusCache.available_points ?? statusCache.total_points ?? 0;
+      document.getElementById('shopBalanceAmt').innerHTML = `${avail}<span>P</span>`;
+      const items = statusCache.shop_items || [];
+      const gridEl = document.getElementById('shopGrid');
+      if (items.length === 0) {
+        gridEl.innerHTML = '';
+        gridEl.insertAdjacentHTML('afterend', '<div class="shop-empty" id="shopEmptyMsg">아직 준비된 상품이 없어요. 곧 채워질 예정이에요!</div>');
+        return;
+      }
+      const existingEmpty = document.getElementById('shopEmptyMsg');
+      if (existingEmpty) existingEmpty.remove();
+      gridEl.innerHTML = items.map(it => {
+        const ok = avail >= it.points_cost;
+        return `<div class="shop-item">
+          <div class="ic-wrap">${it.emoji || '🎁'}</div>
+          <div class="nm">${escapeHtmlAttend(it.name)}</div>
+          <div class="pr">${it.points_cost}P</div>
+          <button type="button" class="redeem-btn ${ok ? 'ok' : 'no'}" data-id="${it.id}" data-name="${escapeHtmlAttend(it.name)}" data-emoji="${it.emoji || '🎁'}" data-cost="${it.points_cost}" ${ok ? '' : 'disabled'}>${ok ? '교환하기' : '포인트 부족'}</button>
+        </div>`;
+      }).join('');
+      gridEl.querySelectorAll('.redeem-btn.ok').forEach(btn => {
+        btn.addEventListener('click', () => openRedeemConfirm(btn.dataset));
+      });
+    }
+
+    let pendingRedeemItem = null;
+
+    function openRedeemConfirm(data) {
+      pendingRedeemItem = data;
+      document.getElementById('shopConfirmIc').textContent = data.emoji;
+      document.getElementById('shopConfirmTtl').textContent = `${data.name}(으)로 교환할까요?`;
+      document.getElementById('shopConfirmPrice').textContent = `${data.cost}P 사용`;
+      document.getElementById('shopConfirmOverlay').classList.add('show');
+    }
+    document.getElementById('shopConfirmCancel').addEventListener('click', () => {
+      document.getElementById('shopConfirmOverlay').classList.remove('show');
+      pendingRedeemItem = null;
+    });
+    document.getElementById('shopConfirmOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'shopConfirmOverlay') {
+        document.getElementById('shopConfirmOverlay').classList.remove('show');
+        pendingRedeemItem = null;
+      }
+    });
+
+    document.getElementById('shopConfirmGo').addEventListener('click', async () => {
+      if (!pendingRedeemItem) return;
+      const goBtn = document.getElementById('shopConfirmGo');
+      goBtn.disabled = true;
+      try {
+        const rows = await callRpc('group_pt_redeem_item', { p_member_id: getSavedMemberId(), p_item_id: pendingRedeemItem.id });
+        const r = rows && rows[0];
+        document.getElementById('shopConfirmOverlay').classList.remove('show');
+        if (!r || !r.ok) {
+          alert((r && r.message) || '교환에 실패했어요. 다시 시도해주세요.');
+        } else {
+          if (statusCache) statusCache.available_points = r.available_points;
+          document.getElementById('statPoints').textContent = r.available_points + 'P';
+          document.getElementById('shopDoneIc').textContent = r.item_emoji || '🎁';
+          document.getElementById('shopDoneDesc').innerHTML = `${escapeHtmlAttend(r.item_name)}(으)로<br>교환됐어요. 프런트에서 받아가세요!`;
+          document.getElementById('shopDoneMinus').textContent = `-${r.points_spent}P 사용`;
+          document.getElementById('shopDoneOverlay').classList.add('show');
+          renderPointShopView();
+        }
+      } catch (err) {
+        document.getElementById('shopConfirmOverlay').classList.remove('show');
+        alert(err.message);
+      } finally {
+        goBtn.disabled = false;
+        pendingRedeemItem = null;
+      }
+    });
+    document.getElementById('shopDoneConfirmBtn').addEventListener('click', () => document.getElementById('shopDoneOverlay').classList.remove('show'));
+
+    // ---- 이달의 출석왕(이번 달 그룹PT 출석 TOP 3 + 내 순위) ----
+    document.getElementById('leaderboardBanner').addEventListener('click', loadLeaderboardView);
+    document.getElementById('lbBackBtn').addEventListener('click', () => showView('viewCalendar'));
+
+    async function loadLeaderboardView() {
+      showView('viewLeaderboard');
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      document.getElementById('lbTitle').textContent = `${month}월 출석왕`;
+      document.getElementById('lbBannerTitle').textContent = `${month}월 출석왕 보러가기`;
+      document.getElementById('lbRangeSub').textContent = `${month}/1 ~ ${month}/${now.getDate()} 기준 · 그룹PT 출석 TOP 3`;
+      document.getElementById('lbPodiumWrap').innerHTML = `<div class="lb-empty"><div class="ic">⏳</div>불러오는 중...</div>`;
+      document.getElementById('lbMyRankWrap').innerHTML = '';
+      try {
+        const rows = await callRpc('group_pt_monthly_leaderboard', { p_member_id: getSavedMemberId() });
+        renderLeaderboard(rows || []);
+      } catch (err) {
+        document.getElementById('lbPodiumWrap').innerHTML = `<div class="lb-empty"><div class="ic">⚠️</div>${err.message}</div>`;
+      }
+    }
+
+    function renderLeaderboard(rows) {
+      const top3 = rows.filter(r => r.rank <= 3).sort((a, b) => a.rank - b.rank);
+      const podiumWrap = document.getElementById('lbPodiumWrap');
+      if (top3.length === 0) {
+        podiumWrap.innerHTML = `<div class="lb-empty"><div class="ic">🏸</div>이번 달 출석 기록이 아직 없어요.<br/>제일 먼저 출석하고 1등에 도전해보세요!</div>`;
+      } else {
+        const byRank = {}; top3.forEach(r => { byRank[r.rank] = r; });
+        const medal = { 1: '🥇', 2: '🥈', 3: '🥉' };
+        const barClass = { 1: 'gold', 2: 'silver', 3: 'bronze' };
+        const order = [2, 1, 3]; // 은-금-동 순서로 배치(가운데가 1등)
+        podiumWrap.innerHTML = `<div class="podium">${order.map(rank => {
+          const r = byRank[rank];
+          if (!r) return '';
+          const initial = (r.display_name || '?').slice(0, 1);
+          const phone = r.phone_hint ? `(${r.phone_hint})` : '';
+          return `<div class="p-col ${barClass[rank]}">
+            ${rank === 1 ? '<div class="p-crown">👑</div>' : ''}
+            <div class="p-medal">${medal[rank]}</div>
+            <div class="p-avatar-wrap"><div class="p-avatar">${escapeHtmlAttend(initial)}</div></div>
+            <div class="p-name">${escapeHtmlAttend(r.display_name)}${escapeHtmlAttend(phone)}</div>
+            <div class="p-count">${r.attendance_count}회</div>
+            <div class="p-countlabel">출석</div>
+            <div class="p-bar"></div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+
+      const mine = rows.find(r => r.is_requester);
+      const myWrap = document.getElementById('lbMyRankWrap');
+      if (!getSavedMemberId()) {
+        myWrap.innerHTML = '';
+      } else if (!mine) {
+        myWrap.innerHTML = `<div class="my-rank-card"><div class="my-rank-num">-</div><div class="my-rank-txt"><div class="t1">아직 이번 달 출석 기록이 없어요</div><div class="t2">출석하고 순위에 도전해보세요!</div></div></div>`;
+      } else if (mine.rank <= 3) {
+        myWrap.innerHTML = `<div class="my-rank-card"><div class="my-rank-num">${mine.rank}</div><div class="my-rank-txt"><div class="t1">축하해요, ${mine.rank}등이에요! 🎉</div><div class="t2">이번 달 이대로 쭉 가봐요</div></div><div class="my-rank-count">${mine.attendance_count}회</div></div>`;
+      } else {
+        const gap = (top3.find(r => r.rank === 3)?.attendance_count || 0) - mine.attendance_count;
+        const gapText = gap > 0 ? `3등까지 ${gap}회 남았어요` : '조금만 더 출석하면 순위권이에요';
+        myWrap.innerHTML = `<div class="my-rank-card"><div class="my-rank-num">${mine.rank}</div><div class="my-rank-txt"><div class="t1">내 순위 · ${mine.rank}위</div><div class="t2">${gapText}</div></div><div class="my-rank-count">${mine.attendance_count}회</div></div>`;
+      }
+    }
+
+    function escapeHtmlAttend(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // ---- 이달의 출석왕 MVP 추가 포인트(1등 150P/2등 100P/3등 70P) ----
+    // 월말 당일엔 자정까지 순위가 계속 바뀔 수 있어서, 대신 "다음 달이 시작되면(지난달 출석이 더는
+    // 안 바뀌니까) 지난달 TOP3 보너스를 받을 수 있게" 하는 방식. 등수·중복 여부는 항상 서버가
+    // (group_pt_mvp_bonus_status/claim 함수 안에서) 다시 계산해서 확인하고, 클라이언트 값은 안 믿음.
+    const MVP_RANK_LABEL = { 1: '1등', 2: '2등', 3: '3등' };
+    const MVP_RANK_MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' };
+    let myHonorHistory = []; // 이 회원이 지금까지 받은 MVP 트로피들 {bonus_year, bonus_month, rank}
+    let myLatestBadgeRank = null; // 이름 옆 "출석왕" 뱃지 색(금/은/동)의 기준이 되는, 제일 최근에 받은 순위
+
+    async function checkMvpBonus(memberId) {
+      const wrap = document.getElementById('mvpBonusWrap');
+      try {
+        const rows = await callRpc('group_pt_mvp_bonus_status', { p_member_id: memberId, p_test_rank: TEST_RANK });
+        const status = rows && rows[0];
+        if (status && status.available) {
+          renderMvpIdleCard(status);
+        } else {
+          wrap.innerHTML = '';
+        }
+      } catch (err) {
+        // migration_57 적용 전이거나 일시적 오류여도 캘린더 화면 자체는 그대로 써야 하므로 조용히 무시함
+        wrap.innerHTML = '';
+      }
+    }
+
+    function renderMvpIdleCard(status) {
+      const wrap = document.getElementById('mvpBonusWrap');
+      const rankLabel = MVP_RANK_LABEL[status.rank];
+      wrap.innerHTML = `<div class="mvp-card rank-${status.rank}" id="mvpCard">
+        <div class="mvp-ribbon">${MVP_RANK_MEDAL[status.rank]} ${status.bonus_month}월 출석왕 ${rankLabel}</div>
+        <div class="mvp-title">축하해요! 추가 포인트를 드려요</div>
+        <div class="mvp-sub">${rankLabel} 보너스 <strong>${status.bonus_points}P</strong>를 받아보세요</div>
+        <button type="button" class="mvp-claim-btn" id="mvpClaimBtn">🎁 보너스 포인트 받기</button>
+      </div>`;
+      document.getElementById('mvpClaimBtn').addEventListener('click', () => openTrophyModal(status));
+    }
+
+    // ---- 전체화면 트로피 모달: A) 큰 트로피 대기 → B) 탭하면 빛줄기 폭발+포인트 증정 → C) 트로피 증정 ----
+    let pendingMvpResult = null;
+
+    function showTmStage(stage) {
+      ['A', 'B', 'C', 'D'].forEach(s => {
+        document.getElementById('tmStage' + s).style.display = s === stage ? 'flex' : 'none';
+      });
+      document.getElementById('trophyModalClose').style.display = stage === 'A' ? 'flex' : 'none';
+    }
+
+    // ---- Lottie 컨페티 버스트: lottie-web 로딩이 끝나면 인스턴스를 한 번만 만들어두고 재생만 반복함.
+    // 라이브러리/애니메이션 로딩이 늦거나 실패하면(네트워크 문제 등) tmLottieReady가 계속 false로
+    // 남아서 showBurstStage()가 자동으로 예전 자체 파티클 효과(burstTrophyParticles)로 대체함 -
+    // 즉 외부 CDN에 문제가 생겨도 연출 자체가 아예 안 뜨는 일은 없음. ----
+    let tmLottieAnim = null;
+    let tmLottieReady = false;
+    let tmLottieFailed = false;
+    function initTmLottieBurst() {
+      if (tmLottieAnim || tmLottieFailed) return;
+      if (typeof lottie === 'undefined') { tmLottieFailed = true; return; }
+      try {
+        tmLottieAnim = lottie.loadAnimation({
+          container: document.getElementById('tmLottieBurst'),
+          renderer: 'svg',
+          loop: false,
+          autoplay: false,
+          path: 'https://assets4.lottiefiles.com/datafiles/U1I3rWEyksM9cCH/data.json'
+        });
+        tmLottieAnim.addEventListener('data_ready', () => { tmLottieReady = true; });
+        tmLottieAnim.addEventListener('data_failed', () => { tmLottieFailed = true; });
+      } catch (e) {
+        tmLottieFailed = true;
+      }
+    }
+
+    // 순위(1/2/3등)에 따라 트로피 모달 전체를 금색/은색/동색으로 바꿔줌 - 명예 훈장(hc-circle.r1/r2/r3)과
+    // 똑같은 색을 쓰는 CSS 변수(--tm-c1/--tm-c2/--tm-hi 등)를 #trophyModal에 다시 세팅하고,
+    // 트로피 아이콘 자체도 순위에 맞는 메달 이모지(🥇/🥈/🥉)로 바꿔서 "2등은 은색, 3등은 동색"이
+    // 카드 → 트로피 모달 → 명예 훈장까지 끊기지 않고 이어지게 함.
+    function applyTmRankTheme(rank) {
+      // 아이콘은 계속 🏆 트로피 그대로 두고(메달 이모지로 안 바꿈), CSS 필터로 트로피 자체를
+      // 금/은/동 색으로 물들임 - 클래스만 갈아끼우면 트로피 색·헤일로·리본·글로우가 전부 같이 바뀜
+      const modal = document.getElementById('trophyModal');
+      modal.classList.remove('tm-rank-2', 'tm-rank-3');
+      if (rank === 2) modal.classList.add('tm-rank-2');
+      else if (rank === 3) modal.classList.add('tm-rank-3');
+    }
+
+    function openTrophyModal(status) {
+      applyTmRankTheme(status.rank);
+      document.getElementById('tmRankBadge').textContent = `${status.bonus_month}월 출석왕 ${MVP_RANK_LABEL[status.rank]}`;
+      document.getElementById('tmShockwave1').classList.remove('burst');
+      document.getElementById('tmShockwave2').classList.remove('burst');
+      document.getElementById('tmCoreFlash').classList.remove('burst');
+      document.getElementById('tmFlashPulse').classList.remove('burst');
+      const burstCanvas = document.getElementById('tmBurstCanvas');
+      if (burstCanvas) burstCanvas.getContext('2d').clearRect(0, 0, burstCanvas.width, burstCanvas.height);
+      initTmLottieBurst();
+      if (tmLottieAnim) tmLottieAnim.goToAndStop(0, true);
+      showTmStage('A');
+      document.getElementById('trophyModal').classList.add('show');
+      document.getElementById('tmTrophyBig').onclick = () => handleMvpClaim(status);
+    }
+
+    // (폴백 전용) 트로피가 터지는 순간 금빛/크림색/흰색 조각들이 물리(초기 속도+중력+공기저항)를 받으며
+    // 흩날리는 캔버스 파티클 연출. Lottie 컨페티 애니메이션을 못 불러왔을 때만 쓰임.
+    // requestAnimationFrame 기반의 진짜 시간 흐름을 쓰므로 가짜 시계(page.clock)를 설치한 테스트에서는
+    // 재생되지 않음(이 모달의 다른 연출들과 동일한 제약).
+    function burstTrophyParticles(canvas) {
+      if (!canvas || !canvas.getContext) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height, cx = W / 2, cy = H / 2;
+      // 지금 모달에 적용된 순위 테마(금/은/동) CSS 변수를 그대로 읽어와서 폴백 파티클도 같은 색으로 흩날리게 함
+      const modalStyle = getComputedStyle(document.getElementById('trophyModal'));
+      const themeHi = modalStyle.getPropertyValue('--tm-hi').trim() || '#FFE9B0';
+      const themeC1 = modalStyle.getPropertyValue('--tm-c1').trim() || '#FFD76A';
+      const themeC2 = modalStyle.getPropertyValue('--tm-c2').trim() || '#F5A524';
+      const COLORS = ['#FFFFFF', themeHi, themeC1, themeC2, themeHi];
+      const COUNT = 46;
+      const particles = [];
+      for (let i = 0; i < COUNT; i++) {
+        const angle = (Math.PI * 2 * i / COUNT) + (Math.random() - 0.5) * 0.5;
+        const speed = 3.2 + Math.random() * 4.4;
+        particles.push({
+          x: cx, y: cy,
+          vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+          size: 2.5 + Math.random() * 3.5,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          diamond: Math.random() < 0.35,
+          rot: Math.random() * Math.PI * 2,
+          vrot: (Math.random() - 0.5) * 0.3
+        });
+      }
+      const GRAVITY = 0.07, FRICTION = 0.975, DURATION = 820;
+      const start = performance.now();
+      function frame(now) {
+        const t = now - start;
+        ctx.clearRect(0, 0, W, H);
+        const life = Math.max(0, 1 - t / DURATION);
+        if (life <= 0) { ctx.clearRect(0, 0, W, H); return; }
+        particles.forEach(p => {
+          p.vx *= FRICTION; p.vy = p.vy * FRICTION + GRAVITY;
+          p.x += p.vx; p.y += p.vy; p.rot += p.vrot;
+          ctx.save();
+          ctx.globalAlpha = life;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 6;
+          if (p.diamond) {
+            const s = p.size;
+            ctx.beginPath();
+            ctx.moveTo(0, -s); ctx.lineTo(s, 0); ctx.lineTo(0, s); ctx.lineTo(-s, 0);
+            ctx.closePath(); ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        });
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    function closeTrophyModal() {
+      document.getElementById('trophyModal').classList.remove('show');
+    }
+
+    document.getElementById('trophyModalClose').addEventListener('click', () => closeTrophyModal());
+
+    let mvpClaiming = false;
+    async function handleMvpClaim(status) {
+      if (mvpClaiming) return;
+      mvpClaiming = true;
+      const trophyBig = document.getElementById('tmTrophyBig');
+      if (trophyBig) trophyBig.style.pointerEvents = 'none';
+      try {
+        const rows = await callRpc('group_pt_mvp_bonus_claim', { p_member_id: getSavedMemberId(), p_test_rank: TEST_RANK });
+        const r = rows && rows[0];
+        if (!r || !r.ok) throw new Error((r && r.message) || '보너스 지급 중 문제가 발생했어요.');
+        showBurstStage(status, r);
+      } catch (err) {
+        closeTrophyModal();
+        const card = document.getElementById('mvpCard');
+        if (card) card.innerHTML = `<div class="mvp-title">앗, 잠깐만요</div><div class="mvp-err">${escapeHtmlAttend(err.message)}</div>`;
+      } finally {
+        mvpClaiming = false;
+        if (trophyBig) trophyBig.style.pointerEvents = '';
+      }
+    }
+
+    // Stage B: 빛줄기가 한 줄씩 뻗어나가다가 가운데가 확 터지면서(펑) 포인트 증정 문구가 뜸(금액은 서버가 순위별로 계산해서 내려줌)
+    function showBurstStage(status, result) {
+      pendingMvpResult = { status, result };
+      const rankLabel = MVP_RANK_LABEL[status.rank];
+      document.getElementById('tmGrantTitle').textContent = `${status.bonus_month}월 출석왕 ${rankLabel} 보너스`;
+      document.getElementById('tmGrantAmount').textContent = `+${result.bonus_points}P 증정!`;
+      document.getElementById('tmGrantSub').innerHTML = `현재 누적 포인트 <strong>${result.new_total_points}P</strong>`;
+      showTmStage('B');
+      const shock1 = document.getElementById('tmShockwave1');
+      const shock2 = document.getElementById('tmShockwave2');
+      const flash = document.getElementById('tmCoreFlash');
+      const flashPulse = document.getElementById('tmFlashPulse');
+      shock1.classList.remove('burst');
+      shock2.classList.remove('burst');
+      flash.classList.remove('burst');
+      flashPulse.classList.remove('burst');
+      void shock1.offsetWidth; // 리플로우를 강제해서 애니메이션이 처음부터 다시 재생되게 함
+      requestAnimationFrame(() => {
+        shock1.classList.add('burst');
+        shock2.classList.add('burst');
+        flash.classList.add('burst');
+        flashPulse.classList.add('burst');
+        const lottieBox = document.getElementById('tmLottieBurst');
+        const canvasBox = document.getElementById('tmBurstCanvas');
+        if (tmLottieReady && tmLottieAnim) {
+          lottieBox.style.display = '';
+          canvasBox.style.display = 'none';
+          tmLottieAnim.goToAndPlay(0, true);
+        } else {
+          lottieBox.style.display = 'none';
+          canvasBox.style.display = '';
+          burstTrophyParticles(canvasBox);
+        }
+      });
+    }
+
+    // Stage B 확인 → Stage C(트로피 증정)로 이어짐
+    document.getElementById('tmConfirmB').addEventListener('click', () => {
+      if (!pendingMvpResult) return;
+      const { status } = pendingMvpResult;
+      document.getElementById('tmGrantTitle2').innerHTML =
+        `${status.bonus_month}월 출석왕 <span class="hi">${MVP_RANK_LABEL[status.rank]}</span><br>트로피 증정!`;
+      showTmStage('C');
+    });
+
+    // Stage C 확인 → Stage D(이름 옆 "출석왕" 뱃지 등록 미리보기)로 이어짐
+    document.getElementById('tmConfirmC').addEventListener('click', () => {
+      if (!pendingMvpResult) return;
+      document.getElementById('tmBadgeName').textContent = `${(statusCache && statusCache.display_name) || ''}님`;
+      showTmStage('D');
+    });
+
+    // Stage D 확인 → 모달을 닫고, 포인트는 코인이 되어 "포인트" 칸으로, 트로피는 "명예 훈장" 칸으로 동시에 날아감
+    // (트로피가 도착하면 renderGreeting()이 다시 그려지면서 실제로 이름 옆에 뱃지가 붙음 - 방금 D에서 미리 본 것과 동일)
+    document.getElementById('tmConfirmD').addEventListener('click', () => {
+      if (!pendingMvpResult) return;
+      const { status, result } = pendingMvpResult;
+      pendingMvpResult = null;
+      closeTrophyModal();
+      document.getElementById('mvpBonusWrap').innerHTML = '';
+      // MVP 보너스도 "사용 가능 포인트" 기준으로 애니메이션 - 이번에 받은 보너스만큼만 잔여 포인트에 더함
+      const oldAvail = statusCache ? (statusCache.available_points ?? statusCache.total_points) : 0;
+      const newAvail = oldAvail + result.bonus_points;
+      if (statusCache) {
+        statusCache.total_points = result.new_total_points; // 서버를 다시 안 불러도 되게 로컬 값도 맞춰둠
+        statusCache.available_points = newAvail;
+      }
+      playCoinBurstToPoints();
+      animatePointsCountUp(oldAvail, newAvail);
+      playTrophyFlyToHonorCase(status);
+    });
+
+    // ---- 명예 훈장(그동안 받은 MVP 트로피들을 보여주는 칸) ----
+    function renderHonorCase(justAddedIndex) {
+      const wrap = document.getElementById('honorCaseWrap');
+      if (!wrap) return;
+      if (!myHonorHistory.length) { wrap.innerHTML = ''; return; }
+      const items = myHonorHistory.map((h, i) => {
+        const medal = MVP_RANK_MEDAL[h.rank] || '🏆';
+        return `<div class="hc-item${i === justAddedIndex ? ' new-badge' : ''}">
+          <div class="hc-circle r${h.rank}">${medal}</div>
+          <div class="hc-lbl">${h.bonus_month}월 · ${MVP_RANK_LABEL[h.rank]}</div>
+        </div>`;
+      }).join('');
+      wrap.innerHTML = `<div class="honor-case"><div class="hc-title">🎖️ 내 명예 훈장</div><div class="hc-row">${items}</div></div>`;
+    }
+
+    // Stage C 확인 후: 트로피가 코인 연출과 같은 방식으로 "명예 훈장" 칸으로 날아가 쌓임
+    function playTrophyFlyToHonorCase(status) {
+      const startX = window.innerWidth / 2;
+      const startY = window.innerHeight * 0.38;
+      const trophy = document.createElement('div');
+      trophy.className = 'trophy-fly';
+      trophy.textContent = '🏆';
+      trophy.style.left = startX + 'px';
+      trophy.style.top = startY + 'px';
+      // 트로피 모달 안에서 봤던 순위 색(은색/동색)이 날아가는 도중에도 똑같이 유지되도록 같은 필터를 그대로 씀
+      if (status.rank === 2) trophy.style.filter = 'grayscale(0.9) brightness(1.18) contrast(0.92) drop-shadow(0 4px 10px rgba(173,184,201,0.6))';
+      else if (status.rank === 3) trophy.style.filter = 'brightness(0) saturate(100%) invert(56%) sepia(62%) saturate(1200%) hue-rotate(342deg) brightness(89%) contrast(88%) drop-shadow(0 4px 10px rgba(201,127,60,0.6))';
+      document.body.appendChild(trophy);
+
+      // 첫 트로피라 명예 훈장 칸이 아직 없으면, 날아갈 목적지를 확보하기 위해 빈 칸을 먼저 만들어둠
+      const wrap = document.getElementById('honorCaseWrap');
+      if (wrap && !wrap.querySelector('.honor-case')) {
+        wrap.innerHTML = `<div class="honor-case"><div class="hc-title">🎖️ 내 명예 훈장</div><div class="hc-row"></div></div>`;
+      }
+      const target = wrap ? wrap.querySelector('.honor-case') : null;
+      const targetRect = target ? target.getBoundingClientRect() : null;
+      const targetX = targetRect ? targetRect.left + 28 : startX;
+      const targetY = targetRect ? targetRect.top + targetRect.height / 2 : startY;
+
+      requestAnimationFrame(() => {
+        trophy.style.transform = `translate(${targetX - startX}px, ${targetY - startY}px) scale(0.35) rotate(-14deg)`;
+        trophy.style.opacity = '0.15';
+      });
+
+      setTimeout(() => {
+        trophy.remove();
+        // 방금 받은 게 제일 최근 기록이니 앞에 추가(honor-case도 최신순으로 보이고, 이름 옆 뱃지 색도
+        // 이번에 받은 순위로 즉시 바뀜)
+        myHonorHistory.unshift({ bonus_year: status.bonus_year, bonus_month: status.bonus_month, rank: status.rank });
+        myLatestBadgeRank = status.rank;
+        renderHonorCase(0);
+        renderGreeting();
+      }, 780);
+    }
+
+    // ---- 보너스 확인 후: 코인이 "포인트" 칸으로 날아가면서 숫자가 실시간으로 올라가는 연출 ----
+    function playCoinBurstToPoints() {
+      const targetEl = document.getElementById('statPointsBox');
+      if (!targetEl) return;
+      const targetRect = targetEl.getBoundingClientRect();
+      const targetX = targetRect.left + targetRect.width / 2;
+      const targetY = targetRect.top + targetRect.height / 2;
+      const startX = window.innerWidth / 2;
+      const startY = window.innerHeight * 0.4; // 방금까지 축하 팝업이 떠 있던 대략적인 위치
+
+      const layer = document.createElement('div');
+      layer.className = 'coin-fly-layer';
+      document.body.appendChild(layer);
+
+      const COIN_COUNT = 7;
+      for (let i = 0; i < COIN_COUNT; i++) {
+        const coin = document.createElement('div');
+        coin.className = 'coin-fly';
+        coin.textContent = '🪙';
+        const jitterX = (Math.random() - 0.5) * 70;
+        const jitterY = (Math.random() - 0.5) * 40;
+        coin.style.left = `${startX + jitterX}px`;
+        coin.style.top = `${startY + jitterY}px`;
+        layer.appendChild(coin);
+        const delay = i * 55;
+        setTimeout(() => {
+          coin.style.transform = `translate(${targetX - (startX + jitterX)}px, ${targetY - (startY + jitterY)}px) scale(0.3)`;
+          coin.style.opacity = '0';
+        }, delay + 20);
+      }
+
+      setTimeout(() => {
+        targetEl.classList.add('points-impact');
+        setTimeout(() => targetEl.classList.remove('points-impact'), 650);
+        layer.remove();
+      }, COIN_COUNT * 55 + 560);
+    }
+
+    function animatePointsCountUp(from, to) {
+      const el = document.getElementById('statPoints');
+      if (!el || from === to) { if (el) el.textContent = to + 'P'; return; }
+      const duration = 900;
+      const startDelay = 300; // 코인이 도착하는 타이밍에 맞춰 숫자가 같이 튀어 오르게
+      const startTime = performance.now();
+      function tick(now) {
+        const elapsed = now - startTime - startDelay;
+        if (elapsed < 0) { requestAnimationFrame(tick); return; }
+        const progress = Math.min(1, elapsed / duration);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out
+        const current = Math.round(from + (to - from) * eased);
+        el.textContent = current + 'P';
+        if (progress < 1) requestAnimationFrame(tick);
+        else el.textContent = to + 'P';
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // ---- 진입점 ----
+    (function init() {
+      const savedId = getSavedMemberId();
+      if (savedId) {
+        loadCalendarView(savedId);
+      } else if (qrToken) {
+        showView('viewIdentify');
+      } else {
+        showView('viewNoToken');
+      }
+    })();
+  </script>
+</body>
+</html>

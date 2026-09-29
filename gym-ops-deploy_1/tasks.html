@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 업무 리스트</title>
+<link rel="stylesheet" href="style.css?v=1790338841" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="consultations.html">신규상담</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="expiry.html">만료회원 · TM</a>
+      <a href="group-pt.html">그룹PT 관리</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html" class="active">업무 리스트</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- 2026-09-21 가독성 개선: 입력 폼 패널과 체크리스트 목록 모두 화면 끝까지 늘어나면 칸/줄이
+         휑해지는 타입이라(업무 목록은 표가 아니라 좌측 텍스트+우측 "수정" 버튼인 체크리스트라 더 그럼)
+         적당한 폭으로 잡음 -->
+    <div class="panel" style="max-width:900px;">
+      <h3>업무 추가</h3>
+      <p class="muted" style="margin:-6px 0 12px;">지점장은 아무에게나 업무를 배정할 수 있고, 트레이너는 본인 앞으로만 업무를 추가할 수 있어요. "매일"/"매주"로 등록하면 마이크로소프트 투두처럼 체크한 업무가 다음 주기에 자동으로 다시 미체크 상태로 돌아와요. "10시 회의", "오후 3시 OO쌤 미팅"처럼 특정 시각이 있는 일정은 "시간"까지 같이 넣어주면 목록에서 시간순으로 정렬돼요.</p>
+      <div id="addErrorBox" class="error-text"></div>
+      <div id="addSuccessBox" class="success-text"></div>
+      <form id="addTaskForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field" id="t_assigneeField"><label>담당자</label><select id="t_assignee" required></select></div>
+          <div class="field" id="t_memberField"><label>대상 회원 (선택)</label><select id="t_member"><option value="">없음</option></select></div>
+          <div class="field" style="grid-column: span 2;"><label>할 일</label><input type="text" id="t_title" placeholder="예: 락커룸 청소 / 강민재 회원 만료 TM 연락" required /></div>
+          <div class="field"><label>반복</label>
+            <select id="t_repeat">
+              <option value="none">반복 없음</option>
+              <option value="daily">매일</option>
+              <option value="weekly">매주</option>
+              <option value="monthly">매월</option>
+            </select>
+          </div>
+          <div class="field" id="t_weekOrdinalField" style="display:none;">
+            <label>몇째 주</label>
+            <select id="t_week_ordinal">
+              <option value="1">첫째 주</option>
+              <option value="2">둘째 주</option>
+              <option value="3">셋째 주</option>
+              <option value="4">넷째 주</option>
+              <option value="-1">마지막 주</option>
+            </select>
+          </div>
+          <div class="field" id="t_weekdayField" style="display:none;">
+            <label>요일</label>
+            <select id="t_weekday">
+              <option value="0">일요일</option>
+              <option value="1" selected>월요일</option>
+              <option value="2">화요일</option>
+              <option value="3">수요일</option>
+              <option value="4">목요일</option>
+              <option value="5">금요일</option>
+              <option value="6">토요일</option>
+            </select>
+          </div>
+          <div class="field"><label>시간 (선택)</label><input type="time" id="t_time" /></div>
+          <div class="field" id="t_dueField"><label>마감일 (선택)</label><input type="date" id="t_due" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">추가</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2 id="taskListTitle">업무 목록</h2>
+      <div id="trainerTabs" class="filter-tabs"></div>
+      <p class="muted" id="taskProgress" style="margin:0 0 12px;"></p>
+      <div id="taskBody" style="max-width:900px;">
+        <p class="muted" style="padding:16px;">불러오는 중...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="editTaskOverlay" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-header">
+        <h3>업무 수정</h3>
+        <button type="button" class="modal-close" id="et_closeBtn">&times;</button>
+      </div>
+      <div id="editErrorBox" class="error-text"></div>
+      <form id="editTaskForm">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field" id="et_assigneeField"><label>담당자</label><select id="et_assignee" required></select></div>
+          <div class="field" style="grid-column: span 2;"><label>할 일</label><input type="text" id="et_title" required /></div>
+          <div class="field"><label>반복</label>
+            <select id="et_repeat">
+              <option value="none">반복 없음</option>
+              <option value="daily">매일</option>
+              <option value="weekly">매주</option>
+              <option value="monthly">매월</option>
+            </select>
+          </div>
+          <div class="field" id="et_weekOrdinalField" style="display:none;">
+            <label>몇째 주</label>
+            <select id="et_week_ordinal">
+              <option value="1">첫째 주</option>
+              <option value="2">둘째 주</option>
+              <option value="3">셋째 주</option>
+              <option value="4">넷째 주</option>
+              <option value="-1">마지막 주</option>
+            </select>
+          </div>
+          <div class="field" id="et_weekdayField" style="display:none;">
+            <label>요일</label>
+            <select id="et_weekday">
+              <option value="0">일요일</option>
+              <option value="1">월요일</option>
+              <option value="2">화요일</option>
+              <option value="3">수요일</option>
+              <option value="4">목요일</option>
+              <option value="5">금요일</option>
+              <option value="6">토요일</option>
+            </select>
+          </div>
+          <div class="field"><label>시간 (선택)</label><input type="time" id="et_time" /></div>
+          <div class="field" id="et_dueField"><label>마감일 (선택)</label><input type="date" id="et_due" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">저장</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js?v=1790338841"></script>
+  <script src="auth.js?v=1790338841"></script>
+  <script src="data.js?v=1790338841"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    let currentUserId = null;
+    let currentUserRole = null;
+    let tasksCache = [];
+    let trainersCache = [];
+    let activeAssigneeFilter = 'all';
+
+    // 업무를 "일일 업무 / ○요일 주간업무 / 월간 업무 / 개인 업무"로 묶어 보여줄 때, 어떤 묶음이 펼쳐져 있는지
+    // (마이크로소프트 투두처럼 목록 제목만 쭉 나오고 눌러야 펼쳐지는 방식 - 업무가 많아져도 화면이 안 길어짐)
+    // 처음 열 때는 "일일 업무" · "개인 업무" · "월간 업무"(한 달에 한 번뿐이라 놓치면 아쉬우니 항상 펼쳐둠) ·
+    // 오늘 요일에 해당하는 주간업무만 기본으로 펼쳐두고, 그 외 요일(당장 안 봐도 되는 것들)은 접어둠.
+    // 이후로는 사용자가 누른 상태 그대로 유지됨(다시 접기 전까지)
+    let expandedGroupKeys = new Set(['daily', 'none', 'monthly', 'weekly-' + new Date().getDay()]);
+
+    document.getElementById('t_repeat').addEventListener('change', (e) => {
+      const isRepeating = e.target.value !== 'none';
+      // 요일 선택은 "매주"·"매월" 둘 다 필요 (매월은 "○째 주 ○요일"이라 요일도 골라야 함)
+      document.getElementById('t_weekdayField').style.display = (e.target.value === 'weekly' || e.target.value === 'monthly') ? '' : 'none';
+      document.getElementById('t_weekOrdinalField').style.display = e.target.value === 'monthly' ? '' : 'none';
+      document.getElementById('t_dueField').style.display = isRepeating ? 'none' : '';
+    });
+
+    document.getElementById('et_repeat').addEventListener('change', (e) => {
+      const isRepeating = e.target.value !== 'none';
+      document.getElementById('et_weekdayField').style.display = (e.target.value === 'weekly' || e.target.value === 'monthly') ? '' : 'none';
+      document.getElementById('et_weekOrdinalField').style.display = e.target.value === 'monthly' ? '' : 'none';
+      document.getElementById('et_dueField').style.display = isRepeating ? 'none' : '';
+    });
+
+    // 업무 카드의 "수정" 버튼을 눌렀을 때: 등록할 때 반복(매일/매주) 설정을 잘못 했거나
+    // 나중에 마감일·할 일 내용을 바꾸고 싶을 때, 지우고 다시 만들지 않고 그 자리에서 고칠 수 있게 함
+    function openEditTaskModal(id) {
+      const t = tasksCache.find(x => x.id === id);
+      if (!t) return;
+      document.getElementById('editErrorBox').style.display = 'none';
+      document.getElementById('editTaskForm').dataset.taskId = id;
+      document.getElementById('et_title').value = t.title;
+
+      const assigneeField = document.getElementById('et_assigneeField');
+      const assigneeSel = document.getElementById('et_assignee');
+      assigneeSel.innerHTML = '';
+      if (currentUserRole === 'manager') {
+        assigneeField.style.display = '';
+        assigneeSel.disabled = false;
+        trainersCache.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          if (s.id === t.assignee_id) opt.selected = true;
+          assigneeSel.appendChild(opt);
+        });
+      } else {
+        // 트레이너는 본인 업무만 수정할 수 있고 담당자를 바꿀 수 없으므로 칸 자체를 숨김
+        assigneeField.style.display = 'none';
+        const opt = document.createElement('option');
+        opt.value = t.assignee_id; opt.selected = true;
+        assigneeSel.appendChild(opt);
+      }
+
+      const repeatType = t.repeat_type || 'none';
+      document.getElementById('et_repeat').value = repeatType;
+      document.getElementById('et_weekdayField').style.display = (repeatType === 'weekly' || repeatType === 'monthly') ? '' : 'none';
+      document.getElementById('et_weekOrdinalField').style.display = repeatType === 'monthly' ? '' : 'none';
+      document.getElementById('et_dueField').style.display = repeatType === 'none' ? '' : 'none';
+      if (repeatType === 'weekly' || repeatType === 'monthly') {
+        document.getElementById('et_weekday').value = t.repeat_weekday != null ? String(t.repeat_weekday) : '1';
+      }
+      if (repeatType === 'monthly') {
+        document.getElementById('et_week_ordinal').value = t.repeat_week_ordinal != null ? String(t.repeat_week_ordinal) : '1';
+      }
+      document.getElementById('et_due').value = t.due_date || '';
+      document.getElementById('et_time').value = t.due_time ? t.due_time.slice(0, 5) : '';
+
+      document.getElementById('editTaskOverlay').style.display = 'flex';
+    }
+    function closeEditTaskModal() {
+      document.getElementById('editTaskOverlay').style.display = 'none';
+    }
+    document.getElementById('et_closeBtn').addEventListener('click', closeEditTaskModal);
+    document.getElementById('editTaskOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'editTaskOverlay') closeEditTaskModal();
+    });
+
+    document.getElementById('editTaskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = e.target.dataset.taskId;
+      const errorBox = document.getElementById('editErrorBox');
+      errorBox.style.display = 'none';
+      const repeatType = document.getElementById('et_repeat').value;
+      const patch = {
+        title: document.getElementById('et_title').value.trim(),
+        due_date: repeatType === 'none' ? (document.getElementById('et_due').value || null) : null,
+        repeat_type: repeatType,
+        repeat_weekday: (repeatType === 'weekly' || repeatType === 'monthly') ? Number(document.getElementById('et_weekday').value) : null,
+        repeat_week_ordinal: repeatType === 'monthly' ? Number(document.getElementById('et_week_ordinal').value) : null,
+        due_time: document.getElementById('et_time').value || null
+      };
+      if (currentUserRole === 'manager') {
+        patch.assignee_id = document.getElementById('et_assignee').value;
+      }
+      try {
+        await updateTask(id, patch);
+        const t = tasksCache.find(x => x.id === id);
+        if (t) Object.assign(t, patch);
+        closeEditTaskModal();
+        renderTaskBody();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    // 담당자 선택: 지점장이면 전체 직원 목록, 트레이너면 본인 하나만(변경 불가) - RLS상 트레이너는
+    // 본인을 담당자로 하는 업무만 등록할 수 있기 때문에 처음부터 다른 사람을 못 고르게 함
+    // fetchStaff()로 이미 받아온 직원 목록으로 "담당자" select를 채움 (예전엔 이 함수 안에서
+    // fetchStaff()를 따로 불러서, 아래 트레이너 필터 탭용 fetchStaff()와 합쳐 같은 요청이 두 번 나갔었음)
+    function populateAssigneeOptions(profile, staff) {
+      const sel = document.getElementById('t_assignee');
+      if (profile.role === 'manager') {
+        staff.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          if (s.id === profile.id) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      } else {
+        const me = staff.find(s => s.id === profile.id) || { id: profile.id, name: profile.name };
+        const opt = document.createElement('option');
+        opt.value = me.id; opt.textContent = me.name; opt.selected = true;
+        sel.appendChild(opt);
+        sel.disabled = true;
+      }
+    }
+
+    async function loadMemberOptions() {
+      const sel = document.getElementById('t_member');
+      try {
+        const members = await fetchMembers();
+        members.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id; opt.textContent = m.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) { /* 무시: 회원 없으면 옵션이 비어있음 */ }
+    }
+
+    function visibleTasks() {
+      return activeAssigneeFilter === 'all' ? tasksCache : tasksCache.filter(t => t.assignee_id === activeAssigneeFilter);
+    }
+
+    function renderProgress() {
+      const list = visibleTasks();
+      const done = list.filter(t => isTaskDone(t)).length;
+      document.getElementById('taskProgress').textContent =
+        list.length > 0 ? `오늘 기준 ${done} / ${list.length} 완료` : '';
+    }
+
+    // 지점장 전용: 담당자별로 걸러볼 수 있는 탭 (전체 + 전체 직원 이름, 지점장/트레이너 구분 없이 다 보여줌).
+    // 트레이너 로그인 화면에서는 RLS로 이미 본인 업무만 보이기 때문에 탭 자체를 숨김
+    function renderTrainerTabs() {
+      const container = document.getElementById('trainerTabs');
+      if (currentUserRole !== 'manager') { container.innerHTML = ''; return; }
+      const counts = {};
+      tasksCache.forEach(t => { counts[t.assignee_id] = (counts[t.assignee_id] || 0) + 1; });
+      const tabs = [{ key: 'all', label: `전체 (${tasksCache.length})` }]
+        .concat(trainersCache.map(s => ({ key: s.id, label: `${s.name} (${counts[s.id] || 0})` })));
+      container.innerHTML = tabs.map(t =>
+        `<button type="button" class="filter-tab${t.key === activeAssigneeFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+      ).join('');
+      container.querySelectorAll('.filter-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeAssigneeFilter = btn.dataset.key;
+          renderTrainerTabs();
+          renderTaskBody();
+        });
+      });
+    }
+
+    function renderTaskRow(t) {
+      const done = isTaskDone(t);
+      const dueLabel = taskDueLabel(t);
+      const canEdit = currentUserRole === 'manager' || t.assignee_id === currentUserId;
+      const checkboxAttrs = canEdit
+        ? `onchange="handleToggleTask('${t.id}', this.checked)"`
+        : 'disabled title="담당자 본인만 체크할 수 있어요"';
+      const metaParts = [];
+      if (currentUserRole === 'manager') metaParts.push(t.assignee ? t.assignee.name : '미지정');
+      if (t.member) metaParts.push(t.member.name);
+      metaParts.push(dueLabel);
+      // 반복 업무만 "마지막 체크" 이력을 보여줌 (담당 선생님이 누락하고 있는지 파악하기 위한 용도라
+      // 반복 없는 개인 업무는 체크박스 상태만으로 충분함)
+      if (t.repeat_type && t.repeat_type !== 'none') {
+        const lastChecked = taskLastCheckedLabel(t);
+        metaParts.push(lastChecked ? `마지막 체크 ${lastChecked}` : `<span style="color:var(--red-600);">체크 기록 없음</span>`);
+      }
+      return `
+        <div class="checklist-row ${done ? 'row-done' : ''}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--slate-200);">
+          <input type="checkbox" ${done ? 'checked' : ''} ${checkboxAttrs} style="width:18px; height:18px; cursor:${canEdit ? 'pointer' : 'default'};" />
+          <div style="flex:1;">
+            <div style="font-size:14px; font-weight:600;">${t.title}</div>
+            <div class="muted" style="font-size:12px; margin-top:2px;">${metaParts.join(' · ')}</div>
+          </div>
+          ${canEdit ? `<button type="button" class="btn-link" onclick="openEditTaskModal('${t.id}')">수정</button>` : ''}
+        </div>
+      `;
+    }
+
+    // 업무를 반복 설정 기준으로 묶음 지어서 반환:
+    // 일일 업무 -> 월~일 순서의 요일별 주간업무 -> 월간 업무(매월 ○째 주 ○요일) -> 개인 업무(반복 없음).
+    // 완료/미완료 둘 다 포함해서 묶기 때문에(마이크로소프트 투두처럼, 체크한 항목도 그 목록 안에 취소선으로 계속 보임),
+    // 묶음 제목 옆에 "완료/전체" 진행 상황을 바로 알 수 있음. 업무가 하나도 없는 묶음은 아예 안 보여줌
+    function buildTaskGroups(list) {
+      const groups = [];
+      const daily = list.filter(t => t.repeat_type === 'daily');
+      if (daily.length > 0) groups.push({ key: 'daily', label: '일일 업무', tasks: daily });
+      [1, 2, 3, 4, 5, 6, 0].forEach(wd => { // 월,화,수,목,금,토,일 순서
+        const weekly = list.filter(t => t.repeat_type === 'weekly' && t.repeat_weekday === wd);
+        if (weekly.length > 0) groups.push({ key: 'weekly-' + wd, label: `${WEEKDAY_LABELS[wd]} 주간업무`, tasks: weekly });
+      });
+      // 매월 반복 업무는 (요일별 주간업무처럼 잘게 쪼개면 항목이 몇 개 안 되는데도 묶음만 많아지므로)
+      // "월간 업무" 하나로 묶고, 그 안에서 "○째 주 ○요일"은 각 업무 행의 마감 라벨(taskDueLabel)로 구분함
+      const monthly = list.filter(t => t.repeat_type === 'monthly');
+      if (monthly.length > 0) groups.push({ key: 'monthly', label: '월간 업무', tasks: monthly });
+      const personal = list.filter(t => !t.repeat_type || t.repeat_type === 'none');
+      if (personal.length > 0) groups.push({ key: 'none', label: '개인 업무', tasks: personal });
+      return groups;
+    }
+
+    function renderTaskGroup(group) {
+      const done = group.tasks.filter(t => isTaskDone(t)).length;
+      const total = group.tasks.length;
+      const allDone = total > 0 && done === total;
+      const expanded = expandedGroupKeys.has(group.key);
+      // 펼쳤을 때는 아직 안 한 업무를 위에, 완료된 업무를 아래로 (그날그날 뭘 더 해야 하는지 한눈에 보이도록)
+      // 같은 완료 상태 안에서는 "시간"이 있는 업무끼리 시간순으로 정렬(10시 회의, 오후 3시 미팅 순서대로 보이게).
+      // 시간이 없는 업무는 뒤로 보냄
+      const sortedTasks = group.tasks.slice().sort((a, b) => {
+        const doneDiff = (isTaskDone(a) ? 1 : 0) - (isTaskDone(b) ? 1 : 0);
+        if (doneDiff !== 0) return doneDiff;
+        if (!a.due_time && !b.due_time) return 0;
+        if (!a.due_time) return 1;
+        if (!b.due_time) return -1;
+        return a.due_time.localeCompare(b.due_time);
+      });
+      return `
+        <div class="card task-group-card" style="padding:0; overflow:hidden; margin-bottom:10px;">
+          <div class="task-group-header" data-key="${group.key}">
+            <div>
+              <div style="font-size:14px; font-weight:600;">${allDone ? '✅ ' : ''}${group.label}</div>
+              <div class="muted" style="font-size:12px; margin-top:2px;">${done} / ${total} 완료</div>
+            </div>
+            <span class="muted" style="font-size:12px;">${expanded ? '▲' : '▼'}</span>
+          </div>
+          <div class="task-group-body" style="${expanded ? '' : 'display:none;'}">
+            ${sortedTasks.map(renderTaskRow).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTaskBody() {
+      const container = document.getElementById('taskBody');
+      const list = visibleTasks();
+      if (list.length === 0) {
+        container.innerHTML = '<p class="muted" style="padding:16px;">해당하는 업무가 없습니다.</p>';
+        renderProgress();
+        return;
+      }
+      const groups = buildTaskGroups(list);
+      container.innerHTML = groups.map(renderTaskGroup).join('');
+      container.querySelectorAll('.task-group-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const key = header.dataset.key;
+          if (expandedGroupKeys.has(key)) expandedGroupKeys.delete(key); else expandedGroupKeys.add(key);
+          renderTaskBody();
+        });
+      });
+      renderProgress();
+    }
+
+    async function handleToggleTask(id, checked) {
+      try {
+        await toggleTaskDone(id, checked);
+        const t = tasksCache.find(x => x.id === id);
+        if (t) {
+          t.status = checked ? 'done' : 'todo';
+          t.last_completed_at = checked ? new Date().toISOString() : null;
+          if (checked) t.last_checked_at = new Date().toISOString();
+        }
+        renderTaskBody();
+      } catch (err) {
+        alert(err.message);
+        loadTasks();
+      }
+    }
+
+    async function loadTasks() {
+      const container = document.getElementById('taskBody');
+      try {
+        tasksCache = await fetchTasks();
+        renderTrainerTabs();
+        renderTaskBody();
+      } catch (err) {
+        container.innerHTML = `<div class="error-text" style="display:block;">${err.message}</div>`;
+      }
+    }
+
+    document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('addErrorBox');
+      const successBox = document.getElementById('addSuccessBox');
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      const repeatType = document.getElementById('t_repeat').value;
+      try {
+        await addTask({
+          assignee_id: document.getElementById('t_assignee').value,
+          member_id: document.getElementById('t_member').value || null,
+          title: document.getElementById('t_title').value.trim(),
+          due_date: repeatType === 'none' ? (document.getElementById('t_due').value || null) : null,
+          status: 'todo',
+          repeat_type: repeatType,
+          repeat_weekday: (repeatType === 'weekly' || repeatType === 'monthly') ? Number(document.getElementById('t_weekday').value) : null,
+          repeat_week_ordinal: repeatType === 'monthly' ? Number(document.getElementById('t_week_ordinal').value) : null,
+          due_time: document.getElementById('t_time').value || null
+        });
+        successBox.textContent = '업무가 등록되었습니다.';
+        successBox.style.display = 'block';
+        document.getElementById('t_title').value = '';
+        document.getElementById('t_due').value = '';
+        document.getElementById('t_time').value = '';
+        document.getElementById('t_member').value = '';
+        document.getElementById('t_repeat').value = 'none';
+        document.getElementById('t_weekdayField').style.display = 'none';
+        document.getElementById('t_weekOrdinalField').style.display = 'none';
+        document.getElementById('t_dueField').style.display = '';
+        loadTasks();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        applyRoleNav(profile);
+        currentUserId = profile.id;
+        currentUserRole = profile.role;
+        document.getElementById('taskListTitle').textContent = profile.role === 'manager' ? '전체 업무 목록' : '내 업무 목록';
+        // "대상 회원" 선택 항목은 지점장/트레이너 화면 모두에서 안 보여줌 (업무에 회원을 굳이 안 엮어도 되니까)
+        document.getElementById('t_memberField').style.display = 'none';
+        if (profile.role !== 'manager') {
+          // 트레이너 화면에서는 본인 앞으로만 등록되니 "담당자" 선택 항목도 굳이 안 보여줌
+          // (담당자 select는 본인으로 이미 고정돼 있어서 숨겨도 제출값은 그대로 유지됨)
+          document.getElementById('t_assigneeField').style.display = 'none';
+        }
+        // 담당자 select/필터 탭에 쓸 직원 목록은 화면의 핵심(업무 목록) 로딩을 막지 않도록 따로 불러옴
+        fetchStaff().then(staff => {
+          populateAssigneeOptions(profile, staff);
+          // 트레이너뿐 아니라 지점장(본인 포함)도 업무를 배정받을 수 있으므로,
+          // 권한과 상관없이 전체 직원을 담당자별 필터 탭에 보여줌
+          if (profile.role === 'manager') {
+            trainersCache = staff;
+            // loadTasks()가 이 요청보다 먼저 끝나서 탭을 이미 그렸을 수도 있으니(담당자 목록 없이),
+            // 직원 목록이 도착한 시점에 탭을 다시 그려서 항상 채워지도록 함
+            renderTrainerTabs();
+          }
+        }).catch(() => {
+          document.getElementById('t_assignee').innerHTML = `<option value="${profile.id}">${profile.name}</option>`;
+          /* 필터 탭은 못 불러와도 무시: 탭만 안 보일 뿐, 전체 목록은 그대로 보임 */
+        });
+      }
+      loadTasks();
+    })();
+  </script>
+</body>
+</html>
