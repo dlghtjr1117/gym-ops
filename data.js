@@ -2492,3 +2492,275 @@ async function deleteGroupPtRewardTier(id) {
   });
   if (!res.ok) await throwApiError(res, '보상 단계 삭제에 실패했습니다.');
 }
+
+// ==================================================================
+// ---- 트레이너 급여(payroll.html) ----
+// migration_67 참고(migration_66을 대체함). 호석님이 실제 쓰시는 1:1 PT/그룹PT 페이롤 구간표
+// 이미지를 확인하고 나서 아래 공식으로 확정함:
+//   1) 회당단가 = 그 PT 결제 건의 금액(sales.amount) ÷ 그 상품의 회차수(products.sessions)
+//   2) 당월 소진 매출 = "출석"으로 처리된 세션만 카운트(결석/노쇼는 잔여횟수는 깎이지만 매출·수당
+//      계산에서는 제외 - 호석님 확인 완료). 세션마다 그 날짜 기준 가장 최근 결제 건의 단가를 곱해서 합산.
+//   3) 이 당월 소진 매출이 속하는 구간(pt_payroll_tiers, 전체 트레이너 공통 9단계)을 찾아서
+//      [기본급] + [소진매출 × 그 구간 정률(%)]을 적용. 1~4구간은 "이 달 OT 완료 건수(OT1+OT2 합,
+//      get_ot_performance_leaderboard() 그대로 재사용)가 구간의 기준 이상이면" OT보너스,
+//      5~9구간은 매출과 무관하게 구간별 성과금을 고정 지급(둘 다 구간표에 들어있어서 자동 계산됨 -
+//      예전엔 이 기본급/보너스를 "영업지원금"/"매출커미션"이라는 이름으로 매달 직접 입력했었는데,
+//      실제로는 이 구간표에서 나온 값이었다는 걸 확인받아서 자동 계산으로 바꿈).
+//   4) 확정 수업료(개인PT) = (소진매출×정률)에서 "부가세 10% 먼저 제외 → 카드수수료 제외" 순서로
+//      계산. 카드수수료는 전체 수당에 일괄 적용이 아니라, sales.payment_method가 'card'인 결제
+//      건의 수당분에만 비례 적용(이체/현금 결제 건은 수수료 없음).
+//   5) 그룹PT 확정수업료는 이번 버전에서도 매달 직접 입력(그룹수업 진행 기록이 앱에 아직 없어서
+//      그룹PT 매출을 자동집계할 수 없음) - 다만 그룹PT 구간표(group_pt_payroll_tiers)를 화면에
+//      참고용으로 보여줘서, 관리자가 이번 달 그룹PT 매출 구간에 맞는 회당 단가를 보고 직접 계산해
+//      넣을 수 있게 함.
+//   6) 세전 합계 = 개인PT 확정수업료 + 기본급 + OT보너스/성과금 + 그룹PT 확정수업료(직접입력)
+//   7) 사업소득세 = ROUNDDOWN(세전합계 × 3%, -1원단위) / 지방소득세 = ROUNDDOWN(사업소득세 × 10%, -1원단위)
+//      (표준 프리랜서 원천징수 3.3% 구조 - 업로드해주신 엑셀 Sheet1 수식 그대로)
+//   8) 최종 급여 = 세전합계 − 사업소득세 − 지방소득세
+// 새 테이블을 최소한으로 두고(구간표 2개 + 확정기록 1개) 이미 있는 sales(결제금액·결제수단)·
+// products(회차수)·pt_bookings(출석/결석 기록)·get_ot_performance_leaderboard()를 그대로 활용 -
+// 아래 fetch 함수들은 원본 데이터만 가져오고, 실제 계산은 이 파일 아래쪽의 순수 함수(buildPtPricingIndex
+// 등)에서 함(테스트하기 쉽게 화면 코드와 분리).
+// ==================================================================
+
+// 이번 달(지점장이 고른 트레이너/월) PT 스케줄 전체를 트레이너 구분 없이 한 번에 가져옴(지점장만
+// 전체가 보임 - RLS: is_manager() or trainer_id=auth.uid()). 출석/결석 둘 다 가져오는 이유는 화면에
+// "당월 출석/결석" 건수를 같이 보여주기 위함(결석도 잔여횟수는 깎이는 이 앱 정책과 맞춤) - 실제
+// 매출·수당 계산에 결석을 넣을지는 아래 computeTrainerConsumption()에서 결정.
+async function fetchPtBookingsForMonth(startStr, endStr) {
+  const { rows, error } = await fetchAllRows(
+    `pt_bookings?start_at=gte.${startStr}&start_at=lt.${endStr}&status=in.(attended,absent)` +
+    `&select=id,trainer_id,member_id,start_at,status`,
+    await authHeaders()
+  );
+  if (error) await throwApiError(error, 'PT 스케줄을 불러오지 못했습니다.');
+  return rows;
+}
+
+// 회당단가 계산용 PT 매출 내역 - 상품이 연결되어 회차수(products.sessions)를 알 수 있는 pt_new/pt_renewal
+// 매출만 의미가 있지만, 필터링은 buildPtPricingIndex()에서 하고 여기서는 그냥 기준일 이전 전체를 가져옴
+// ("직접 입력"으로 상품 연결 없이 기록된 매출도 같이 받아온 다음 순수 함수 쪽에서 걸러야, 나중에
+// 필터 기준이 바뀌어도 이 fetch 함수는 안 건드려도 됨). payment_method는 카드수수료 계산에 씀.
+async function fetchPtSalesForPricing(beforeStr) {
+  const { rows, error } = await fetchAllRows(
+    `sales?category=in.(pt_new,pt_renewal)&sale_date=lt.${beforeStr}` +
+    `&select=member_id,amount,sale_date,payment_method,product:products(sessions)&order=sale_date.asc`,
+    await authHeaders()
+  );
+  if (error) await throwApiError(error, 'PT 매출 내역을 불러오지 못했습니다.');
+  return rows;
+}
+
+async function fetchTrainerSalarySettings() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/trainer_salary_settings?select=*`, { headers: await authHeaders() });
+  if (!res.ok) await throwApiError(res, '급여 조건을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 1:1 PT 구간표(전체 트레이너 공통, migration_67) - 매출 낮은 구간부터 정렬해서 가져옴
+async function fetchPtPayrollTiers() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_payroll_tiers?select=*&order=tier_order.asc`, { headers: await authHeaders() });
+  if (!res.ok) await throwApiError(res, '개인PT 급여 구간표를 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 그룹PT 구간표(전체 트레이너 공통, 참고용 표시만 - 실제 확정수업료 계산엔 안 쓰임)
+async function fetchGroupPtPayrollTiers() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_payroll_tiers?select=*&order=tier_order.asc`, { headers: await authHeaders() });
+  if (!res.ok) await throwApiError(res, '그룹PT 급여 구간표를 불러오지 못했습니다.');
+  return res.json();
+}
+
+// migration_51의 OT 성과 순위 함수를 그대로 재사용해서, 트레이너별 그 달 OT 완료 건수(OT1+OT2 성공
+// 합계)만 뽑아 씀 - 1~4구간 OT보너스("OT 30회 채우면 20만원") 판정에 씀
+async function fetchOtDoneCountsForMonth(monthStartStr, monthEndStr) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_ot_performance_leaderboard`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_month_start: monthStartStr, p_month_end: monthEndStr })
+  });
+  if (!res.ok) await throwApiError(res, 'OT 실적을 불러오지 못했습니다.');
+  const rows = await res.json();
+  const byTrainer = {};
+  rows.forEach(r => { byTrainer[r.trainer_id] = (Number(r.ot1_success) || 0) + (Number(r.ot2_success) || 0); });
+  return byTrainer;
+}
+
+// trainer_id가 이미 있으면 덮어쓰기(upsert) - migration_65의 primary key(trainer_id)를 그대로 이용
+async function upsertTrainerSalarySetting(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/trainer_salary_settings?on_conflict=trainer_id`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '급여 조건 저장에 실패했습니다.');
+  return res.json();
+}
+
+async function fetchPayrollSettings() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/payroll_settings?id=eq.1&select=*`, { headers: await authHeaders() });
+  if (!res.ok) await throwApiError(res, '급여 계산 설정을 불러오지 못했습니다.');
+  const rows = await res.json();
+  return rows[0] || { id: 1, vat_rate: 10, business_tax_rate: 3, local_tax_multiplier: 10 };
+}
+
+async function updatePayrollSettings(patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/payroll_settings?id=eq.1`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) await throwApiError(res, '급여 계산 설정 저장에 실패했습니다.');
+  return res.json();
+}
+
+async function fetchTrainerPayrollRecords(monthStr) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/trainer_payroll_records?period_month=eq.${monthStr}&select=*`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '급여 확정 기록을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// trainer_id+period_month가 이미 있으면 덮어쓰기(재확정) - migration_65의 unique 제약을 이용
+async function upsertTrainerPayrollRecord(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/trainer_payroll_records?on_conflict=trainer_id,period_month`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '급여 확정 저장에 실패했습니다.');
+  return res.json();
+}
+
+// ---- 순수 계산 함수(화면 코드와 분리 - node로 바로 단위테스트 가능) ----
+
+// PT 매출 목록을 회원별로 묶어서, 날짜순으로 정렬해둠. 상품이 연결 안 됐거나(product null) 그
+// 상품에 회차수가 없는(sessions null/0) 매출, amount가 없는 매출은 회당단가를 알 수 없어서 뺌.
+// paymentMethod도 같이 들고 있어야 카드수수료를 "카드로 결제한 건"에만 비례해서 매길 수 있음.
+function buildPtPricingIndex(ptSales) {
+  const byMember = {};
+  for (const s of ptSales) {
+    if (!s.member_id || !s.product || s.product.sessions == null || s.product.sessions <= 0) continue;
+    if (s.amount == null) continue;
+    const unitPrice = s.amount / s.product.sessions;
+    if (!byMember[s.member_id]) byMember[s.member_id] = [];
+    byMember[s.member_id].push({ date: s.sale_date, unitPrice, paymentMethod: s.payment_method || null });
+  }
+  Object.values(byMember).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));
+  return byMember;
+}
+
+// 세션(부킹) 날짜 기준으로 "그 시점에 적용됐을" 결제 건(단가+결제수단)을 찾음 - 그 날짜 이전(당일
+// 포함) 중 가장 최근 결제 건. 같은 회원이 달 중간에 재등록해서 단가가 바뀌어도, 재등록 이전 세션은
+// 이전 단가로, 이후 세션은 새 단가로 정확히 나뉨. 해당하는 결제 건을 못 찾으면 null(단가 미확인)
+function findPricingEntryForSession(pricingIndex, memberId, sessionDateStr) {
+  const list = pricingIndex[memberId];
+  if (!list || list.length === 0) return null;
+  let entry = null;
+  for (const e of list) {
+    if (e.date <= sessionDateStr) entry = e;
+    else break;
+  }
+  return entry;
+}
+// 이전 버전 호환용(같은 동작, 단가만 반환)
+function findUnitPriceForSession(pricingIndex, memberId, sessionDateStr) {
+  const entry = findPricingEntryForSession(pricingIndex, memberId, sessionDateStr);
+  return entry ? entry.unitPrice : null;
+}
+
+// bookings: fetchPtBookingsForMonth() 결과(출석+결석 전부), pricingIndex: buildPtPricingIndex() 결과
+// -> { [trainer_id]: { attended, absent, unpriced, revenue, cardRevenue, otherRevenue } }
+// 결석(absent)은 "당월 출석/결석" 건수 표시용으로만 집계하고, 매출·카드매출에는 절대 더하지 않음
+// (호석님 확인: 노쇼 세션은 수당 계산에서 제외).
+function computeTrainerConsumption(bookings, pricingIndex) {
+  const byTrainer = {};
+  for (const b of bookings) {
+    if (!byTrainer[b.trainer_id]) {
+      byTrainer[b.trainer_id] = { attended: 0, absent: 0, unpriced: 0, revenue: 0, cardRevenue: 0, otherRevenue: 0 };
+    }
+    const t = byTrainer[b.trainer_id];
+    if (b.status === 'absent') { t.absent += 1; continue; }
+    t.attended += 1;
+    const dateStr = formatDateStr(new Date(b.start_at));
+    const entry = findPricingEntryForSession(pricingIndex, b.member_id, dateStr);
+    if (!entry) { t.unpriced += 1; continue; }
+    t.revenue += entry.unitPrice;
+    if (entry.paymentMethod === 'card') t.cardRevenue += entry.unitPrice;
+    else t.otherRevenue += entry.unitPrice;
+  }
+  return byTrainer;
+}
+
+// 엑셀의 ROUNDDOWN(x, -1)과 동일 - 10원 단위 내림 (세금 계산에 씀)
+function roundDownToTen(n) {
+  return Math.floor(n / 10) * 10;
+}
+
+// 당월 소진매출(원)이 속하는 구간을 pt_payroll_tiers에서 찾음. tier_order 오름차순으로 정렬해서
+// [min_revenue, max_revenue] 범위(max_revenue가 null이면 그 이상 전부)에 맞는 첫 구간을 반환.
+// 구간표가 비어있거나(설정 전) 일치하는 구간이 없으면(이론상 1구간 min이 0이라 항상 걸리지만,
+// 혹시 구간표가 잘못 설정된 경우 대비) 가장 높은 구간을 fallback으로 반환.
+function findPtTier(tiers, revenue) {
+  if (!tiers || tiers.length === 0) return null;
+  const sorted = [...tiers].sort((a, b) => a.tier_order - b.tier_order);
+  for (const t of sorted) {
+    const min = Number(t.min_revenue) || 0;
+    const max = t.max_revenue == null ? Infinity : Number(t.max_revenue);
+    if (revenue >= min && revenue <= max) return t;
+  }
+  return sorted[sorted.length - 1];
+}
+
+// 개인PT 소진매출 -> 구간 판정(기본급/정률/OT보너스/성과금) -> 확정수업료 -> (그룹PT 합산) ->
+// 세전합계 -> 최종급여까지 공식 그대로 계산 (호석님 확인 완료):
+//   당월 수당 = 소진매출 × 구간 정률
+//   확정수업료 = 수당 -> 부가세 10% 먼저 제외 -> 그 나머지에서 카드결제 비중만큼 카드수수료 제외
+//   OT보너스 = 1~4구간이고 그 달 OT완료건수가 구간 기준 이상이면 구간의 ot_bonus_amount, 아니면 0
+//   성과금 = 5~9구간이면 구간의 performance_bonus(매출과 무관하게 고정 지급), 1~4구간이면 0
+//   세전합계 = 확정수업료(개인PT) + 구간 기본급 + OT보너스 + 성과금 + 그룹PT확정수업료(직접입력)
+//   사업소득세 = ROUNDDOWN(세전합계 × 3%, -1) / 지방소득세 = ROUNDDOWN(사업소득세 × localTaxMultiplier%, -1)
+//   최종급여 = 세전합계 − 사업소득세 − 지방소득세
+function computeTrainerPayroll({
+  consumedRevenue, cardRevenue, tier, otDoneCount, vatRate, cardFeeRate,
+  groupConfirmedFee, businessTaxRate, localTaxMultiplier
+}) {
+  const rate = tier ? Number(tier.rate) || 0 : 0;
+  const basePay = tier ? Number(tier.base_pay) || 0 : 0;
+
+  const grossCommission = consumedRevenue * (rate / 100);
+  const vatAmount = grossCommission * (vatRate / 100);
+  const postVat = grossCommission - vatAmount;
+  // 카드결제 비중은 "소진매출 중 카드결제분 비율"을 그대로 부가세 차감 후 금액에 적용
+  const cardRatio = consumedRevenue > 0 ? cardRevenue / consumedRevenue : 0;
+  const cardFeeAmount = postVat * cardRatio * (cardFeeRate / 100);
+  const individualConfirmedFee = postVat - cardFeeAmount;
+
+  let otBonusAmount = 0;
+  let performanceBonus = 0;
+  if (tier) {
+    if (tier.ot_bonus_threshold != null && (Number(otDoneCount) || 0) >= Number(tier.ot_bonus_threshold)) {
+      otBonusAmount = Number(tier.ot_bonus_amount) || 0;
+    }
+    performanceBonus = Number(tier.performance_bonus) || 0;
+  }
+
+  const preTaxTotal = individualConfirmedFee + basePay + otBonusAmount + performanceBonus + groupConfirmedFee;
+  const businessTaxAmount = roundDownToTen(preTaxTotal * (businessTaxRate / 100));
+  const localTaxAmount = roundDownToTen(businessTaxAmount * (localTaxMultiplier / 100));
+  const finalSalary = preTaxTotal - businessTaxAmount - localTaxAmount;
+
+  return {
+    rate, basePay, grossCommission, vatAmount, postVat, cardFeeAmount, individualConfirmedFee,
+    otBonusAmount, performanceBonus, preTaxTotal, businessTaxAmount, localTaxAmount, finalSalary
+  };
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession,
+    computeTrainerConsumption, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr
+  };
+}
