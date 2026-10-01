@@ -18,6 +18,11 @@
 -- 그래서 insert 전에 '사전 점검' 쿼리를 먼저 돌려서 바디코디 엑셀에는 있지만 members에 전화번호가
 -- 없는 분이 있는지 꼭 확인해주세요 - 있으면 그 줄은 member_id가 비어있는 매출로 조용히 들어가서
 -- (에러는 안 나지만) 급여 계산에 안 잡혀요.
+--
+-- (2026-10-01 수정) 3개 insert문 모두 "on conflict ... do nothing"으로 바꿔서, 이 스크립트를 중간에
+-- 멈췄다 다시 실행하거나 실수로 두 번 돌려도 안전하게(이미 들어간 건 건너뛰고) 동작하도록 함 - 처음
+-- 버전은 "where not exists"로만 막아뒀었는데, migration_68/69를 먼저 안 돌리고 실행했다가 다시
+-- 돌리는 과정에서 "duplicate key" 에러로 멈추는 문제가 있었음.
 
 -- ========== 0) 사전 점검: 아래 전화번호 중 members에 없는 번호가 있는지 확인 ==========
 -- (결과가 1건이라도 나오면, 그 회원을 먼저 회원 관리 화면에서 등록한 뒤 다시 이 점검 쿼리를 돌려보세요)
@@ -403,10 +408,7 @@ from (values
 join members m on m.phone = v.phone
 left join profiles p on p.name = v.staff_name
 join products pr on pr.category = 'pt' and pr.sessions = v.sessions
-where not exists (
-  select 1 from sales s2
-  where s2.external_sale_no = v.external_sale_no and s2.sale_date = v.sale_date::date and s2.amount = v.amount
-);
+on conflict (external_sale_no, sale_date, amount) where external_sale_no is not null do nothing;
 
 -- ========== 2) 묶음(번들)판매 8건 - PT 몫 금액은 호석님이 직접 확인해주신 금액으로 반영 ==========
 -- (바디코디 엑셀에는 PT 외 다른 상품과 금액이 합쳐져서 찍혀 있던 건들. 할부로 나뉜 건(이재경/남주경)은
@@ -430,10 +432,7 @@ from (values
 join members m on m.phone = v.phone
 left join profiles p on p.name = v.staff_name
 join products pr on pr.category = 'pt' and pr.sessions = v.sessions
-where not exists (
-  select 1 from sales s2
-  where s2.external_sale_no = v.external_sale_no and s2.sale_date = v.sale_date::date and s2.amount = v.amount
-);
+on conflict (external_sale_no, sale_date, amount) where external_sale_no is not null do nothing;
 
 -- ========== 3) 번들에서 분리된 PT 외 소액 매출 2건 (운동복) - 참고용, 이 작업의 핵심은 아니지만 ==========
 -- 금액이 작게나마 누락되지 않도록 같이 반영합니다.
@@ -446,10 +445,7 @@ from (values
 join members m on m.phone = v.phone
 left join profiles p on p.name = v.staff_name
 left join products pr on pr.category = 'clothes' and pr.name = '운동복 1개월'
-where not exists (
-  select 1 from sales s2
-  where s2.external_sale_no = v.external_sale_no and s2.sale_date = v.sale_date::date and s2.amount = v.amount
-);
+on conflict (external_sale_no, sale_date, amount) where external_sale_no is not null do nothing;
 
 -- ========== 4) 반영 결과 확인 ==========
 select count(*) as imported_count, sum(amount) as imported_total
