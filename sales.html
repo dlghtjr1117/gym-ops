@@ -6,6 +6,27 @@
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 매출 입력</title>
 <link rel="stylesheet" href="style.css?v=1790687074" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* 바디코디 판매내역 업로드 - group-pt.html의 방문기록 업로드 박스와 같은 관례 */
+  .upload-box {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--slate-50); border: 1px dashed var(--slate-300); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  [data-theme="dark"] .upload-box { background: rgba(255,255,255,0.03); }
+  .upload-box .u-left { font-size: 13px; }
+  .upload-box .u-left b { display: block; font-size: 14px; margin-bottom: 2px; }
+  .note-box {
+    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 14px;
+    font-size: 12.5px; color: #1e3a8a; margin: 10px 0 16px; line-height: 1.6;
+  }
+  .import-summary-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; background: var(--slate-100); margin: 0 6px 6px 0;
+  }
+  [data-theme="dark"] .import-summary-chip { background: rgba(255,255,255,0.06); }
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -79,6 +100,32 @@
         </div>
         <button type="submit" class="btn btn-primary" style="width:auto; padding-left:24px; padding-right:24px;">등록</button>
       </form>
+    </div>
+
+    <!-- 2026-10-01 추가: 바디코디 "판매내역" 월간 엑셀을 매달 올리면 1:1 PT 판매만 골라서
+         자동으로 매출에 반영해주는 기능. 지점장만 보임(트레이너는 본인 담당 매출만 insert할 수 있어서
+         여러 트레이너 매출이 섞인 일괄 업로드를 할 수 없음 - schema.sql의 "매출 등록" RLS 정책 참고).
+         1:1 PT 판매만 다루고 헬스이용권/락커/운동복 등 다른 상품은 이 업로드에 포함하지 않음(기존처럼
+         직접 입력) - PT는 회차·단가가 트레이너 급여(소진매출) 계산에 그대로 쓰이는데, 지금까지 1월~8월
+         같은 과거 데이터가 바디코디에만 있고 gym-ops에는 없어서 "이 회원님이 몇 회를 얼마에 등록했는지"를
+         알 수가 없었던 문제를 해결하기 위해 만듦. 엑셀을 올리면 바로 반영하지 않고 먼저 분석 결과(즉시
+         반영 가능/검토 필요/제외)를 보여주고, "반영하기"를 눌러야 실제로 저장됨. -->
+    <div class="section" id="ptImportSection" style="display:none;">
+      <h2>바디코디 판매내역 엑셀 업로드 <span class="muted">(1:1 PT만)</span></h2>
+      <div class="upload-box">
+        <div class="u-left">
+          <b>📤 바디코디 "판매내역(결제 및 환불 통합내역)" 월간 엑셀을 올려주세요</b>
+          <span class="muted" id="ptImportSubText">전화번호로 회원을 매칭해서 1:1 PT 판매 건만 매출로 등록해요. 아직 업로드한 적 없어요.</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="file" id="ptImportFile" accept=".xlsx,.xls,.csv" style="max-width:240px;" />
+          <button type="button" class="btn btn-primary" id="ptImportAnalyzeBtn">분석하기</button>
+        </div>
+      </div>
+      <div class="note-box">
+        💡 헬스이용권·락커·운동복·그룹PT 등 PT가 아닌 판매는 이 업로드에 포함되지 않아요(기존처럼 위에서 직접 입력해주세요). 환불/양도 건은 자동으로 제외돼요. 계약금+잔금처럼 할부로 나눠 낸 건 같은 판매번호로 여러 번 찍히는데, 그건 전부 실제로 들어온 결제라서 각각 따로 반영돼요(이미 똑같은 판매번호·날짜·금액을 한 번 가져온 적 있으면만 중복으로 걸러내요 - 엑셀을 두 번 올렸을 때를 막기 위함). 묶음(번들)으로 다른 상품과 같이 결제된 건, 담당 선생님 이름을 못 찾은 건, 회원을 못 찾은 건은 "검토 필요"로 따로 보여드리니 그 목록은 위 매출 등록 폼에서 직접 입력해주세요.
+      </div>
+      <div id="ptImportResult"></div>
     </div>
 
     <div class="section">
@@ -306,6 +353,229 @@
       }
     }
 
+    // ---- 바디코디 "판매내역" 엑셀 업로드 (1:1 PT만) ----
+    // group-pt.html의 방문기록 업로드와 같은 패턴(SheetJS로 클라이언트에서 직접 파싱, 전화번호로
+    // 회원 매칭)을 그대로 쓰되, 여기서는 곧바로 반영하지 않고 "분석 -> 미리보기 -> 확정 반영" 2단계로
+    // 나눔. 매출/급여에 직접 영향을 주는 데이터라 실수로 잘못 들어가는 걸 막기 위함.
+    const str = v => (v === undefined || v === null) ? '' : v.toString().trim();
+    let staffCache = [];
+    let ptImportRows = null; // 마지막 분석 결과 {importable, review, excludedCount}
+
+    function findHeaderKey(headerRow, matcher) {
+      return headerRow.find(h => matcher(str(h)));
+    }
+
+    // "2026. 4.15 (수) 오후 10:36" 같은 바디코디 표기에서 날짜(YYYY-MM-DD)와 시각(HH:MM, 24시간제)을 뽑아냄.
+    // 요일/오전오후 표기는 포맷이 들쑥날쑥해서 정규식으로 느슨하게 찾음 (group-pt.html의 parseAnyDate와 같은 접근)
+    function parsePtDateTime(text) {
+      const t = str(text);
+      const dm = t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!dm) return { date: null, time: null };
+      const date = `${dm[1]}-${String(dm[2]).padStart(2, '0')}-${String(dm[3]).padStart(2, '0')}`;
+      const tm = t.match(/(오전|오후)?\s*(\d{1,2})\s*:\s*(\d{1,2})/);
+      let time = null;
+      if (tm) {
+        let h = parseInt(tm[2], 10);
+        const min = String(tm[3]).padStart(2, '0');
+        if (tm[1] === '오후' && h < 12) h += 12;
+        if (tm[1] === '오전' && h === 12) h = 0;
+        time = `${String(h).padStart(2, '0')}:${min}`;
+      }
+      return { date, time };
+    }
+
+    function mapPtPaymentMethod(text) {
+      const t = str(text);
+      if (t.includes('카드')) return 'card';
+      if (t.includes('현금')) return 'cash';
+      if (t.includes('이체')) return 'transfer';
+      if (t.includes('키오스크')) return 'kiosk';
+      return null;
+    }
+
+    function renderPtImportSummary() {
+      const resultBox = document.getElementById('ptImportResult');
+      if (!ptImportRows) { resultBox.innerHTML = ''; return; }
+      const { importable, review, dupCount, excludedCount } = ptImportRows;
+      const importTotal = importable.reduce((sum, r) => sum + r.sale.amount, 0);
+      const reviewReasonCounts = {};
+      review.forEach(r => { reviewReasonCounts[r.reason] = (reviewReasonCounts[r.reason] || 0) + 1; });
+
+      resultBox.innerHTML = `
+        <div style="margin:10px 0;">
+          <span class="import-summary-chip" style="background:var(--green-100,#dcfce7); color:var(--green-700,#15803d);">✅ 즉시 반영 가능 ${importable.length}건 · ${formatWon(importTotal)}</span>
+          <span class="import-summary-chip">🔎 검토 필요 ${review.length}건</span>
+          <span class="import-summary-chip">⏭️ 이미 가져온 결제 건(중복) ${dupCount}건</span>
+          <span class="import-summary-chip">🚫 환불/양도 제외 ${excludedCount}건</span>
+        </div>
+        ${importable.length > 0 ? `<button type="button" class="btn btn-primary" id="ptImportConfirmBtn">즉시 반영 가능한 ${importable.length}건 반영하기</button>` : ''}
+        ${review.length > 0 ? `
+          <div style="margin-top:16px; overflow-x:auto;">
+            <h3 style="font-size:14px; margin-bottom:8px;">검토 필요 ${review.length}건 - 아래 목록은 위 "매출 등록" 폼에서 직접 입력해주세요</h3>
+            <table class="table-fixed" style="min-width:760px;">
+              <thead><tr><th style="width:12%;">일자</th><th style="width:16%;">회원명</th><th style="width:16%;">연락처</th><th style="width:13%;">금액</th><th style="width:43%;">사유</th></tr></thead>
+              <tbody>
+                ${review.map(r => `<tr>
+                  <td>${escapeHtml(r.date || '-')}</td>
+                  <td>${escapeHtml(r.name || '-')}</td>
+                  <td>${escapeHtml(r.phone || '-')}</td>
+                  <td>${formatWon(r.amount)}</td>
+                  <td>${escapeHtml(r.reason)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : ''}
+      `;
+
+      const confirmBtn = document.getElementById('ptImportConfirmBtn');
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', async () => {
+          confirmBtn.disabled = true;
+          confirmBtn.textContent = '반영하는 중...';
+          try {
+            await addSales(importable.map(r => r.sale));
+            const now = new Date();
+            const nowLabel = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            document.getElementById('ptImportSubText').textContent = `전화번호로 회원을 매칭해서 1:1 PT 판매 건만 매출로 등록해요. 마지막 업로드: ${nowLabel} (${importable.length}건 반영)`;
+            ptImportRows = null;
+            document.getElementById('ptImportFile').value = '';
+            resultBox.innerHTML = `<div class="success-text" style="display:block;">${importable.length}건이 매출로 등록됐어요.</div>`;
+            loadSales(true);
+          } catch (err) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = `즉시 반영 가능한 ${importable.length}건 반영하기`;
+            resultBox.insertAdjacentHTML('afterbegin', `<div class="error-text" style="display:block;">${err.message}</div>`);
+          }
+        });
+      }
+    }
+
+    document.getElementById('ptImportAnalyzeBtn').addEventListener('click', async () => {
+      const fileInput = document.getElementById('ptImportFile');
+      const resultBox = document.getElementById('ptImportResult');
+      if (!fileInput.files.length) {
+        resultBox.innerHTML = '<div class="error-text" style="display:block;">파일을 먼저 선택해주세요.</div>';
+        return;
+      }
+      const btn = document.getElementById('ptImportAnalyzeBtn');
+      btn.disabled = true;
+      resultBox.innerHTML = '<div class="muted">분석 중...</div>';
+
+      try {
+        const file = fileInput.files[0];
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const headerRow = (XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 })[0] || []).map(h => str(h));
+        const rows = XLSX.utils.sheet_to_json(sheet, { raw: false });
+
+        const dateKey = findHeaderKey(headerRow, h => h.includes('결제일시') || h.includes('판매일시'));
+        const nameKey = findHeaderKey(headerRow, h => h === '회원명');
+        const phoneKey = findHeaderKey(headerRow, h => ['전화번호', '휴대폰번호', '연락처', '핸드폰번호'].includes(h));
+        const saleNoKey = findHeaderKey(headerRow, h => h.includes('판매번호'));
+        const productKey = findHeaderKey(headerRow, h => h.includes('판매상품'));
+        const statusKey = findHeaderKey(headerRow, h => h.includes('판매상태'));
+        // 금액은 "판매가"(상품 전체 가격)가 아니라 "결제금액"(그 행에서 실제로 받은 돈)을 써야 함 -
+        // 바디코디는 계약금+잔금처럼 할부로 나눠 받으면 같은 판매번호로 행을 여러 개 만드는데, 그때마다
+        // 판매가는 전체 금액으로 똑같이 찍히고 결제금액만 그 날 실제로 받은 만큼만 다름. 판매가를 쓰면
+        // 할부 건마다 전체 금액이 중복으로 잡혀서 매출이 실제보다 훨씬 커짐.
+        const paidKey = findHeaderKey(headerRow, h => h.includes('결제금액'));
+        const payMethodKey = findHeaderKey(headerRow, h => h.includes('결제방법') || h.includes('결제수단'));
+        const staffKey = findHeaderKey(headerRow, h => h.includes('판매담당자') || h === '담당자');
+
+        if (!nameKey || !phoneKey || !saleNoKey || !productKey || !paidKey) {
+          resultBox.innerHTML = '<div class="error-text" style="display:block;">엑셀에서 회원명/연락처/판매번호/판매상품/결제금액 칸을 찾지 못했어요. 바디코디 "판매내역" 엑셀 그대로 올려주세요.</div>';
+          btn.disabled = false;
+          return;
+        }
+
+        staffCache = await fetchStaff();
+        const ptProducts = (await fetchProducts()).filter(p => p.category === 'pt');
+        // "이미 가져온 결제 건"은 판매번호만으로 판단하면 안 됨(할부 잔금도 판매번호가 같음) -
+        // 판매번호+판매일자+금액이 전부 같을 때만(=같은 엑셀을 두 번 올렸을 때) 중복으로 봄
+        const existingPaymentKeys = await fetchExternalPaymentKeys();
+        const seenInFile = new Set();
+
+        const importable = [];
+        const review = [];
+        let dupCount = 0;
+        let excludedCount = 0;
+
+        for (const row of rows) {
+          const product = str(row[productKey]);
+          const ptMatch = product.match(/1\s*[:：]?\s*1\s*PT\s*(\d+)\s*회/);
+          if (!ptMatch) continue; // 1:1 PT 판매가 아니면 이 업로드에서 다루지 않음
+
+          const status = str(row[statusKey]);
+          const saleNo = str(row[saleNoKey]);
+          const name = str(row[nameKey]).replace(/^PT|그룹PT/g, '').trim() || str(row[nameKey]);
+          const phone = str(row[phoneKey]);
+          const price = Number(str(row[paidKey]).replace(/[^0-9.-]/g, '')) || 0;
+          const { date } = parsePtDateTime(row[dateKey]);
+
+          if (status.includes('환불')) { excludedCount++; continue; }
+          if (product.includes('양도') || status.includes('양도')) { excludedCount++; continue; }
+          const paymentKey = `${saleNo}|${date}|${price}`;
+          if (saleNo && (existingPaymentKeys.has(paymentKey) || seenInFile.has(paymentKey))) { dupCount++; continue; }
+          if (saleNo) seenInFile.add(paymentKey);
+
+          if (product.includes('외') && product.includes('건')) {
+            review.push({ date, name, phone, amount: price, reason: `묶음판매(다른 상품과 합산) - 엑셀 표기: "${product}"` });
+            continue;
+          }
+          if (status && status !== '판매') {
+            review.push({ date, name, phone, amount: price, reason: `판매상태 확인 필요("${status}") - 엑셀 표기: "${product}"` });
+            continue;
+          }
+
+          const sessions = parseInt(ptMatch[1], 10);
+          const product_row = ptProducts.find(p => Number(p.sessions) === sessions);
+          if (!product_row) {
+            review.push({ date, name, phone, amount: price, reason: `${sessions}회 PT 상품이 상품 카탈로그에 없음(이용권 관리에서 추가 필요)` });
+            continue;
+          }
+
+          const member = await findMemberByPhone(phone);
+          if (!member) {
+            review.push({ date, name, phone, amount: price, reason: '회원 매칭 안 됨(이 연락처로 등록된 회원이 없음)' });
+            continue;
+          }
+
+          const staffText = str(row[staffKey]);
+          const staffMatch = staffCache.find(s => s.name === staffText);
+          if (!staffMatch) {
+            review.push({ date, name, phone, amount: price, reason: `담당 선생님 확인 필요(바디코디 표기: "${staffText || '(없음)'}")` });
+            continue;
+          }
+
+          const { time } = parsePtDateTime(row[dateKey]);
+          importable.push({
+            date, name, phone, amount: price,
+            sale: {
+              member_id: member.id,
+              staff_id: staffMatch.id,
+              category: 'pt_renewal',
+              product_id: product_row.id,
+              amount: price,
+              sale_date: date || new Date().toISOString().slice(0, 10),
+              sale_time: time || null,
+              payment_method: mapPtPaymentMethod(row[payMethodKey]),
+              memo: `바디코디 가져오기 (판매번호 ${saleNo})`,
+              external_sale_no: saleNo || null
+            }
+          });
+        }
+
+        ptImportRows = { importable, review, dupCount, excludedCount };
+        renderPtImportSummary();
+      } catch (err) {
+        resultBox.innerHTML = `<div class="error-text" style="display:block;">${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     (async () => {
       const profile = await getMyProfile();
       if (profile) {
@@ -315,6 +585,7 @@
         if (profile.role === 'manager') {
           isManagerFlag = true;
           document.getElementById('salesDeleteColHeader').style.display = '';
+          document.getElementById('ptImportSection').style.display = '';
         }
       }
       loadMemberOptions();

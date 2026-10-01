@@ -342,6 +342,20 @@ async function addSales(salesArray) {
   return res.json();
 }
 
+// 바디코디 판매내역 엑셀 업로드(sales.html)에서 "이미 가져온 결제 건인지" 확인하기 위한 용도.
+// migration_69 참고 - 판매번호가 같아도 할부로 나눠 결제하면 날짜·금액이 다른 별개의 결제 건이라
+// 판매번호만으로는 중복을 판단할 수 없음(막으면 할부 잔금이 통째로 막혀버림). 그래서
+// "판매번호+판매일자+금액"이 전부 같을 때만(=같은 엑셀을 실수로 두 번 올렸을 때) 중복으로 봄.
+// 직접 입력한 매출은 이 값들이 비어있어서 select 대상에서 제외(not.is.null)함.
+async function fetchExternalPaymentKeys() {
+  const { rows, error } = await fetchAllRows(
+    'sales?external_sale_no=not.is.null&select=external_sale_no,sale_date,amount',
+    await authHeaders()
+  );
+  if (error) await throwApiError(error, '기존 결제 내역을 불러오지 못했습니다.');
+  return new Set(rows.map(r => `${r.external_sale_no}|${r.sale_date}|${r.amount}`));
+}
+
 // 잘못 등록한 매출 삭제 (지점장만 가능 - RLS로도 막혀있음)
 async function deleteSale(id) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?id=eq.${id}`, {
