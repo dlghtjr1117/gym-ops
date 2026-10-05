@@ -1621,6 +1621,80 @@ async function updateProfileRole(id, role) {
   if (!res.ok) await throwApiError(res, '권한 변경에 실패했습니다.');
 }
 
+// ---- 통화 자동 기록 연동 (call_webhook_tokens / call_events) - migration_72 필요 ----
+// 휴대폰 자동화 앱(Tasker 등)이 로그인 없이 호출할 수 있는 본인 전용 토큰. staff.html에서 발급.
+async function fetchMyCallTokens() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/call_webhook_tokens?select=*&order=created_at.desc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '통화연동 토큰을 불러오지 못했습니다.');
+  return res.json();
+}
+
+function generateCallWebhookToken() {
+  // Tasker HTTP Request 설정창에 바로 붙여넣기 쉽게, URL에 넣어도 안전한 문자만 씀
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function createMyCallToken(staffId, label) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/call_webhook_tokens`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ staff_id: staffId, token: generateCallWebhookToken(), label: label || null })
+  });
+  if (!res.ok) await throwApiError(res, '통화연동 토큰 발급에 실패했습니다.');
+  return res.json();
+}
+
+async function setCallTokenActive(id, active) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/call_webhook_tokens?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ active })
+  });
+  if (!res.ok) await throwApiError(res, '토큰 상태 변경에 실패했습니다.');
+}
+
+// "자동 통화 기록함"(expiry.html) - Tasker가 쌓아둔 call_events 중 아직 TM으로 정리 안 한 것들
+async function fetchPendingCallEvents() {
+  const { rows, error } = await fetchAllRows(
+    'call_events?select=*,member:members(id,name,phone),staff:profiles(name)&status=eq.new&order=called_at.desc',
+    await authHeaders()
+  );
+  if (error) await throwApiError(error, '자동 통화 기록을 불러오지 못했습니다.');
+  return rows;
+}
+
+// 통화 기록 하나를 TM 기록으로 확정 저장(붙여넣은 요약을 memo로) - addTmLog와 call_events 업데이트를 묶어서 처리
+async function convertCallEventToTmLog(callEvent, { memberId, status, memo }) {
+  const tmLog = await addTmLog({
+    member_id: memberId,
+    staff_id: callEvent.staff_id,
+    status,
+    memo,
+    contact_date: (callEvent.called_at || '').slice(0, 10) || undefined
+  });
+  const saved = Array.isArray(tmLog) ? tmLog[0] : tmLog;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/call_events?id=eq.${callEvent.id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ status: 'logged', summary_text: memo, tm_log_id: saved && saved.id ? saved.id : null })
+  });
+  if (!res.ok) await throwApiError(res, '통화 기록 상태 갱신에 실패했습니다.');
+  return saved;
+}
+
+async function ignoreCallEvent(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/call_events?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ status: 'ignored' })
+  });
+  if (!res.ok) await throwApiError(res, '통화 기록 무시 처리에 실패했습니다.');
+}
+
 // ---- OT 연락 미응답 기록 (pt_ot_no_response) - PT 관리 > OT 관리 탭 하단 ----
 async function fetchPtOtNoResponse() {
   const res = await fetch(

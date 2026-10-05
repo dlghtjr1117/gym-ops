@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 직원 관리</title>
-<link rel="stylesheet" href="style.css?v=1790687074" />
+<link rel="stylesheet" href="style.css?v=1791173929" />
 <style>
   /* 이 페이지 전용 - 권한 드롭다운을 뱃지처럼 보이게 */
   .role-select {
@@ -64,11 +64,41 @@
         <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
     </div>
+
+    <div class="section" id="callTokenSection" style="display:none;">
+      <h2>📞 내 통화 자동 기록 연동</h2>
+      <p class="muted" style="margin:-4px 0 12px;">
+        내 휴대폰(안드로이드)에서 전화가 끝나면 자동으로 "만료회원 · TM" 화면의 자동 통화 기록함에
+        한 줄씩 쌓이게 하는 연동이에요. 아래 토큰을 발급받아서 Tasker 같은 자동화 앱에 설정해두면 돼요.
+        통화 "내용"까지 자동으로 채워지진 않고(번호·시간만 자동), 내용은 익시오 등에서 복사해서 직접
+        붙여넣어야 해요.
+      </p>
+      <div id="callTokenList"></div>
+      <button type="button" class="btn btn-outline" id="createCallTokenBtn" style="width:auto;padding:7px 14px;font-size:12.5px;margin-top:10px;">+ 새 토큰 발급</button>
+
+      <details style="margin-top:16px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:13px;">Tasker 설정 방법 보기</summary>
+        <div class="muted" style="font-size:13px;line-height:1.7;margin-top:8px;">
+          1. 플레이스토어에서 <b>Tasker</b> 앱 설치 (유료, 약 4,000원대) 후 실행<br>
+          2. <b>프로필</b> 탭 → + → <b>상태(State)</b> → <b>전화</b> → <b>통화중</b> 선택 → 뒤로가기(저장)<br>
+          3. 바로 뜨는 <b>새 작업</b> 창에서 + → <b>net</b> → <b>HTTP Request</b> 선택 후 아래처럼 입력:<br>
+          <div style="background:var(--slate-100);border-radius:8px;padding:10px;margin:6px 0;font-family:monospace;font-size:12px;word-break:break-all;">
+            Method: POST<br>
+            URL: <span id="taskerUrl"></span><br>
+            Headers: apikey:<span id="taskerApikey"></span>&#10;Content-Type:application/json<br>
+            Body: {"p_token":"<b>(아래 발급받은 토큰)</b>","p_phone":"%CNUM","p_duration_seconds":%CALLD,"p_direction":"unknown"}
+          </div>
+          4. 프로필 이름을 "통화 자동 기록" 같은 걸로 저장<br>
+          5. 전화 한 통 해보고, "만료회원 · TM" 화면 자동 통화 기록함에 뜨는지 확인해보세요<br>
+          <span class="muted">(Tasker 버전에 따라 메뉴 이름이 살짝 다를 수 있어요. 안 되면 화면 캡처해서 알려주시면 같이 봐드릴게요)</span>
+        </div>
+      </details>
+    </div>
   </div>
 
-  <script src="config.js?v=1790687074"></script>
-  <script src="auth.js?v=1790687074"></script>
-  <script src="data.js?v=1790687074"></script>
+  <script src="config.js?v=1791173929"></script>
+  <script src="auth.js?v=1791173929"></script>
+  <script src="data.js?v=1791173929"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -141,6 +171,95 @@
       }
     }
 
+    // ---- 통화 자동 기록 연동 토큰 (migration_72) ----
+    function formatTokenDate(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function renderCallTokenList(myTokens) {
+      const listEl = document.getElementById('callTokenList');
+      if (myTokens.length === 0) {
+        listEl.innerHTML = '<p class="muted" style="margin:0;">아직 발급한 토큰이 없어요. 아래 버튼으로 하나 만들어주세요.</p>';
+        return;
+      }
+      listEl.innerHTML = `
+        <table style="max-width:700px;">
+          <thead><tr><th>이름표</th><th>토큰</th><th>발급일</th><th>마지막 사용</th><th>상태</th></tr></thead>
+          <tbody>
+            ${myTokens.map(t => `
+              <tr data-token-id="${t.id}">
+                <td>${escapeHtml(t.label || '(이름 없음)')}</td>
+                <td>
+                  <code style="font-size:11px;">${t.token.slice(0, 10)}...</code>
+                  <button type="button" class="btn-link copy-token-btn" data-token="${t.token}" style="font-size:12px;">복사</button>
+                </td>
+                <td class="muted" style="font-size:12px;">${formatTokenDate(t.created_at)}</td>
+                <td class="muted" style="font-size:12px;">${t.last_used_at ? formatTokenDate(t.last_used_at) : '아직 없음'}</td>
+                <td>
+                  <select class="token-active-select" data-id="${t.id}" style="font-size:12px;padding:2px 6px;">
+                    <option value="true" ${t.active ? 'selected' : ''}>사용중</option>
+                    <option value="false" ${!t.active ? 'selected' : ''}>중지</option>
+                  </select>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+
+      listEl.querySelectorAll('.copy-token-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(btn.dataset.token);
+            showToast('토큰을 복사했어요.');
+          } catch (e) {
+            prompt('아래 토큰을 복사해주세요:', btn.dataset.token);
+          }
+        });
+      });
+      listEl.querySelectorAll('.token-active-select').forEach(sel => {
+        sel.addEventListener('change', async () => {
+          sel.disabled = true;
+          try {
+            await setCallTokenActive(sel.dataset.id, sel.value === 'true');
+            showToast('상태를 변경했어요.');
+          } catch (err) {
+            alert(err.message);
+          } finally {
+            sel.disabled = false;
+          }
+        });
+      });
+    }
+
+    async function loadCallTokens() {
+      const section = document.getElementById('callTokenSection');
+      try {
+        const tokens = await fetchMyCallTokens();
+        section.style.display = 'block'; // call_webhook_tokens 테이블이 있으면(migration_72 실행됨) 보여줌
+        renderCallTokenList(tokens.filter(t => t.staff_id === myId));
+        document.getElementById('taskerUrl').textContent = `${SUPABASE_URL}/rest/v1/rpc/log_call_event`;
+        document.getElementById('taskerApikey').textContent = SUPABASE_ANON_KEY;
+      } catch (err) {
+        section.style.display = 'none'; // migration_72 아직 안 돌리신 경우 - 조용히 숨김
+      }
+    }
+
+    document.getElementById('createCallTokenBtn').addEventListener('click', async () => {
+      const label = prompt('이 토큰을 어디서 쓸지 적어주세요 (예: 내 갤럭시) - 안 적어도 괜찮아요', '');
+      if (label === null) return; // 취소
+      const btn = document.getElementById('createCallTokenBtn');
+      btn.disabled = true;
+      try {
+        await createMyCallToken(myId, label.trim());
+        await loadCallTokens();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     (async () => {
       const profile = await getMyProfile();
       if (profile) {
@@ -154,6 +273,7 @@
         }
       }
       loadStaff();
+      loadCallTokens();
     })();
   </script>
 </body>
