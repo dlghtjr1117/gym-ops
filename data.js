@@ -702,6 +702,13 @@ async function fetchExpiringItems(daysAhead = 14) {
 // - 재등록 처리하면 만료일이 뒤로 밀려 "45일 이내 만료" 목록에서 빠지는 경우가 많아서, 처리 완료 보관함이
 //   비지 않도록 tm_logs에서 재등록/이월/거부 기록이 있는 회원+상품도 따로 찾아서 함께 돌려줌
 const TM_ARCHIVE_STATUSES = ['renewed', 'rolled_over', 'declined'];
+// 재등록 연락(TM) 대상이 아닌 1회성 이용권 - 종목명에 이 글자가 들어 있으면 헬스이용권 만료 목록에서 뺌
+const EXPIRY_EXCLUDED_MEMBERSHIP_KEYWORDS = ['일일입장권', '일일권', '추석패스'];
+function isExcludedFromExpiry(member, catKey) {
+  if (catKey !== 'membership') return false;
+  const t = String(member.membership_type || '').replace(/\s+/g, '');
+  return EXPIRY_EXCLUDED_MEMBERSHIP_KEYWORDS.some(k => t.includes(k));
+}
 async function fetchExpiryBoard(daysAhead = 45) {
   const headers = await authHeaders();
   const limitDate = new Date();
@@ -740,6 +747,7 @@ async function fetchExpiryBoard(daysAhead = 45) {
       if (!cat.field) continue;
       const endDate = m[cat.field];
       if (!endDate || endDate > limitStr) continue;
+      if (isExcludedFromExpiry(m, cat.key)) continue; // 일일입장권 · 추석패스권은 제외
       seen.add(`${m.id}|${cat.key}`);
       items.push({ member: m, categoryKey: cat.key, categoryLabel: cat.label, productLabel: labelFor(m, cat),
         expiryDate: endDate, latestTm: latestFor(m.id, cat.key) });
@@ -752,7 +760,7 @@ async function fetchExpiryBoard(daysAhead = 45) {
     const key = `${m.id}|${r.category}`;
     if (seen.has(key)) continue;
     const cat = EXPIRY_CATEGORIES.find(c => c.key === r.category && c.field);
-    if (!cat) continue;
+    if (!cat || isExcludedFromExpiry(m, cat.key)) continue;
     const latest = latestFor(m.id, cat.key);
     if (!latest || !TM_ARCHIVE_STATUSES.includes(latest.status)) continue; // 그 뒤에 되돌린 건 제외
     seen.add(key);
