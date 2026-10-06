@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 직원 관리</title>
-<link rel="stylesheet" href="style.css?v=1791180016" />
+<link rel="stylesheet" href="style.css?v=1791279332" />
 <style>
   /* 이 페이지 전용 - 권한 드롭다운을 뱃지처럼 보이게 */
   .role-select {
@@ -68,7 +68,7 @@
     <div class="section" id="callTokenSection" style="display:none;">
       <h2>📞 내 통화 자동 기록 연동</h2>
       <p class="muted" style="margin:-4px 0 12px;">
-        내 휴대폰(안드로이드)에서 전화가 끝나면 자동으로 "만료회원 · TM" 화면의 자동 통화 기록함에
+        내 휴대폰(안드로이드)에서 전화가 끝나면 자동으로 "신규상담" 화면의 자동 통화 기록함에
         한 줄씩 쌓이게 하는 연동이에요. 아래 토큰을 발급받아서 Tasker 같은 자동화 앱에 설정해두면 돼요.
         통화 "내용"까지 자동으로 채워지진 않고(번호·시간만 자동), 내용은 익시오 등에서 복사해서 직접
         붙여넣어야 해요.
@@ -79,7 +79,7 @@
       <details style="margin-top:16px;">
         <summary style="cursor:pointer;font-weight:600;font-size:13px;">Tasker 설정 방법 보기</summary>
         <div class="muted" style="font-size:13px;line-height:1.7;margin-top:8px;">
-          1. 플레이스토어에서 <b>Tasker</b> 앱 설치 (유료, 약 4,000원대) 후 실행<br>
+          1. 플레이스토어에서 <b>Tasker</b> 앱 설치 (유료, 7,500원 1회 결제) 후 실행<br>
           2. <b>프로필</b> 탭 → + → <b>상태(State)</b> → <b>전화</b> → <b>통화중</b> 선택 → 뒤로가기(저장)<br>
           3. 바로 뜨는 <b>새 작업</b> 창에서 + → <b>net</b> → <b>HTTP Request</b> 선택 후 아래처럼 입력:<br>
           <div style="background:var(--slate-100);border-radius:8px;padding:10px;margin:6px 0;font-family:monospace;font-size:12px;word-break:break-all;">
@@ -89,16 +89,16 @@
             Body: {"p_token":"<b>(아래 발급받은 토큰)</b>","p_phone":"%CNUM","p_duration_seconds":%CALLD,"p_direction":"unknown"}
           </div>
           4. 프로필 이름을 "통화 자동 기록" 같은 걸로 저장<br>
-          5. 전화 한 통 해보고, "만료회원 · TM" 화면 자동 통화 기록함에 뜨는지 확인해보세요<br>
+          5. 전화 한 통 해보고, "신규상담" 화면 맨 위 자동 통화 기록함에 뜨는지 확인해보세요<br>
           <span class="muted">(Tasker 버전에 따라 메뉴 이름이 살짝 다를 수 있어요. 안 되면 화면 캡처해서 알려주시면 같이 봐드릴게요)</span>
         </div>
       </details>
     </div>
   </div>
 
-  <script src="config.js?v=1791180016"></script>
-  <script src="auth.js?v=1791180016"></script>
-  <script src="data.js?v=1791180016"></script>
+  <script src="config.js?v=1791279332"></script>
+  <script src="auth.js?v=1791279332"></script>
+  <script src="data.js?v=1791279332"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);

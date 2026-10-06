@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 신규상담 · 워크인 관리</title>
-<link rel="stylesheet" href="style.css?v=1791180016" />
+<link rel="stylesheet" href="style.css?v=1791279332" />
 <style>
   /* 이 페이지 전용 - 특이사항(메모)/성함/전화번호 칸: 엑셀 시트처럼 바로 타이핑해서 저장 */
   .sheet-input {
@@ -14,13 +14,56 @@
   }
   .sheet-input:hover { border-color: var(--slate-300); }
   .sheet-input:focus { border-color: var(--indigo-600); background: var(--surface); outline: none; }
-  .interest-check { width: 17px; height: 17px; cursor: pointer; }
-  /* 표 맨 아래 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 */
+  .interest-check { width: 16px; height: 16px; cursor: pointer; vertical-align: middle; }
   .add-row-trigger td {
     cursor: pointer; color: var(--indigo-600); font-weight: 700; text-align: center;
     padding: 11px 12px; border-top: 1px dashed var(--slate-300);
   }
   .add-row-trigger:hover td { background: var(--slate-50); }
+
+  /* 워크인(왼쪽) / TM 전화상담(오른쪽) 반반 - 화면이 좁으면 위아래로 쌓임 */
+  .split-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 24px; }
+  @media (max-width: 1100px) { .split-grid { grid-template-columns: minmax(0, 1fr); } }
+  .half-box { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 16px; }
+  .half-box h2 { font-size: 15px; font-weight: 800; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .half-box .half-sub { margin: 0 0 12px; font-size: 12px; }
+  .count-pill { font-size: 11.5px; font-weight: 700; background: var(--slate-100); color: var(--slate-700); border-radius: 999px; padding: 2px 9px; }
+
+  /* 기록 한 건 = 위 줄(기본 정보) + 아래 줄(상담일 · 특이사항 · 1/2/3차 연락일) */
+  table.rec-table td { padding: 5px 6px; }
+  tr.rec-main > td { border-bottom: none !important; }
+  tr.rec-sub > td { padding: 0 8px 9px !important; }
+  .sub-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12px; }
+  .sub-field { display: flex; align-items: center; gap: 5px; }
+  .sub-field .sheet-input { width: 128px; border-color: var(--slate-200); background: var(--surface); }
+  .sub-field.memo { flex: 1 1 200px; min-width: 0; }
+  .sub-field.memo .sheet-input { flex: 1; min-width: 0; width: auto; }
+  .sub-tag {
+    border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-600);
+    border-radius: 6px; font-size: 11.5px; font-weight: 700; padding: 3px 7px; cursor: pointer; white-space: nowrap;
+  }
+  .sub-tag:hover { border-color: var(--indigo-600); color: var(--indigo-600); }
+  .sub-tag.static { cursor: default; }
+  .sub-tag.static:hover { border-color: var(--slate-300); color: var(--slate-600); }
+  .kind-tag { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+  .kind-walkin { background: #dbeafe; color: #1d4ed8; }
+  .kind-tm { background: #e0e7ff; color: #4338ca; }
+  .mini-btn { background: none; border: none; padding: 2px 4px; font-size: 11.5px; color: var(--indigo-600); cursor: pointer; text-decoration: underline; white-space: nowrap; }
+
+  /* 처리 완료 보관함 */
+  .archive-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .archive-toolbar input[type="search"] { padding: 7px 10px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); width: 220px; }
+  .sms-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; padding: 10px 12px; border: 1px dashed var(--slate-300); border-radius: 10px; }
+  .archive-table td, .archive-table th { font-size: 12px; }
+  .archive-table td { vertical-align: middle; }
+  .archive-table .sheet-input { border-color: var(--slate-200); }
+
+  /* 문자 보내기 창 */
+  #smsModal .modal-box { max-width: 560px; }
+  .sms-textarea { width: 100%; box-sizing: border-box; padding: 9px 10px; font-size: 14px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: inherit; resize: vertical; }
+  .sms-preview { white-space: pre-wrap; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; }
+  .sms-warn { background: #fef3c7; color: #92400e; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 10px; }
+  .sms-error { background: #fee2e2; color: #991b1b; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -57,13 +100,14 @@
     <div class="report-nav">
       <div style="display:flex; flex-direction:column; gap:2px;">
         <h1 style="margin:0; font-size:19px; font-weight:800;">신규상담 · 워크인 관리</h1>
-        <span class="muted">전화 상담 · 워크인으로 들어온 신규 문의를 담당자 구분 없이 다 같이 기록/관리해요</span>
+        <span class="muted">직접 방문(워크인)과 전화상담(TM)을 나눠서 기록하고, 처리가 끝난 건은 아래 보관함으로 옮겨져요</span>
       </div>
       <div style="flex:1;"></div>
       <button type="button" class="report-nav-arrow" id="monthPrevBtn">◀</button>
       <div class="report-period-label" id="monthLabel">-</div>
       <button type="button" class="report-nav-arrow" id="monthNextBtn">▶</button>
-      <button type="button" class="btn btn-primary" id="openAddConsultBtn" style="width:auto; padding-left:16px; padding-right:16px; flex-shrink:0;">+ 상담 기록 추가</button>
+      <button type="button" class="btn btn-primary" id="addWalkinTopBtn" style="width:auto; padding-left:14px; padding-right:14px; flex-shrink:0;">+ 워크인 추가</button>
+      <button type="button" class="btn btn-primary" id="addTmTopBtn" style="width:auto; padding-left:14px; padding-right:14px; flex-shrink:0;">+ TM 추가</button>
     </div>
 
     <div class="hero-grid" style="grid-template-columns:repeat(3,1fr);">
@@ -92,54 +136,176 @@
       </div>
     </div>
 
-    <div class="section" id="callEventsSection" style="display:none;">
-      <h2>📞 자동 통화 기록함 <span class="muted">(휴대폰에서 자동으로 잡힌 통화)</span></h2>
-      <p class="muted" style="margin:-6px 0 12px;">
-        센터폰으로 전화가 끝나면 자동으로 여기 한 줄씩 쌓여요(새로고침 없이도 30초 안에 떠요). 익시오
-        같은 통화요약 앱에서 요약 내용을 복사해서 아래 칸에 붙여넣고 성함 등을 채운 뒤 저장하면 아래
-        "상담·워크인 기록" 표에 바로 한 줄로 등록돼요. 연동 설정은 <a href="staff.html">직원 관리</a>에서
-        할 수 있어요.
-      </p>
-      <div id="callEventsList"></div>
+    <p class="muted" style="margin:14px 0 0; font-size:12px;">
+      아래 두 표에는 <strong>고민중</strong>인 건만 보여요(이번 달 + 이전 달에 아직 처리 안 한 건). 현황을 등록 · 이월 · 거부로 바꾸면 맨 아래
+      "처리 완료 보관함"으로 자동으로 옮겨지고, 통계(등록률 등)에는 그대로 반영돼요.
+    </p>
+
+    <div class="split-grid">
+      <!-- 왼쪽: 워크인 기록일지 -->
+      <div class="half-box">
+        <h2>🚶 워크인 기록일지 <span class="count-pill" id="walkinCount">0건</span></h2>
+        <p class="muted half-sub">센터에 직접 찾아와서 상담한 분들</p>
+        <div style="overflow-x:auto;">
+          <table id="walkinTable" class="table-fixed rec-table" style="min-width:640px;">
+            <thead><tr>
+              <th style="width:86px;">성함</th>
+              <th style="width:116px;">전화번호</th>
+              <th style="width:104px;">유입경로</th>
+              <th style="width:146px; white-space:nowrap;">관심</th>
+              <th style="width:84px; white-space:nowrap;">현황</th>
+              <th style="width:104px;"></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="report-nav" id="walkinPagination" style="justify-content:flex-end; margin:10px 0 0;"></div>
+      </div>
+
+      <!-- 오른쪽: TM(전화상담) - 맨 위에 자동 통화 기록함 -->
+      <div class="half-box">
+        <h2>☎️ TM (전화상담) <span class="count-pill" id="tmCount">0건</span></h2>
+        <p class="muted half-sub">전화로 들어온 문의 · 재등록 TM</p>
+
+        <div id="callEventsSection" style="display:none; margin-bottom:14px; padding:12px; border:1px solid var(--slate-200); border-radius:12px; background:var(--slate-50);">
+          <div style="font-weight:800; font-size:13.5px; margin-bottom:4px;">📞 자동 통화 기록함 <span class="muted" style="font-weight:400; font-size:12px;">(휴대폰에서 자동으로 잡힌 통화)</span></div>
+          <p class="muted" style="margin:0 0 10px; font-size:12px;">
+            센터폰으로 전화가 끝나면 30초 안에 여기 쌓여요. 성함 등을 채우고 저장하면 아래 TM 표에 한 줄로 등록돼요.
+            연동 설정은 <a href="staff.html">직원 관리</a>에서 할 수 있어요.
+          </p>
+          <div id="callEventsList"></div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table id="tmTable" class="table-fixed rec-table" style="min-width:640px;">
+            <thead><tr>
+              <th style="width:86px;">성함</th>
+              <th style="width:116px;">전화번호</th>
+              <th style="width:104px;">유입경로</th>
+              <th style="width:146px; white-space:nowrap;">관심</th>
+              <th style="width:84px; white-space:nowrap;">현황</th>
+              <th style="width:104px;"></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="report-nav" id="tmPagination" style="justify-content:flex-end; margin:10px 0 0;"></div>
+      </div>
     </div>
 
-    <div class="section">
-      <h2>상담 · 워크인 기록</h2>
-      <div id="statusTabs" class="filter-tabs"></div>
-      <div style="overflow-x:auto;">
-      <table id="consultTable" class="table-fixed" style="min-width:1095px;">
-        <thead><tr>
-          <th style="width:140px;">날짜</th>
-          <th style="width:100px;">성함</th>
-          <th style="width:130px;">전화번호</th>
-          <th style="width:70px; white-space:nowrap;">성별</th>
-          <th style="width:140px;">유입경로</th>
-          <th style="width:56px; white-space:nowrap;">헬스</th>
-          <th style="width:50px; white-space:nowrap;">PT</th>
-          <th style="width:70px; white-space:nowrap;">그룹PT</th>
-          <th>특이사항</th>
-          <th style="width:100px; white-space:nowrap;">현황</th>
-          <th style="width:55px;"></th>
-        </tr></thead>
-        <tbody><tr><td colspan="11" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-      </table>
+    <!-- 처리 완료 보관함 -->
+    <div class="section" id="archiveSection">
+      <h2>📦 처리 완료 보관함 <span class="muted">(등록 · 이월 · 거부로 처리된 기록)</span></h2>
+      <div class="archive-toolbar">
+        <div id="archiveScopeTabs" class="filter-tabs" style="margin:0;"></div>
+        <div id="archiveKindTabs" class="filter-tabs" style="margin:0;"></div>
+        <input type="search" id="archiveSearch" placeholder="성함 · 전화번호 검색" />
       </div>
-      <div class="report-nav" id="consultPagination" style="justify-content:flex-end; margin-top:10px;"></div>
+      <div id="archiveStatusTabs" class="filter-tabs"></div>
+
+      <div class="sms-bar" id="smsBar" style="display:none;">
+        <span id="smsSelectedLabel" style="font-weight:700; font-size:13px;">선택한 사람 없음</span>
+        <button type="button" class="btn btn-primary" id="smsOpenBtn" style="width:auto; padding:7px 14px; font-size:13px;" disabled>✉️ 선택한 분께 문자 보내기</button>
+        <button type="button" class="btn-link" id="smsClearBtn">선택 해제</button>
+        <span class="muted" style="font-size:12px;">문자는 <strong>이월 · 거부</strong> 처리된 분만 보낼 수 있어요 (지점장 전용)</span>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table id="archiveTable" class="table-fixed archive-table" style="min-width:1300px;">
+          <thead><tr>
+            <th style="width:36px; text-align:center;" id="archiveCheckHead"><input type="checkbox" id="archiveCheckAll" class="interest-check" title="지금 조건에 맞는 이월·거부 전체 선택/해제" /></th>
+            <th style="width:100px;">상담일</th>
+            <th style="width:62px;">구분</th>
+            <th style="width:84px;">성함</th>
+            <th style="width:118px;">전화번호</th>
+            <th style="width:96px;">유입경로</th>
+            <th style="width:104px;">관심</th>
+            <th style="width:142px;">1차 연락일</th>
+            <th style="width:142px;">2차 연락일</th>
+            <th style="width:142px;">3차 연락일</th>
+            <th>특이사항</th>
+            <th style="width:76px; white-space:nowrap;">현황</th>
+            <th style="width:112px;"></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="report-nav" id="archivePagination" style="justify-content:flex-end; margin-top:10px;"></div>
+    </div>
+
+    <!-- 문자 발송 이력 (지점장만) -->
+    <div class="section" id="smsHistorySection" style="display:none;">
+      <h2>✉️ 문자 발송 이력 <span class="muted">(최근 20건)</span></h2>
+      <div id="smsHistoryList"></div>
     </div>
   </div>
 
-  <script src="config.js?v=1791180016"></script>
-  <script src="auth.js?v=1791180016"></script>
-  <script src="data.js?v=1791180016"></script>
+  <!-- 문자 보내기 창 -->
+  <div class="modal-overlay" id="smsModal" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3>✉️ 문자 보내기</h3>
+          <div class="muted" id="smsModalRecipients" style="font-size:12.5px;"></div>
+        </div>
+        <button type="button" class="modal-close" id="smsModalClose">×</button>
+      </div>
+
+      <div id="smsModalAlert"></div>
+
+      <div class="modal-section">
+        <h4>문자 내용</h4>
+        <textarea id="smsMessage" class="sms-textarea" rows="5" maxlength="1000" placeholder="예) 10월 한 달간 신규 등록 시 PT 1회 무료 체험을 드려요. 편하게 방문해주세요!"></textarea>
+        <div class="muted" style="font-size:12px; margin-top:4px;" id="smsCounter"></div>
+      </div>
+
+      <div class="modal-section">
+        <h4>실제로 나가는 문자 미리보기 <span class="muted" style="font-weight:400;">((광고) 표기와 무료수신거부 안내가 자동으로 붙어요)</span></h4>
+        <div class="sms-preview" id="smsPreview"></div>
+      </div>
+
+      <div class="modal-section">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" id="smsMarkContact" class="interest-check" checked />
+          보낸 분들의 다음 빈 연락일(1·2·3차)에 오늘 날짜 자동 입력
+        </label>
+        <div class="muted" style="font-size:12px; margin-top:6px;">
+          광고성 문자는 <strong>사전에 수신 동의를 받은 분께만</strong> 보낼 수 있고, 밤 9시~아침 8시에는 보낼 수 없어요. 동의 확인 책임은 발송하는 센터에 있어요.
+        </div>
+      </div>
+
+      <div id="smsModalResult"></div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+        <button type="button" class="btn" id="smsCancelBtn" style="width:auto; padding:8px 16px;">닫기</button>
+        <button type="button" class="btn btn-primary" id="smsSendBtn" style="width:auto; padding:8px 18px;">문자 발송</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1791279332"></script>
+  <script src="auth.js?v=1791279332"></script>
+  <script src="data.js?v=1791279332"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
 
-    let consultAllCache = [];   // 이번 달 범위의 전체 기록 (필터 전)
-    let activeStatusFilter = 'all';
-    let consultPage = 1;
-    const CONSULT_PAGE_SIZE = 15;
+    // ---------------------------------------------------------------------
+    // 상태값
+    // ---------------------------------------------------------------------
+    let allRows = [];                 // 전체 기간의 모든 상담 기록 (워크인 + TM, 모든 처리 상태)
     let monthAnchor = new Date();
+    let currentUserId = null;
+    let isManager = false;
+    const ACTIVE_PAGE_SIZE = 10;
+    const ARCHIVE_PAGE_SIZE = 15;
+    const activePage = { walkin: 1, tm: 1 };
+    let archiveScope = 'month';       // 'month' | 'all'
+    let archiveKind = 'all';          // 'all' | 'walkin' | 'tm'
+    let archiveStatus = 'all';        // 'all' | 'registered' | 'rolled_over' | 'declined'
+    let archiveSearch = '';
+    let archivePage = 1;
+    const selectedIds = new Set();    // 문자 보낼 대상으로 체크한 기록 id
 
     const CHANNEL_OPTIONS = [
       { value: 'phone_auto', label: '자동통화', badge: 'badge-indigo' },
@@ -159,13 +325,29 @@
 
     const STATUS_OPTIONS = [
       { value: 'considering', label: '고민중', badge: 'badge-amber' },
+      { value: 'registered', label: '등록', badge: 'badge-green' },
       { value: 'rolled_over', label: '이월', badge: 'badge-purple' },
-      { value: 'declined', label: '거부', badge: 'badge-red' },
-      { value: 'registered', label: '등록', badge: 'badge-green' }
+      { value: 'declined', label: '거부', badge: 'badge-red' }
     ];
     const STATUS_LABEL = {};
     const STATUS_BADGE = {};
     STATUS_OPTIONS.forEach(o => { STATUS_LABEL[o.value] = o.label; STATUS_BADGE[o.value] = o.badge; });
+    const KIND_LABEL = { walkin: '워크인', tm: 'TM' };
+
+    // ---------------------------------------------------------------------
+    // 공용 도우미
+    // ---------------------------------------------------------------------
+    function findRow(id) { return allRows.find(x => x.id === id); }
+    function isArchived(c) { return (c.status || 'considering') !== 'considering'; }
+    function kindOf(c) { return c.kind === 'tm' ? 'tm' : 'walkin'; }
+
+    // 문자 보낼 수 있는 휴대폰 번호인지 (서버 send-sms와 같은 규칙)
+    function normalizeMobile(raw) {
+      let d = String(raw == null ? '' : raw).replace(/\D/g, '');
+      if (d.startsWith('82') && d.length >= 11) d = '0' + d.slice(2);
+      if (d.length === 10 && d[0] !== '0') d = '0' + d;
+      return /^01[016789]\d{7,8}$/.test(d) ? d : null;
+    }
 
     function getMonthRange() {
       const start = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
@@ -176,10 +358,15 @@
       const { start } = getMonthRange();
       return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
     }
+    function inViewedMonth(c) {
+      const { startStr, endStr } = getMonthRange();
+      return c.consult_date >= startStr && c.consult_date < endStr;
+    }
     function shiftMonth(dir) {
       monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1);
-      consultPage = 1;
-      reloadAll();
+      activePage.walkin = 1; activePage.tm = 1; archivePage = 1;
+      document.getElementById('monthLabel').textContent = monthLabelText();
+      renderAll();
     }
     document.getElementById('monthPrevBtn').addEventListener('click', () => shiftMonth(-1));
     document.getElementById('monthNextBtn').addEventListener('click', () => shiftMonth(1));
@@ -189,90 +376,67 @@
       const d = new Date(y, m - 1 + n, 1);
       return formatDateStr(d);
     }
-    // "이월" 처리하면 이 기록을 다음 달로 옮기는 게 아니라(예전 방식), OT/PT 관리와 똑같이 다음 달에
-    // "진행중(고민중)" 상태의 새 기록을 복사해서 만들고, 이번 달 기록 자체는 "이월" 상태 그대로 이번 달
-    // 시트에 남겨둠 - 그래야 이번 달에 몇 건이 이월됐는지 이번 달 시트에서도 계속 보임
-    // (요청: "이월은 어차피 다음달로 넘어가는거지만, 다음달로 넘기면서 이 달 시트에는 그냥 남아있게")
+
+    // "이월" 처리하면 다음 달에 "고민중" 상태의 새 기록을 복사해서 만들고(1·2·3차 연락일도 그대로 가져감),
+    // 이번 달 기록은 "이월" 상태 그대로 보관함에 남아요 - 그래야 이번 달에 몇 건이 이월됐는지 계속 보임
     async function carryOverConsultationToNextMonth(c) {
       const nextMonthFirstDay = firstDayOfMonthAfter(c.consult_date || formatDateStr(new Date()), 1);
       const nextMonthLabel = `${Number(nextMonthFirstDay.slice(5, 7))}월`;
       const nmStart = nextMonthFirstDay;
       const nmEnd = firstDayOfMonthAfter(nextMonthFirstDay, 1);
       try {
-        const all = await fetchWalkinConsultations();
-        const dup = all.find(x => x.name === c.name && (x.phone || '') === (c.phone || '') &&
+        const dup = allRows.find(x => x.name === c.name && (x.phone || '') === (c.phone || '') &&
           x.consult_date && x.consult_date >= nmStart && x.consult_date < nmEnd);
         if (dup) {
           showToast(`${nextMonthLabel}에 이미 같은 이름의 기록이 있어서 새로 만들지 않았어요.`);
           return;
         }
-        await addWalkinConsultation({
+        const created = await addWalkinConsultation({
           consult_date: nextMonthFirstDay, name: c.name, phone: c.phone || null, gender: c.gender || null,
           channel: c.channel || null, interest_gym: !!c.interest_gym, interest_pt: !!c.interest_pt,
-          interest_group_pt: !!c.interest_group_pt, memo: c.memo || null, status: 'considering'
+          interest_group_pt: !!c.interest_group_pt, memo: c.memo || null, status: 'considering',
+          kind: kindOf(c),
+          contact1_date: c.contact1_date || null, contact2_date: c.contact2_date || null, contact3_date: c.contact3_date || null,
+          created_by: currentUserId
         });
+        const rec = Array.isArray(created) ? created[0] : created;
+        if (rec) allRows.push(rec);
         showToast(`이월 처리됐어요. ${nextMonthLabel} 목록에도 자동으로 추가됐어요.`);
       } catch (err) {
         alert('다음 달로 이월하는 중 문제가 생겼어요: ' + err.message);
       }
     }
 
-    function renderChannelSelect(c) {
-      const cur = c.channel || '';
-      const opts = ['<option value="">선택</option>'].concat(
-        CHANNEL_OPTIONS.map(o => `<option value="${o.value}" ${o.value === cur ? 'selected' : ''}>${o.label}</option>`)
-      ).join('');
-      return `<select class="sheet-input badge ${CHANNEL_BADGE[cur] || ''}" data-id="${c.id}" onchange="handleChannelChange(this)">${opts}</select>`;
-    }
-    async function handleChannelChange(selectEl) {
-      const id = selectEl.dataset.id;
-      const value = selectEl.value || null;
+    // ---------------------------------------------------------------------
+    // 칸 하나 저장하는 핸들러들 (엑셀처럼 바로 입력하면 저장)
+    // ---------------------------------------------------------------------
+    async function handleFieldSave(inputEl, field) {
+      const id = inputEl.dataset.id;
+      const value = inputEl.value.trim() || null;
       try {
-        await updateWalkinConsultation(id, { channel: value });
-        const c = consultAllCache.find(x => x.id === id);
-        if (c) c.channel = value;
-        selectEl.className = 'sheet-input badge ' + (CHANNEL_BADGE[value] || '');
+        await updateWalkinConsultation(id, { [field]: value });
+        const c = findRow(id);
+        if (c) c[field] = value;
       } catch (err) { alert(err.message); }
     }
 
-    function renderStatusSelect(c) {
-      const cur = c.status || 'considering';
-      const opts = STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === cur ? 'selected' : ''}>${o.label}</option>`).join('');
-      return `<select class="sheet-input badge ${STATUS_BADGE[cur] || ''}" data-id="${c.id}" onchange="handleStatusChange(this)">${opts}</select>`;
-    }
-    async function handleStatusChange(selectEl) {
-      const id = selectEl.dataset.id;
-      const value = selectEl.value;
-      const c = consultAllCache.find(x => x.id === id);
+    // 상담일은 비울 수 없고, 바꾸면 보고 있는 달에서 사라질 수 있어서 저장 후 다시 그림
+    async function handleConsultDateSave(inputEl) {
+      const id = inputEl.dataset.id;
+      const c = findRow(id);
+      const value = inputEl.value;
+      if (!value) { alert('상담일은 비워둘 수 없어요.'); inputEl.value = c ? c.consult_date : ''; return; }
       try {
-        await updateWalkinConsultation(id, { status: value });
-        if (c) c.status = value;
-        selectEl.className = 'sheet-input badge ' + (STATUS_BADGE[value] || '');
-        // 현황 칸을 바꾸면 그 줄 전체가 바로 색이 바뀌어 보이게 함(고민중=갈색/이월=보라/거부=빨강/등록=초록)
-        const row = selectEl.closest('tr');
-        if (row) row.className = 'row-cstatus-' + value;
-        renderHeroStats();
-        renderStatusTabs();
-        // "이월"은 상태만 바뀌는 게 아니라, 다음 달 목록에도 진행중인 상담으로 자동 복사됨(이번 달
-        // 기록은 그대로 이번 달 시트에 "이월" 상태로 남아있음)
-        if (value === 'rolled_over' && c) {
-          await carryOverConsultationToNextMonth(c);
-        }
-      } catch (err) {
-        alert(err.message);
-        // 저장 실패 시 select에 표시된 값도 원래 상태로 되돌려서 실제 저장된 값과 안 어긋나게 함
-        selectEl.value = c ? c.status : 'considering';
-        selectEl.className = 'sheet-input badge ' + (STATUS_BADGE[selectEl.value] || '');
-        const row = selectEl.closest('tr');
-        if (row) row.className = 'row-cstatus-' + selectEl.value;
-      }
+        await updateWalkinConsultation(id, { consult_date: value });
+        if (c) c.consult_date = value;
+        renderAll();
+      } catch (err) { alert(err.message); if (c) inputEl.value = c.consult_date; }
     }
 
-    // 이름은 not null 컬럼이라 빈 값으로 저장하면 안 돼서 별도 처리 (ot.html 패턴과 동일)
     async function handleNameSave(inputEl) {
       const id = inputEl.dataset.id;
       const value = inputEl.value.trim();
-      const c = consultAllCache.find(x => x.id === id);
+      const c = findRow(id);
       if (!value) {
         alert('성함은 비워둘 수 없습니다.');
         inputEl.value = c ? c.name : '';
@@ -285,23 +449,24 @@
       } catch (err) { alert(err.message); if (c) inputEl.value = c.name; }
     }
 
-    async function handleFieldSave(inputEl, field) {
-      const id = inputEl.dataset.id;
-      const value = inputEl.value.trim() || null;
-      try {
-        await updateWalkinConsultation(id, { [field]: value });
-        const c = consultAllCache.find(x => x.id === id);
-        if (c) c[field] = value;
-      } catch (err) { alert(err.message); }
-    }
-
     async function handleGenderSave(selectEl) {
       const id = selectEl.dataset.id;
       const value = selectEl.value || null;
       try {
         await updateWalkinConsultation(id, { gender: value });
-        const c = consultAllCache.find(x => x.id === id);
+        const c = findRow(id);
         if (c) c.gender = value;
+      } catch (err) { alert(err.message); }
+    }
+
+    async function handleChannelChange(selectEl) {
+      const id = selectEl.dataset.id;
+      const value = selectEl.value || null;
+      try {
+        await updateWalkinConsultation(id, { channel: value });
+        const c = findRow(id);
+        if (c) c.channel = value;
+        selectEl.className = 'sheet-input badge ' + (CHANNEL_BADGE[value] || '');
       } catch (err) { alert(err.message); }
     }
 
@@ -311,7 +476,7 @@
       checkboxEl.disabled = true;
       try {
         await updateWalkinConsultation(id, { [field]: checked });
-        const c = consultAllCache.find(x => x.id === id);
+        const c = findRow(id);
         if (c) c[field] = checked;
       } catch (err) {
         alert(err.message);
@@ -321,88 +486,344 @@
       }
     }
 
+    // "1차/2차/3차" 이름표를 누르면 그 칸이 비어있을 때 오늘 날짜가 바로 들어감
+    async function handleContactToday(id, n) {
+      const c = findRow(id);
+      if (!c || c[`contact${n}_date`]) return;
+      const today = formatDateStr(new Date());
+      try {
+        await updateWalkinConsultation(id, { [`contact${n}_date`]: today });
+        c[`contact${n}_date`] = today;
+        renderAll();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function handleStatusChange(selectEl) {
+      const id = selectEl.dataset.id;
+      const value = selectEl.value;
+      const c = findRow(id);
+      if (!c) return;
+      const prev = c.status;
+      try {
+        await updateWalkinConsultation(id, { status: value });
+        c.status = value;
+        // 이월은 상태만 바뀌는 게 아니라 다음 달 목록에도 "고민중"으로 자동 복사됨
+        if (value === 'rolled_over') await carryOverConsultationToNextMonth(c);
+        renderAll();
+        if (value !== 'considering') {
+          showToast(`'${STATUS_LABEL[value]}' 처리돼서 처리 완료 보관함으로 옮겨졌어요.`);
+        }
+      } catch (err) {
+        alert(err.message);
+        c.status = prev;
+        renderAll();
+      }
+    }
+
+    // 보관함 → 다시 "고민중"으로 (잘못 눌렀을 때)
+    async function handleRestore(id) {
+      const c = findRow(id);
+      if (!c) return;
+      const warn = c.status === 'rolled_over'
+        ? '\n\n※ 이월할 때 다음 달에 복사된 기록은 자동으로 지워지지 않아요. 필요하면 다음 달 목록에서 직접 삭제해주세요.'
+        : '';
+      if (!confirm(`'${c.name}'님 기록을 다시 고민중으로 되돌릴까요? 위쪽 표로 돌아가요.${warn}`)) return;
+      try {
+        await updateWalkinConsultation(id, { status: 'considering' });
+        c.status = 'considering';
+        selectedIds.delete(id);
+        renderAll();
+        showToast('고민중으로 되돌렸어요.');
+      } catch (err) { alert(err.message); }
+    }
+
+    // 워크인 ↔ TM 이동
+    async function handleMoveKind(id) {
+      const c = findRow(id);
+      if (!c) return;
+      const next = kindOf(c) === 'tm' ? 'walkin' : 'tm';
+      try {
+        await updateWalkinConsultation(id, { kind: next });
+        c.kind = next;
+        renderAll();
+        showToast(`${KIND_LABEL[next]} 쪽으로 옮겼어요.`);
+      } catch (err) { alert(err.message); }
+    }
+
     async function handleDeleteConsult(id) {
-      if (!confirm('이 상담 기록을 삭제할까요?')) return;
+      if (!confirm('이 상담 기록을 삭제할까요? (되돌릴 수 없어요)')) return;
       try {
         await deleteWalkinConsultation(id);
-        await reloadAll();
+        allRows = allRows.filter(x => x.id !== id);
+        selectedIds.delete(id);
+        renderAll();
         showToast('기록이 삭제되었습니다.', 'danger');
       } catch (err) { alert(err.message); }
     }
 
-    function renderStatusTabs() {
-      const counts = {};
-      consultAllCache.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
-      const tabs = [{ key: 'all', label: `전체 (${consultAllCache.length})` }]
-        .concat(STATUS_OPTIONS.map(o => ({ key: o.value, label: `${o.label} (${counts[o.value] || 0})` })));
-      document.getElementById('statusTabs').innerHTML = tabs.map(t =>
-        `<button type="button" class="filter-tab${t.key === activeStatusFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
+    // ---------------------------------------------------------------------
+    // 위쪽 두 표 (워크인 / TM) - 고민중인 건만
+    // ---------------------------------------------------------------------
+    function renderChannelSelect(c) {
+      const cur = c.channel || '';
+      const opts = ['<option value="">선택</option>'].concat(
+        CHANNEL_OPTIONS.map(o => `<option value="${o.value}" ${o.value === cur ? 'selected' : ''}>${o.label}</option>`)
       ).join('');
-      document.querySelectorAll('#statusTabs .filter-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeStatusFilter = btn.dataset.key;
-          consultPage = 1;
-          renderStatusTabs();
-          renderConsultTable();
-        });
-      });
+      return `<select class="sheet-input badge ${CHANNEL_BADGE[cur] || ''}" data-id="${c.id}" onchange="handleChannelChange(this)">${opts}</select>`;
     }
 
-    // 표 맨 아래에 붙는 "+ 추가하기" 줄 - 클릭하면 모달 없이 바로 새 줄이 추가됨 (페이지네이션과
-    // 무관하게 항상 마지막에 붙여서, 지금 보고 있는 페이지 바로 아래에서 바로 추가할 수 있게 함)
-    const ADD_ROW_HTML = `
-        <tr class="add-row-trigger" onclick="handleQuickAddConsult()">
-          <td colspan="11">+ 추가하기</td>
+    function renderStatusSelect(c) {
+      const cur = c.status || 'considering';
+      const opts = STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === cur ? 'selected' : ''}>${o.label}</option>`).join('');
+      return `<select class="sheet-input badge ${STATUS_BADGE[cur] || ''}" data-id="${c.id}" onchange="handleStatusChange(this)">${opts}</select>`;
+    }
+
+    function contactField(c, n) {
+      const v = c[`contact${n}_date`] || '';
+      return `<div class="sub-field">
+        <button type="button" class="sub-tag" title="${v ? '연락한 날짜' : '누르면 오늘 날짜가 들어가요'}" onclick="handleContactToday('${c.id}', ${n})">${n}차</button>
+        <input class="sheet-input" type="date" value="${v}" data-id="${c.id}" onchange="handleFieldSave(this,'contact${n}_date')" />
+      </div>`;
+    }
+
+    function renderActiveRecord(c) {
+      const other = kindOf(c) === 'tm' ? '워크인' : 'TM';
+      return `
+        <tr class="rec-main row-cstatus-considering">
+          <td><input class="sheet-input" type="text" value="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}" data-id="${c.id}" onchange="handleNameSave(this)" /></td>
+          <td><input class="sheet-input" type="text" value="${escapeHtml(c.phone || '')}" placeholder="010-0000-0000" data-id="${c.id}" onchange="handleFieldSave(this,'phone')" /></td>
+          <td>${renderChannelSelect(c)}</td>
+          <td style="white-space:nowrap; font-size:12px;">
+            <label title="헬스" style="cursor:pointer;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_gym ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_gym')" />헬스</label>
+            <label title="PT" style="cursor:pointer;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_pt ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_pt')" />PT</label>
+            <label title="그룹PT" style="cursor:pointer;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_group_pt ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_group_pt')" />그룹</label>
+          </td>
+          <td>${renderStatusSelect(c)}</td>
+          <td style="text-align:center; white-space:nowrap;">
+            <button type="button" class="mini-btn" title="${other} 표로 옮기기" onclick="handleMoveKind('${c.id}')">→${other}</button>
+            <button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteConsult('${c.id}')">삭제</button>
+          </td>
+        </tr>
+        <tr class="rec-sub row-cstatus-considering">
+          <td colspan="6">
+            <div class="sub-line">
+              <div class="sub-field"><span class="sub-tag static">상담일</span>
+                <input class="sheet-input" type="date" value="${c.consult_date || ''}" data-id="${c.id}" onchange="handleConsultDateSave(this)" /></div>
+              <div class="sub-field"><span class="sub-tag static">성별</span>
+                <select class="sheet-input" style="width:64px;" data-id="${c.id}" onchange="handleGenderSave(this)">
+                  <option value="" ${!c.gender ? 'selected' : ''}>-</option>
+                  <option value="male" ${c.gender === 'male' ? 'selected' : ''}>남</option>
+                  <option value="female" ${c.gender === 'female' ? 'selected' : ''}>여</option>
+                </select></div>
+              ${contactField(c, 1)}${contactField(c, 2)}${contactField(c, 3)}
+              <div class="sub-field memo"><span class="sub-tag static">메모</span>
+                <input class="sheet-input" type="text" value="${escapeHtml(c.memo || '')}" placeholder="특이사항" data-id="${c.id}" onchange="handleFieldSave(this,'memo')" /></div>
+            </div>
+          </td>
         </tr>`;
+    }
 
-    function renderConsultTable() {
-      const tbody = document.querySelector('#consultTable tbody');
-      const paginationEl = document.getElementById('consultPagination');
-      const allItems = activeStatusFilter === 'all'
-        ? consultAllCache
-        : consultAllCache.filter(c => c.status === activeStatusFilter);
+    function activeItems(kind) {
+      const { endStr } = getMonthRange();
+      // 고민중인 건 = 보고 있는 달까지(이전 달에 처리 못 한 건 포함)
+      return allRows
+        .filter(c => kindOf(c) === kind && !isArchived(c) && c.consult_date < endStr)
+        .sort((a, b) => (a.consult_date || '').localeCompare(b.consult_date || '') || (a.created_at || '').localeCompare(b.created_at || ''));
+    }
 
-      if (allItems.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="muted" style="padding:16px;">해당하는 상담 기록이 없습니다.</td></tr>' + ADD_ROW_HTML;
+    function renderActiveTable(kind) {
+      const tableId = kind === 'tm' ? 'tmTable' : 'walkinTable';
+      const pagId = kind === 'tm' ? 'tmPagination' : 'walkinPagination';
+      const tbody = document.querySelector(`#${tableId} tbody`);
+      const paginationEl = document.getElementById(pagId);
+      const items = activeItems(kind);
+      document.getElementById(kind === 'tm' ? 'tmCount' : 'walkinCount').textContent = `${items.length}건`;
+      const addRow = `<tr class="add-row-trigger" onclick="handleQuickAddConsult('${kind}')"><td colspan="6">+ 추가하기</td></tr>`;
+      if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="muted" style="padding:16px;">처리할 ${KIND_LABEL[kind]} 기록이 없어요.</td></tr>` + addRow;
         paginationEl.innerHTML = '';
         return;
       }
-      const totalPages = Math.max(1, Math.ceil(allItems.length / CONSULT_PAGE_SIZE));
-      consultPage = Math.min(Math.max(1, consultPage), totalPages);
-      const startIdx = (consultPage - 1) * CONSULT_PAGE_SIZE;
-      const items = allItems.slice(startIdx, startIdx + CONSULT_PAGE_SIZE);
-      renderPagination(paginationEl, consultPage, allItems.length, CONSULT_PAGE_SIZE, (newPage) => {
-        consultPage = newPage;
-        renderConsultTable();
+      const totalPages = Math.max(1, Math.ceil(items.length / ACTIVE_PAGE_SIZE));
+      activePage[kind] = Math.min(Math.max(1, activePage[kind]), totalPages);
+      const startIdx = (activePage[kind] - 1) * ACTIVE_PAGE_SIZE;
+      const pageItems = items.slice(startIdx, startIdx + ACTIVE_PAGE_SIZE);
+      renderPagination(paginationEl, activePage[kind], items.length, ACTIVE_PAGE_SIZE, (p) => {
+        activePage[kind] = p;
+        renderActiveTable(kind);
       });
-
-      tbody.innerHTML = items.map(c => `
-        <tr class="row-cstatus-${c.status || 'considering'}">
-          <td><input class="sheet-input" type="date" value="${c.consult_date || ''}" data-id="${c.id}" onchange="handleFieldSave(this,'consult_date')" /></td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}" data-id="${c.id}" onchange="handleNameSave(this)" /></td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(c.phone || '')}" placeholder="010-0000-0000" data-id="${c.id}" onchange="handleFieldSave(this,'phone')" /></td>
-          <td>
-            <select class="sheet-input" data-id="${c.id}" onchange="handleGenderSave(this)">
-              <option value="" ${!c.gender ? 'selected' : ''}>-</option>
-              <option value="male" ${c.gender === 'male' ? 'selected' : ''}>남</option>
-              <option value="female" ${c.gender === 'female' ? 'selected' : ''}>여</option>
-            </select>
-          </td>
-          <td>${renderChannelSelect(c)}</td>
-          <td style="text-align:center;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_gym ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_gym')" /></td>
-          <td style="text-align:center;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_pt ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_pt')" /></td>
-          <td style="text-align:center;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_group_pt ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_group_pt')" /></td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(c.memo || '')}" placeholder="특이사항" data-id="${c.id}" onchange="handleFieldSave(this,'memo')" /></td>
-          <td>${renderStatusSelect(c)}</td>
-          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteConsult('${c.id}')">삭제</button></td>
-        </tr>
-      `).join('') + ADD_ROW_HTML;
+      tbody.innerHTML = pageItems.map(renderActiveRecord).join('') + addRow;
     }
 
+    // 표 맨 아래 "+ 추가하기"나 맨 위 버튼 - 모달 없이 바로 새 줄(이름은 "새 상담"으로 임시 저장 -
+    // DB에서 이름이 필수값이라)을 추가하고 성함 칸에 커서를 놓아줌
+    let quickAddInProgress = false;
+    async function handleQuickAddConsult(kind) {
+      if (quickAddInProgress) return;
+      quickAddInProgress = true;
+      const btns = [document.getElementById('addWalkinTopBtn'), document.getElementById('addTmTopBtn')];
+      btns.forEach(b => b.disabled = true);
+      try {
+        const { startStr, endStr } = getMonthRange();
+        const today = formatDateStr(new Date());
+        const defaultDate = (today >= startStr && today < endStr) ? today : startStr;
+        const created = await addWalkinConsultation({
+          consult_date: defaultDate, name: '새 상담', phone: null, gender: null,
+          channel: kind === 'tm' ? 'phone_auto' : null,
+          interest_gym: false, interest_pt: false, interest_group_pt: false, memo: null,
+          status: 'considering', kind, created_by: currentUserId
+        });
+        const rec = Array.isArray(created) ? created[0] : created;
+        allRows.push(rec);
+        activePage[kind] = Math.max(1, Math.ceil(activeItems(kind).length / ACTIVE_PAGE_SIZE)); // 새 줄이 보이는 마지막 페이지로
+        renderAll();
+        const nameInput = document.querySelector(`input[data-id="${rec.id}"][onchange="handleNameSave(this)"]`);
+        if (nameInput) { nameInput.focus(); nameInput.select(); }
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        quickAddInProgress = false;
+        btns.forEach(b => b.disabled = false);
+      }
+    }
+    document.getElementById('addWalkinTopBtn').addEventListener('click', () => handleQuickAddConsult('walkin'));
+    document.getElementById('addTmTopBtn').addEventListener('click', () => handleQuickAddConsult('tm'));
+
+    // ---------------------------------------------------------------------
+    // 처리 완료 보관함
+    // ---------------------------------------------------------------------
+    function archiveBase() {
+      // 기간/구분/검색 조건까지만 적용한 목록(상태 탭 숫자 계산용)
+      const q = archiveSearch.trim().toLowerCase();
+      const qDigits = q.replace(/\D/g, '');
+      return allRows.filter(c => {
+        if (!isArchived(c)) return false;
+        if (archiveScope === 'month' && !inViewedMonth(c)) return false;
+        if (archiveKind !== 'all' && kindOf(c) !== archiveKind) return false;
+        if (q) {
+          const nameHit = (c.name || '').toLowerCase().includes(q);
+          const phoneHit = qDigits && (c.phone || '').replace(/\D/g, '').includes(qDigits);
+          if (!nameHit && !phoneHit) return false;
+        }
+        return true;
+      }).sort((a, b) => (b.consult_date || '').localeCompare(a.consult_date || '') || (b.created_at || '').localeCompare(a.created_at || ''));
+    }
+    function archiveItems() {
+      const base = archiveBase();
+      return archiveStatus === 'all' ? base : base.filter(c => c.status === archiveStatus);
+    }
+    function isSmsEligible(c) { return (c.status === 'rolled_over' || c.status === 'declined') && !!normalizeMobile(c.phone); }
+
+    function renderArchiveTabs() {
+      const base = archiveBase();
+      const counts = {};
+      base.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
+      const statusTabs = [{ key: 'all', label: `전체 (${base.length})` }].concat(
+        STATUS_OPTIONS.filter(o => o.value !== 'considering').map(o => ({ key: o.value, label: `${o.label} (${counts[o.value] || 0})` }))
+      );
+      const scopeTabs = [{ key: 'month', label: `${monthLabelText()}만` }, { key: 'all', label: '전체 기간' }];
+      const kindTabs = [{ key: 'all', label: '워크인+TM' }, { key: 'walkin', label: '워크인' }, { key: 'tm', label: 'TM' }];
+      const draw = (elId, tabs, cur, onPick) => {
+        const el = document.getElementById(elId);
+        el.innerHTML = tabs.map(t => `<button type="button" class="filter-tab${t.key === cur ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`).join('');
+        el.querySelectorAll('.filter-tab').forEach(btn => btn.addEventListener('click', () => { onPick(btn.dataset.key); archivePage = 1; renderArchive(); }));
+      };
+      draw('archiveStatusTabs', statusTabs, archiveStatus, k => { archiveStatus = k; });
+      draw('archiveScopeTabs', scopeTabs, archiveScope, k => { archiveScope = k; });
+      draw('archiveKindTabs', kindTabs, archiveKind, k => { archiveKind = k; });
+    }
+
+    function interestText(c) {
+      const t = [];
+      if (c.interest_gym) t.push('헬스');
+      if (c.interest_pt) t.push('PT');
+      if (c.interest_group_pt) t.push('그룹PT');
+      return t.join(' · ') || '-';
+    }
+
+    function renderArchiveRow(c) {
+      const eligible = isSmsEligible(c);
+      const canSelect = isManager && eligible;
+      const noPhoneTitle = !c.phone ? '전화번호가 없어요' : (!normalizeMobile(c.phone) ? '휴대폰 번호 형식이 아니에요' : (c.status === 'registered' ? '등록 처리된 분께는 문자를 보내지 않아요' : ''));
+      const checkCell = isManager
+        ? `<td style="text-align:center;"><input type="checkbox" class="interest-check archive-pick" data-id="${c.id}" ${selectedIds.has(c.id) ? 'checked' : ''} ${canSelect ? '' : 'disabled'} title="${canSelect ? '문자 보낼 대상으로 선택' : noPhoneTitle}" /></td>`
+        : '<td></td>';
+      const dateCell = (n) => `<td><input class="sheet-input" type="date" value="${c[`contact${n}_date`] || ''}" data-id="${c.id}" onchange="handleFieldSave(this,'contact${n}_date')" /></td>`;
+      return `
+        <tr class="row-cstatus-${c.status}">
+          ${checkCell}
+          <td>${c.consult_date || ''}</td>
+          <td><span class="kind-tag kind-${kindOf(c)}">${KIND_LABEL[kindOf(c)]}</span></td>
+          <td title="${escapeHtml(c.name)}" style="font-weight:700;">${escapeHtml(c.name)}</td>
+          <td>${escapeHtml(formatPhone(c.phone) || c.phone || '')}</td>
+          <td>${c.channel ? `<span class="badge ${CHANNEL_BADGE[c.channel] || ''}">${CHANNEL_LABEL[c.channel] || escapeHtml(c.channel)}</span>` : '-'}</td>
+          <td>${interestText(c)}</td>
+          ${dateCell(1)}${dateCell(2)}${dateCell(3)}
+          <td><input class="sheet-input" type="text" value="${escapeHtml(c.memo || '')}" title="${escapeHtml(c.memo || '')}" placeholder="특이사항" data-id="${c.id}" onchange="handleFieldSave(this,'memo')" /></td>
+          <td style="white-space:nowrap;"><span class="badge ${STATUS_BADGE[c.status] || ''}">${STATUS_LABEL[c.status] || c.status}</span></td>
+          <td style="text-align:center; white-space:nowrap;">
+            <button type="button" class="mini-btn" onclick="handleRestore('${c.id}')">되돌리기</button>
+            <button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteConsult('${c.id}')">삭제</button>
+          </td>
+        </tr>`;
+    }
+
+    function renderArchive() {
+      renderArchiveTabs();
+      const tbody = document.querySelector('#archiveTable tbody');
+      const paginationEl = document.getElementById('archivePagination');
+      const items = archiveItems();
+      // 지금 보이는 조건 밖으로 사라진/상태가 바뀐 선택은 정리
+      const validIds = new Set(allRows.filter(isSmsEligible).map(c => c.id));
+      Array.from(selectedIds).forEach(id => { if (!validIds.has(id)) selectedIds.delete(id); });
+
+      const totalPages = Math.max(1, Math.ceil(items.length / ARCHIVE_PAGE_SIZE));
+      archivePage = Math.min(Math.max(1, archivePage), totalPages);
+      const pageItems = items.slice((archivePage - 1) * ARCHIVE_PAGE_SIZE, archivePage * ARCHIVE_PAGE_SIZE);
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" class="muted" style="padding:16px;">처리 완료된 기록이 없어요.</td></tr>';
+        paginationEl.innerHTML = '';
+      } else {
+        tbody.innerHTML = pageItems.map(renderArchiveRow).join('');
+        renderPagination(paginationEl, archivePage, items.length, ARCHIVE_PAGE_SIZE, (p) => { archivePage = p; renderArchive(); });
+      }
+      tbody.querySelectorAll('.archive-pick').forEach(cb => cb.addEventListener('change', () => {
+        if (cb.checked) selectedIds.add(cb.dataset.id); else selectedIds.delete(cb.dataset.id);
+        updateSmsBar();
+      }));
+      updateSmsBar();
+    }
+
+    function updateSmsBar() {
+      document.getElementById('smsBar').style.display = isManager ? 'flex' : 'none';
+      document.getElementById('archiveCheckHead').style.visibility = isManager ? 'visible' : 'hidden';
+      const n = selectedIds.size;
+      document.getElementById('smsSelectedLabel').textContent = n > 0 ? `${n}명 선택됨` : '선택한 사람 없음';
+      document.getElementById('smsOpenBtn').disabled = n === 0;
+      // 머리말 체크박스: 지금 조건에 맞는 문자 가능 대상이 전부 선택돼 있으면 체크
+      const eligibleNow = archiveItems().filter(isSmsEligible);
+      const all = document.getElementById('archiveCheckAll');
+      all.checked = eligibleNow.length > 0 && eligibleNow.every(c => selectedIds.has(c.id));
+      all.disabled = eligibleNow.length === 0;
+    }
+
+    document.getElementById('archiveCheckAll').addEventListener('change', (e) => {
+      const eligibleNow = archiveItems().filter(isSmsEligible);
+      if (e.target.checked) eligibleNow.forEach(c => selectedIds.add(c.id));
+      else eligibleNow.forEach(c => selectedIds.delete(c.id));
+      renderArchive();
+    });
+    document.getElementById('smsClearBtn').addEventListener('click', () => { selectedIds.clear(); renderArchive(); });
+    document.getElementById('archiveSearch').addEventListener('input', (e) => { archiveSearch = e.target.value; archivePage = 1; renderArchive(); });
+
+    // ---------------------------------------------------------------------
+    // 통계 카드 (보관함에 있는 건도 계속 센다)
+    // ---------------------------------------------------------------------
     function renderHeroStats() {
-      const total = consultAllCache.length;
-      const pending = consultAllCache.filter(c => c.status === 'considering' || c.status === 'rolled_over').length;
-      const registered = consultAllCache.filter(c => c.status === 'registered').length;
+      const monthRows = allRows.filter(inViewedMonth);
+      const total = monthRows.length;
+      const pending = monthRows.filter(c => c.status === 'considering' || c.status === 'rolled_over').length;
+      const registered = monthRows.filter(c => c.status === 'registered').length;
       const rate = total > 0 ? Math.round((registered / total) * 100) : 0;
 
       animateCount(document.getElementById('heroTotalCount'), total);
@@ -425,76 +846,31 @@
       animateCount(document.getElementById('registerRateValue'), rate);
     }
 
+    function renderAll() {
+      renderActiveTable('walkin');
+      renderActiveTable('tm');
+      renderArchive();
+      renderHeroStats();
+    }
+
     async function reloadAll() {
-      const tbody = document.querySelector('#consultTable tbody');
       document.getElementById('monthLabel').textContent = monthLabelText();
       try {
-        const { startStr, endStr } = getMonthRange();
-        const all = await fetchWalkinConsultations();
-        consultAllCache = all.filter(c => c.consult_date >= startStr && c.consult_date < endStr);
-        renderStatusTabs();
-        renderConsultTable();
-        renderHeroStats();
+        allRows = await fetchWalkinConsultations();
+        renderAll();
       } catch (err) {
-        document.getElementById('statusTabs').innerHTML = '';
-        tbody.innerHTML = `<tr><td colspan="11" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        const msg = `<tr><td colspan="6" class="error-text" style="display:table-cell;">${escapeHtml(err.message)}</td></tr>`;
+        document.querySelector('#walkinTable tbody').innerHTML = msg;
+        document.querySelector('#tmTable tbody').innerHTML = msg;
         document.getElementById('heroTotalSub').textContent = err.message;
       }
     }
 
-    // "+ 상담 기록 추가"(상단 버튼)나 표 맨 아래 "+ 추가하기" 줄, 둘 중 아무거나 눌러도 모달 없이
-    // 바로 빈 줄(이름은 "새 상담"으로 임시로 채워서 저장 - DB에서 이름이 필수값이라 완전히 빈 채로는
-    // 저장이 안 돼서)을 표에 추가하고, 그 줄의 성함 칸에 바로 커서를 놓고 전체 선택해줘서 이어서
-    // 타이핑하면 바로 덮어써짐 ("모달 뜨는 게 불편하다"는 피드백으로 인라인 방식으로 바꿈 -
-    // OT/PT 관리의 모달 방식과는 다르게 이 화면만 이렇게 처리함)
-    let quickAddInProgress = false; // 두 트리거를 빠르게 연타해도 중복으로 추가되지 않게 막음
-    async function handleQuickAddConsult() {
-      if (quickAddInProgress) return;
-      quickAddInProgress = true;
-      const btn = document.getElementById('openAddConsultBtn');
-      btn.disabled = true;
-      try {
-        const { startStr, endStr } = getMonthRange();
-        const today = formatDateStr(new Date());
-        // 지금 보고 있는 달이 실제 이번 달이면 오늘 날짜로, 과거/미래 달을 보고 있으면 그 달 1일로 -
-        // 그래야 새로 추가한 줄이 지금 보고 있는 목록에 바로 나타남
-        const defaultDate = (today >= startStr && today < endStr) ? today : startStr;
-        const created = await addWalkinConsultation({
-          consult_date: defaultDate,
-          name: '새 상담',
-          phone: null,
-          gender: null,
-          channel: null,
-          interest_gym: false,
-          interest_pt: false,
-          interest_group_pt: false,
-          memo: null,
-          status: 'considering',
-          created_by: currentUserId
-        });
-        const rec = Array.isArray(created) ? created[0] : created;
-        consultAllCache.push(rec); // 목록 맨 위가 아니라 맨 아래에 새 줄이 생기게 (맨 위에 생기면 헷갈린다는 피드백)
-        activeStatusFilter = 'all'; // 다른 상태 탭을 보고 있어서 방금 추가한 줄이 안 보이는 일 없게
-        // 맨 아래에 추가했으니, 페이지가 여러 장이면 1페이지가 아니라 마지막 페이지로 이동해야
-        // 방금 추가한 줄이 화면에 보이고 포커스도 걸림
-        consultPage = Math.max(1, Math.ceil(consultAllCache.length / CONSULT_PAGE_SIZE));
-        renderStatusTabs();
-        renderConsultTable();
-        renderHeroStats();
-        const nameInput = document.querySelector(`input[data-id="${rec.id}"][onchange="handleNameSave(this)"]`);
-        if (nameInput) { nameInput.focus(); nameInput.select(); }
-      } catch (err) {
-        alert(err.message);
-      } finally {
-        quickAddInProgress = false;
-        btn.disabled = false;
-      }
-    }
-    document.getElementById('openAddConsultBtn').addEventListener('click', handleQuickAddConsult);
-
-    // ---- 자동 통화 기록함 (migration_72) ----
+    // ---------------------------------------------------------------------
+    // 자동 통화 기록함 (migration_72) - TM 표 위에 표시
+    // ---------------------------------------------------------------------
     function formatCallDuration(sec) {
-      if (sec === null || sec === undefined) return '-';
+      if (sec === null || sec === undefined) return '';
       const m = Math.floor(sec / 60), s = sec % 60;
       return m > 0 ? `${m}분 ${s}초` : `${s}초`;
     }
@@ -514,12 +890,13 @@
       const channelOpts = CHANNEL_OPTIONS.map(o =>
         `<option value="${o.value}" ${o.value === 'phone_auto' ? 'selected' : ''}>${o.label}</option>`
       ).join('');
+      const durText = formatCallDuration(ev.duration_seconds);
       return `
-        <div class="panel" style="margin-bottom:10px;padding:12px 14px;" data-call-event-id="${ev.id}">
+        <div class="panel" style="margin:0 0 10px;padding:12px 14px;" data-call-event-id="${ev.id}">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
             <div><strong>${phoneLabel}</strong></div>
             <div class="muted" style="font-size:12px;">
-              ${formatCallTime(ev.called_at)} · ${CALL_DIRECTION_LABEL[ev.direction] || '통화'} ${formatCallDuration(ev.duration_seconds)}
+              ${formatCallTime(ev.called_at)} · ${CALL_DIRECTION_LABEL[ev.direction] || '통화'}${durText ? ' ' + durText : ''}
             </div>
           </div>
           ${memberNote}
@@ -537,7 +914,7 @@
           <textarea class="call-event-summary" placeholder="익시오 등에서 복사한 통화 요약(또는 통화 메모)을 여기 붙여넣어주세요" rows="2"
             style="width:100%;padding:6px 8px;font-size:13px;border:1px solid var(--slate-300);border-radius:6px;box-sizing:border-box;"></textarea>
           <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-            <button type="button" class="btn btn-primary call-event-save-btn" style="width:auto;padding:6px 14px;font-size:12.5px;">상담 기록으로 저장</button>
+            <button type="button" class="btn btn-primary call-event-save-btn" style="width:auto;padding:6px 14px;font-size:12.5px;">TM 기록으로 저장</button>
             <button type="button" class="btn-link call-event-ignore-btn">무시</button>
             <span class="call-event-msg muted" style="font-size:12px;"></span>
           </div>
@@ -559,23 +936,21 @@
         saveBtn.disabled = true;
         msgEl.textContent = '저장 중...';
         try {
-          const consultDate = (ev.called_at || '').slice(0, 10) || formatDateStr(new Date());
+          const consultDate = (ev.called_at ? formatDateStr(new Date(ev.called_at)) : '') || formatDateStr(new Date());
           const created = await convertCallEventToConsultation(ev, {
             consultDate, name, phone: ev.phone || null, gender, channel,
             interestGym, interestPt, interestGroupPt, memo: memo || null,
             status: 'considering', createdBy: currentUserId
           });
-          // 지금 보고 있는 달 범위 안이면 상담·워크인 기록 표에도 바로 한 줄 추가해서 보여줌
-          const { startStr, endStr } = getMonthRange();
-          if (created && created.consult_date >= startStr && created.consult_date < endStr) {
-            consultAllCache.push(created);
-            renderStatusTabs();
-            renderConsultTable();
-            renderHeroStats();
+          if (created) {
+            allRows.push(created);
+            // 새로 생긴 TM 줄이 보이는 마지막 페이지로
+            activePage.tm = Math.max(1, Math.ceil(activeItems('tm').length / ACTIVE_PAGE_SIZE));
+            renderAll();
           }
           rowEl.remove();
           updateCallEventsEmptyState();
-          showToast('상담 기록으로 저장했어요.');
+          showToast('TM(전화상담) 기록으로 저장했어요.');
         } catch (err) {
           msgEl.textContent = err.message;
           saveBtn.disabled = false;
@@ -597,12 +972,11 @@
     function updateCallEventsEmptyState() {
       const listEl = document.getElementById('callEventsList');
       if (!listEl.querySelector('[data-call-event-id]')) {
-        listEl.innerHTML = '<p class="muted" style="margin:0;">처리할 통화 기록이 없어요. 새 전화가 오면 30초 안에 자동으로 여기 쌓여요.</p>';
+        listEl.innerHTML = '<p class="muted" style="margin:0;font-size:12.5px;">처리할 통화 기록이 없어요. 새 전화가 오면 30초 안에 자동으로 여기 쌓여요.</p>';
       }
     }
 
-    // poll 방식: 30초마다 새로 생긴 통화만 조용히 추가함(이미 떠 있는 줄은 직원이 요약을 입력
-    // 중일 수 있어서 건드리지 않음 - 다른 직원이 먼저 처리해서 'new' 상태가 아니게 된 줄만 치움)
+    // 30초마다 새로 생긴 통화만 조용히 추가(직원이 입력 중인 줄은 건드리지 않음)
     let callEventsPollTimer = null;
     async function loadCallEvents() {
       const section = document.getElementById('callEventsSection');
@@ -634,17 +1008,208 @@
       }
     }
 
-    let currentUserId = null;
+    // ---------------------------------------------------------------------
+    // 문자 보내기 (지점장 전용) - 실제 발송은 Edge Function(send-sms)이 함
+    // ---------------------------------------------------------------------
+    const SMS_PRICE = { SMS: 18, LMS: 45 }; // 문자 업체(SOLAPI) 공개 단가(부가세 별도). 대략적인 안내용
+    let smsInfo = null;                      // { center_name, optout_number, night_blocked, missing }
+    let smsSending = false;
+
+    function smsByteLength(s) {
+      let n = 0;
+      for (const ch of s) n += ch.charCodeAt(0) <= 0x7f ? 1 : 2;
+      return n;
+    }
+    function smsBuildFinal(message) {
+      const name = (smsInfo && smsInfo.center_name) || '[업체명]';
+      const optout = (smsInfo && smsInfo.optout_number) || '[080 번호]';
+      const body = message.trim() || '(여기에 쓴 내용이 들어가요)';
+      return `(광고)${name}\n${body}\n무료수신거부 ${optout}`;
+    }
+    function smsRecipients() {
+      return Array.from(selectedIds).map(findRow).filter(Boolean).filter(isSmsEligible);
+    }
+
+    function updateSmsPreview() {
+      const msg = document.getElementById('smsMessage').value;
+      const finalText = smsBuildFinal(msg);
+      const bytes = smsByteLength(finalText);
+      const type = bytes <= 90 ? 'SMS(단문)' : 'LMS(장문)';
+      const n = smsRecipients().length;
+      const price = (bytes <= 90 ? SMS_PRICE.SMS : SMS_PRICE.LMS) * n;
+      document.getElementById('smsPreview').textContent = finalText;
+      document.getElementById('smsCounter').textContent =
+        `본문 ${msg.length}자 · 광고 문구 포함 ${bytes}바이트 → ${type} · 예상 비용 약 ${price.toLocaleString('ko-KR')}원 (부가세 별도, 업체 단가 기준이라 달라질 수 있어요)`;
+    }
+
+    function setSmsAlert(html) { document.getElementById('smsModalAlert').innerHTML = html || ''; }
+
+    async function openSmsModal() {
+      const rec = smsRecipients();
+      if (rec.length === 0) return;
+      document.getElementById('smsModalResult').innerHTML = '';
+      document.getElementById('smsSendBtn').disabled = false;
+      document.getElementById('smsSendBtn').textContent = '문자 발송';
+      const names = rec.slice(0, 5).map(c => escapeHtml(c.name)).join(', ');
+      document.getElementById('smsModalRecipients').innerHTML =
+        `받는 사람 <strong>${rec.length}명</strong> · ${names}${rec.length > 5 ? ` 외 ${rec.length - 5}명` : ''}`;
+      setSmsAlert('');
+      document.getElementById('smsModal').style.display = 'flex';
+      updateSmsPreview();
+      // 업체명/수신거부 번호/발송 가능 시간대는 서버(Secrets)에 있어서, 창이 열릴 때 한 번 물어봄
+      try {
+        smsInfo = await fetchSmsInfo();
+        const warns = [];
+        if (smsInfo.missing && smsInfo.missing.length) {
+          warns.push(`<div class="sms-error">문자 발송 설정이 덜 끝났어요 (Supabase Secrets에 ${smsInfo.missing.join(', ')} 필요). SMS_SETUP.md를 확인해주세요.</div>`);
+          document.getElementById('smsSendBtn').disabled = true;
+        }
+        if (smsInfo.night_blocked) {
+          warns.push('<div class="sms-warn">지금은 광고성 문자를 보낼 수 없는 시간(밤 9시~아침 8시)이에요. 아침 8시 이후에 보내주세요.</div>');
+          document.getElementById('smsSendBtn').disabled = true;
+        }
+        setSmsAlert(warns.join(''));
+      } catch (err) {
+        smsInfo = null;
+        setSmsAlert(`<div class="sms-error">${escapeHtml(err.message)}</div>`);
+        document.getElementById('smsSendBtn').disabled = true;
+      }
+      updateSmsPreview();
+    }
+
+    function closeSmsModal() {
+      if (smsSending) return;
+      document.getElementById('smsModal').style.display = 'none';
+    }
+
+    async function sendSmsNow() {
+      if (smsSending) return;
+      const rec = smsRecipients();
+      const message = document.getElementById('smsMessage').value.trim();
+      if (rec.length === 0) { alert('받는 사람이 없어요.'); return; }
+      if (!message) { alert('문자 내용을 입력해주세요.'); return; }
+      const finalText = smsBuildFinal(message);
+      if (!confirm(`${rec.length}명에게 아래 문자를 발송할까요? 보낸 문자는 되돌릴 수 없어요.\n\n${finalText}`)) return;
+
+      smsSending = true;
+      const btn = document.getElementById('smsSendBtn');
+      btn.disabled = true;
+      btn.textContent = '발송 중...';
+      document.getElementById('smsModalResult').innerHTML = '';
+      try {
+        const data = await sendSmsToConsultations({
+          message,
+          recipients: rec.map(c => ({ consult_id: c.id, name: c.name, phone: c.phone })),
+          isAd: true
+        });
+        // 보낸 분들의 다음 빈 연락일에 오늘 날짜 자동 입력
+        let marked = 0;
+        if (document.getElementById('smsMarkContact').checked) {
+          const today = formatDateStr(new Date());
+          for (const r of data.results.filter(x => x.status === 'sent' && x.consult_id)) {
+            const c = findRow(r.consult_id);
+            if (!c) continue;
+            const slot = [1, 2, 3].find(n => !c[`contact${n}_date`]);
+            if (!slot) continue;
+            try {
+              await updateWalkinConsultation(c.id, { [`contact${slot}_date`]: today });
+              c[`contact${slot}_date`] = today;
+              marked++;
+            } catch (e) { /* 연락일 입력 실패는 발송 결과에 영향 없음 */ }
+          }
+        }
+        const failed = data.results.filter(x => x.status === 'failed');
+        document.getElementById('smsModalResult').innerHTML = `
+          <div class="modal-section">
+            <h4>발송 결과</h4>
+            <div style="font-size:14px;">
+              ✅ 접수 <strong>${data.success_count}건</strong>${data.fail_count > 0 ? ` · ❌ 실패 <strong>${data.fail_count}건</strong>` : ''}
+              <span class="muted">(${data.type === 'LMS' ? '장문' : '단문'} ${data.bytes}바이트)</span>
+            </div>
+            ${marked > 0 ? `<div class="muted" style="font-size:12.5px;margin-top:4px;">${marked}명의 연락일(1·2·3차)에 오늘 날짜를 입력했어요.</div>` : ''}
+            ${failed.length ? `<ul style="margin:8px 0 0 18px;padding:0;font-size:12.5px;">${failed.map(f => `<li>${escapeHtml(f.name || f.phone)} (${escapeHtml(f.phone)}): ${escapeHtml(f.error || '실패')}</li>`).join('')}</ul>` : ''}
+          </div>`;
+        data.results.filter(x => x.status === 'sent' && x.consult_id).forEach(x => selectedIds.delete(x.consult_id));
+        renderAll();
+        loadSmsHistory();
+        btn.textContent = '발송 완료';
+      } catch (err) {
+        document.getElementById('smsModalResult').innerHTML = `<div class="sms-error" style="margin-top:12px;">${escapeHtml(err.message)}</div>`;
+        btn.disabled = false;
+        btn.textContent = '문자 발송';
+      } finally {
+        smsSending = false;
+      }
+    }
+
+    document.getElementById('smsOpenBtn').addEventListener('click', openSmsModal);
+    document.getElementById('smsModalClose').addEventListener('click', closeSmsModal);
+    document.getElementById('smsCancelBtn').addEventListener('click', closeSmsModal);
+    document.getElementById('smsSendBtn').addEventListener('click', sendSmsNow);
+    document.getElementById('smsMessage').addEventListener('input', updateSmsPreview);
+
+    // ---- 문자 발송 이력 ----
+    async function loadSmsHistory() {
+      if (!isManager) return;
+      const section = document.getElementById('smsHistorySection');
+      const listEl = document.getElementById('smsHistoryList');
+      try {
+        const rows = await fetchSmsCampaigns(20);
+        section.style.display = 'block';
+        if (rows.length === 0) {
+          listEl.innerHTML = '<p class="muted" style="margin:0;">아직 보낸 문자가 없어요.</p>';
+          return;
+        }
+        listEl.innerHTML = `
+          <div style="overflow-x:auto;"><table class="table-fixed" style="min-width:760px;">
+            <thead><tr>
+              <th style="width:130px;">발송 시각</th><th style="width:80px;">보낸 사람</th>
+              <th>내용</th><th style="width:130px;">결과</th><th style="width:70px;"></th>
+            </tr></thead>
+            <tbody>${rows.map(r => `
+              <tr data-campaign="${r.id}">
+                <td>${formatCallTime(r.created_at)}</td>
+                <td>${escapeHtml((r.sender && r.sender.name) || '-')}</td>
+                <td title="${escapeHtml(r.final_text || r.message)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml((r.final_text || r.message || '').replace(/\n/g, ' '))}</td>
+                <td>${r.recipient_count}명 중 성공 ${r.success_count}${r.fail_count > 0 ? ` · 실패 ${r.fail_count}` : ''}</td>
+                <td><button type="button" class="mini-btn sms-detail-btn" data-id="${r.id}">자세히</button></td>
+              </tr>`).join('')}
+            </tbody></table></div>`;
+        listEl.querySelectorAll('.sms-detail-btn').forEach(btn => btn.addEventListener('click', () => toggleSmsDetail(btn)));
+      } catch (err) {
+        // migration_74를 아직 안 돌렸으면 표가 없어서 에러 - 이력 섹션만 조용히 숨김
+        section.style.display = 'none';
+      }
+    }
+    async function toggleSmsDetail(btn) {
+      const tr = btn.closest('tr');
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains('sms-detail-row')) { next.remove(); btn.textContent = '자세히'; return; }
+      btn.textContent = '불러오는 중';
+      try {
+        const msgs = await fetchSmsMessages(btn.dataset.id);
+        tr.insertAdjacentHTML('afterend', `<tr class="sms-detail-row"><td colspan="5" style="font-size:12px;">
+          ${msgs.map(m => `${m.status === 'sent' ? '✅' : '❌'} ${escapeHtml(m.name || '')} ${escapeHtml(formatPhone(m.phone) || m.phone || '')}${m.error ? ' - ' + escapeHtml(m.error) : ''}`).join('<br>')}
+        </td></tr>`);
+        btn.textContent = '닫기';
+      } catch (err) { alert(err.message); btn.textContent = '자세히'; }
+    }
+
+    // ---------------------------------------------------------------------
+    // 시작
+    // ---------------------------------------------------------------------
     (async () => {
       const profile = await getMyProfile();
       if (profile) {
         document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
         applyRoleNav(profile);
         currentUserId = profile.id;
+        isManager = profile.role === 'manager';
       }
-      reloadAll();
+      await reloadAll();
       loadCallEvents();
       callEventsPollTimer = setInterval(loadCallEvents, 30000);
+      loadSmsHistory();
     })();
   </script>
 </body>

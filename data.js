@@ -1684,6 +1684,7 @@ async function convertCallEventToConsultation(callEvent, {
     interest_group_pt: !!interestGroupPt,
     memo: memo || null,
     status: status || 'considering',
+    kind: 'tm', // 전화로 들어온 건 신규상담 화면의 "TM(전화상담)" 쪽에 쌓임 (migration_74)
     created_by: createdBy || null
   });
   const saved = Array.isArray(created) ? created[0] : created;
@@ -1745,12 +1746,13 @@ async function deletePtOtNoResponse(id) {
 
 // ---- 신규상담 · 워크인 관리 (walkin_consultations) ----
 async function fetchWalkinConsultations() {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/walkin_consultations?select=*&order=consult_date.desc,created_at.desc`,
-    { headers: await authHeaders() }
+  // 처리 완료 보관함에서 전체 기간을 다루게 돼서(기록이 계속 쌓임) 1000행 제한에 안 걸리게 나눠서 전부 가져옴
+  const { rows, error } = await fetchAllRows(
+    'walkin_consultations?select=*&order=consult_date.desc,created_at.desc',
+    await authHeaders()
   );
-  if (!res.ok) await throwApiError(res, '신규상담 기록을 불러오지 못했습니다.');
-  return res.json();
+  if (error) await throwApiError(error, '신규상담 기록을 불러오지 못했습니다.');
+  return rows;
 }
 
 async function addWalkinConsultation(row) {
@@ -1779,6 +1781,72 @@ async function deleteWalkinConsultation(id) {
     headers: await authHeaders()
   });
   if (!res.ok) await throwApiError(res, '신규상담 기록 삭제에 실패했습니다.');
+}
+
+// ---- 문자 발송 (신규상담 화면의 "처리 완료 보관함" - 이월/거부 회원 대상) ----
+// 실제 발송은 Supabase Edge Function "send-sms"가 문자 업체(SOLAPI) API로 함(키는 서버에만 있음).
+// 설정/배포 방법은 SMS_SETUP.md 참고. recipients = [{ consult_id, name, phone }]
+async function sendSmsToConsultations({ message, recipients, isAd = true }) {
+  const token = await getValidAccessToken();
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/send-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ message, recipients, is_ad: isAd })
+    });
+  } catch (e) {
+    throw new Error('문자 발송 서버에 연결하지 못했어요. 인터넷 연결을 확인해주세요.');
+  }
+  if (res.status === 404) {
+    throw new Error('문자 발송 기능(send-sms)이 아직 배포되지 않았어요. SMS_SETUP.md의 순서대로 먼저 설정해주세요.');
+  }
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* 아래에서 처리 */ }
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || `문자 발송에 실패했습니다. (${res.status})`);
+  return data; // { ok, type, bytes, final_text, success_count, fail_count, results:[{consult_id,name,phone,status,error}] }
+}
+
+// "문자 보내기" 창 미리보기용: 업체명 / 수신거부번호 / 지금 발송 가능한 시간대인지 (실제 발송 아님)
+async function fetchSmsInfo() {
+  const token = await getValidAccessToken();
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/send-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'info' })
+    });
+  } catch (e) {
+    throw new Error('문자 발송 서버에 연결하지 못했어요. 인터넷 연결을 확인해주세요.');
+  }
+  if (res.status === 404) {
+    throw new Error('문자 발송 기능(send-sms)이 아직 배포되지 않았어요. SMS_SETUP.md의 순서대로 먼저 설정해주세요.');
+  }
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* 아래에서 처리 */ }
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || `문자 설정을 확인하지 못했어요. (${res.status})`);
+  return data; // { ok, center_name, optout_number, night_blocked, missing:[...] }
+}
+
+// 최근 문자 발송 이력(지점장만 조회 가능 - RLS)
+async function fetchSmsCampaigns(limit = 20) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/sms_campaigns?select=*,sender:sent_by(name)&order=created_at.desc&limit=${limit}`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '문자 발송 이력을 불러오지 못했습니다.');
+  return res.json();
+}
+
+// 특정 발송의 받는 사람별 결과
+async function fetchSmsMessages(campaignId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/sms_messages?campaign_id=eq.${campaignId}&select=*&order=created_at.asc`,
+    { headers: await authHeaders() }
+  );
+  if (!res.ok) await throwApiError(res, '문자 발송 내역을 불러오지 못했습니다.');
+  return res.json();
 }
 
 // ---- 광고 성과 관리 (marketing.html) - 캠페인(ad_campaigns) + 일별 기록(ad_campaign_logs) ----
