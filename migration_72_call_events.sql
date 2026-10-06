@@ -32,9 +32,15 @@ create table if not exists call_events (
   matched_member_id uuid references members(id),  -- 번호로 자동 매칭된 회원(없으면 null)
   summary_text text,                       -- 사람이 나중에 붙여넣는 익시오 요약
   status text not null default 'new' check (status in ('new','logged','ignored')),
-  tm_log_id uuid references tm_logs(id),   -- TM 기록으로 저장했으면 그 tm_logs.id
+  tm_log_id uuid references tm_logs(id),   -- (이전 버전 흔적, 더는 안 씀) TM 기록으로 저장했으면 그 tm_logs.id
   created_at timestamptz default now()
 );
+
+-- 2026-10-05 수정: 센터폰 하나로 들어오는 전화는 신규 문의가 대부분이라, 통화 기록을
+-- TM(tm_logs)이 아니라 신규상담·워크인 관리(walkin_consultations) 쪽으로 저장하도록 바꿈.
+-- 이미 이 파일을 한 번 실행하셨어도(위 create table이 그냥 넘어가도) 아래 alter는 새 컬럼을
+-- 추가해줌 - 안 하셨으면 테이블이 방금 위에서 만들어졌을 테니 이 alter도 바로 적용됨.
+alter table if exists call_events add column if not exists consult_id uuid references walkin_consultations(id);
 
 create index if not exists call_events_staff_idx on call_events(staff_id, called_at desc);
 create index if not exists call_events_status_idx on call_events(status);

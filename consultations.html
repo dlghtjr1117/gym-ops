@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 신규상담 · 워크인 관리</title>
-<link rel="stylesheet" href="style.css?v=1791173929" />
+<link rel="stylesheet" href="style.css?v=1791180016" />
 <style>
   /* 이 페이지 전용 - 특이사항(메모)/성함/전화번호 칸: 엑셀 시트처럼 바로 타이핑해서 저장 */
   .sheet-input {
@@ -92,6 +92,17 @@
       </div>
     </div>
 
+    <div class="section" id="callEventsSection" style="display:none;">
+      <h2>📞 자동 통화 기록함 <span class="muted">(휴대폰에서 자동으로 잡힌 통화)</span></h2>
+      <p class="muted" style="margin:-6px 0 12px;">
+        센터폰으로 전화가 끝나면 자동으로 여기 한 줄씩 쌓여요(새로고침 없이도 30초 안에 떠요). 익시오
+        같은 통화요약 앱에서 요약 내용을 복사해서 아래 칸에 붙여넣고 성함 등을 채운 뒤 저장하면 아래
+        "상담·워크인 기록" 표에 바로 한 줄로 등록돼요. 연동 설정은 <a href="staff.html">직원 관리</a>에서
+        할 수 있어요.
+      </p>
+      <div id="callEventsList"></div>
+    </div>
+
     <div class="section">
       <h2>상담 · 워크인 기록</h2>
       <div id="statusTabs" class="filter-tabs"></div>
@@ -117,9 +128,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791173929"></script>
-  <script src="auth.js?v=1791173929"></script>
-  <script src="data.js?v=1791173929"></script>
+  <script src="config.js?v=1791180016"></script>
+  <script src="auth.js?v=1791180016"></script>
+  <script src="data.js?v=1791180016"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -131,6 +142,7 @@
     let monthAnchor = new Date();
 
     const CHANNEL_OPTIONS = [
+      { value: 'phone_auto', label: '자동통화', badge: 'badge-indigo' },
       { value: 'naver_place', label: '네이버 플레이스', badge: 'badge-green' },
       { value: 'carrot', label: '당근', badge: 'badge-orange' },
       { value: 'blog', label: '블로그', badge: 'badge-yellow' },
@@ -480,6 +492,148 @@
     }
     document.getElementById('openAddConsultBtn').addEventListener('click', handleQuickAddConsult);
 
+    // ---- 자동 통화 기록함 (migration_72) ----
+    function formatCallDuration(sec) {
+      if (sec === null || sec === undefined) return '-';
+      const m = Math.floor(sec / 60), s = sec % 60;
+      return m > 0 ? `${m}분 ${s}초` : `${s}초`;
+    }
+    function formatCallTime(iso) {
+      const d = new Date(iso);
+      return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    const CALL_DIRECTION_LABEL = { incoming: '수신', outgoing: '발신', missed: '부재중', unknown: '통화' };
+
+    function renderCallEventRow(ev) {
+      const member = ev.member;
+      const phoneLabel = formatPhone(ev.phone) || ev.phone || '번호 없음';
+      const memberNote = member
+        ? `<div class="muted" style="font-size:12px;margin-bottom:6px;">⚠ 이미 등록된 회원 번호예요 (${escapeHtml(member.name)}) - 그래도 필요하면 아래에 상담으로 기록할 수 있어요.</div>`
+        : '';
+      const genderOpts = `<option value="">성별</option><option value="female">여</option><option value="male">남</option>`;
+      const channelOpts = CHANNEL_OPTIONS.map(o =>
+        `<option value="${o.value}" ${o.value === 'phone_auto' ? 'selected' : ''}>${o.label}</option>`
+      ).join('');
+      return `
+        <div class="panel" style="margin-bottom:10px;padding:12px 14px;" data-call-event-id="${ev.id}">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <div><strong>${phoneLabel}</strong></div>
+            <div class="muted" style="font-size:12px;">
+              ${formatCallTime(ev.called_at)} · ${CALL_DIRECTION_LABEL[ev.direction] || '통화'} ${formatCallDuration(ev.duration_seconds)}
+            </div>
+          </div>
+          ${memberNote}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+            <input type="text" class="sheet-input call-event-name" placeholder="성함 입력" value="${member ? escapeHtml(member.name) : ''}"
+              style="border:1px solid var(--slate-300);flex:1;min-width:100px;" />
+            <select class="sheet-input call-event-gender" style="border:1px solid var(--slate-300);width:80px;">${genderOpts}</select>
+            <select class="sheet-input call-event-channel" style="border:1px solid var(--slate-300);width:130px;">${channelOpts}</select>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;font-size:12.5px;">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="interest-check call-event-interest-gym" />헬스</label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="interest-check call-event-interest-pt" />PT</label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="interest-check call-event-interest-group-pt" />그룹PT</label>
+          </div>
+          <textarea class="call-event-summary" placeholder="익시오 등에서 복사한 통화 요약(또는 통화 메모)을 여기 붙여넣어주세요" rows="2"
+            style="width:100%;padding:6px 8px;font-size:13px;border:1px solid var(--slate-300);border-radius:6px;box-sizing:border-box;"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+            <button type="button" class="btn btn-primary call-event-save-btn" style="width:auto;padding:6px 14px;font-size:12.5px;">상담 기록으로 저장</button>
+            <button type="button" class="btn-link call-event-ignore-btn">무시</button>
+            <span class="call-event-msg muted" style="font-size:12px;"></span>
+          </div>
+        </div>`;
+    }
+
+    function wireCallEventRow(rowEl, ev) {
+      const saveBtn = rowEl.querySelector('.call-event-save-btn');
+      const msgEl = rowEl.querySelector('.call-event-msg');
+
+      saveBtn.addEventListener('click', async () => {
+        const name = rowEl.querySelector('.call-event-name').value.trim() || '전화상담';
+        const gender = rowEl.querySelector('.call-event-gender').value || null;
+        const channel = rowEl.querySelector('.call-event-channel').value || null;
+        const interestGym = rowEl.querySelector('.call-event-interest-gym').checked;
+        const interestPt = rowEl.querySelector('.call-event-interest-pt').checked;
+        const interestGroupPt = rowEl.querySelector('.call-event-interest-group-pt').checked;
+        const memo = rowEl.querySelector('.call-event-summary').value.trim();
+        saveBtn.disabled = true;
+        msgEl.textContent = '저장 중...';
+        try {
+          const consultDate = (ev.called_at || '').slice(0, 10) || formatDateStr(new Date());
+          const created = await convertCallEventToConsultation(ev, {
+            consultDate, name, phone: ev.phone || null, gender, channel,
+            interestGym, interestPt, interestGroupPt, memo: memo || null,
+            status: 'considering', createdBy: currentUserId
+          });
+          // 지금 보고 있는 달 범위 안이면 상담·워크인 기록 표에도 바로 한 줄 추가해서 보여줌
+          const { startStr, endStr } = getMonthRange();
+          if (created && created.consult_date >= startStr && created.consult_date < endStr) {
+            consultAllCache.push(created);
+            renderStatusTabs();
+            renderConsultTable();
+            renderHeroStats();
+          }
+          rowEl.remove();
+          updateCallEventsEmptyState();
+          showToast('상담 기록으로 저장했어요.');
+        } catch (err) {
+          msgEl.textContent = err.message;
+          saveBtn.disabled = false;
+        }
+      });
+
+      rowEl.querySelector('.call-event-ignore-btn').addEventListener('click', async () => {
+        if (!confirm('이 통화 기록을 무시할까요? (상담 기록으로 저장하지 않고 목록에서만 지워요)')) return;
+        try {
+          await ignoreCallEvent(ev.id);
+          rowEl.remove();
+          updateCallEventsEmptyState();
+        } catch (err) {
+          msgEl.textContent = err.message;
+        }
+      });
+    }
+
+    function updateCallEventsEmptyState() {
+      const listEl = document.getElementById('callEventsList');
+      if (!listEl.querySelector('[data-call-event-id]')) {
+        listEl.innerHTML = '<p class="muted" style="margin:0;">처리할 통화 기록이 없어요. 새 전화가 오면 30초 안에 자동으로 여기 쌓여요.</p>';
+      }
+    }
+
+    // poll 방식: 30초마다 새로 생긴 통화만 조용히 추가함(이미 떠 있는 줄은 직원이 요약을 입력
+    // 중일 수 있어서 건드리지 않음 - 다른 직원이 먼저 처리해서 'new' 상태가 아니게 된 줄만 치움)
+    let callEventsPollTimer = null;
+    async function loadCallEvents() {
+      const section = document.getElementById('callEventsSection');
+      const listEl = document.getElementById('callEventsList');
+      try {
+        const events = await fetchPendingCallEvents();
+        section.style.display = 'block'; // call_events 테이블이 있으면(=migration_72 실행됨) 항상 보여줌
+        const existingIds = new Set(
+          Array.from(listEl.querySelectorAll('[data-call-event-id]')).map(el => el.dataset.callEventId)
+        );
+        const incomingIds = new Set(events.map(e => e.id));
+        existingIds.forEach(id => {
+          if (!incomingIds.has(id)) {
+            const el = listEl.querySelector(`[data-call-event-id="${id}"]`);
+            if (el) el.remove();
+          }
+        });
+        events.forEach(ev => {
+          if (existingIds.has(ev.id)) return;
+          listEl.insertAdjacentHTML('beforeend', renderCallEventRow(ev));
+          const rowEl = listEl.querySelector(`[data-call-event-id="${ev.id}"]`);
+          if (rowEl) wireCallEventRow(rowEl, ev);
+        });
+        updateCallEventsEmptyState();
+      } catch (err) {
+        // migration_72를 아직 안 돌리신 경우(테이블 자체가 없음) - 조용히 섹션을 숨기고 polling도 멈춤
+        section.style.display = 'none';
+        if (callEventsPollTimer) { clearInterval(callEventsPollTimer); callEventsPollTimer = null; }
+      }
+    }
+
     let currentUserId = null;
     (async () => {
       const profile = await getMyProfile();
@@ -489,6 +643,8 @@
         currentUserId = profile.id;
       }
       reloadAll();
+      loadCallEvents();
+      callEventsPollTimer = setInterval(loadCallEvents, 30000);
     })();
   </script>
 </body>

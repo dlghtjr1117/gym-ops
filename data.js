@@ -1657,7 +1657,7 @@ async function setCallTokenActive(id, active) {
   if (!res.ok) await throwApiError(res, '토큰 상태 변경에 실패했습니다.');
 }
 
-// "자동 통화 기록함"(expiry.html) - Tasker가 쌓아둔 call_events 중 아직 TM으로 정리 안 한 것들
+// "자동 통화 기록함"(consultations.html) - Tasker가 쌓아둔 call_events 중 아직 상담 기록으로 정리 안 한 것들
 async function fetchPendingCallEvents() {
   const { rows, error } = await fetchAllRows(
     'call_events?select=*,member:members(id,name,phone),staff:profiles(name)&status=eq.new&order=called_at.desc',
@@ -1667,20 +1667,30 @@ async function fetchPendingCallEvents() {
   return rows;
 }
 
-// 통화 기록 하나를 TM 기록으로 확정 저장(붙여넣은 요약을 memo로) - addTmLog와 call_events 업데이트를 묶어서 처리
-async function convertCallEventToTmLog(callEvent, { memberId, status, memo }) {
-  const tmLog = await addTmLog({
-    member_id: memberId,
-    staff_id: callEvent.staff_id,
-    status,
-    memo,
-    contact_date: (callEvent.called_at || '').slice(0, 10) || undefined
+// 통화 기록 하나를 신규상담(walkin_consultations) 기록으로 확정 저장 - addWalkinConsultation과
+// call_events 업데이트를 묶어서 처리. (예전엔 TM 기록으로 저장했는데, 센터폰 하나로 들어오는 전화는
+// 신규 문의가 대부분이라 신규상담·워크인 관리 쪽에 쌓이도록 바꿈)
+async function convertCallEventToConsultation(callEvent, {
+  consultDate, name, phone, gender, channel, interestGym, interestPt, interestGroupPt, memo, status, createdBy
+}) {
+  const created = await addWalkinConsultation({
+    consult_date: consultDate,
+    name: name || '전화상담',
+    phone: phone || null,
+    gender: gender || null,
+    channel: channel || null,
+    interest_gym: !!interestGym,
+    interest_pt: !!interestPt,
+    interest_group_pt: !!interestGroupPt,
+    memo: memo || null,
+    status: status || 'considering',
+    created_by: createdBy || null
   });
-  const saved = Array.isArray(tmLog) ? tmLog[0] : tmLog;
+  const saved = Array.isArray(created) ? created[0] : created;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/call_events?id=eq.${callEvent.id}`, {
     method: 'PATCH',
     headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
-    body: JSON.stringify({ status: 'logged', summary_text: memo, tm_log_id: saved && saved.id ? saved.id : null })
+    body: JSON.stringify({ status: 'logged', summary_text: memo || null, consult_id: saved && saved.id ? saved.id : null })
   });
   if (!res.ok) await throwApiError(res, '통화 기록 상태 갱신에 실패했습니다.');
   return saved;
