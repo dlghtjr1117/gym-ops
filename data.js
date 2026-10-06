@@ -696,6 +696,72 @@ async function fetchExpiringItems(daysAhead = 14) {
   return items;
 }
 
+// 만료회원 · TM 화면용: "연락이 필요한 회원"과 "처리 완료(재등록/이월/거부)" 모두를 한 번에 불러옴.
+// - TM 상태는 회원 전체가 아니라 "회원 + 상품(헬스이용권/그룹PT 등)" 단위로 가장 최근 기록을 따짐
+//   (예전 기록처럼 상품이 안 적힌 것은 그 회원의 모든 상품에 적용)
+// - 재등록 처리하면 만료일이 뒤로 밀려 "45일 이내 만료" 목록에서 빠지는 경우가 많아서, 처리 완료 보관함이
+//   비지 않도록 tm_logs에서 재등록/이월/거부 기록이 있는 회원+상품도 따로 찾아서 함께 돌려줌
+const TM_ARCHIVE_STATUSES = ['renewed', 'rolled_over', 'declined'];
+async function fetchExpiryBoard(daysAhead = 45) {
+  const headers = await authHeaders();
+  const limitDate = new Date();
+  limitDate.setDate(limitDate.getDate() + daysAhead);
+  const limitStr = limitDate.toISOString().slice(0, 10);
+  const orClause = EXPIRY_CATEGORIES.filter(c => c.field).map(c => `${c.field}.lte.${limitStr}`).join(',');
+
+  const [mRes, lRes, aRes] = await Promise.all([
+    fetchAllRows(`members?select=*,trainer:profiles(name)&status=neq.left&or=(${orClause})&order=name.asc,id.asc`, headers),
+    fetchAllRows('tm_logs?select=id,member_id,status,category,contact_date,memo,created_at&order=created_at.desc,id.asc', headers),
+    fetchAllRows(
+      `tm_logs?select=member_id,category,member:members(*,trainer:profiles(name))&status=in.(${TM_ARCHIVE_STATUSES.join(',')})` +
+      `&category=not.is.null&order=created_at.desc,id.asc`, headers)
+  ]);
+  if (mRes.error) await throwApiError(mRes.error, '만료 예정 회원을 불러오지 못했습니다.');
+  if (lRes.error) await throwApiError(lRes.error, 'TM 기록을 불러오지 못했습니다.');
+  if (aRes.error) await throwApiError(aRes.error, '처리 완료 기록을 불러오지 못했습니다.');
+
+  const logsByMember = new Map();
+  for (const l of lRes.rows) {
+    if (!logsByMember.has(l.member_id)) logsByMember.set(l.member_id, []);
+    logsByMember.get(l.member_id).push(l); // 이미 최신순
+  }
+  const latestFor = (memberId, catKey) => {
+    const arr = logsByMember.get(memberId) || [];
+    return arr.find(l => l.category === catKey) || arr.find(l => !l.category) || null;
+  };
+  const labelFor = (m, cat) =>
+    cat.key === 'membership' ? (m.membership_type || cat.label) :
+    cat.key === 'group_pt' ? (m.group_pt_type || cat.label) : cat.label;
+
+  const items = [];
+  const seen = new Set();
+  for (const m of mRes.rows) {
+    for (const cat of EXPIRY_CATEGORIES) {
+      if (!cat.field) continue;
+      const endDate = m[cat.field];
+      if (!endDate || endDate > limitStr) continue;
+      seen.add(`${m.id}|${cat.key}`);
+      items.push({ member: m, categoryKey: cat.key, categoryLabel: cat.label, productLabel: labelFor(m, cat),
+        expiryDate: endDate, latestTm: latestFor(m.id, cat.key) });
+    }
+  }
+  // 만료일이 이미 뒤로 밀린(=재등록돼서 목록에서 빠진) 회원+상품 중 처리 완료 기록이 있는 것
+  for (const r of aRes.rows) {
+    const m = r.member;
+    if (!m || m.status === 'left') continue;
+    const key = `${m.id}|${r.category}`;
+    if (seen.has(key)) continue;
+    const cat = EXPIRY_CATEGORIES.find(c => c.key === r.category && c.field);
+    if (!cat) continue;
+    const latest = latestFor(m.id, cat.key);
+    if (!latest || !TM_ARCHIVE_STATUSES.includes(latest.status)) continue; // 그 뒤에 되돌린 건 제외
+    seen.add(key);
+    items.push({ member: m, categoryKey: cat.key, categoryLabel: cat.label, productLabel: labelFor(m, cat),
+      expiryDate: m[cat.field] || '', latestTm: latest, fromLogsOnly: true });
+  }
+  return items;
+}
+
 // ---- 그룹PT(올바른 운동 무제한) 참석 관리: 방문이 뜸해진 회원을 찾아서 초심자패키지 5회
 // 전환을 제안하는 TM을 기록하는 전용 공간. 자세한 이유는 migration_44_group_pt_retention.sql
 // 주석 참고 - tm_logs와 완전히 분리된 테이블(group_pt_retention_logs)을 씀
