@@ -385,7 +385,8 @@
       const nmStart = nextMonthFirstDay;
       const nmEnd = firstDayOfMonthAfter(nextMonthFirstDay, 1);
       try {
-        const dup = allRows.find(x => x.name === c.name && (x.phone || '') === (c.phone || '') &&
+        const digitsOf = (v) => String(v || '').replace(/\D/g, '');
+        const dup = allRows.find(x => x.name === c.name && digitsOf(x.phone) === digitsOf(c.phone) &&
           x.consult_date && x.consult_date >= nmStart && x.consult_date < nmEnd);
         if (dup) {
           showToast(`${nextMonthLabel}에 이미 같은 이름의 기록이 있어서 새로 만들지 않았어요.`);
@@ -431,6 +432,30 @@
         if (c) c.consult_date = value;
         renderAll();
       } catch (err) { alert(err.message); if (c) inputEl.value = c.consult_date; }
+    }
+
+    // 전화번호는 타이핑하는 대로 010-0000-0000 형태로 바뀌고, 저장도 그 형태로 됨
+    document.addEventListener('input', (e) => {
+      const el = e.target;
+      if (!el.classList || !el.classList.contains('phone-input')) return;
+      const caretFromEnd = el.value.length - el.selectionStart;
+      const digits = el.value.replace(/\D/g, '').slice(0, 11);
+      let f = digits;
+      if (digits.length > 7) f = `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+      else if (digits.length > 3) f = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+      el.value = f;
+      const pos = Math.max(0, f.length - caretFromEnd);
+      el.setSelectionRange(pos, pos);
+    });
+    async function handlePhoneSave(inputEl) {
+      const id = inputEl.dataset.id;
+      const value = formatPhone(inputEl.value.trim()) || null;
+      inputEl.value = value || '';
+      try {
+        await updateWalkinConsultation(id, { phone: value });
+        const c = findRow(id);
+        if (c) c.phone = value;
+      } catch (err) { alert(err.message); }
     }
 
     async function handleNameSave(inputEl) {
@@ -591,7 +616,7 @@
       return `
         <tr class="rec-main row-cstatus-considering">
           <td><input class="sheet-input" type="text" value="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}" data-id="${c.id}" onchange="handleNameSave(this)" /></td>
-          <td><input class="sheet-input" type="text" value="${escapeHtml(c.phone || '')}" placeholder="010-0000-0000" data-id="${c.id}" onchange="handleFieldSave(this,'phone')" /></td>
+          <td><input class="sheet-input phone-input" type="tel" inputmode="numeric" maxlength="13" value="${escapeHtml(formatPhone(c.phone) || '')}" placeholder="010-0000-0000" data-id="${c.id}" onchange="handlePhoneSave(this)" /></td>
           <td>${renderChannelSelect(c)}</td>
           <td style="white-space:nowrap; font-size:12px;">
             <label title="헬스" style="cursor:pointer;"><input type="checkbox" class="interest-check" data-id="${c.id}" ${c.interest_gym ? 'checked' : ''} onchange="handleInterestToggle(this,'interest_gym')" />헬스</label>
@@ -938,7 +963,7 @@
         try {
           const consultDate = (ev.called_at ? formatDateStr(new Date(ev.called_at)) : '') || formatDateStr(new Date());
           const created = await convertCallEventToConsultation(ev, {
-            consultDate, name, phone: ev.phone || null, gender, channel,
+            consultDate, name, phone: formatPhone(ev.phone) || null, gender, channel,
             interestGym, interestPt, interestGroupPt, memo: memo || null,
             status: 'considering', createdBy: currentUserId
           });
