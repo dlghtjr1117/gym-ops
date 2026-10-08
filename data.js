@@ -941,18 +941,25 @@ const TASK_STATUS_BADGE = { todo: 'badge-red', in_progress: 'badge-amber', done:
 const EDITABLE_TASK_STATUSES = ['todo', 'in_progress', 'done'];
 
 // 업무 배정 대상 선택용: 트레이너뿐 아니라 지점장 본인도 자기 업무를 만들 수 있어야 하므로 전체 직원을 가져옴
-async function fetchStaff() {
-  // job_title(팀장 직급, migration_77)이 아직 없는 DB에서도 앱 전체가 안 깨지게, 실패하면 옛 컬럼만으로 다시 불러옴
-  let res = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,job_title&order=name.asc`,
-    { headers: await authHeaders() }
-  );
-  if (!res.ok) {
-    res = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role&order=name.asc`,
-      { headers: await authHeaders() }
-    );
+// 직원 전체(퇴사한 직원 포함 - 과거 기록의 이름/직급 표시용). 담당자 선택 목록 등에는 isActiveStaff로 걸러서 씀.
+// job_title(migration_77)/is_active(migration_78) 컬럼이 아직 없는 DB에서도 앱 전체가 안 깨지게, 실패하면 옛 컬럼만으로 다시 불러옴
+async function fetchProfilesWithFallback(extraCols, order) {
+  const attempts = [
+    'id,name,role,job_title,is_active,deactivated_at' + extraCols,
+    'id,name,role,job_title' + extraCols,
+    'id,name,role' + extraCols
+  ];
+  let res = null;
+  for (const cols of attempts) {
+    res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=${cols}&order=${order}`, { headers: await authHeaders() });
+    if (res.ok) return res;
   }
+  return res;
+}
+const isActiveStaff = (p) => !p || p.is_active !== false;
+
+async function fetchStaff() {
+  const res = await fetchProfilesWithFallback('', 'name.asc');
   if (!res.ok) await throwApiError(res, '직원 목록을 불러오지 못했습니다.');
   return res.json();
 }
@@ -1694,19 +1701,27 @@ async function movePtCareLogToNewTrainer(memberId, newTrainerId) {
 // ---- 직원(profiles) - 직원 관리 화면 ----
 // 지점장이면 RLS 덕분에 전체 직원이 조회되고, 트레이너면 본인 행만 조회됨
 async function fetchProfiles() {
-  let res = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,job_title,phone,created_at&order=created_at.asc`,
-    { headers: await authHeaders() }
-  );
-  if (!res.ok) { // migration_77 전이면 job_title 없이 다시
-    res = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,phone,created_at&order=created_at.asc`,
-      { headers: await authHeaders() }
-    );
-  }
+  const res = await fetchProfilesWithFallback(',phone,created_at', 'created_at.asc');
   if (!res.ok) await throwApiError(res, '직원 목록을 불러오지 못했습니다.');
   return res.json();
 }
+
+// 직원 삭제(= 퇴사 처리: 로그인 차단 + 선택 목록에서 숨김, 매출·PT 등 과거 기록은 그대로) / 복구. migration_78 필요
+async function callStaffRpc(fn, id, failMsg) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ p_id: id })
+  });
+  if (!res.ok) {
+    let msg = '';
+    try { msg = (await res.json()).message || ''; } catch (e) { /* ignore */ }
+    if (res.status === 404) msg = 'Supabase에서 migration_78_staff_deactivate.sql을 먼저 실행해주세요.';
+    throw new Error(msg || failMsg);
+  }
+}
+const deactivateStaff = (id) => callStaffRpc('deactivate_staff', id, '직원 삭제에 실패했습니다.');
+const reactivateStaff = (id) => callStaffRpc('reactivate_staff', id, '직원 복구에 실패했습니다.');
 
 // 직원 직급 변경: 'trainer'(트레이너) / 'lead'(팀장 = 관리자 권한 + 직급 팀장) / 'manager'(지점장).
 // RLS 정책상 지점장만 성공함 (migration_25 필요). 팀장 직급 저장은 migration_77 필요.

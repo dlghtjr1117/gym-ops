@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 스케줄</title>
-<link rel="stylesheet" href="style.css?v=1791479657" />
+<link rel="stylesheet" href="style.css?v=1791480155" />
 <style>
   .sg-wrap { overflow-x: auto; margin-top: 14px; border-radius: 10px; }
   .sg-grid {
@@ -146,9 +146,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791479657"></script>
-  <script src="auth.js?v=1791479657"></script>
-  <script src="data.js?v=1791479657"></script>
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791480155"></script>
+  <script src="data.js?v=1791480155"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -477,7 +477,7 @@
 
       if (isManagerFlag) {
         const sel = document.getElementById('trainerSelect');
-        const trainers = staffCache.filter(s => s.role === 'trainer').concat(staffCache.filter(s => s.role === 'manager'));
+        const trainers = staffCache.filter(isActiveStaff).filter(s => s.role === 'trainer').concat(staffCache.filter(isActiveStaff).filter(s => s.role === 'manager'));
         trainers.forEach(s => {
           const opt = document.createElement('option');
           opt.value = s.id; opt.textContent = `${s.name} (${roleLabelOf(s)})`;

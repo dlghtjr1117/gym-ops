@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - OT 관리</title>
-<link rel="stylesheet" href="style.css?v=1791479657" />
+<link rel="stylesheet" href="style.css?v=1791480155" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
   .sheet-input {
@@ -345,9 +345,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791479657"></script>
-  <script src="auth.js?v=1791479657"></script>
-  <script src="data.js?v=1791479657"></script>
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791480155"></script>
+  <script src="data.js?v=1791480155"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -994,7 +994,7 @@
       isManagerFlag = profile.role === 'manager';
 
       try { staffCache = await fetchStaff(); } catch (err) { staffCache = []; }
-      trainersList = staffCache.filter(s => s.role === 'trainer').concat(staffCache.filter(s => s.role === 'manager'));
+      trainersList = staffCache.filter(isActiveStaff).filter(s => s.role === 'trainer').concat(staffCache.filter(isActiveStaff).filter(s => s.role === 'manager'));
       if (!isManagerFlag && !trainersList.some(t => t.id === currentUserId)) {
         // 만약 본인 프로필이 위 목록에 없으면(드문 경우) 최소한 본인 이름은 표시되도록 보강
         const me = staffCache.find(s => s.id === currentUserId);

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1791479657" />
+<link rel="stylesheet" href="style.css?v=1791480155" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -407,9 +407,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791479657"></script>
-  <script src="auth.js?v=1791479657"></script>
-  <script src="data.js?v=1791479657"></script>
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791480155"></script>
+  <script src="data.js?v=1791480155"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -571,7 +571,7 @@
       const sel = document.getElementById(selectId);
       sel.innerHTML = '';
       try {
-        const staff = await fetchStaff();
+        const staff = (await fetchStaff()).filter(isActiveStaff); // 퇴사 처리된 직원은 선택 목록에서 제외
         staff.forEach(s => {
           const opt = document.createElement('option');
           opt.value = s.id;
@@ -1132,8 +1132,9 @@
       if (!isManagerFlag || staffCache.length === 0) {
         return escapeHtml(s.staff ? s.staff.name : '-');
       }
-      const options = staffCache.map(st =>
-        `<option value="${st.id}" ${st.id === s.staff_id ? 'selected' : ''}>${escapeHtml(st.name)}${st.role === 'manager' ? ' (지점장)' : ''}</option>`
+      // 퇴사 처리된 직원은 선택지에서 빼되, 이 매출의 현재 담당자라면 그대로 보여줌(기록 보존)
+      const options = staffCache.filter(st => isActiveStaff(st) || st.id === s.staff_id).map(st =>
+        `<option value="${st.id}" ${st.id === s.staff_id ? 'selected' : ''}>${escapeHtml(st.name)}${st.role === 'manager' ? ` (${roleLabelOf(st)})` : ''}${isActiveStaff(st) ? '' : ' (퇴사)'}</option>`
       ).join('');
       return `<select class="sale-staff-edit-select" data-sale-id="${s.id}" style="padding:4px 6px; font-size:12.5px;">${options}</select>`;
     }

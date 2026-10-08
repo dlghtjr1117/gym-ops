@@ -1438,6 +1438,15 @@ v2에서 "확인 대기 중"으로 남겨뒀던 영업지원금/매출커미션 
 - `roleLabelOf(profile)`(auth.js): 로그인 뱃지·담당자 드롭다운 등 모든 직급 문구를 이걸로 통일 (지점장/팀장/트레이너). `fetchStaff/fetchProfiles/getMyProfile`은 job_title 컬럼이 아직 없어도(migration_77 전) 옛 컬럼으로 재시도해서 앱이 안 깨짐.
 - 급여 관리(payroll.html)는 아직 role==='trainer'만 대상 - 팀장 급여는 따로 요청 시 작업.
 
+## 직원 삭제(퇴사 처리) + 복구 (2026-10-08) - `migration_78_staff_deactivate.sql`
+
+- 직원 관리(staff.html)에 줄마다 "삭제" 버튼(지점장만, 본인 줄 제외) + "퇴사한 직원 보기"(복구 버튼).
+- 진짜로 profiles 행을 지우면 sales.staff_id 등 FK 때문에 기록이 깨지거나 "담당자 미지정"으로 바뀌므로, 행은 남기고 `profiles.is_active=false, deactivated_at` 표시(= 퇴사 처리). 매출/PT/회원 담당 기록과 이름 표시는 그대로.
+- DB 함수 `deactivate_staff(p_id)`/`reactivate_staff(p_id)`(security definer, 지점장만, 본인 불가): auth.users.banned_until='infinity'로 로그인 차단 + auth.sessions 삭제(실패해도 무시 - 앱의 getMyProfile이 is_active=false면 강제 로그아웃). `is_manager()`는 is_active까지 확인하도록 교체.
+- 선택 목록(매출 담당자, 업무 담당자, PT/스케줄/OT 트레이너, 대시보드 성과 지표 평균 인원)에서는 퇴사자 제외(`isActiveStaff`). `fetchStaff()`는 퇴사자 포함 전체를 돌려줘서 과거 기록의 이름/직급 표시는 유지. 대시보드 성과 지표는 퇴사한 트레이너/팀장의 그 달 PT매출을 본인 이름(+"퇴사" 표시)으로 계속 보여줌. `get_pt_trainer_leaderboard()`는 퇴사자는 그 달에 등록 기록이 있을 때만 포함.
+- 급여 관리(payroll.html)는 퇴사자도 그대로 포함(과거 달 급여 보존) - 필요하면 따로 정리.
+- migration_77/78 전(컬럼 없음)에도 앱이 깨지지 않게 `fetchProfilesWithFallback`/`getMyProfile`이 옛 컬럼으로 재시도.
+
 ## 아직 안 만든 것 / 예정
 
 - 데이터 백업 자동화 — 현재는 홈 화면에서 수동으로 버튼을 눌러 엑셀 백업. 데이터가 많아지면 주기적 자동 백업으로 발전시킬 예정 (사용자가 원할 때)

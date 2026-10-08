@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 직원 관리</title>
-<link rel="stylesheet" href="style.css?v=1791479657" />
+<link rel="stylesheet" href="style.css?v=1791480155" />
 <style>
   /* 이 페이지 전용 - 권한 드롭다운을 뱃지처럼 보이게 */
   .role-select {
@@ -60,11 +60,18 @@
 
     <div class="section">
       <h2>직원 목록</h2>
-      <p class="muted" style="margin:-4px 0 12px;">권한 칸을 클릭해서 트레이너 ↔ 지점장으로 바로 전환할 수 있어요. 지점장으로 바꾸면 그 직원도 전체 회원 · 매출 · PT 기록을 다 볼 수 있게 돼요. 본인 권한은 실수로 잠기는 걸 막기 위해 여기서 바꿀 수 없어요 — 다른 지점장에게 부탁해주세요.</p>
+      <p class="muted" style="margin:-4px 0 12px;">직급 칸을 클릭해서 트레이너 / 팀장 / 지점장으로 바로 전환할 수 있어요. 팀장·지점장으로 바꾸면 그 직원도 전체 회원 · 매출 · PT 기록을 다 볼 수 있게 돼요. 본인 직급은 실수로 잠기는 걸 막기 위해 여기서 바꿀 수 없어요 — 다른 지점장에게 부탁해주세요.<br>퇴사한 직원은 오른쪽 <b>삭제</b> 버튼으로 정리할 수 있어요. 삭제하면 로그인이 막히고 선택 목록에서 사라지지만, 그 직원의 <b>매출 · PT · 회원 담당 기록은 그대로 남아요</b>(실수로 삭제해도 아래 "퇴사한 직원 보기"에서 복구할 수 있어요).</p>
       <table id="staffTable" style="max-width:800px;">
-        <thead><tr><th>이름</th><th>연락처</th><th>가입일</th><th>권한</th></tr></thead>
-        <tbody><tr><td colspan="4" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        <thead><tr><th>이름</th><th>연락처</th><th>가입일</th><th>직급</th><th></th></tr></thead>
+        <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
       </table>
+      <details id="inactiveBox" style="margin-top:14px; display:none;">
+        <summary style="cursor:pointer;font-weight:600;font-size:13px;">퇴사한 직원 보기 (<span id="inactiveCount">0</span>명)</summary>
+        <table id="inactiveTable" style="max-width:800px; margin-top:8px;">
+          <thead><tr><th>이름</th><th>직급(퇴사 전)</th><th>삭제일</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </details>
     </div>
 
     <div class="section" id="callTokenSection" style="display:none;">
@@ -98,9 +105,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791479657"></script>
-  <script src="auth.js?v=1791479657"></script>
-  <script src="data.js?v=1791479657"></script>
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791480155"></script>
+  <script src="data.js?v=1791480155"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -119,10 +126,14 @@
     function kindOf(p) { return p.role !== 'manager' ? 'trainer' : (p.job_title === '팀장' ? 'lead' : 'manager'); }
     function roleClass(p) { return kindOf(p) === 'trainer' ? 'role-trainer' : (kindOf(p) === 'lead' ? 'role-lead' : 'role-manager'); }
 
-    function renderStaffTable(list) {
+    let allProfiles = [];
+    function renderStaffTable(fullList) {
+      allProfiles = fullList;
+      const list = fullList.filter(isActiveStaff);
+      renderInactiveTable(fullList.filter(p => !isActiveStaff(p)));
       const tbody = document.querySelector('#staffTable tbody');
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="muted" style="padding:16px;">직원이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px;">직원이 없습니다.</td></tr>';
         return;
       }
       tbody.innerHTML = list.map(p => {
@@ -140,8 +151,23 @@
               <option value="manager" ${kindOf(p) === 'manager' ? 'selected' : ''}>지점장</option>
             </select>
           </td>
+          <td style="text-align:right;">${canEdit ? `<button type="button" class="btn-link staff-del-btn" style="color:var(--red-600);" data-id="${p.id}">삭제</button>` : ''}</td>
         </tr>`;
       }).join('');
+      tbody.querySelectorAll('.staff-del-btn').forEach(btn => btn.addEventListener('click', async () => {
+        const p = allProfiles.find(x => x.id === btn.dataset.id);
+        if (!p) return;
+        if (!confirm(`${p.name} 직원을 삭제할까요?\n\n· 이 직원의 로그인이 막혀요\n· 담당자/트레이너 선택 목록에서 사라져요\n· 이 직원의 매출 · PT · 회원 담당 기록은 그대로 남아요\n\n(나중에 "퇴사한 직원 보기"에서 복구할 수 있어요)`)) return;
+        btn.disabled = true;
+        try {
+          await deactivateStaff(p.id);
+          showToast(`${p.name} 직원을 삭제했어요. 기존 기록은 그대로 남아 있어요.`);
+          loadStaff();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      }));
 
       if (isManagerFlag) {
         tbody.querySelectorAll('.role-select:not(:disabled)').forEach(sel => {
@@ -172,13 +198,38 @@
       }
     }
 
+    function renderInactiveTable(gone) {
+      document.getElementById('inactiveBox').style.display = gone.length ? '' : 'none';
+      document.getElementById('inactiveCount').textContent = gone.length;
+      document.querySelector('#inactiveTable tbody').innerHTML = gone.map(p => `
+        <tr>
+          <td>${escapeHtml(p.name)}</td>
+          <td>${KIND_LABEL[kindOf(p)]}</td>
+          <td>${p.deactivated_at ? formatJoinDate(p.deactivated_at) : '-'}</td>
+          <td style="text-align:right;">${isManagerFlag ? `<button type="button" class="btn-link restore-btn" data-id="${p.id}">복구</button>` : ''}</td>
+        </tr>`).join('');
+      document.querySelectorAll('#inactiveTable .restore-btn').forEach(btn => btn.addEventListener('click', async () => {
+        const p = allProfiles.find(x => x.id === btn.dataset.id);
+        if (!p || !confirm(`${p.name} 직원을 복구할까요? 다시 로그인할 수 있고 선택 목록에도 나타나요.`)) return;
+        btn.disabled = true;
+        try {
+          await reactivateStaff(p.id);
+          showToast(`${p.name} 직원을 복구했어요.`);
+          loadStaff();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      }));
+    }
+
     async function loadStaff() {
       const tbody = document.querySelector('#staffTable tbody');
       try {
         const list = await fetchProfiles();
         renderStaffTable(list);
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="4" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
     }
 

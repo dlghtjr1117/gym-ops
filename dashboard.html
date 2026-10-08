@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 대시보드</title>
-<link rel="stylesheet" href="style.css?v=1791479657" />
+<link rel="stylesheet" href="style.css?v=1791480155" />
 <style>
   /* 문의 경로/워크인 입력칸(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 .sheet-input과 동일한
      스타일. 원래 이 클래스 정의가 이 페이지엔 없어서 브라우저 기본 숫자칸(굵은 회색 테두리)으로
@@ -531,9 +531,9 @@
        뜨는 기능은 브라우저 자체 기능만으로는 만들 방법이 없어서 이 버튼 하나를 위해 예외적으로 씀
        (인터넷 연결이 없으면 이 버튼만 안 되고, 나머지 화면은 평소처럼 그대로 동작함) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="config.js?v=1791479657"></script>
-  <script src="auth.js?v=1791479657"></script>
-  <script src="data.js?v=1791479657"></script>
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791480155"></script>
+  <script src="data.js?v=1791480155"></script>
   <script>
     // 로그인 안 되어 있으면 login.html로 이동
     requireLogin();
@@ -769,7 +769,7 @@
         try {
           staffAllCache = await fetchStaff();
           // 2026-10-08: 팀장 직급(관리자 권한 + job_title '팀장')도 성과 지표 대상에 포함 - 지점장만 제외
-          staffListCache = staffAllCache.filter(p => p.role === 'trainer' || isTeamLead(p));
+          staffListCache = staffAllCache.filter(p => isActiveStaff(p) && (p.role === 'trainer' || isTeamLead(p)));
         } catch (err) {
           staffAllCache = [];
           staffListCache = [];
@@ -797,6 +797,14 @@
         if (s.staff_id && managerIds.has(s.staff_id)) return; // 지점장 매출은 트레이너 성과 지표에서 제외
         const amt = Number(s.amount) || 0;
         let row = s.staff_id ? map.get(s.staff_id) : null;
+        if (!row && s.staff_id) {
+          // 퇴사 처리된 트레이너/팀장의 과거 매출은 "담당자 미지정"이 아니라 본인 이름으로 그대로 남겨둠(이번 달 평균 인원에는 안 들어감)
+          const gone = (staffAllCache || []).find(p => p.id === s.staff_id && !isActiveStaff(p) && (p.role === 'trainer' || isTeamLead(p)));
+          if (gone) {
+            row = { id: gone.id, name: gone.name, role: gone.role, title: '퇴사', ptAmount: 0, ptCount: 0, newCount: 0, renewalCount: 0, salesRows: [] };
+            map.set(gone.id, row);
+          }
+        }
         if (!row) {
           row = map.get('__unassigned__');
           if (!row) {

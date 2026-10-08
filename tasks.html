@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 업무 리스트</title>
-<link rel="stylesheet" href="style.css?v=1791479657" />
+<link rel="stylesheet" href="style.css?v=1791480155" />
 </head>
 <body>
   <div class="topbar">
@@ -148,9 +148,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791479657"></script>
-  <script src="auth.js?v=1791479657"></script>
-  <script src="data.js?v=1791479657"></script>
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791480155"></script>
+  <script src="data.js?v=1791480155"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -198,7 +198,7 @@
       if (currentUserRole === 'manager') {
         assigneeField.style.display = '';
         assigneeSel.disabled = false;
-        trainersCache.forEach(s => {
+        trainersCache.filter(s => isActiveStaff(s) || s.id === t.assignee_id).forEach(s => {
           const opt = document.createElement('option');
           opt.value = s.id; opt.textContent = `${s.name} (${roleLabelOf(s)})`;
           if (s.id === t.assignee_id) opt.selected = true;
@@ -272,7 +272,7 @@
     function populateAssigneeOptions(profile, staff) {
       const sel = document.getElementById('t_assignee');
       if (profile.role === 'manager') {
-        staff.forEach(s => {
+        staff.filter(isActiveStaff).forEach(s => {
           const opt = document.createElement('option');
           opt.value = s.id; opt.textContent = `${s.name} (${roleLabelOf(s)})`;
           if (s.id === profile.id) opt.selected = true;
@@ -318,7 +318,7 @@
       const counts = {};
       tasksCache.forEach(t => { counts[t.assignee_id] = (counts[t.assignee_id] || 0) + 1; });
       const tabs = [{ key: 'all', label: `전체 (${tasksCache.length})` }]
-        .concat(trainersCache.map(s => ({ key: s.id, label: `${s.name} (${counts[s.id] || 0})` })));
+        .concat(trainersCache.filter(isActiveStaff).map(s => ({ key: s.id, label: `${s.name} (${counts[s.id] || 0})` })));
       container.innerHTML = tabs.map(t =>
         `<button type="button" class="filter-tab${t.key === activeAssigneeFilter ? ' active' : ''}" data-key="${t.key}">${t.label}</button>`
       ).join('');

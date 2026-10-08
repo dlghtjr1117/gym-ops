@@ -141,12 +141,12 @@ async function getMyProfile() {
   const token = await getValidAccessToken();
   if (!token) return null;
 
-  // migration_77(job_title)을 아직 안 돌렸으면 첫 select가 400으로 실패하므로, 그땐 옛 컬럼만으로 다시 시도함
-  const selects = ['id,name,role,job_title', 'id,name,role'];
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // migration_77(job_title)/78(is_active)을 아직 안 돌렸으면 앞쪽 select가 400으로 실패하므로, 그땐 옛 컬럼만으로 다시 시도함
+  const selects = ['id,name,role,job_title,is_active', 'id,name,role,job_title', 'id,name,role'];
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=${selects[attempt === 0 ? 0 : 1]}`,
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=${selects[Math.min(attempt, selects.length - 1)]}`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -155,13 +155,20 @@ async function getMyProfile() {
         }
       );
       if (!res.ok) {
-        if (attempt < 2) { await new Promise(r => setTimeout(r, attempt === 0 ? 0 : 500)); continue; }
+        if (attempt < 3) { await new Promise(r => setTimeout(r, attempt < 2 ? 0 : 500)); continue; }
         return null;
       }
       const rows = await res.json();
+      // 삭제(퇴사 처리)된 직원이면 즉시 로그아웃 (migration_78)
+      if (rows[0] && rows[0].is_active === false) {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        alert('삭제된(퇴사 처리된) 계정입니다. 지점장에게 문의해주세요.');
+        location.href = 'login.html';
+        return null;
+      }
       return rows[0] || null;
     } catch (e) {
-      if (attempt < 2) { await new Promise(r => setTimeout(r, 500)); continue; }
+      if (attempt < 3) { await new Promise(r => setTimeout(r, 500)); continue; }
       return null;
     }
   }
