@@ -451,6 +451,7 @@
     let currentUserId = null;
     let isManagerFlag = false;
     let staffCache = [];
+    let staffLoaded = false; // 직원 목록 로딩이 끝났는지(성공/실패 무관) - 순위표에서 지점장/팀장을 가리려면 직원 직급을 알아야 해서 그때까지 순위표 그리기를 미룸
     let membersCache = [];
     let selectedTrainerId = null;
 
@@ -594,7 +595,12 @@
       const emptyBox = document.getElementById('leaderboardEmpty');
       // 매출 0인 트레이너도 "아직 0원"이라는 것 자체가 순위표의 의미라 숨기지 않고 다 보여줌 -
       // 다만 전원이 0원이면(이번 달 초처럼) 막대가 전부 폭 0%라 의미가 없어서 안내 문구로 대체함
-      const rows = (leaderboardCache || []).slice().sort((a, b) => Number(b.confirmed_total) - Number(a.confirmed_total));
+      if (!staffLoaded) return; // 직원 목록이 오면 다시 그려짐
+      // 2026-10-09: "지점장 라인은 매출에서 빼달라"는 요청 - 순위표에는 트레이너와 팀장만 나오고 지점장은 제외
+      // (지점장 본인의 기록은 PT 회원 관리 등 다른 화면에서 그대로 볼 수 있음)
+      const rows = (leaderboardCache || [])
+        .filter(r => r.trainer_role !== 'manager' || managerTitleOf(r.trainer_id) === '팀장')
+        .sort((a, b) => Number(b.confirmed_total) - Number(a.confirmed_total));
       if (rows.length === 0 || rows.every(r => Number(r.confirmed_total) <= 0)) {
         box.innerHTML = '';
         emptyBox.style.display = '';
@@ -614,7 +620,7 @@
           <span class="lb-main">
             <span class="lb-name-row">
               <span class="lb-name">${escapeHtml(r.trainer_name)}${r.trainer_role === 'manager' ? ` <span class="muted" style="font-weight:400;">(${managerTitleOf(r.trainer_id)})</span>` : ''}</span>
-              <span class="lb-amount">${formatWon(amount)}원</span>
+              <span class="lb-amount">${formatWon(amount)}</span>
             </span>
             <span class="lb-bar-track"><span class="lb-bar-fill" style="width:${pct}%;"></span></span>
           </span>
@@ -662,14 +668,14 @@
       const newAmount = newSales.reduce((s, x) => s + (Number(x.amount) || 0), 0);
       const renewalAmount = renewalSales.reduce((s, x) => s + (Number(x.amount) || 0), 0);
       const boxes = [
-        { icon: '💰', color: 'stat-blue', label: 'PT매출 합계', value: formatWon(row.ptAmount) + '원', sub: `${row.ptCount}건` },
-        { icon: '🎯', color: 'stat-purple', label: '목표', value: target != null ? formatWon(target) + '원' : '미설정', sub: '' },
+        { icon: '💰', color: 'stat-blue', label: 'PT매출 합계', value: formatWon(row.ptAmount), sub: `${row.ptCount}건` },
+        { icon: '🎯', color: 'stat-purple', label: '목표', value: target != null ? formatWon(target) : '미설정', sub: '' },
         { icon: '📈', color: 'stat-teal', label: '달성률', value: achievementPct != null ? `${achievementPct}%` : '-', sub: '', cls: achievementPct == null ? '' : (achieved ? 'is-good' : '') },
-        { icon: '⏳', color: 'stat-blue', label: '목표까지', value: target == null ? '-' : (achieved ? '달성' : formatWon(target - row.ptAmount) + '원'),
-          sub: target == null ? '목표 미설정' : (achieved ? `${formatWon(row.ptAmount - target)}원 초과` : '남음'),
+        { icon: '⏳', color: 'stat-blue', label: '목표까지', value: target == null ? '-' : (achieved ? '달성' : formatWon(target - row.ptAmount)),
+          sub: target == null ? '목표 미설정' : (achieved ? `${formatWon(row.ptAmount - target)} 초과` : '남음'),
           cls: target == null ? '' : (achieved ? 'is-good' : 'is-bad') },
-        { icon: '🆕', color: 'stat-purple', label: '신규', value: `${newSales.length}건`, sub: formatWon(newAmount) + '원' },
-        { icon: '🔁', color: 'stat-teal', label: '재등록', value: `${renewalSales.length}건`, sub: formatWon(renewalAmount) + '원' }
+        { icon: '🆕', color: 'stat-purple', label: '신규', value: `${newSales.length}건`, sub: formatWon(newAmount) },
+        { icon: '🔁', color: 'stat-teal', label: '재등록', value: `${renewalSales.length}건`, sub: formatWon(renewalAmount) }
       ];
       return boxes.map(b => `
         <div class="trainer-stat-box ${b.color} ${b.cls || ''}">
@@ -687,7 +693,7 @@
             <span class="src-name">${escapeHtml(b.source)}</span>
             <span class="src-pct">${b.count}건 · ${b.pct}%</span>
           </div>
-          <div class="src-amount">${formatWon(b.amount)}원</div>
+          <div class="src-amount">${formatWon(b.amount)}</div>
           <div class="src-bar-track"><div class="src-bar-fill" style="width:${b.pct}%; background:${trainerSourceColor(b.source)};"></div></div>
         </div>`).join('');
     }
@@ -710,9 +716,9 @@
       if (target == null) {
         cards.push({ cls: 'is-neutral', html: '이번 달 목표가 아직 설정되지 않았어요.' });
       } else if (row.ptAmount >= target) {
-        cards.push({ cls: '', html: `목표를 <b>${formatWon(row.ptAmount - target)}원</b> 초과 달성했습니다. (달성률 ${Math.round((row.ptAmount / target) * 1000) / 10}%)` });
+        cards.push({ cls: '', html: `목표를 <b>${formatWon(row.ptAmount - target)}</b> 초과 달성했습니다. (달성률 ${Math.round((row.ptAmount / target) * 1000) / 10}%)` });
       } else {
-        cards.push({ cls: 'is-warn', html: `목표까지 <b>${formatWon(target - row.ptAmount)}원</b> 남았습니다. (달성률 ${Math.round((row.ptAmount / target) * 1000) / 10}%)` });
+        cards.push({ cls: 'is-warn', html: `목표까지 <b>${formatWon(target - row.ptAmount)}</b> 남았습니다. (달성률 ${Math.round((row.ptAmount / target) * 1000) / 10}%)` });
       }
       if (row.ptCount > 0) {
         const newAmount = row.salesRows.filter(s => !isRenewalSale(s)).reduce((s, x) => s + (Number(x.amount) || 0), 0);
@@ -720,7 +726,7 @@
         const total = newAmount + renewalAmount;
         const newPct = total > 0 ? Math.round((newAmount / total) * 100) : 0;
         const renewalPct = total > 0 ? 100 - newPct : 0;
-        cards.push({ cls: 'is-neutral', html: `이번 달 매출 구성: 신규 <b>${formatWon(newAmount)}원</b>(${newPct}%) · 재등록 <b>${formatWon(renewalAmount)}원</b>(${renewalPct}%) · 총 ${row.ptCount}건` });
+        cards.push({ cls: 'is-neutral', html: `이번 달 매출 구성: 신규 <b>${formatWon(newAmount)}</b>(${newPct}%) · 재등록 <b>${formatWon(renewalAmount)}</b>(${renewalPct}%) · 총 ${row.ptCount}건` });
       }
       if (trendMonths && trendMonths.length >= 2) {
         const cur = trendMonths[trendMonths.length - 1];
@@ -729,9 +735,9 @@
           const delta = cur.amount - prev.amount;
           const deltaPct = Math.round((delta / prev.amount) * 1000) / 10;
           const sign = delta >= 0 ? '+' : '';
-          cards.push({ cls: delta >= 0 ? '' : 'is-warn', html: `전월(${prev.label}) 대비 <b>${sign}${formatWon(delta)}원</b>(${sign}${deltaPct}%)` });
+          cards.push({ cls: delta >= 0 ? '' : 'is-warn', html: `전월(${prev.label}) 대비 <b>${sign}${formatWon(delta)}</b>(${sign}${deltaPct}%)` });
         } else if (cur.amount > 0) {
-          cards.push({ cls: '', html: `전월(${prev.label})에는 PT매출이 없었는데, 이번 달 <b>${formatWon(cur.amount)}원</b>을 기록했어요.` });
+          cards.push({ cls: '', html: `전월(${prev.label})에는 PT매출이 없었는데, 이번 달 <b>${formatWon(cur.amount)}</b>을 기록했어요.` });
         }
       }
       return cards.map(c => `<div class="trainer-insight-card ${c.cls}">${c.html}</div>`).join('');
@@ -758,17 +764,17 @@
       const avgDelta = deltaN > 0 ? Math.round((deltaSum / deltaN) * 10) / 10 : null;
 
       const summaryHtml = `
-        <div class="tt-box"><div class="tt-label">마감 5개월 평균</div><div class="tt-value">${formatWon(Math.round(closedAvg))}원</div></div>
+        <div class="tt-box"><div class="tt-label">마감 5개월 평균</div><div class="tt-value">${formatWon(Math.round(closedAvg))}</div></div>
         <div class="tt-box"><div class="tt-label">평균 달성률</div><div class="tt-value">${avgAchievement != null ? avgAchievement + '%' : '-'}</div></div>
         <div class="tt-box"><div class="tt-label">평균 전월대비</div><div class="tt-value">${avgDelta != null ? (avgDelta >= 0 ? '+' : '') + avgDelta + '%' : '-'}</div></div>
-        <div class="tt-box"><div class="tt-label">6개월 합계</div><div class="tt-value">${formatWon(sixMonthTotal)}원</div></div>`;
+        <div class="tt-box"><div class="tt-label">6개월 합계</div><div class="tt-value">${formatWon(sixMonthTotal)}</div></div>`;
 
       const chartHtml = months.map((m, i) => {
         const heightPct = Math.max(4, Math.round((m.amount / maxAmount) * 100));
         const isCurrent = i === months.length - 1;
         return `
           <div class="trainer-trend-bar-col ${isCurrent ? 'is-current' : ''}">
-            <div class="tb-amount">${m.amount > 0 ? formatWon(m.amount) + '원' : '-'}</div>
+            <div class="tb-amount">${m.amount > 0 ? formatWon(m.amount) : '-'}</div>
             ${m.achievementPct != null ? `<div class="tb-pct">${m.achievementPct}%</div>` : ''}
             <div class="trainer-trend-bar" style="height:${heightPct}%;"></div>
             <div class="tb-month">${m.label}</div>
@@ -798,13 +804,13 @@
         const total = cells.reduce((a, b) => a + b, 0);
         return `<tr>
           <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${trainerSourceColor(src)};margin-right:6px;vertical-align:middle;"></span>${escapeHtml(src)}</td>
-          ${cells.map(c => `<td style="text-align:right;">${c > 0 ? formatWon(c) + '원' : '<span class="muted">-</span>'}</td>`).join('')}
-          <td style="text-align:right; font-weight:700;">${formatWon(total)}원</td>
+          ${cells.map(c => `<td style="text-align:right;">${c > 0 ? formatWon(c) : '<span class="muted">-</span>'}</td>`).join('')}
+          <td style="text-align:right; font-weight:700;">${formatWon(total)}</td>
         </tr>`;
       });
       const totalsByMonth = months.map((m, i) => monthBreakdowns[i].reduce((s, b) => s + b.amount, 0));
       const grandTotal = totalsByMonth.reduce((a, b) => a + b, 0);
-      rows.push(`<tr><td style="font-weight:700;">합계</td>${totalsByMonth.map(t => `<td style="text-align:right; font-weight:700;">${t > 0 ? formatWon(t) + '원' : '<span class="muted">-</span>'}</td>`).join('')}<td style="text-align:right; font-weight:700;">${formatWon(grandTotal)}원</td></tr>`);
+      rows.push(`<tr><td style="font-weight:700;">합계</td>${totalsByMonth.map(t => `<td style="text-align:right; font-weight:700;">${t > 0 ? formatWon(t) : '<span class="muted">-</span>'}</td>`).join('')}<td style="text-align:right; font-weight:700;">${formatWon(grandTotal)}</td></tr>`);
       return rows.join('');
     }
     let trainerMonthRankCache = null; // { monthStr, rows } - "핵심 인사이트"의 순위/비중 계산용 (열 때마다 다시 안 부르게 달 단위로 캐싱)
@@ -864,7 +870,7 @@
         const target = (targetsAll || []).find(t => t.period_type === 'monthly' && t.period_start === startStr);
         const targetAmount = target ? Number(target.target_amount) : null;
 
-        document.getElementById('trd_sub').textContent = `${monthLabel()} · PT매출 ${formatWon(row.ptAmount)}원 · ${row.ptCount}건`;
+        document.getElementById('trd_sub').textContent = `${monthLabel()} · PT매출 ${formatWon(row.ptAmount)} · ${row.ptCount}건`;
         const myRank = (rankRows || []).filter(r => r.pt_amount > 0).slice().sort((a, b) => b.pt_amount - a.pt_amount).findIndex(r => r.trainer_id === trainerId);
         const rankBadge = document.getElementById('trd_rankBadge');
         if (myRank >= 0) { rankBadge.style.display = ''; rankBadge.textContent = `🏆 ${myRank + 1}위`; }
@@ -891,7 +897,7 @@
               <td>${escapeHtml(s.member_name || '-')}</td>
               <td>${saleDisplayItemWithCategory({ category: s.category, memo: s.memo })}</td>
               <td>${s.payment_method ? escapeHtml(PAYMENT_METHOD_LABEL[s.payment_method] || s.payment_method) : '-'}</td>
-              <td style="text-align:right;">${formatWon(s.amount)}원</td>
+              <td style="text-align:right;">${formatWon(s.amount)}</td>
             </tr>`).join('');
         }
       } catch (err) {
@@ -1648,6 +1654,8 @@
       // 서로 무관한 두 요청이니 동시에 보냄 (하나씩 기다리면 그만큼 초기 로딩이 느려짐)
       const [staffResult, membersResult] = await Promise.allSettled([fetchStaff(), fetchMembers()]);
       staffCache = staffResult.status === 'fulfilled' ? staffResult.value : [];
+      staffLoaded = true;
+      renderLeaderboard();
       membersCache = membersResult.status === 'fulfilled' ? membersResult.value : [];
 
       if (isManagerFlag) {
