@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 계정 관리</title>
-<link rel="stylesheet" href="style.css?v=1791279332" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <style>
   /* 이 페이지 전용 - 비밀번호 칸을 점(dot)으로 가려서 보여줄 때 쓰는 스타일 */
   .pw-text { font-family: 'Courier New', monospace; letter-spacing: 1px; }
@@ -71,9 +71,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791279332"></script>
-  <script src="auth.js?v=1791279332"></script>
-  <script src="data.js?v=1791279332"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -220,7 +220,7 @@
       const profile = await getMyProfile();
       if (profile) {
         myId = profile.id;
-        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
         applyRoleNav(profile);
       }
       loadAccounts();

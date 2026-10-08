@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - OT 관리</title>
-<link rel="stylesheet" href="style.css?v=1791279332" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) - pt.html의 같은 관례 */
   .sheet-input {
@@ -345,9 +345,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791279332"></script>
-  <script src="auth.js?v=1791279332"></script>
-  <script src="data.js?v=1791279332"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -393,7 +393,7 @@
       return formatDateStr(d);
     }
     function staffName(id) { const s = staffCache.find(x => x.id === id); return s ? s.name : '-'; }
-    function staffRoleLabel(id) { const s = staffCache.find(x => x.id === id); return s && s.role === 'manager' ? '지점장' : '트레이너'; }
+    function staffRoleLabel(id) { const s = staffCache.find(x => x.id === id); return roleLabelOf(s); }
     function initials(name) { return (name || '-').slice(0, 2); }
 
     function shiftMonth(dir) {
@@ -609,7 +609,7 @@
               <div class="ot-avatar ${t.role === 'trainer' ? 'is-trainer' : ''}">${escapeHtml(initials(t.name))}</div>
               <div style="display:flex; flex-direction:column; gap:2px; text-align:left;">
                 <span style="font-size:15.5px; font-weight:800;">${escapeHtml(t.name)}</span>
-                <span class="badge ${t.role === 'manager' ? 'badge-blue' : 'badge-slate'}">${t.role === 'manager' ? '지점장' : '트레이너'}</span>
+                <span class="badge ${t.role === 'manager' ? 'badge-blue' : 'badge-slate'}">${roleLabelOf(t)}</span>
               </div>
             </div>
             ${s.noResponse > 0 ? `<span class="badge badge-red">미응답 ${s.noResponse}건</span>` : '<span class="muted" style="font-size:12px;">미응답 없음</span>'}
@@ -644,7 +644,7 @@
         const ot1 = rateInfo(s.ot1Rate), ot2 = rateInfo(s.ot2Rate);
         return `
         <tr>
-          <td style="font-weight:700;">${escapeHtml(t.name)} <span class="muted" style="font-weight:500; font-size:12px;">· ${t.role === 'manager' ? '지점장' : '트레이너'}</span></td>
+          <td style="font-weight:700;">${escapeHtml(t.name)} <span class="muted" style="font-weight:500; font-size:12px;">· ${roleLabelOf(t)}</span></td>
           <td style="text-align:right;">${s.ot1Total}건</td>
           <td style="text-align:right;">${s.ot1Done}건</td>
           <td style="text-align:right;"><span class="badge ${ot1.cls}">${ot1.label}</span></td>
@@ -988,7 +988,7 @@
     (async () => {
       const profile = await getMyProfile();
       if (!profile) return;
-      document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+      document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
       applyRoleNav(profile);
       currentUserId = profile.id;
       isManagerFlag = profile.role === 'manager';

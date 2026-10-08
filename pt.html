@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1791439714" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -441,9 +441,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791439714"></script>
-  <script src="auth.js?v=1791439714"></script>
-  <script src="data.js?v=1791439714"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -613,7 +613,7 @@
           <span class="lb-avatar">${escapeHtml(initials(r.trainer_name))}</span>
           <span class="lb-main">
             <span class="lb-name-row">
-              <span class="lb-name">${escapeHtml(r.trainer_name)}${r.trainer_role === 'manager' ? ' <span class="muted" style="font-weight:400;">(지점장)</span>' : ''}</span>
+              <span class="lb-name">${escapeHtml(r.trainer_name)}${r.trainer_role === 'manager' ? ` <span class="muted" style="font-weight:400;">(${managerTitleOf(r.trainer_id)})</span>` : ''}</span>
               <span class="lb-amount">${formatWon(amount)}원</span>
             </span>
             <span class="lb-bar-track"><span class="lb-bar-fill" style="width:${pct}%;"></span></span>
@@ -814,13 +814,15 @@
       trainerMonthRankCache = { monthStr, rows };
       return rows;
     }
+    // 관리자 권한자의 직급 문구(지점장/팀장) - job_title은 staffCache(fetchStaff)에 들어 있음
+    function managerTitleOf(id) { return roleLabelOf((staffCache || []).find(s => s.id === id) || { role: 'manager' }); }
     async function openTrainerRevenueDetail(trainerId) {
       const lb = (leaderboardCache || []).find(x => x.trainer_id === trainerId);
       const trainerName = lb ? lb.trainer_name : staffName(trainerId);
       const trainerRole = lb ? lb.trainer_role : (staffCache.find(s => s.id === trainerId) || {}).role;
       const { start: monthStart, startStr, endStr, monthStr } = getMonthRange();
 
-      document.getElementById('trd_name').textContent = `${trainerName}${trainerRole === 'manager' ? ' (지점장)' : ''}`;
+      document.getElementById('trd_name').textContent = `${trainerName}${trainerRole === 'manager' ? ` (${managerTitleOf(trainerId)})` : ''}`;
       document.getElementById('trd_sub').textContent = '불러오는 중...';
       document.getElementById('trd_rankBadge').style.display = 'none';
       document.getElementById('trd_sourceMonthLabel').textContent = `(${monthLabel()})`;
@@ -1638,7 +1640,7 @@
     (async () => {
       const profile = await getMyProfile();
       if (!profile) return;
-      document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+      document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
       applyRoleNav(profile);
       currentUserId = profile.id;
       isManagerFlag = profile.role === 'manager';
@@ -1653,7 +1655,7 @@
         const trainers = staffCache.filter(s => s.role === 'trainer').concat(staffCache.filter(s => s.role === 'manager'));
         trainers.forEach(s => {
           const opt = document.createElement('option');
-          opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          opt.value = s.id; opt.textContent = `${s.name} (${roleLabelOf(s)})`;
           sel.appendChild(opt);
         });
         sel.style.display = '';

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 직원 관리</title>
-<link rel="stylesheet" href="style.css?v=1791279332" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <style>
   /* 이 페이지 전용 - 권한 드롭다운을 뱃지처럼 보이게 */
   .role-select {
@@ -18,6 +18,7 @@
      약해짐 - badge-blue와 같은 이유로 라이트 모드 때 값(진한 인디고)으로 고정해서, "지점장" 표시가
      다크 모드에서도 항상 또렷하게 보이도록 함 */
   .role-select.role-manager { background-color: #e0e7ff; color: #4338ca; }
+  .role-select.role-lead { background-color: #d1fae5; color: #047857; }
   .role-select.role-trainer { background-color: var(--slate-200); color: var(--slate-700); }
 </style>
 </head>
@@ -97,9 +98,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791279332"></script>
-  <script src="auth.js?v=1791279332"></script>
-  <script src="data.js?v=1791279332"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -112,6 +113,11 @@
       const d = new Date(s);
       return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
     }
+
+    // 직급 3가지: trainer(트레이너) / lead(팀장 - 관리자 권한 + job_title '팀장') / manager(지점장)
+    const KIND_LABEL = { trainer: '트레이너', lead: '팀장', manager: '지점장' };
+    function kindOf(p) { return p.role !== 'manager' ? 'trainer' : (p.job_title === '팀장' ? 'lead' : 'manager'); }
+    function roleClass(p) { return kindOf(p) === 'trainer' ? 'role-trainer' : (kindOf(p) === 'lead' ? 'role-lead' : 'role-manager'); }
 
     function renderStaffTable(list) {
       const tbody = document.querySelector('#staffTable tbody');
@@ -128,9 +134,10 @@
           <td>${p.phone ? escapeHtml(formatPhone(p.phone)) : '<span class="muted">-</span>'}</td>
           <td>${formatJoinDate(p.created_at)}</td>
           <td>
-            <select class="role-select ${p.role === 'manager' ? 'role-manager' : 'role-trainer'}" data-id="${p.id}" ${canEdit ? '' : 'disabled'}>
-              <option value="trainer" ${p.role === 'trainer' ? 'selected' : ''}>트레이너</option>
-              <option value="manager" ${p.role === 'manager' ? 'selected' : ''}>지점장</option>
+            <select class="role-select ${roleClass(p)}" data-id="${p.id}" ${canEdit ? '' : 'disabled'}>
+              <option value="trainer" ${kindOf(p) === 'trainer' ? 'selected' : ''}>트레이너</option>
+              <option value="lead" ${kindOf(p) === 'lead' ? 'selected' : ''}>팀장</option>
+              <option value="manager" ${kindOf(p) === 'manager' ? 'selected' : ''}>지점장</option>
             </select>
           </td>
         </tr>`;
@@ -140,20 +147,23 @@
         tbody.querySelectorAll('.role-select:not(:disabled)').forEach(sel => {
           sel.addEventListener('change', async () => {
             const id = sel.dataset.id;
-            const newRole = sel.value;
-            const roleLabel = newRole === 'manager' ? '지점장' : '트레이너';
-            if (!confirm(`이 직원을 ${roleLabel}(으)로 전환할까요?`)) {
-              sel.value = sel.value === 'manager' ? 'trainer' : 'manager'; // 취소하면 원래 값으로 되돌림
+            const newKind = sel.value;
+            const person = list.find(x => x.id === id);
+            const prevKind = person ? kindOf(person) : 'trainer';
+            const roleLabel = KIND_LABEL[newKind];
+            if (!confirm(`이 직원을 ${roleLabel}(으)로 전환할까요?${newKind === 'trainer' ? '' : '\n(관리자 권한이 부여돼요)'}`)) {
+              sel.value = prevKind; // 취소하면 원래 값으로 되돌림
               return;
             }
             sel.disabled = true;
             try {
-              await updateProfileRole(id, newRole);
-              sel.className = 'role-select ' + (newRole === 'manager' ? 'role-manager' : 'role-trainer');
-              showToast(`${roleLabel} 권한으로 변경되었습니다.`);
+              await updateProfileRole(id, newKind);
+              if (person) { person.role = newKind === 'trainer' ? 'trainer' : 'manager'; person.job_title = newKind === 'lead' ? '팀장' : null; }
+              sel.className = 'role-select ' + (person ? roleClass(person) : 'role-trainer');
+              showToast(`${roleLabel}(으)로 변경되었습니다.`);
             } catch (err) {
               alert(err.message);
-              sel.value = newRole === 'manager' ? 'trainer' : 'manager';
+              sel.value = prevKind;
             } finally {
               sel.disabled = false;
             }
@@ -265,7 +275,7 @@
       const profile = await getMyProfile();
       if (profile) {
         myId = profile.id;
-        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
         applyRoleNav(profile);
         if (profile.role === 'manager') {
           isManagerFlag = true;

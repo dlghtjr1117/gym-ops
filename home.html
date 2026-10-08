@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 홈</title>
-<link rel="stylesheet" href="style.css?v=1791279332" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -96,9 +96,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791279332"></script>
-  <script src="auth.js?v=1791279332"></script>
-  <script src="data.js?v=1791465318"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -109,7 +109,7 @@
         document.getElementById('roleBadge').textContent = '프로필을 불러오지 못했어요';
         return;
       }
-      const roleLabel = profile.role === 'manager' ? '지점장' : '트레이너';
+      const roleLabel = roleLabelOf(profile);
       document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;
       document.getElementById('homeGreeting').textContent = `안녕하세요, ${profile.name}님 👋`;
       applyRoleNav(profile);

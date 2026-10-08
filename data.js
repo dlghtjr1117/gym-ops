@@ -942,10 +942,17 @@ const EDITABLE_TASK_STATUSES = ['todo', 'in_progress', 'done'];
 
 // 업무 배정 대상 선택용: 트레이너뿐 아니라 지점장 본인도 자기 업무를 만들 수 있어야 하므로 전체 직원을 가져옴
 async function fetchStaff() {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role&order=name.asc`,
+  // job_title(팀장 직급, migration_77)이 아직 없는 DB에서도 앱 전체가 안 깨지게, 실패하면 옛 컬럼만으로 다시 불러옴
+  let res = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,job_title&order=name.asc`,
     { headers: await authHeaders() }
   );
+  if (!res.ok) {
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role&order=name.asc`,
+      { headers: await authHeaders() }
+    );
+  }
   if (!res.ok) await throwApiError(res, '직원 목록을 불러오지 못했습니다.');
   return res.json();
 }
@@ -1687,22 +1694,34 @@ async function movePtCareLogToNewTrainer(memberId, newTrainerId) {
 // ---- 직원(profiles) - 직원 관리 화면 ----
 // 지점장이면 RLS 덕분에 전체 직원이 조회되고, 트레이너면 본인 행만 조회됨
 async function fetchProfiles() {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,phone,created_at&order=created_at.asc`,
+  let res = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,job_title,phone,created_at&order=created_at.asc`,
     { headers: await authHeaders() }
   );
+  if (!res.ok) { // migration_77 전이면 job_title 없이 다시
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=id,name,role,phone,created_at&order=created_at.asc`,
+      { headers: await authHeaders() }
+    );
+  }
   if (!res.ok) await throwApiError(res, '직원 목록을 불러오지 못했습니다.');
   return res.json();
 }
 
-// 직원 권한(트레이너 <-> 지점장) 변경. RLS 정책상 지점장만 성공함 (migration_25 필요)
-async function updateProfileRole(id, role) {
+// 직원 직급 변경: 'trainer'(트레이너) / 'lead'(팀장 = 관리자 권한 + 직급 팀장) / 'manager'(지점장).
+// RLS 정책상 지점장만 성공함 (migration_25 필요). 팀장 직급 저장은 migration_77 필요.
+async function updateProfileRole(id, kind) {
+  const role = kind === 'trainer' ? 'trainer' : 'manager';
+  const body = { role, job_title: kind === 'lead' ? '팀장' : null };
   const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
-    body: JSON.stringify({ role })
+    body: JSON.stringify(body)
   });
-  if (!res.ok) await throwApiError(res, '권한 변경에 실패했습니다.');
+  if (!res.ok) {
+    if (kind === 'lead' || res.status === 400) throw new Error('팀장 직급을 저장하지 못했어요. Supabase에서 migration_77_profile_job_title.sql을 먼저 실행해주세요.');
+    await throwApiError(res, '권한 변경에 실패했습니다.');
+  }
 }
 
 // ---- 통화 자동 기록 연동 (call_webhook_tokens / call_events) - migration_72 필요 ----

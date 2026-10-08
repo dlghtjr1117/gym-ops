@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 매출 입력</title>
-<link rel="stylesheet" href="style.css?v=1791279332" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 바디코디 판매내역 업로드 - group-pt.html의 방문기록 업로드 박스와 같은 관례 */
@@ -192,9 +192,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791279332"></script>
-  <script src="auth.js?v=1791279332"></script>
-  <script src="data.js?v=1791279332"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -342,7 +342,7 @@
         staff.forEach(s => {
           const opt = document.createElement('option');
           opt.value = s.id;
-          opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          opt.textContent = `${s.name} (${roleLabelOf(s)})`;
           if (s.id === currentUserId) opt.selected = true;
           sel.appendChild(opt);
         });
@@ -580,7 +580,7 @@
     (async () => {
       const profile = await getMyProfile();
       if (profile) {
-        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
         applyRoleNav(profile);
         currentUserId = profile.id;
         if (profile.role === 'manager') {

@@ -128,16 +128,25 @@ function requireLogin() {
 //    잠깐 쉬었다가 한 번 더 시도해봄 — 이러면 사용자가 직접 새로고침 안 해도 저절로 뜨는 경우가 많아짐.
 // 그래도 안 되면 예외를 던지지 않고 null을 돌려줘서, 각 페이지가 이미 갖고 있는
 // "if (!profile) { ... }" 처리로 자연스럽게(멈추지 않고) 넘어가도록 함.
+// 직급 표시 문구: 권한이 manager여도 job_title이 '팀장'이면 팀장, 아니면 지점장. (migration_77 - 컬럼이 아직 없어도 동작)
+function roleLabelOf(p) {
+  if (!p) return '트레이너';
+  if (p.role === 'manager') return p.job_title === '팀장' ? '팀장' : '지점장';
+  return '트레이너';
+}
+
 async function getMyProfile() {
   const session = getSession();
   if (!session) return null;
   const token = await getValidAccessToken();
   if (!token) return null;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // migration_77(job_title)을 아직 안 돌렸으면 첫 select가 400으로 실패하므로, 그땐 옛 컬럼만으로 다시 시도함
+  const selects = ['id,name,role,job_title', 'id,name,role'];
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=id,name,role`,
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=${selects[attempt === 0 ? 0 : 1]}`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -146,13 +155,13 @@ async function getMyProfile() {
         }
       );
       if (!res.ok) {
-        if (attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue; }
+        if (attempt < 2) { await new Promise(r => setTimeout(r, attempt === 0 ? 0 : 500)); continue; }
         return null;
       }
       const rows = await res.json();
       return rows[0] || null;
     } catch (e) {
-      if (attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue; }
+      if (attempt < 2) { await new Promise(r => setTimeout(r, 500)); continue; }
       return null;
     }
   }

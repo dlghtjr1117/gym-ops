@@ -1430,6 +1430,14 @@ v2에서 "확인 대기 중"으로 남겨뒀던 영업지원금/매출커미션 
 - 테이블 `center_rules`, 데이터 함수 `fetchCenterRules/addCenterRule/updateCenterRule/deleteCenterRule`(data.js). 마이그레이션이 비어 있을 때만 2건(실제 규정 1 + "[예시 - 수정해서 사용]" 환불 절차 1)을 시드.
 - 모든 페이지 상단 메뉴(업무 리스트 다음)와 홈 타일에 "센터 규정" 링크 추가.
 
+## 직급 "팀장" 추가 + 성과 지표에 팀장 포함 (2026-10-08) - `migration_77_profile_job_title.sql`
+
+- 배경: 대시보드 "트레이너 성과 지표"는 지점장(role='manager') 매출을 통째로 제외하는데, 이동혁(권한은 지점장, 직급은 팀장)의 매출까지 같이 빠져서 표가 전부 0원으로 나왔음.
+- 권한(role)은 그대로 trainer/manager 두 가지(RLS `is_manager()` 불변). `profiles.job_title`('팀장' 또는 null)만 추가 - 관리자 중 팀장을 구분. 직원 관리 화면 드롭다운이 트레이너 / 팀장 / 지점장 3개이고 팀장 = role manager + job_title 팀장(`updateProfileRole(id, 'trainer'|'lead'|'manager')`).
+- 대시보드 성과 지표: 트레이너 + 팀장 포함, 지점장은 계속 제외. 표에서 이름 옆에 "팀장" 표시.
+- `roleLabelOf(profile)`(auth.js): 로그인 뱃지·담당자 드롭다운 등 모든 직급 문구를 이걸로 통일 (지점장/팀장/트레이너). `fetchStaff/fetchProfiles/getMyProfile`은 job_title 컬럼이 아직 없어도(migration_77 전) 옛 컬럼으로 재시도해서 앱이 안 깨짐.
+- 급여 관리(payroll.html)는 아직 role==='trainer'만 대상 - 팀장 급여는 따로 요청 시 작업.
+
 ## 아직 안 만든 것 / 예정
 
 - 데이터 백업 자동화 — 현재는 홈 화면에서 수동으로 버튼을 눌러 엑셀 백업. 데이터가 많아지면 주기적 자동 백업으로 발전시킬 예정 (사용자가 원할 때)

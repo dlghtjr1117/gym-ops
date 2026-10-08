@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 스케줄</title>
-<link rel="stylesheet" href="style.css?v=1791279332" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <style>
   .sg-wrap { overflow-x: auto; margin-top: 14px; border-radius: 10px; }
   .sg-grid {
@@ -146,9 +146,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791279332"></script>
-  <script src="auth.js?v=1791279332"></script>
-  <script src="data.js?v=1791279332"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -297,7 +297,7 @@
       // (지금 보고 있는 스케줄의 트레이너와 회원의 실제 담당 트레이너가 다를 수도 있어서 그 경우 안내 문구를 같이 보여줌)
       const trainer = staffCache.find(s => s.id === m.assigned_trainer_id);
       const trainerHtml = trainer
-        ? `${trainer.role === 'manager' ? '지점장' : '트레이너'} ${trainer.name}`
+        ? `${roleLabelOf(trainer)} ${trainer.name}`
         : '담당 트레이너 미지정';
       const mismatchNote = (m.assigned_trainer_id && m.assigned_trainer_id !== selectedTrainerId)
         ? `<div class="muted" style="font-size:11.5px; margin-top:3px;">⚠️ 지금 보고 있는 ${staffName(selectedTrainerId)} 트레이너의 스케줄과 담당자가 달라요</div>`
@@ -464,7 +464,7 @@
     (async () => {
       const profile = await getMyProfile();
       if (!profile) return;
-      document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+      document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
       applyRoleNav(profile);
       currentUserId = profile.id;
       currentUserRole = profile.role;
@@ -480,7 +480,7 @@
         const trainers = staffCache.filter(s => s.role === 'trainer').concat(staffCache.filter(s => s.role === 'manager'));
         trainers.forEach(s => {
           const opt = document.createElement('option');
-          opt.value = s.id; opt.textContent = `${s.name} (${s.role === 'manager' ? '지점장' : '트레이너'})`;
+          opt.value = s.id; opt.textContent = `${s.name} (${roleLabelOf(s)})`;
           sel.appendChild(opt);
         });
         sel.style.display = '';

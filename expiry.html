@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 만료회원 · TM 관리</title>
-<link rel="stylesheet" href="style.css?v=1791439456" />
+<link rel="stylesheet" href="style.css?v=1791479657" />
 <style>
   /* 이 페이지 전용 - 특이사항(메모) 칸: 엑셀 시트처럼 바로 타이핑해서 저장 (pt.html의
      .sheet-input과 같은 관례) */
@@ -133,9 +133,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791439456"></script>
-  <script src="auth.js?v=1791439456"></script>
-  <script src="data.js?v=1791439456"></script>
+  <script src="config.js?v=1791479657"></script>
+  <script src="auth.js?v=1791479657"></script>
+  <script src="data.js?v=1791479657"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -538,7 +538,7 @@
     (async () => {
       const profile = await getMyProfile();
       if (profile) {
-        document.getElementById('roleBadge').textContent = `${profile.role === 'manager' ? '지점장' : '트레이너'} · ${profile.name}`;
+        document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
         applyRoleNav(profile);
         currentUserId = profile.id;
       }
