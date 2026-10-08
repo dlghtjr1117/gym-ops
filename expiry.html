@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 만료회원 · TM 관리</title>
-<link rel="stylesheet" href="style.css?v=1791283205" />
+<link rel="stylesheet" href="style.css?v=1791439456" />
 <style>
   /* 이 페이지 전용 - 특이사항(메모) 칸: 엑셀 시트처럼 바로 타이핑해서 저장 (pt.html의
      .sheet-input과 같은 관례) */
@@ -132,9 +132,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791283205"></script>
-  <script src="auth.js?v=1791283205"></script>
-  <script src="data.js?v=1791283205"></script>
+  <script src="config.js?v=1791439456"></script>
+  <script src="auth.js?v=1791439456"></script>
+  <script src="data.js?v=1791439456"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -198,9 +198,15 @@
       const newStatus = selectEl.value;
       selectEl.disabled = true;
       try {
+        // 방금 메모를 입력하고 바로 상태를 바꾼 경우, 메모 저장이 끝난 뒤에 이어서 처리 (순서가 뒤섞이지 않게)
+        if (pendingMemoSave) { try { await pendingMemoSave; } catch (e) { /* 메모 저장 실패는 그쪽에서 안내함 */ } }
+        // 상태를 바꾸면 새 연락 기록이 생기는데, 메모도 같이 따라가야 해서 지금 화면에 적힌 메모를 그대로 옮겨 저장
+        const memoInput = Array.from(document.querySelectorAll('.tm-memo-input'))
+          .find(el => el.dataset.memberId === memberId && el.dataset.category === category);
+        const carriedMemo = memoInput ? memoInput.value.trim() : '';
         await addTmLog({
           member_id: memberId, staff_id: currentUserId, status: newStatus, category: category,
-          contact_date: TODAY, memo: null
+          contact_date: TODAY, memo: carriedMemo || null
         });
         await loadExpiring();
         if (TM_ARCHIVE_STATUSES.includes(newStatus)) {
@@ -220,7 +226,7 @@
       try {
         await addTmLog({
           member_id: memberId, staff_id: currentUserId, status: 'in_progress', category: category,
-          contact_date: TODAY, memo: null
+          contact_date: TODAY, memo: (it.latestTm && it.latestTm.memo) || null
         });
         await loadExpiring();
         showToast('고민중으로 되돌렸어요.');
@@ -236,22 +242,42 @@
                 onblur="handleMemoChange(this)" onkeydown="if(event.key==='Enter'){this.blur();}" />`;
     }
 
-    async function handleMemoChange(inputEl) {
+    let pendingMemoSave = null;
+    function handleMemoChange(inputEl) {
+      pendingMemoSave = saveMemo(inputEl);
+      return pendingMemoSave;
+    }
+    async function saveMemo(inputEl) {
       const newValue = inputEl.value.trim();
       const original = inputEl.dataset.original || '';
       if (newValue === original) return;
       const tmId = inputEl.dataset.tmId;
+      const it = boardItems.find(x => x.member.id === inputEl.dataset.memberId && x.categoryKey === inputEl.dataset.category);
       inputEl.disabled = true;
       try {
         if (tmId) {
           await updateTmLog(tmId, { memo: newValue || null });
+          // 메모를 지우는 경우: 이전 기록에 남아 있던 같은 메모가 다시 나타나지 않게 함께 비움
+          if (!newValue) {
+            const others = ((it && it.latestTm && it.latestTm.memoIds) || []).filter(id => id !== tmId);
+            for (const id of others) await updateTmLog(id, { memo: null });
+            if (it && it.latestTm) it.latestTm.memoIds = [];
+          }
+          if (it && it.latestTm) it.latestTm.memo = newValue || null;
         } else {
-          await addTmLog({
+          const rows = await addTmLog({
             member_id: inputEl.dataset.memberId, staff_id: currentUserId, status: 'not_contacted',
             category: inputEl.dataset.category, contact_date: TODAY, memo: newValue || null
           });
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          if (row) {
+            inputEl.dataset.tmId = row.id;
+            if (it) it.latestTm = { ...row, memoIds: newValue ? [row.id] : [] };
+          }
         }
-        await loadExpiring();
+        // 표 전체를 다시 그리지 않고(옆 칸 상태 선택 중일 때 화면이 바뀌어버리는 걸 막기 위해) 이 칸만 갱신
+        inputEl.dataset.original = newValue;
+        inputEl.disabled = false;
       } catch (err) {
         alert(err.message);
         inputEl.disabled = false;

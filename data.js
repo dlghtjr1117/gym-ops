@@ -732,9 +732,19 @@ async function fetchExpiryBoard(daysAhead = 45) {
     if (!logsByMember.has(l.member_id)) logsByMember.set(l.member_id, []);
     logsByMember.get(l.member_id).push(l); // 이미 최신순
   }
+  // 가장 최근 기록을 돌려주되, 최근 기록에 메모가 비어 있으면 같은 회원+상품의 이전 기록 중 가장 최근 메모를 대신 보여줌
+  // (예전에는 상태를 바꿀 때 새 기록에 메모가 안 따라가서, 메모가 이전 기록에만 남아 있는 경우가 있었음)
   const latestFor = (memberId, catKey) => {
     const arr = logsByMember.get(memberId) || [];
-    return arr.find(l => l.category === catKey) || arr.find(l => !l.category) || null;
+    const latest = arr.find(l => l.category === catKey) || arr.find(l => !l.category) || null;
+    if (!latest) return null;
+    const sameScope = arr.filter(l => l.category === catKey || !l.category);
+    const memoIds = sameScope.filter(l => l.memo).map(l => l.id);
+    if (!latest.memo && memoIds.length) {
+      const src = sameScope.find(l => l.memo);
+      return { ...latest, memo: src.memo, memoIds };
+    }
+    return { ...latest, memoIds };
   };
   const labelFor = (m, cat) =>
     cat.key === 'membership' ? (m.membership_type || cat.label) :
