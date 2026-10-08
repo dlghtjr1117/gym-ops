@@ -1933,6 +1933,39 @@ async function fetchSmsMessages(campaignId) {
   return res.json();
 }
 
+// ---- 센터 규정 · 업무 매뉴얼 (rules.html, migration_76) ----
+async function fetchCenterRules() {
+  const { rows, error } = await fetchAllRows(
+    'center_rules?select=*,editor:updated_by(name)&order=created_at.asc,id.asc', await authHeaders()
+  );
+  if (error) await throwApiError(error, '센터 규정을 불러오지 못했습니다.');
+  return rows;
+}
+async function addCenterRule(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/center_rules`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) await throwApiError(res, '규정 추가에 실패했습니다.');
+  return res.json();
+}
+async function updateCenterRule(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/center_rules?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() })
+  });
+  if (!res.ok) await throwApiError(res, '규정 수정에 실패했습니다.');
+  return res.json();
+}
+async function deleteCenterRule(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/center_rules?id=eq.${id}`, {
+    method: 'DELETE', headers: await authHeaders()
+  });
+  if (!res.ok) await throwApiError(res, '규정 삭제에 실패했습니다.');
+}
+
 // ---- 광고 성과 관리 (marketing.html) - 캠페인(ad_campaigns) + 일별 기록(ad_campaign_logs) ----
 async function fetchAdCampaigns() {
   const res = await fetch(
