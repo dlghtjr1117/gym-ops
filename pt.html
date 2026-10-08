@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - PT 관리</title>
-<link rel="stylesheet" href="style.css?v=1791180016" />
+<link rel="stylesheet" href="style.css?v=1791439714" />
 <style>
   /* 이 페이지 전용 - 인라인 수정 가능한 셀(엑셀 시트처럼 바로 타이핑해서 저장) */
   .sheet-input {
@@ -304,9 +304,9 @@
         <div style="overflow-x:auto;">
           <table id="careTable" class="table-fixed sheet-table" style="min-width:1320px;">
             <thead><tr>
-              <th style="width:13%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
+              <th style="width:6%;"></th><th style="width:13%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
               <th style="width:15%;">수업방향</th><th style="width:11%; word-break:keep-all;">3회차 이내 세일즈 여부</th><th style="width:16%;">장기적 플랜(관리 방향)</th>
-              <th style="width:8%;">재등록예상횟수</th><th style="width:9%;">예상매출</th><th style="width:8%;">재등록확률</th><th style="width:6%;"></th>
+              <th style="width:8%;">재등록예상횟수</th><th style="width:9%;">예상매출</th><th style="width:8%;">재등록확률</th>
             </tr></thead>
             <tbody><tr><td colspan="10" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
           </table>
@@ -440,9 +440,9 @@
     </div>
   </div>
 
-  <script src="config.js?v=1791180016"></script>
-  <script src="auth.js?v=1791180016"></script>
-  <script src="data.js?v=1791180016"></script>
+  <script src="config.js?v=1791439714"></script>
+  <script src="auth.js?v=1791439714"></script>
+  <script src="data.js?v=1791439714"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -1383,6 +1383,7 @@
           : `<div style="margin-top:2px;"><button type="button" class="btn-link" style="font-size:10.5px;" onclick="openCareLinkModal('${m.id}')">회원 연결</button></div>`;
         return `
         <tr class="row-care-${careProbVal}">
+          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteCareLog('${m.id}')">삭제</button></td>
           <td><input class="sheet-input" type="month" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" /></td>
           <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
           <td style="text-align:center;">${remainingHtml}${linkHtml}</td>
@@ -1392,7 +1393,6 @@
           <td><input class="sheet-input" type="number" min="0" value="${m.pt_expected_sessions != null ? m.pt_expected_sessions : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_sessions',true)" placeholder="예상횟수" /></td>
           <td><input class="sheet-input money-input" type="text" inputmode="numeric" value="${m.pt_expected_amount != null ? Number(m.pt_expected_amount).toLocaleString('ko-KR') : ''}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_amount',true)" placeholder="예상매출" /></td>
           <td><select class="sheet-input badge ${CARE_PROB_BADGE[careProbVal] || ''}" data-member-id="${m.id}" onchange="handleCareProbSave(this)">${probOptions}</select></td>
-          <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteCareLog('${m.id}')">삭제</button></td>
         </tr>`;
       }).join('');
     }
