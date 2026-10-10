@@ -554,14 +554,18 @@
     //    (재등록예상시기 월은 따지지 않음 - 10월 시트에 50%로 적어두면 10월 주차별 기록에 잡힘.
     //     2026-10-10 수정: 처음엔 재등록예상시기 월 기준이라 "예상시기를 11월로 해둔 10월 시트 회원"이
     //     안 들어오는 문제가 있었음)
-    //    이월 · 미스 · 등록 · 확률 미설정은 제외 (이월은 다음 달 시트로 넘어가고, 등록은 이미 실제 매출 기록이 따로 있음)
+    //    등록 · 미스로 바뀐 기록도 그대로 남겨서 "예상으로 두었다가 등록됐는지 미스됐는지"를 이 표에서 계속 볼 수 있게 함
+    //    (2026-10-10 수정: 처음엔 등록/미스가 되면 행이 사라져서 결과를 확인할 수 없었음)
+    //    이월(다음 달 시트로 넘어감)과 확률 미설정은 제외
     //  - 주차: 재등록예상시기가 이 달일 때만 그 주차를 쓰고, 다른 달이거나 비어있으면 "미정"(맨 아래)
     //  - 이미 이 달 주차별 표에 같은 이름의 "재등록" 기록을 직접 적어둔 회원은 이중으로 안 잡히게 건너뜀
     function ptCareVirtualLeads() {
       const { monthStr, startStr, endStr } = getMonthRange();
       const out = [];
       careCache.forEach(m => {
-        if (m.renewal_stage !== 'in_progress' || m.pt_expected_probability == null) return;
+        const st = m.renewal_stage;
+        const isOpen = st === 'in_progress' && m.pt_expected_probability != null;
+        if (!isOpen && st !== 'registered' && st !== 'missed') return;
         const dup = leadsCache.some(l => l.source === '재등록' && l.name === m.name && isLeadInMonth(l, startStr, endStr));
         if (dup) return;
         const weekOk = m.pt_expected_renewal_month === monthStr && m.pt_expected_renewal_week != null;
@@ -569,7 +573,7 @@
           id: 'care:' + m.id, _virtual: true, _careId: m.id, _memberId: m.member_id || null,
           source: '재등록', name: m.name,
           expected_amount: m.pt_expected_amount, sessions: m.pt_expected_sessions,
-          stage: 'in_progress', probability: Number(m.pt_expected_probability),
+          stage: isOpen ? 'in_progress' : st, probability: isOpen ? Number(m.pt_expected_probability) : null,
           week_no: weekOk ? Number(m.pt_expected_renewal_week) : null,
           contact_date: null, ot_date: null, memo: null
         });
@@ -609,7 +613,8 @@
       const { startStr, endStr } = getMonthRange();
       const monthLeads = getMonthItems();
 
-      const registeredLeads = monthLeads.filter(l => l.stage === 'registered');
+      // 확정 매출 카드는 실제로 입력한 상담/매출 기록만 셈 (PT 회원 시트에서 자동 반영된 "등록" 행은 결과 확인용이라 제외)
+      const registeredLeads = monthLeads.filter(l => l.stage === 'registered' && !l._virtual);
       const confirmedTotal = registeredLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
       animateCount(document.getElementById('confirmedAmount'), confirmedTotal);
       document.getElementById('confirmedSub').textContent = `이번 달 PT 매출 ${registeredLeads.length}건`;
