@@ -566,7 +566,9 @@
         const st = m.renewal_stage;
         const isOpen = st === 'in_progress' && m.pt_expected_probability != null;
         if (!isOpen && st !== 'registered' && st !== 'missed') return;
-        const dup = leadsCache.some(l => l.source === '재등록' && l.name === m.name && isLeadInMonth(l, startStr, endStr));
+        // 이미 이 달 표에 같은 이름의 재등록 기록(등록 처리된 경우엔 유형 상관없이 등록 기록)이 직접 있으면 이중 집계 방지로 건너뜀
+        const dup = leadsCache.some(l => l.name === m.name && isLeadInMonth(l, startStr, endStr) &&
+          (l.source === '재등록' || (st === 'registered' && l.stage === 'registered')));
         if (dup) return;
         const weekOk = m.pt_expected_renewal_month === monthStr && m.pt_expected_renewal_week != null;
         out.push({
@@ -613,8 +615,9 @@
       const { startStr, endStr } = getMonthRange();
       const monthLeads = getMonthItems();
 
-      // 확정 매출 카드는 실제로 입력한 상담/매출 기록만 셈 (PT 회원 시트에서 자동 반영된 "등록" 행은 결과 확인용이라 제외)
-      const registeredLeads = monthLeads.filter(l => l.stage === 'registered' && !l._virtual);
+      // PT 회원 시트에서 "등록"으로 처리한 재등록(자동 반영 행)도 확정 매출에 포함 (2026-10-10 요청 - 등록으로 바꿨는데
+      // 위쪽 확정 매출/남은 매출이 안 바뀌던 문제). 순위표(migration_81)도 같은 기준으로 합산함
+      const registeredLeads = monthLeads.filter(l => l.stage === 'registered');
       const confirmedTotal = registeredLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
       animateCount(document.getElementById('confirmedAmount'), confirmedTotal);
       document.getElementById('confirmedSub').textContent = `이번 달 PT 매출 ${registeredLeads.length}건`;
@@ -1824,5 +1827,6 @@
       reloadAll();
     })();
   </script>
+  <div id="pageVersion" style="text-align:center; font-size:11px; color:#94a3b8; padding:14px 0 22px;">PT 관리 화면 버전: 2026-10-10 확정매출 반영판 (이 문구가 보이면 최신 파일이 올라간 거예요)</div>
 </body>
 </html>
