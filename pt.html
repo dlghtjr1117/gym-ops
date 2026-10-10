@@ -1407,6 +1407,8 @@
           member_id: m.member_id || null,
           name: m.name,
           pt_expected_renewal_month: m.pt_expected_renewal_month || null,
+          // 재등록 예상 주차도 전달에 적어둔 그대로 이어서 넘김 (주차를 안 적은 회원은 컬럼 없이 보내서 migration_80 전에도 안전)
+          ...(m.pt_expected_renewal_week != null ? { pt_expected_renewal_week: m.pt_expected_renewal_week } : {}),
           pt_remaining_sessions: m.pt_remaining_sessions != null ? m.pt_remaining_sessions : null,
           pt_session_focus: m.pt_session_focus || null,
           pt_short_term_plan: m.pt_short_term_plan || 'X',
