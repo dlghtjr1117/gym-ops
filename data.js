@@ -111,6 +111,17 @@ async function fetchAllRows(pathWithQuery, headers) {
   return { rows: all };
 }
 
+// 회원별 "PT 재등록" 매출 건수 {member_id: 건수} - PT 관리의 "재등록 N회" 표시용(2026-10-10).
+// 매출 입력에서 PT 재등록으로 기록된 건을 그대로 셈. (RLS상 트레이너 계정은 본인이 입력한 매출만 보이므로
+// 다른 선생님이 받은 재등록은 안 셀 수 있고, 지점장 계정은 전체가 보임)
+async function fetchPtRenewalCounts() {
+  const { rows, error } = await fetchAllRows('sales?select=member_id&category=eq.pt_renewal&member_id=not.is.null&order=id', await authHeaders());
+  if (error) await throwApiError(error, 'PT 재등록 횟수를 불러오지 못했습니다.');
+  const counts = {};
+  rows.forEach(r => { counts[r.member_id] = (counts[r.member_id] || 0) + 1; });
+  return counts;
+}
+
 // ---- 회원(members) ----
 async function fetchMembers() {
   const { rows, error } = await fetchAllRows('members?select=*,trainer:profiles(name)&order=created_at.desc', await authHeaders());

@@ -176,6 +176,7 @@
   .renewal-when { display: flex; gap: 4px; align-items: center; }
   .renewal-when input { flex: 1 1 auto; min-width: 0; }
   .renewal-when .renewal-week { flex: 0 0 66px; width: 66px; }
+  .renew-count { display: inline-block; margin-top: 2px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 800; color: #0f766e; background: #ccfbf1; white-space: nowrap; }
   .row-virtual td:first-child { box-shadow: inset 3px 0 0 #16a34a; }
 </style>
 </head>
@@ -450,7 +451,7 @@
 
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791480155"></script>
-  <script src="data.js?v=1791480155"></script>
+  <script src="data.js?v=1791560000"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -464,6 +465,7 @@
 
     let leadsCache = [];      // 선택된 트레이너의 pt_leads 전체 (월 필터는 화면에서)
     let careCache = [];       // 선택된 트레이너의 PT 케어 대상 회원 (보고 있는 달에 기록한 것만)
+    let renewalCounts = {};   // {member_id: PT 재등록 매출 건수} ("재등록 N회" 표시용)
     let allCareCache = [];    // 선택된 트레이너의 모든 달 PT 회원 기록 (재등록 예상시기가 이 달인 회원을 주차별 매출에 자동 반영할 때 씀)
     let targetsCache = [];
     let leaderboardCache = []; // 트레이너 매출 순위 - get_pt_trainer_leaderboard()가 돌려주는 트레이너별 합계(전원)
@@ -528,6 +530,21 @@
       return Math.min(5, Math.ceil(day / 7));
     }
 
+    // ---- "PT 재등록 N회" 표시 (2026-10-10) ----
+    // 지금까지 매출 입력에 PT 재등록으로 기록된 건수. 회원과 연결된 행은 그 회원 id로, 연결 안 된 행은
+    // 이름이 같은 회원이 딱 한 명일 때만 그 회원으로 찾음(동명이인이면 틀릴 수 있어서 표시하지 않음).
+    // 한 번도 재등록 안 한 회원(0회)은 표시하지 않음
+    function resolveMemberId(memberId, name) {
+      if (memberId) return memberId;
+      const same = membersCache.filter(m => m.name === name);
+      return same.length === 1 ? same[0].id : null;
+    }
+    function renewalBadgeHtml(memberId, name) {
+      const id = resolveMemberId(memberId, name);
+      const n = id ? (renewalCounts[id] || 0) : 0;
+      return n > 0 ? `<div class="renew-count" title="매출 입력에 PT 재등록으로 기록된 횟수예요">PT 재등록 ${n}회</div>` : '';
+    }
+
     // ---- PT 회원 관리 → 주차별 매출 기록 자동 반영 (2026-10-10) ----
     // 요청: "PT 회원시트에서 이월 처리된 회원 이외에, 확률(25/50/75%)이 잡힌 회원은 알아서 주차별 예상매출에
     // 들어가게" - 두 표를 일일이 따로 고치는 게 번거로워서, PT 회원 관리 표를 고치면 주차별 표/예상 매출
@@ -549,7 +566,7 @@
         if (dup) return;
         const weekOk = m.pt_expected_renewal_month === monthStr && m.pt_expected_renewal_week != null;
         out.push({
-          id: 'care:' + m.id, _virtual: true, _careId: m.id,
+          id: 'care:' + m.id, _virtual: true, _careId: m.id, _memberId: m.member_id || null,
           source: '재등록', name: m.name,
           expected_amount: m.pt_expected_amount, sessions: m.pt_expected_sessions,
           stage: 'in_progress', probability: Number(m.pt_expected_probability),
@@ -1263,7 +1280,7 @@
             <td><select class="sheet-input week-band" data-care-id="${l._careId}" onchange="handleVirtualWeekChange(this)">${weekOptions}</select></td>
             <td class="muted" style="font-size:12px;">${Number(getMonthRange().monthStr.slice(5, 7))}월 ${l.week_no != null ? l.week_no + '주차 ' : ''}예정</td>
             <td><span class="badge badge-green">재등록</span></td>
-            <td class="cell-1line" title="${escapeHtml(l.name || '')}">${escapeHtml(l.name || '')}</td>
+            <td title="${escapeHtml(l.name || '')}"><div class="cell-1line">${escapeHtml(l.name || '')}</div>${renewalBadgeHtml(l._memberId, l.name)}</td>
             <td>${l.expected_amount != null ? Number(l.expected_amount).toLocaleString('ko-KR') : '<span class="muted">-</span>'}</td>
             <td>${l.sessions != null ? l.sessions : '<span class="muted">-</span>'}</td>
             <td><select class="badge ${PROB_BADGE[val]} sheet-input" data-care-id="${l._careId}" onchange="handleVirtualProbChange(this)">${probOptions}</select></td>
@@ -1344,7 +1361,7 @@
             <td>${renderWeekSelect(l)}</td>
             <td><input class="sheet-input" type="date" value="${l.contact_date || ''}" data-lead-id="${l.id}" onchange="handleLeadDateChange(this)" /></td>
             <td>${renderSourceSelect(l)}</td>
-            <td><input class="sheet-input" type="text" value="${escapeHtml(l.name || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'name',false)" placeholder="이름" /></td>
+            <td><input class="sheet-input" type="text" value="${escapeHtml(l.name || '')}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'name',false)" placeholder="이름" />${renewalBadgeHtml(l.converted_member_id, l.name)}</td>
             <td><input class="sheet-input money-input" type="text" inputmode="numeric" value="${l.expected_amount != null ? Number(l.expected_amount).toLocaleString('ko-KR') : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'expected_amount',true)" placeholder="금액" /></td>
             <td><input class="sheet-input" type="number" min="0" value="${l.sessions != null ? l.sessions : ''}" data-lead-id="${l.id}" onchange="handleLeadFieldSave(this,'sessions',true)" placeholder="횟수" /></td>
             <td>${renderProbSelect(l)}</td>
@@ -1514,7 +1531,7 @@
             <input class="sheet-input" type="month" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" />
             <select class="sheet-input renewal-week" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_week',true)">${['<option value="">주차</option>'].concat([1, 2, 3, 4, 5].map(n => `<option value="${n}" ${Number(m.pt_expected_renewal_week) === n ? 'selected' : ''}>${n}주차</option>`)).join('')}</select>
           </div></td>
-          <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
+          <td title="${escapeHtml(m.name)}"><div class="cell-1line">${escapeHtml(m.name)}</div>${renewalBadgeHtml(m.member_id, m.name)}</td>
           <td style="text-align:center;">${remainingHtml}${linkHtml}</td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_session_focus || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_session_focus',false)" placeholder="수업방향" /></td>
           <td style="text-align:center;"><button type="button" class="toggle-ox ${shortVal === 'O' ? 'is-o' : 'is-x'}" data-member-id="${m.id}" data-value="${shortVal}" onclick="handleToggleShortTerm(this)">${shortVal}</button></td>
@@ -1741,9 +1758,10 @@
       // 4개 요청을 순서대로 하나씩 기다리면 화면이 뜨기까지 그만큼 느려지므로, 서로 의존관계가 없는
       // 요청들은 한꺼번에 보내고(Promise.allSettled) 결과만 각자 따로 처리함 (로딩 체감 속도 개선)
       const { monthStr } = getMonthRange();
-      const [leadsResult, careResult, targetsResult] = await Promise.allSettled([
-        fetchPtLeads(), fetchPtCareLogs(), fetchPtTargets()
+      const [leadsResult, careResult, targetsResult, renewalResult] = await Promise.allSettled([
+        fetchPtLeads(), fetchPtCareLogs(), fetchPtTargets(), fetchPtRenewalCounts()
       ]);
+      renewalCounts = renewalResult.status === 'fulfilled' ? renewalResult.value : {};
       if (leadsResult.status === 'fulfilled') {
         leadsCache = leadsResult.value.filter(l => l.trainer_id === selectedTrainerId);
       } else {
