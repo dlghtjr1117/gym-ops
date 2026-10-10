@@ -172,6 +172,11 @@
     .pt-2col { grid-template-columns: 1fr; }
   }
   .pt-2col-section { margin-top: 0; }
+  /* PT 회원 관리 재등록예상시기(월 + 주차)와, 주차별 매출 기록에 자동으로 들어온 재등록 예정 행 표시 */
+  .renewal-when { display: flex; gap: 4px; align-items: center; }
+  .renewal-when input { flex: 1 1 auto; min-width: 0; }
+  .renewal-when .renewal-week { flex: 0 0 66px; width: 66px; }
+  .row-virtual td:first-child { box-shadow: inset 3px 0 0 #16a34a; }
 </style>
 </head>
 <body>
@@ -305,9 +310,9 @@
         <div style="overflow-x:auto;">
           <table id="careTable" class="table-fixed sheet-table" style="min-width:1320px;">
             <thead><tr>
-              <th style="width:6%;"></th><th style="width:13%;">재등록예상시기</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
-              <th style="width:15%;">수업방향</th><th style="width:11%; word-break:keep-all;">3회차 이내 세일즈 여부</th><th style="width:16%;">장기적 플랜(관리 방향)</th>
-              <th style="width:8%;">재등록예상횟수</th><th style="width:9%;">예상매출</th><th style="width:8%;">재등록확률</th>
+              <th style="width:6%;"></th><th style="width:19%;">재등록예상시기 (월 · 주차)</th><th style="width:8%;">이름</th><th style="width:6%;">남은횟수</th>
+              <th style="width:11%;">수업방향</th><th style="width:10%; word-break:keep-all;">3회차 이내 세일즈 여부</th><th style="width:14%;">장기적 플랜(관리 방향)</th>
+              <th style="width:8%;">재등록예상횟수</th><th style="width:9%;">예상매출</th><th style="width:9%;">재등록확률</th>
             </tr></thead>
             <tbody><tr><td colspan="10" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
           </table>
@@ -335,7 +340,9 @@
         </div>
         <div class="form-grid">
           <div class="field"><label>이름 *</label><input type="text" id="cm_name" required /></div>
-          <div class="field"><label>재등록예상시기</label><input type="month" id="cm_renewal_month" /></div>
+          <div class="field"><label>재등록예상시기 (월 · 주차)</label>
+            <div style="display:flex; gap:6px;"><input type="month" id="cm_renewal_month" style="flex:1;" />
+            <select id="cm_renewal_week" style="width:92px;"><option value="">주차</option><option value="1">1주차</option><option value="2">2주차</option><option value="3">3주차</option><option value="4">4주차</option><option value="5">5주차</option></select></div></div>
           <div class="field"><label>남은횟수 <span id="cm_remainingHint" class="muted" style="display:none;">(연동된 회원이라 자동으로 채워져요)</span></label><input type="number" id="cm_remaining_sessions" min="0" placeholder="예: 5" /></div>
           <div class="field"><label>3회차 이내 세일즈 여부</label>
             <select id="cm_short_term_plan">
@@ -456,7 +463,8 @@
     let selectedTrainerId = null;
 
     let leadsCache = [];      // 선택된 트레이너의 pt_leads 전체 (월 필터는 화면에서)
-    let careCache = [];       // 선택된 트레이너의 PT 케어 대상 회원
+    let careCache = [];       // 선택된 트레이너의 PT 케어 대상 회원 (보고 있는 달에 기록한 것만)
+    let allCareCache = [];    // 선택된 트레이너의 모든 달 PT 회원 기록 (재등록 예상시기가 이 달인 회원을 주차별 매출에 자동 반영할 때 씀)
     let targetsCache = [];
     let leaderboardCache = []; // 트레이너 매출 순위 - get_pt_trainer_leaderboard()가 돌려주는 트레이너별 합계(전원)
 
@@ -520,6 +528,45 @@
       return Math.min(5, Math.ceil(day / 7));
     }
 
+    // ---- PT 회원 관리 → 주차별 매출 기록 자동 반영 (2026-10-10) ----
+    // 요청: "PT 회원시트에서 이월 처리된 회원 이외에, 확률(25/50/75%)이 잡힌 회원은 알아서 주차별 예상매출에
+    // 들어가게" - 두 표를 일일이 따로 고치는 게 번거로워서, PT 회원 관리 표를 고치면 주차별 표/예상 매출
+    // 카드/재등록 조사가 같이 바뀌도록 함. 별도 데이터를 새로 저장하지 않고 PT 회원 기록에서 매번 계산해서
+    // 만드는 "가상 행"이라서 두 곳이 어긋날 일이 없음.
+    //  - 대상: 재등록예상시기가 "지금 보는 달"이고, 확률이 25/50/75%로 잡힌 진행중 기록
+    //    (이월 · 등록 · 미스 · 확률 미설정은 제외 - 등록은 이미 실제 매출 기록이 따로 있으므로)
+    //  - 이미 이 달 주차별 표에 같은 이름의 "재등록" 기록을 직접 적어둔 회원은 이중으로 안 잡히게 건너뜀
+    function ptCareVirtualLeads() {
+      const { monthStr, startStr, endStr } = getMonthRange();
+      const out = [];
+      allCareCache.forEach(m => {
+        if (m.renewal_stage !== 'in_progress' || m.pt_expected_probability == null) return;
+        if (m.pt_expected_renewal_month !== monthStr) return;
+        const dup = leadsCache.some(l => l.source === '재등록' && l.name === m.name && isLeadInMonth(l, startStr, endStr));
+        if (dup) return;
+        out.push({
+          id: 'care:' + m.id, _virtual: true, _careId: m.id,
+          source: '재등록', name: m.name,
+          expected_amount: m.pt_expected_amount, sessions: m.pt_expected_sessions,
+          stage: 'in_progress', probability: Number(m.pt_expected_probability),
+          week_no: m.pt_expected_renewal_week != null ? Number(m.pt_expected_renewal_week) : null,
+          contact_date: null, ot_date: null, memo: null
+        });
+      });
+      return out;
+    }
+    // 이 달 주차별 매출 기록에 올라가는 전체 행 = 직접 적은 상담/매출 기록 + PT 회원 관리에서 자동으로 온 행
+    function getMonthItems() {
+      const { startStr, endStr } = getMonthRange();
+      return leadsCache.filter(l => isLeadInMonth(l, startStr, endStr)).concat(ptCareVirtualLeads());
+    }
+    // PT 회원 관리 칸을 고친 뒤, 거기서 파생되는 화면(주차별 표 · 카드 · 재등록 조사)을 같이 다시 그림
+    function refreshCareDerived() {
+      renderWeeklyTable();
+      loadAllMiniStats();
+      loadRevenueCards();
+    }
+
     function staffName(id) { const s = staffCache.find(x => x.id === id); return s ? s.name : '-'; }
 
     // ---- 트레이너/월 선택 ----
@@ -539,7 +586,7 @@
     // (별도 매출입력 페이지의 sales 기록과는 독립적 - 이 시트 자체가 트레이너의 실시간 현황판 역할)
     function loadRevenueCards() {
       const { startStr, endStr } = getMonthRange();
-      const monthLeads = leadsCache.filter(l => isLeadInMonth(l, startStr, endStr));
+      const monthLeads = getMonthItems();
 
       const registeredLeads = monthLeads.filter(l => l.stage === 'registered');
       const confirmedTotal = registeredLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
@@ -567,7 +614,8 @@
       const openLeads = monthLeads.filter(l => l.stage !== 'registered' && l.stage !== 'missed' && l.stage !== 'rolled_over');
       const expectedTotal = openLeads.reduce((sum, l) => sum + Number(l.expected_amount || 0), 0);
       animateCount(document.getElementById('expectedAmount'), Math.round(expectedTotal));
-      document.getElementById('expectedSub').textContent = `진행중인 상담 ${openLeads.length}건 기준`;
+      const virtualOpen = openLeads.filter(l => l._virtual).length;
+      document.getElementById('expectedSub').textContent = `진행중인 상담 ${openLeads.length}건 기준` + (virtualOpen > 0 ? ` (PT회원 재등록 예정 ${virtualOpen}건 포함)` : '');
     }
 
     // ---- 트레이너 매출 순위(리더보드) ----
@@ -1133,7 +1181,8 @@
       if (added > 0) {
         try {
           const all = await fetchPtCareLogs();
-          careCache = all.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr);
+          allCareCache = all.filter(m => m.trainer_id === selectedTrainerId);
+          careCache = allCareCache.filter(m => m.period_month === monthStr);
           renderCareTable();
         } catch (err) { /* 다음에 화면을 다시 열면 어차피 또 확인함 */ }
         showToast(`이전에 놓쳤던 ${added}명을 PT 회원 관리에 자동으로 채워 넣었어요.`);
@@ -1200,19 +1249,74 @@
       } catch (err) { alert(err.message); }
     }
 
+    // PT 회원 관리에서 자동으로 들어온 "재등록 예정" 행 - 금액/횟수/이름은 PT 회원 관리 표에서 고치고,
+    // 여기서는 주차와 확률만 바로 바꿀 수 있음(같은 PT 회원 기록에 저장되므로 두 표가 항상 같이 움직임)
+    function renderVirtualRenewalRow(l) {
+      const val = leadToProbValue(l);
+      const probOptions = PROB_SELECT_OPTIONS.map(o => `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`).join('');
+      const weekOptions = ['<option value="">미정</option>'].concat([1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === l.week_no ? 'selected' : ''}>${n}주차</option>`)).join('');
+      return `<tr class="row-prob-${val} row-virtual" title="PT 회원 관리에서 자동으로 들어온 재등록 예정 행이에요">
+            <td><select class="sheet-input week-band" data-care-id="${l._careId}" onchange="handleVirtualWeekChange(this)">${weekOptions}</select></td>
+            <td class="muted" style="font-size:12px;">${Number(getMonthRange().monthStr.slice(5, 7))}월 ${l.week_no != null ? l.week_no + '주차 ' : ''}예정</td>
+            <td><span class="badge badge-green">재등록</span></td>
+            <td class="cell-1line" title="${escapeHtml(l.name || '')}">${escapeHtml(l.name || '')}</td>
+            <td>${l.expected_amount != null ? Number(l.expected_amount).toLocaleString('ko-KR') : '<span class="muted">-</span>'}</td>
+            <td>${l.sessions != null ? l.sessions : '<span class="muted">-</span>'}</td>
+            <td><select class="badge ${PROB_BADGE[val]} sheet-input" data-care-id="${l._careId}" onchange="handleVirtualProbChange(this)">${probOptions}</select></td>
+            <td class="muted" style="font-size:12px;"><span title="금액·횟수는 오른쪽 PT 회원 관리 표에서 수정해주세요">🔗 PT 회원 시트 자동 반영</span></td>
+            <td></td>
+          </tr>`;
+    }
+    async function handleVirtualWeekChange(selectEl) {
+      const m = allCareCache.find(x => x.id === selectEl.dataset.careId);
+      if (!m) return;
+      const value = selectEl.value === '' ? null : Number(selectEl.value);
+      try {
+        await updatePtCareLog(m.id, { pt_expected_renewal_week: value });
+        m.pt_expected_renewal_week = value;
+        renderCareTable();
+        refreshCareDerived();
+      } catch (err) { alert(weekColumnHint(err)); }
+    }
+    async function handleVirtualProbChange(selectEl) {
+      const m = allCareCache.find(x => x.id === selectEl.dataset.careId);
+      if (!m) return;
+      const raw = selectEl.value;
+      const patch = raw.startsWith('p')
+        ? { renewal_stage: 'in_progress', pt_expected_probability: Number(raw.slice(1)) }
+        : { renewal_stage: raw };
+      selectEl.disabled = true;
+      try {
+        await updatePtCareLog(m.id, patch);
+        Object.assign(m, patch);
+        if (raw === 'rolled_over') await carryOverCareLogToNextMonth(m);
+        await reloadCareLogsOnly();
+      } catch (err) { alert(err.message); selectEl.disabled = false; }
+    }
+    // 주차 칸 저장 실패가 "컬럼이 없다"는 뜻이면(migration_80을 아직 안 돌린 경우) 안내 문구로 바꿔줌
+    function weekColumnHint(err) {
+      const msg = String(err && err.message || err);
+      return /pt_expected_renewal_week|column|schema/i.test(msg)
+        ? '주차 칸을 쓰려면 먼저 Supabase에서 migration_80_care_renewal_week.sql을 실행해주세요.'
+        : msg;
+    }
+
     function renderWeeklyTable() {
       const tbody = document.querySelector('#weeklyTable tbody');
       const { startStr, endStr } = getMonthRange();
       // 상담일(contact_date)이 이번 달인 리드뿐 아니라, 상담은 지난 달에 했어도 OT일(ot_date)이 이번 달로
       // 잡힌 리드도 이번 달 표에 같이 보여줌 (예: 8/31에 연락→9/2 OT 확정된 경우 9월 표에도 나오게)
-      const items = leadsCache
-        .filter(l => isLeadInMonth(l, startStr, endStr))
+      // 주차 미정(PT 회원 관리에서 주차를 아직 안 고른 재등록 예정)은 맨 아래로
+      const weekKey = (l) => (l._virtual && l.week_no == null) ? 9 : weekNoForMonth(l);
+      const items = getMonthItems()
         .slice()
         .sort((a, b) => {
-          const wa = weekNoForMonth(a);
-          const wb = weekNoForMonth(b);
+          const wa = weekKey(a);
+          const wb = weekKey(b);
           if (wa !== wb) return wa - wb;
-          return (a.contact_date < b.contact_date ? -1 : a.contact_date > b.contact_date ? 1 : 0);
+          if (!!a._virtual !== !!b._virtual) return a._virtual ? 1 : -1;
+          const da = a.contact_date || '9999', db = b.contact_date || '9999';
+          return da < db ? -1 : da > db ? 1 : 0;
         });
 
       const addRowHtml = '<tr class="add-row-trigger" onclick="handleQuickAddLead()"><td colspan="9">+ 추가하기</td></tr>';
@@ -1228,6 +1332,7 @@
       let total = 0;
       items.forEach(l => {
         total += Number(l.expected_amount || 0);
+        if (l._virtual) { html += renderVirtualRenewalRow(l); return; }
         html += `<tr class="row-prob-${leadToProbValue(l)}">
             <td>${renderWeekSelect(l)}</td>
             <td><input class="sheet-input" type="date" value="${l.contact_date || ''}" data-lead-id="${l.id}" onchange="handleLeadDateChange(this)" /></td>
@@ -1250,7 +1355,7 @@
     function loadConfirmMiniStats(sourceValue, idPrefix) {
       const { startStr, endStr } = getMonthRange();
       // 주차별 매출 기록 표와 동일한 기준: 상담일 또는 OT일이 이번 달이면 포함
-      const monthLeads = leadsCache.filter(l => isLeadInMonth(l, startStr, endStr));
+      const monthLeads = getMonthItems();
       const expected = monthLeads.filter(l => l.source === sourceValue);
       const confirmed = expected.filter(l => l.stage === 'registered');
       document.getElementById(idPrefix + 'ExpectedCount').textContent = expected.length;
@@ -1274,7 +1379,9 @@
         await updatePtCareLog(id, { [field]: value });
         const m = careCache.find(x => x.id === id);
         if (m) m[field] = value;
-      } catch (err) { alert(err.message); }
+        // 재등록 시기/주차/예상횟수/예상매출은 주차별 매출 기록에도 바로 반영돼야 함
+        if (['pt_expected_renewal_month', 'pt_expected_renewal_week', 'pt_expected_sessions', 'pt_expected_amount'].includes(field)) refreshCareDerived();
+      } catch (err) { alert(field === 'pt_expected_renewal_week' ? weekColumnHint(err) : err.message); }
     }
     // "YYYY-MM" 형식의 period_month를 한 달 뒤로
     function nextMonthStr(monthStr) {
@@ -1332,6 +1439,7 @@
         if (raw === 'rolled_over' && m) {
           await carryOverCareLogToNextMonth(m);
         }
+        refreshCareDerived();
       } catch (err) { alert(err.message); }
     }
     async function handleToggleShortTerm(btn) {
@@ -1393,7 +1501,10 @@
         return `
         <tr class="row-care-${careProbVal}">
           <td style="text-align:center;"><button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteCareLog('${m.id}')">삭제</button></td>
-          <td><input class="sheet-input" type="month" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" /></td>
+          <td><div class="renewal-when">
+            <input class="sheet-input" type="month" value="${escapeHtml(m.pt_expected_renewal_month || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_month',false)" />
+            <select class="sheet-input renewal-week" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_expected_renewal_week',true)">${['<option value="">주차</option>'].concat([1, 2, 3, 4, 5].map(n => `<option value="${n}" ${Number(m.pt_expected_renewal_week) === n ? 'selected' : ''}>${n}주차</option>`)).join('')}</select>
+          </div></td>
           <td class="cell-1line" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</td>
           <td style="text-align:center;">${remainingHtml}${linkHtml}</td>
           <td><input class="sheet-input" type="text" value="${escapeHtml(m.pt_session_focus || '')}" data-member-id="${m.id}" onchange="handleCareFieldSave(this,'pt_session_focus',false)" placeholder="수업방향" /></td>
@@ -1512,9 +1623,11 @@
       const { monthStr } = getMonthRange();
       try {
         const all = await fetchPtCareLogs();
-        careCache = all.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr);
-      } catch (err) { careCache = []; }
+        allCareCache = all.filter(m => m.trainer_id === selectedTrainerId);
+        careCache = allCareCache.filter(m => m.period_month === monthStr);
+      } catch (err) { allCareCache = []; careCache = []; }
       renderCareTable();
+      refreshCareDerived();
     }
 
     document.getElementById('addCareMemberForm').addEventListener('submit', async (e) => {
@@ -1534,6 +1647,7 @@
           member_id: document.getElementById('cm_member_id').value || null,
           name: document.getElementById('cm_name').value.trim(),
           pt_expected_renewal_month: document.getElementById('cm_renewal_month').value.trim() || null,
+          ...(document.getElementById('cm_renewal_week').value ? { pt_expected_renewal_week: Number(document.getElementById('cm_renewal_week').value) } : {}),
           pt_remaining_sessions: document.getElementById('cm_remaining_sessions').value ? Number(document.getElementById('cm_remaining_sessions').value) : null,
           pt_session_focus: document.getElementById('cm_session_focus').value.trim() || null,
           pt_short_term_plan: document.getElementById('cm_short_term_plan').value,
@@ -1546,7 +1660,7 @@
         await reloadCareLogsOnly();
         showToast('PT 회원 관리 목록에 추가되었습니다.');
       } catch (err) {
-        errorBox.textContent = err.message;
+        errorBox.textContent = document.getElementById('cm_renewal_week').value ? weekColumnHint(err) : err.message;
         errorBox.style.display = 'block';
       }
     });
@@ -1627,9 +1741,10 @@
         leadsCache = [];
         document.querySelector('#weeklyTable tbody').innerHTML = `<tr><td colspan="9" class="error-text" style="display:table-cell;">${leadsResult.reason.message}</td></tr>`;
       }
-      careCache = careResult.status === 'fulfilled'
-        ? careResult.value.filter(m => m.trainer_id === selectedTrainerId && m.period_month === monthStr)
+      allCareCache = careResult.status === 'fulfilled'
+        ? careResult.value.filter(m => m.trainer_id === selectedTrainerId)
         : [];
+      careCache = allCareCache.filter(m => m.period_month === monthStr);
       targetsCache = targetsResult.status === 'fulfilled' ? targetsResult.value : [];
 
       renderWeeklyTable();
