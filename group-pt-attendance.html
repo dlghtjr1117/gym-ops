@@ -48,6 +48,39 @@
   #qrCanvasWrap { width: 300px; height: 300px; }
   .qr-modal-footnote { margin-top: 24px; font-size: 13.5px; color: var(--slate-700); font-weight: 600; }
   .qr-modal-footsub { margin-top: 6px; font-size: 12px; color: var(--slate-500); }
+
+  /* 포인트 상점 관리 - 회원 휴대폰 화면 미리보기 */
+  .shop-admin-wrap { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 18px; }
+  .shop-admin-right { flex: 1 1 560px; min-width: 0; }
+  .shop-admin-right .badge { white-space: nowrap; }
+  .shop-admin-right .section:last-child { margin-bottom: 0; }
+  .pv-col { flex: 0 0 330px; position: sticky; top: 16px; }
+  .pv-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .pv-title .pv-draft { display: none; font-size: 11px; font-weight: 800; color: #c2410c; background: #fff7ed; border: 1px solid #fdba74; border-radius: 999px; padding: 2px 9px; }
+  .pv-phone { width: 330px; border-radius: 34px; border: 9px solid #1f2335; background: #fff; overflow: hidden; box-shadow: 0 20px 40px -20px rgba(15,17,35,.5); color: #16192E; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; }
+  .pv-screen { height: 560px; overflow-y: auto; padding-bottom: 16px; scrollbar-width: none; }
+  .pv-screen::-webkit-scrollbar { display: none; }
+  .pv-bar { display: flex; align-items: center; gap: 8px; padding: 14px 16px 6px; font-size: 13.5px; font-weight: 800; }
+  .pv-bar i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; background: #F6F7FB; display: flex; align-items: center; justify-content: center; }
+  .pv-bal { margin: 8px 16px 4px; padding: 16px; border-radius: 18px; color: #fff; background: linear-gradient(150deg, #2E2410 0%, #6B4B0F 55%, #F5A524 130%); }
+  .pv-bal .l { font-size: 10.5px; opacity: .8; font-weight: 700; }
+  .pv-bal .a { font-size: 25px; font-weight: 900; margin-top: 3px; }
+  .pv-bal .a span { font-size: 12px; opacity: .7; }
+  .pv-mycp { margin: 10px 16px 0; display: flex; justify-content: space-between; padding: 10px 13px; border-radius: 12px; border: 1.3px solid #F3CE8A; background: #FFF9EC; font-size: 11.5px; font-weight: 800; color: #7A4E0A; }
+  .pv-sec { margin: 16px 16px 8px; font-size: 12px; font-weight: 900; }
+  .pv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; }
+  .pv-item { border: 1.3px solid #E7E9F2; border-radius: 15px; padding: 11px 6px 10px; text-align: center; position: relative; }
+  .pv-item.cp { border-color: #F9A86A; background: #FFF8F1; }
+  .pv-item .tag { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); background: #F97316; color: #fff; font-size: 9px; font-weight: 900; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .pv-item .ic { width: 42px; height: 42px; margin: 0 auto 5px; border-radius: 13px; background: #F6F7FB; display: flex; align-items: center; justify-content: center; font-size: 21px; }
+  .pv-item .nm { font-size: 11px; font-weight: 800; min-height: 28px; display: flex; align-items: center; justify-content: center; line-height: 1.3; }
+  .pv-item .pr { font-size: 12px; font-weight: 900; color: #B4790C; margin: 3px 0 7px; }
+  .pv-item .pr.tbd { color: #9CA3AF; }
+  .pv-item .bt { border-radius: 8px; padding: 6px 0; font-size: 10.5px; font-weight: 800; background: #3D5FFF; color: #fff; }
+  .pv-item .bt.no { background: #F6F7FB; color: #9CA3AF; }
+  .pv-empty { margin: 8px 16px; text-align: center; font-size: 11.5px; color: #6B7280; padding: 14px 0; }
+  .pv-ctrl { margin-top: 10px; font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .pv-ctrl input { width: 80px; border: 1px solid var(--slate-300); border-radius: 8px; padding: 5px 8px; }
 </style>
 </head>
 <body>
@@ -140,23 +173,32 @@
       </table>
     </div>
 
-    <div class="section">
-      <h2>🛍️ 포인트 상점 관리</h2>
-      <p class="muted" style="margin:-6px 0 14px;font-size:13px;">회원 화면의 포인트 상점에 진열되는 상품이에요. 필요 포인트를 비워두면(미정) 회원에게는 "포인트 준비중"으로만 보이고 교환은 안 돼요. 입력·수정은 지점장만 할 수 있어요.</p>
-      <table class="table-fixed" style="max-width:720px;">
-        <thead><tr><th>상품</th><th style="width:30%;">필요 포인트</th><th style="width:18%;">진열</th></tr></thead>
-        <tbody id="shopItemBody"><tr><td colspan="3" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-      </table>
-    </div>
-
-    <div class="section">
-      <h2>🎫 쿠폰 사용 처리</h2>
-      <p class="muted" style="margin:-6px 0 14px;font-size:13px;">회원이 포인트로 교환한 쿠폰이에요. 회원이 쿠폰 화면(쿠폰번호)을 보여주면 이름·번호로 찾아서, <b>할인된 금액으로 결제한 뒤 "사용 처리"</b>를 눌러주세요. 한 번 처리하면 다시 쓸 수 없어요.</p>
-      <div style="margin-bottom:10px;"><input type="search" id="couponSearch" placeholder="회원 이름 · 쿠폰번호 검색" class="sheet-input" style="width:260px; border:1px solid var(--slate-300); border-radius:8px; padding:7px 10px;" /></div>
-      <table class="table-fixed">
-        <thead><tr><th style="width:15%;">회원명</th><th style="width:22%;">쿠폰</th><th style="width:12%;">쿠폰번호</th><th style="width:14%;">교환일</th><th style="width:14%;">유효기간</th><th>상태</th><th style="width:14%;"></th></tr></thead>
-        <tbody id="couponBody"><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
-      </table>
+    <div class="shop-admin-wrap">
+      <div class="pv-col">
+        <div class="pv-title"><span>📱 회원 화면 · 포인트 상점</span><span class="pv-draft" id="pvDraft">저장 전 미리보기</span></div>
+        <div class="pv-phone"><div class="pv-screen" id="pvScreen"></div></div>
+        <div class="pv-ctrl">예시 보유 포인트 <input type="number" min="0" id="pvPoints" value="1240" /> P <span>(버튼이 "교환하기"/"포인트 부족"으로 어떻게 보이는지 확인용)</span></div>
+      </div>
+      <div class="shop-admin-right">
+        <div class="section">
+          <h2>🛍️ 상점 상품 관리</h2>
+          <p class="muted" style="margin:-6px 0 14px;font-size:13px;">회원 화면의 포인트 상점에 진열되는 상품이에요. 필요 포인트를 비워두면(미정) 회원에게는 "포인트 준비중"으로만 보이고 교환은 안 돼요. 입력·수정은 지점장만 할 수 있어요.</p>
+          <table class="table-fixed">
+            <thead><tr><th>상품</th><th style="width:30%;">필요 포인트</th><th style="width:26%;">진열</th></tr></thead>
+            <tbody id="shopItemBody"><tr><td colspan="3" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+          </table>
+          <p class="muted" style="margin:10px 0 0;font-size:12.5px;">👉 "진열" 체크를 켜고 끄면 왼쪽 휴대폰 화면에 바로 반영돼요. 포인트 칸에 숫자를 적으면 저장하기 전에도 미리 어떻게 보일지 확인할 수 있어요.</p>
+        </div>
+      <div class="section">
+        <h2>🎫 쿠폰 사용 처리</h2>
+        <p class="muted" style="margin:-6px 0 14px;font-size:13px;">회원이 포인트로 교환한 쿠폰이에요. 회원이 쿠폰 화면(쿠폰번호)을 보여주면 이름·번호로 찾아서, <b>할인된 금액으로 결제한 뒤 "사용 처리"</b>를 눌러주세요. 한 번 처리하면 다시 쓸 수 없어요.</p>
+        <div style="margin-bottom:10px;"><input type="search" id="couponSearch" placeholder="회원 이름 · 쿠폰번호 검색" class="sheet-input" style="width:260px; border:1px solid var(--slate-300); border-radius:8px; padding:7px 10px;" /></div>
+        <table class="table-fixed">
+          <thead><tr><th style="width:12%;">회원명</th><th style="width:22%;">쿠폰</th><th style="width:12%;">쿠폰번호</th><th style="width:12%;">교환일</th><th style="width:13%;">유효기간</th><th style="width:15%;">상태</th><th style="width:14%;"></th></tr></thead>
+          <tbody id="couponBody"><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+      </div>
     </div>
 
     <div class="section">
@@ -363,7 +405,7 @@
       const tbody = document.getElementById('shopItemBody');
       try { shopItemsCache = await fetchShopItems(); }
       catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="error-text" style="display:table-cell;">${escapeHtml(err.message)}</td></tr>`; return; }
-      if (!shopItemsCache.length) { tbody.innerHTML = '<tr><td colspan="3" class="muted" style="padding:16px;">진열된 상품이 없어요.</td></tr>'; return; }
+      if (!shopItemsCache.length) { tbody.innerHTML = '<tr><td colspan="3" class="muted" style="padding:16px;">진열된 상품이 없어요.</td></tr>'; renderShopPreview(); return; }
       tbody.innerHTML = shopItemsCache.map(it => {
         const isCoupon = it.item_type === 'coupon';
         const cost = it.points_cost == null ? '' : it.points_cost;
@@ -378,6 +420,8 @@
           <td>${escapeHtml(it.emoji || '🎁')} ${escapeHtml(it.name)} ${isCoupon ? '<span class="badge badge-amber">쿠폰</span>' : ''}</td>
           <td>${priceCell}</td><td>${activeCell}</td></tr>`;
       }).join('');
+      tbody.querySelectorAll('.shop-cost-input').forEach(inp => inp.addEventListener('input', renderShopPreview));
+      renderShopPreview();
       tbody.querySelectorAll('.shop-cost-save').forEach(btn => btn.addEventListener('click', async () => {
         const input = tbody.querySelector(`.shop-cost-input[data-id="${btn.dataset.id}"]`);
         const raw = input.value.trim();
@@ -388,10 +432,52 @@
         catch (err) { alert(err.message); btn.disabled = false; }
       }));
       tbody.querySelectorAll('.shop-active').forEach(cb => cb.addEventListener('change', async () => {
+        // 체크하는 순간 오른쪽 미리보기에 먼저 반영하고, 저장이 실패하면 되돌림
+        const it = shopItemsCache.find(x => x.id === cb.dataset.id);
+        const prev = it ? it.active : null;
+        if (it) { it.active = cb.checked; renderShopPreview(); }
         try { await updateShopItem(cb.dataset.id, { active: cb.checked }); await loadShopItems(); }
-        catch (err) { alert(err.message); cb.checked = !cb.checked; }
+        catch (err) { alert(err.message); cb.checked = !cb.checked; if (it) { it.active = prev; renderShopPreview(); } }
       }));
     }
+
+    // ---- 회원 휴대폰 화면 미리보기 (진열 on/off · 입력 중인 포인트가 회원 화면에서 어떻게 보이는지) ----
+    function renderShopPreview() {
+      const screen = document.getElementById('pvScreen');
+      if (!screen) return;
+      const avail = Number(document.getElementById('pvPoints').value) || 0;
+      let draftExists = false;
+      const view = shopItemsCache.filter(it => it.active).map(it => {
+        const input = document.querySelector(`.shop-cost-input[data-id="${it.id}"]`);
+        let cost = it.points_cost;
+        if (input) {
+          const raw = input.value.trim();
+          const typed = raw === '' ? null : Number(raw);
+          if (typed !== it.points_cost && !(typed !== null && (!Number.isInteger(typed) || typed <= 0))) { cost = typed; draftExists = true; }
+        }
+        return { ...it, cost };
+      });
+      document.getElementById('pvDraft').style.display = draftExists ? 'inline-block' : 'none';
+      const coupons = view.filter(it => it.item_type === 'coupon');
+      const gifts = view.filter(it => it.item_type !== 'coupon');
+      const card = (it, isCp) => {
+        const ready = it.cost != null;
+        const ok = ready && avail >= it.cost;
+        const label = !ready ? (isCp ? '곧 오픈!' : '준비중') : (ok ? '교환하기' : '포인트 부족');
+        return `<div class="pv-item ${isCp ? 'cp' : ''}">${isCp ? `<div class="tag">${ready ? 'COUPON' : 'NEW'}</div>` : ''}
+          <div class="ic">${escapeHtml(it.emoji || (isCp ? '🏷️' : '🎁'))}</div><div class="nm">${escapeHtml(it.name)}</div>
+          <div class="pr ${ready ? '' : 'tbd'}">${ready ? it.cost + 'P' : (isCp ? '포인트 준비중' : '준비중')}</div>
+          <div class="bt ${ok ? '' : 'no'}">${label}</div></div>`;
+      };
+      screen.innerHTML = `
+        <div class="pv-bar"><i>‹</i>포인트 상점</div>
+        <div class="pv-bal"><div class="l">🛍️ 내 포인트</div><div class="a">${avail.toLocaleString('ko-KR')}<span>P</span></div></div>
+        <div class="pv-mycp"><span>🎫 내 쿠폰함</span><span>사용 가능 0장 ›</span></div>
+        ${coupons.length ? `<div class="pv-sec">🏷️ 쿠폰</div><div class="pv-grid">${coupons.map(it => card(it, true)).join('')}</div>` : ''}
+        <div class="pv-sec">🎁 교환 가능한 선물</div>
+        ${gifts.length ? `<div class="pv-grid">${gifts.map(it => card(it, false)).join('')}</div>` : '<div class="pv-empty">아직 준비된 상품이 없어요. 곧 채워질 예정이에요!</div>'}`;
+    }
+    document.getElementById('pvPoints').addEventListener('input', renderShopPreview);
 
     function couponStatus(c) {
       if (c.used_at) return { key: 'used', label: '사용 완료', cls: 'badge-slate' };
