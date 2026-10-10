@@ -1447,6 +1447,16 @@ v2에서 "확인 대기 중"으로 남겨뒀던 영업지원금/매출커미션 
 - 급여 관리(payroll.html)는 퇴사자도 그대로 포함(과거 달 급여 보존) - 필요하면 따로 정리.
 - migration_77/78 전(컬럼 없음)에도 앱이 깨지지 않게 `fetchProfilesWithFallback`/`getMyProfile`이 옛 컬럼으로 재시도.
 
+## 포인트 상점 - 회원권 20% 할인 쿠폰 + 상품 관리 + 쿠폰 사용 처리 (2026-10-10) - `migration_79_point_shop_coupons.sql`
+
+- 요청: "포인트 샵에서 회원권 20% 할인 적용 쿠폰 하나 만들어줘, 포인트는 아직 미측정" → 구현안 이미지(`coupon_plan`)로 먼저 확인받고, 유효기간 30일 / 직원이 할인 금액 계산해서 입력(자동 적용 아님) / 헬스 이용권만 대상으로 구현.
+- `group_pt_shop_items`에 `item_type`('gift'|'coupon'), `discount_percent`, `valid_days` 추가, `points_cost`를 NULL 허용(=가격 미정). 쿠폰 첫 상품 "회원권 20% 할인 쿠폰"(20%, 30일, 가격 미정)을 시드. 가격이 NULL인 동안 회원 화면엔 "포인트 준비중 / 곧 오픈!"으로 보이고 서버(`group_pt_redeem_item`)도 교환을 막음. 상품 추가/수정/삭제 RLS를 지점장 전용으로 강화(예전엔 로그인 직원 누구나 가능).
+- 교환 시(`group_pt_redeem_item`, 반환 컬럼 확장으로 drop 후 재생성): 포인트 서버 차감 + 쿠폰번호(`EF-XXXX`, 중복 방지)·유효기간 발급해서 `group_pt_point_redemptions`(item_type/discount_percent/coupon_code/expires_at/used_at/used_by 컬럼 추가)에 기록. `group_pt_get_member_status`에 `coupons`(내 쿠폰 목록)와 상점 상품의 종류/할인율 추가. 참고: 기존 함수는 `points_spent` 컬럼명이 OUT 파라미터와 겹쳐서(plpgsql ambiguous) 실제 DB에서 에러가 날 수 있는 형태였어서 새 함수에서는 컬럼을 별칭으로 명시함.
+- 직원용 함수 `group_pt_use_coupon`(로그인한 직원 누구나, 한 번만·만료 쿠폰 불가) / `group_pt_unuse_coupon`(지점장만, 실수 취소).
+- 회원 화면(`attend.html`): 포인트 상점에 "🏷️ 쿠폰" 칸 + "🎫 내 쿠폰함"(사용 가능/사용 완료/기간 만료 티켓, 쿠폰번호·유효기간), 교환 완료 팝업에서 바로 쿠폰함으로 이동.
+- 직원 화면(`group-pt-attendance.html`): "🛍️ 포인트 상점 관리"(필요 포인트 입력/미정·진열 on/off - 지점장만 수정) + "🎫 쿠폰 사용 처리"(회원명·쿠폰번호 검색, 사용 가능 먼저 정렬, 사용 처리/지점장 사용 취소). data.js: `fetchShopItems/updateShopItem/fetchCouponRedemptions/useCoupon/unuseCoupon`.
+- 검증: 로컬 Postgres로 SQL(미정 거부·포인트 부족·교환·잔액·쿠폰번호·30일·사용 1회·만료·권한)을 직접 실행, Playwright로 가짜 서버(SQL 규칙 동일)를 두고 회원/지점장/트레이너 화면 흐름 전체 확인.
+
 ## 아직 안 만든 것 / 예정
 
 - 데이터 백업 자동화 — 현재는 홈 화면에서 수동으로 버튼을 눌러 엑셀 백업. 데이터가 많아지면 주기적 자동 백업으로 발전시킬 예정 (사용자가 원할 때)

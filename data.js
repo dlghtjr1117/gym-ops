@@ -2810,6 +2810,41 @@ async function deleteGroupPtRewardTier(id) {
   if (!res.ok) await throwApiError(res, '보상 단계 삭제에 실패했습니다.');
 }
 
+// ---- 포인트 상점 상품 관리 / 쿠폰 사용 처리 (migration_79_point_shop_coupons.sql 필요) ----
+async function fetchShopItems() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_shop_items?select=*&order=sort_order.asc,created_at.asc`, { headers: await authHeaders() });
+  if (!res.ok) await throwApiError(res, '포인트 상점 상품을 불러오지 못했습니다.');
+  return res.json();
+}
+// fields: { points_cost(숫자 또는 null=미정), active }
+async function updateShopItem(id, fields) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_shop_items?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
+    body: JSON.stringify(fields)
+  });
+  if (!res.ok) await throwApiError(res, '상품 정보를 저장하지 못했습니다.');
+}
+async function fetchCouponRedemptions() {
+  const { rows, error } = await fetchAllRows(
+    'group_pt_point_redemptions?select=*,member:members(name),user:used_by(name)&item_type=eq.coupon&order=redeemed_at.desc,id.asc', await authHeaders()
+  );
+  if (error) await throwApiError(error, '쿠폰 목록을 불러오지 못했습니다.');
+  return rows;
+}
+async function callCouponRpc(fn, id, failMsg) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST', headers: await authHeaders(), body: JSON.stringify({ p_redemption_id: id })
+  });
+  if (!res.ok) {
+    let msg = '';
+    try { msg = (await res.json()).message || ''; } catch (e) { /* ignore */ }
+    throw new Error(msg || failMsg);
+  }
+}
+const useCoupon = (id) => callCouponRpc('group_pt_use_coupon', id, '쿠폰 사용 처리에 실패했습니다.');
+const unuseCoupon = (id) => callCouponRpc('group_pt_unuse_coupon', id, '쿠폰 사용 취소에 실패했습니다.');
+
 // ==================================================================
 // ---- 트레이너 급여(payroll.html) ----
 // (2026-09-29 v5 확정 - 호석님과 두 번의 시행착오 끝에 최종 확인) 매출 관련 개념이 두 가지라

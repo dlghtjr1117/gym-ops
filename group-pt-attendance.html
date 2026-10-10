@@ -141,6 +141,25 @@
     </div>
 
     <div class="section">
+      <h2>🛍️ 포인트 상점 관리</h2>
+      <p class="muted" style="margin:-6px 0 14px;font-size:13px;">회원 화면의 포인트 상점에 진열되는 상품이에요. 필요 포인트를 비워두면(미정) 회원에게는 "포인트 준비중"으로만 보이고 교환은 안 돼요. 입력·수정은 지점장만 할 수 있어요.</p>
+      <table class="table-fixed" style="max-width:720px;">
+        <thead><tr><th>상품</th><th style="width:30%;">필요 포인트</th><th style="width:18%;">진열</th></tr></thead>
+        <tbody id="shopItemBody"><tr><td colspan="3" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>🎫 쿠폰 사용 처리</h2>
+      <p class="muted" style="margin:-6px 0 14px;font-size:13px;">회원이 포인트로 교환한 쿠폰이에요. 회원이 쿠폰 화면(쿠폰번호)을 보여주면 이름·번호로 찾아서, <b>할인된 금액으로 결제한 뒤 "사용 처리"</b>를 눌러주세요. 한 번 처리하면 다시 쓸 수 없어요.</p>
+      <div style="margin-bottom:10px;"><input type="search" id="couponSearch" placeholder="회원 이름 · 쿠폰번호 검색" class="sheet-input" style="width:260px; border:1px solid var(--slate-300); border-radius:8px; padding:7px 10px;" /></div>
+      <table class="table-fixed">
+        <thead><tr><th style="width:15%;">회원명</th><th style="width:22%;">쿠폰</th><th style="width:12%;">쿠폰번호</th><th style="width:14%;">교환일</th><th style="width:14%;">유효기간</th><th>상태</th><th style="width:14%;"></th></tr></thead>
+        <tbody id="couponBody"><tr><td colspan="7" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
       <h2>⚙️ 보상 단계 설정</h2>
       <p class="muted" style="margin:-6px 0 14px;font-size:13px;">며칠 출석 시 어떤 보상을 줄지 여기서 직접 정하고 바꿀 수 있어요.</p>
       <table class="table-fixed" style="max-width:560px;">
@@ -169,7 +188,7 @@
 
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791480155"></script>
-  <script src="data.js?v=1791480155"></script>
+  <script src="data.js?v=1791614825"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -327,6 +346,97 @@
       } catch (err) { alert(err.message); }
     });
 
+
+    // ---- 포인트 상점 관리 / 쿠폰 사용 처리 (migration_79) ----
+    let isManagerFlag = false;
+    let shopItemsCache = [];
+    let couponsCache = [];
+    const migrationHint = ' (Supabase에서 migration_79_point_shop_coupons.sql을 먼저 실행해주세요)';
+
+    function fmtDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    async function loadShopItems() {
+      const tbody = document.getElementById('shopItemBody');
+      try { shopItemsCache = await fetchShopItems(); }
+      catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="error-text" style="display:table-cell;">${escapeHtml(err.message)}</td></tr>`; return; }
+      if (!shopItemsCache.length) { tbody.innerHTML = '<tr><td colspan="3" class="muted" style="padding:16px;">진열된 상품이 없어요.</td></tr>'; return; }
+      tbody.innerHTML = shopItemsCache.map(it => {
+        const isCoupon = it.item_type === 'coupon';
+        const cost = it.points_cost == null ? '' : it.points_cost;
+        const priceCell = isManagerFlag
+          ? `<input type="number" min="1" class="shop-cost-input sheet-input" data-id="${it.id}" value="${cost}" placeholder="미정" style="width:90px; border:1px solid var(--slate-300); border-radius:8px; padding:6px 8px;" /> P
+             <button type="button" class="btn-link shop-cost-save" data-id="${it.id}">저장</button>`
+          : (it.points_cost == null ? '<span class="muted">미정</span>' : `${it.points_cost}P`);
+        const activeCell = isManagerFlag
+          ? `<label style="cursor:pointer;"><input type="checkbox" class="shop-active" data-id="${it.id}" ${it.active ? 'checked' : ''} /> ${it.active ? '진열중' : '숨김'}</label>`
+          : (it.active ? '진열중' : '<span class="muted">숨김</span>');
+        return `<tr>
+          <td>${escapeHtml(it.emoji || '🎁')} ${escapeHtml(it.name)} ${isCoupon ? '<span class="badge badge-amber">쿠폰</span>' : ''}</td>
+          <td>${priceCell}</td><td>${activeCell}</td></tr>`;
+      }).join('');
+      tbody.querySelectorAll('.shop-cost-save').forEach(btn => btn.addEventListener('click', async () => {
+        const input = tbody.querySelector(`.shop-cost-input[data-id="${btn.dataset.id}"]`);
+        const raw = input.value.trim();
+        const val = raw === '' ? null : Number(raw);
+        if (val !== null && (!Number.isInteger(val) || val <= 0)) { alert('필요 포인트는 1 이상의 정수로 입력해주세요. (비우면 미정)'); return; }
+        btn.disabled = true;
+        try { await updateShopItem(btn.dataset.id, { points_cost: val }); showToast(val === null ? '미정으로 저장했어요.' : `${val}P로 저장했어요.`); await loadShopItems(); }
+        catch (err) { alert(err.message); btn.disabled = false; }
+      }));
+      tbody.querySelectorAll('.shop-active').forEach(cb => cb.addEventListener('change', async () => {
+        try { await updateShopItem(cb.dataset.id, { active: cb.checked }); await loadShopItems(); }
+        catch (err) { alert(err.message); cb.checked = !cb.checked; }
+      }));
+    }
+
+    function couponStatus(c) {
+      if (c.used_at) return { key: 'used', label: '사용 완료', cls: 'badge-slate' };
+      if (c.expires_at && new Date(c.expires_at) < new Date()) return { key: 'expired', label: '기간 만료', cls: 'badge-red' };
+      return { key: 'ok', label: '사용 가능', cls: 'badge-green' };
+    }
+    async function loadCoupons() {
+      const tbody = document.getElementById('couponBody');
+      try { couponsCache = await fetchCouponRedemptions(); }
+      catch (err) { tbody.innerHTML = `<tr><td colspan="7" class="error-text" style="display:table-cell;">${escapeHtml(err.message)}${migrationHint}</td></tr>`; return; }
+      renderCoupons();
+    }
+    function renderCoupons() {
+      const tbody = document.getElementById('couponBody');
+      const q = document.getElementById('couponSearch').value.trim().toLowerCase();
+      const rank = { ok: 0, expired: 1, used: 2 };
+      const list = couponsCache
+        .filter(c => !q || (c.member && c.member.name || '').toLowerCase().includes(q) || (c.coupon_code || '').toLowerCase().includes(q))
+        .map(c => ({ c, st: couponStatus(c) }))
+        .sort((a, b) => rank[a.st.key] - rank[b.st.key]);
+      if (!list.length) { tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:16px;">${couponsCache.length ? '검색 결과가 없어요.' : '아직 교환된 쿠폰이 없어요.'}</td></tr>`; return; }
+      tbody.innerHTML = list.map(({ c, st }) => `<tr>
+        <td>${escapeHtml(c.member ? c.member.name : '-')}</td>
+        <td>${escapeHtml(c.item_emoji || '🏷️')} ${escapeHtml(c.item_name)}</td>
+        <td>${escapeHtml(c.coupon_code || '-')}</td>
+        <td>${fmtDate(c.redeemed_at)}</td>
+        <td>${fmtDate(c.expires_at)}</td>
+        <td><span class="badge ${st.cls}">${st.label}</span>${c.used_at ? ` <span class="muted" style="font-size:11.5px;">${fmtDate(c.used_at)}${c.user && c.user.name ? ' · ' + escapeHtml(c.user.name) : ''}</span>` : ''}</td>
+        <td style="text-align:right;">${st.key === 'ok' ? `<button type="button" class="btn btn-primary coupon-use-btn" data-id="${c.id}" style="width:auto; padding:6px 12px; font-size:12.5px;">사용 처리</button>`
+            : (st.key === 'used' && isManagerFlag ? `<button type="button" class="btn-link coupon-undo-btn" data-id="${c.id}">사용 취소</button>` : '')}</td>
+      </tr>`).join('');
+      tbody.querySelectorAll('.coupon-use-btn').forEach(btn => btn.addEventListener('click', async () => {
+        const c = couponsCache.find(x => x.id === btn.dataset.id);
+        if (!confirm(`${c.member ? c.member.name : ''} 회원님의 ${c.item_name}를 사용 처리할까요?\n\n할인된 금액으로 결제까지 마친 뒤에 눌러주세요. 한 번 처리하면 회원이 다시 쓸 수 없어요.`)) return;
+        btn.disabled = true;
+        try { await useCoupon(c.id); showToast('쿠폰을 사용 처리했어요.'); await loadCoupons(); }
+        catch (err) { alert(err.message); btn.disabled = false; await loadCoupons(); }
+      }));
+      tbody.querySelectorAll('.coupon-undo-btn').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('사용 처리를 취소할까요? (실수로 눌렀을 때만 사용해주세요)')) return;
+        try { await unuseCoupon(btn.dataset.id); await loadCoupons(); } catch (err) { alert(err.message); }
+      }));
+    }
+    document.getElementById('couponSearch').addEventListener('input', renderCoupons);
+
     // ---- 오늘의 출석 QR 모달 ----
     let qrInstance = null;
     async function openQrModal() {
@@ -358,7 +468,10 @@
       if (profile) {
         document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
         applyRoleNav(profile);
+        isManagerFlag = profile.role === 'manager';
       }
+      loadShopItems();
+      loadCoupons();
       await loadOverview();
     })();
   </script>

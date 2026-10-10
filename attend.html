@@ -597,6 +597,24 @@
   .redeem-done-coin { width: 66px; height: 66px; border-radius: 50%; margin: 0 auto 14px; background: linear-gradient(150deg, #FFE9B8, var(--gold)); display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 12px 22px -10px rgba(245,165,36,0.6); }
   .popup .desc { font-size: 12px; color: var(--muted); margin: 0 0 4px; line-height: 1.5; }
   .popup .minus { font-size: 13px; font-weight: 800; color: #DC2626; margin: 6px 0 20px; }
+
+  /* 쿠폰 (포인트 상점 > 쿠폰 칸 / 내 쿠폰함) */
+  .shop-my-coupons { margin: 12px 24px 0; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 14px; border: 1.3px solid #F3CE8A; background: #FFF9EC; font-size: 12.5px; font-weight: 800; color: #7A4E0A; cursor: pointer; width: calc(100% - 48px); font-family: inherit; }
+  .shop-my-coupons span { color: #C4780A; }
+  .shop-item.coupon { border-color: #F9A86A; background: #FFF8F1; position: relative; }
+  .shop-item.coupon .tag { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: #F97316; color: #fff; font-size: 9.5px; font-weight: 900; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .shop-item .pr.tbd { color: #9CA3AF; }
+  .cp-note { margin: 14px 24px 4px; padding: 12px 14px; border-radius: 14px; background: #F0FDF4; border: 1.3px solid #BBF7D0; color: #166534; font-size: 12px; font-weight: 700; line-height: 1.6; }
+  .cp-ticket { margin: 12px 24px 0; border-radius: 20px; padding: 20px 20px 16px; color: #fff; position: relative; background: linear-gradient(135deg, #3D5FFF, #6F4BFF); overflow: hidden; }
+  .cp-ticket .st { position: absolute; top: 14px; right: 14px; background: #fff; color: #16A34A; font-weight: 900; font-size: 11px; border-radius: 999px; padding: 3px 10px; }
+  .cp-ticket .t { font-size: 13px; font-weight: 800; opacity: .95; }
+  .cp-ticket .big { font-size: 38px; font-weight: 900; letter-spacing: -1px; margin-top: 2px; }
+  .cp-ticket .dash { border-top: 2px dashed rgba(255,255,255,.5); margin: 12px -6px; }
+  .cp-ticket .m { font-size: 12px; opacity: .92; line-height: 1.75; }
+  .cp-ticket .code { display: inline-block; margin-top: 6px; background: rgba(255,255,255,.2); border-radius: 8px; padding: 3px 10px; font-weight: 900; letter-spacing: 1px; }
+  .cp-ticket.used, .cp-ticket.expired { background: #CFD3DF; }
+  .cp-ticket.used .st, .cp-ticket.expired .st { color: #6B7280; }
+  .cp-empty { margin: 40px 24px; text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
 </style>
 <!-- 트로피 터지는 연출의 파티클(색종이/컨페티) 부분을 전문 모션 디자이너가 만든 애니메이션으로 재생하기
      위해 Lottie 렌더러(lottie-web, airbnb/lottiefiles의 핵심 오픈소스 라이브러리)를 CDN에서 불러옴.
@@ -734,8 +752,20 @@
       <div class="amt" id="shopBalanceAmt">-<span>P</span></div>
       <div class="hint">출석하고 모은 포인트로 다양한 선물로 교환해보세요</div>
     </div>
+    <button type="button" class="shop-my-coupons" id="myCouponsBtn">🎫 내 쿠폰함 <span id="myCouponsCount">0장</span></button>
+    <div id="couponSection" style="display:none;">
+      <div class="shop-sec-title">🏷️ 쿠폰</div>
+      <div class="shop-grid" id="couponShopGrid" style="padding-bottom:6px;"></div>
+    </div>
     <div class="shop-sec-title">🎁 교환 가능한 선물</div>
     <div class="shop-grid" id="shopGrid"></div>
+  </div>
+
+  <div class="view" id="viewMyCoupons">
+    <div class="dt-appbar"><button type="button" class="dt-back" id="couponsBackBtn">‹</button><div class="t">내 쿠폰함</div></div>
+    <div class="cp-note" id="couponsNote">결제하실 때 프런트에 이 화면(쿠폰번호)을 보여주세요. 직원이 확인하고 할인해드려요.</div>
+    <div id="couponsList"></div>
+    <div style="height:30px;"></div>
   </div>
 
   <div class="overlay" id="shopConfirmOverlay">
@@ -757,6 +787,7 @@
       <div class="desc" id="shopDoneDesc"></div>
       <div class="minus" id="shopDoneMinus"></div>
       <button type="button" id="shopDoneConfirmBtn">확인</button>
+      <button type="button" id="shopDoneCouponBtn" style="display:none; margin-top:8px; background:var(--brand-bg); color:var(--brand);">🎫 내 쿠폰함 보기</button>
     </div>
   </div>
 
@@ -1355,35 +1386,93 @@
       if (!statusCache) return;
       const avail = statusCache.available_points ?? statusCache.total_points ?? 0;
       document.getElementById('shopBalanceAmt').innerHTML = `${avail}<span>P</span>`;
-      const items = statusCache.shop_items || [];
+      const allItems = statusCache.shop_items || [];
+      const coupons = statusCache.coupons || [];
+      const usable = coupons.filter(c => couponState(c) === 'ok').length;
+      document.getElementById('myCouponsCount').textContent = `사용 가능 ${usable}장 ›`;
+      const couponItems = allItems.filter(it => it.item_type === 'coupon');
+      const items = allItems.filter(it => it.item_type !== 'coupon');
+
+      // 쿠폰 칸: 포인트가 아직 안 정해진 쿠폰은 "준비중"으로 보여주고 교환은 막음
+      document.getElementById('couponSection').style.display = couponItems.length ? '' : 'none';
+      document.getElementById('couponShopGrid').innerHTML = couponItems.map(it => {
+        const ready = it.points_cost != null;
+        const ok = ready && avail >= it.points_cost;
+        return `<div class="shop-item coupon">
+          <div class="tag">${ready ? 'COUPON' : 'NEW'}</div>
+          <div class="ic-wrap">${it.emoji || '🏷️'}</div>
+          <div class="nm">${escapeHtmlAttend(it.name)}</div>
+          <div class="pr ${ready ? '' : 'tbd'}">${ready ? it.points_cost + 'P' : '포인트 준비중'}</div>
+          <button type="button" class="redeem-btn ${ok ? 'ok' : 'no'}" data-id="${it.id}" data-name="${escapeHtmlAttend(it.name)}" data-emoji="${it.emoji || '🏷️'}" data-cost="${it.points_cost ?? ''}" data-type="coupon" ${ok ? '' : 'disabled'}>${!ready ? '곧 오픈!' : (ok ? '교환하기' : '포인트 부족')}</button>
+        </div>`;
+      }).join('');
+
       const gridEl = document.getElementById('shopGrid');
+      const emptyMsg = document.getElementById('shopEmptyMsg');
+      if (emptyMsg) emptyMsg.remove();
       if (items.length === 0) {
         gridEl.innerHTML = '';
         gridEl.insertAdjacentHTML('afterend', '<div class="shop-empty" id="shopEmptyMsg">아직 준비된 상품이 없어요. 곧 채워질 예정이에요!</div>');
-        return;
-      }
-      const existingEmpty = document.getElementById('shopEmptyMsg');
-      if (existingEmpty) existingEmpty.remove();
-      gridEl.innerHTML = items.map(it => {
-        const ok = avail >= it.points_cost;
-        return `<div class="shop-item">
+      } else {
+        gridEl.innerHTML = items.map(it => {
+          const ok = it.points_cost != null && avail >= it.points_cost;
+          return `<div class="shop-item">
           <div class="ic-wrap">${it.emoji || '🎁'}</div>
           <div class="nm">${escapeHtmlAttend(it.name)}</div>
-          <div class="pr">${it.points_cost}P</div>
-          <button type="button" class="redeem-btn ${ok ? 'ok' : 'no'}" data-id="${it.id}" data-name="${escapeHtmlAttend(it.name)}" data-emoji="${it.emoji || '🎁'}" data-cost="${it.points_cost}" ${ok ? '' : 'disabled'}>${ok ? '교환하기' : '포인트 부족'}</button>
+          <div class="pr">${it.points_cost != null ? it.points_cost + 'P' : '준비중'}</div>
+          <button type="button" class="redeem-btn ${ok ? 'ok' : 'no'}" data-id="${it.id}" data-name="${escapeHtmlAttend(it.name)}" data-emoji="${it.emoji || '🎁'}" data-cost="${it.points_cost ?? ''}" data-type="gift" ${ok ? '' : 'disabled'}>${ok ? '교환하기' : '포인트 부족'}</button>
         </div>`;
-      }).join('');
-      gridEl.querySelectorAll('.redeem-btn.ok').forEach(btn => {
+        }).join('');
+      }
+      document.querySelectorAll('#viewPointShop .redeem-btn.ok').forEach(btn => {
         btn.addEventListener('click', () => openRedeemConfirm(btn.dataset));
       });
     }
+
+    // ---- 내 쿠폰함 ----
+    function couponState(c) {
+      if (c.used_at) return 'used';
+      if (c.expires_at && new Date(c.expires_at) < new Date()) return 'expired';
+      return 'ok';
+    }
+    function fmtCouponDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function renderMyCoupons() {
+      const list = (statusCache && statusCache.coupons) || [];
+      const el = document.getElementById('couponsList');
+      document.getElementById('couponsNote').style.display = list.some(c => couponState(c) === 'ok') ? '' : 'none';
+      if (!list.length) {
+        el.innerHTML = '<div class="cp-empty">아직 교환한 쿠폰이 없어요.<br>포인트 상점에서 쿠폰으로 교환해보세요!</div>';
+        return;
+      }
+      const rank = { ok: 0, expired: 1, used: 2 };
+      el.innerHTML = list.slice().sort((a, b) => rank[couponState(a)] - rank[couponState(b)]).map(c => {
+        const st = couponState(c);
+        const stLabel = st === 'ok' ? '사용 가능' : (st === 'used' ? '사용 완료' : '기간 만료');
+        const dn = c.discount_percent ? `${c.discount_percent}% OFF` : '할인';
+        const last = st === 'used' ? `사용일 ${fmtCouponDate(c.used_at)} · 프런트 확인` : `유효기간 <b>${fmtCouponDate(c.expires_at)}</b> 까지`;
+        return `<div class="cp-ticket ${st}">
+          <div class="st">${stLabel}</div>
+          <div class="t">${c.emoji || '🏷️'} ${escapeHtmlAttend(c.name)}</div>
+          <div class="big">${dn}</div>
+          <div class="dash"></div>
+          <div class="m">발급일 ${fmtCouponDate(c.redeemed_at)}<br>${last}<br>쿠폰번호 <span class="code">${escapeHtmlAttend(c.coupon_code || '-')}</span></div>
+        </div>`;
+      }).join('');
+    }
+    function openMyCoupons() { showView('viewMyCoupons'); renderMyCoupons(); }
+    document.getElementById('myCouponsBtn').addEventListener('click', openMyCoupons);
+    document.getElementById('couponsBackBtn').addEventListener('click', () => { showView('viewPointShop'); renderPointShopView(); });
 
     let pendingRedeemItem = null;
 
     function openRedeemConfirm(data) {
       pendingRedeemItem = data;
       document.getElementById('shopConfirmIc').textContent = data.emoji;
-      document.getElementById('shopConfirmTtl').textContent = `${data.name}(으)로 교환할까요?`;
+      document.getElementById('shopConfirmTtl').textContent = data.type === 'coupon' ? `${data.name}을(를) 교환할까요?` : `${data.name}(으)로 교환할까요?`;
       document.getElementById('shopConfirmPrice').textContent = `${data.cost}P 사용`;
       document.getElementById('shopConfirmOverlay').classList.add('show');
     }
@@ -1412,9 +1501,18 @@
           if (statusCache) statusCache.available_points = r.available_points;
           document.getElementById('statPoints').textContent = r.available_points + 'P';
           document.getElementById('shopDoneIc').textContent = r.item_emoji || '🎁';
-          document.getElementById('shopDoneDesc').innerHTML = `${escapeHtmlAttend(r.item_name)}(으)로<br>교환됐어요. 프런트에서 받아가세요!`;
+          const isCoupon = r.item_type === 'coupon';
+          document.getElementById('shopDoneTitle').textContent = isCoupon ? '쿠폰 발급 완료! 🎉' : '교환 완료! 🎉';
+          document.getElementById('shopDoneDesc').innerHTML = isCoupon
+            ? `${escapeHtmlAttend(r.item_name)}이(가) 발급됐어요.<br>쿠폰번호 <b>${escapeHtmlAttend(r.coupon_code || '')}</b><br>결제하실 때 프런트에 쿠폰함을 보여주세요!`
+            : `${escapeHtmlAttend(r.item_name)}(으)로<br>교환됐어요. 프런트에서 받아가세요!`;
           document.getElementById('shopDoneMinus').textContent = `-${r.points_spent}P 사용`;
+          document.getElementById('shopDoneCouponBtn').style.display = isCoupon ? '' : 'none';
           document.getElementById('shopDoneOverlay').classList.add('show');
+          if (isCoupon) {
+            // 방금 발급된 쿠폰이 "내 쿠폰함"에 바로 보이도록 상태를 다시 불러옴
+            try { const rows = await callRpc('group_pt_get_member_status', { p_member_id: getSavedMemberId() }); if (rows && rows[0]) statusCache = rows[0]; } catch (e) { /* 다음에 열 때 반영됨 */ }
+          }
           renderPointShopView();
         }
       } catch (err) {
@@ -1426,6 +1524,7 @@
       }
     });
     document.getElementById('shopDoneConfirmBtn').addEventListener('click', () => document.getElementById('shopDoneOverlay').classList.remove('show'));
+    document.getElementById('shopDoneCouponBtn').addEventListener('click', () => { document.getElementById('shopDoneOverlay').classList.remove('show'); openMyCoupons(); });
 
     // ---- 이달의 출석왕(이번 달 그룹PT 출석 TOP 3 + 내 순위) ----
     document.getElementById('leaderboardBanner').addEventListener('click', loadLeaderboardView);
