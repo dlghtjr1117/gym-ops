@@ -559,6 +559,9 @@
     //    이월(다음 달 시트로 넘어감)과 확률 미설정은 제외
     //  - 주차: 재등록예상시기가 이 달일 때만 그 주차를 쓰고, 다른 달이거나 비어있으면 "미정"(맨 아래)
     //  - 이미 이 달 주차별 표에 같은 이름의 "재등록" 기록을 직접 적어둔 회원은 이중으로 안 잡히게 건너뜀
+    // 자동 반영된 행의 메모 칸 기본 문구 - 처음엔 이 문구가 실제로 채워져 있고, 직접 고치거나 지울 수 있음
+    // (지우면 빈 값('')으로 저장돼서 다시 기본 문구가 채워지지 않음 - 아직 한 번도 안 고친 행만 기본 문구)
+    const VIRTUAL_MEMO_DEFAULT = 'PT회원시트 자동반영';
     function ptCareVirtualLeads() {
       const { monthStr, startStr, endStr } = getMonthRange();
       const out = [];
@@ -577,7 +580,7 @@
           expected_amount: m.pt_expected_amount, sessions: m.pt_expected_sessions,
           stage: isOpen ? 'in_progress' : st, probability: isOpen ? Number(m.pt_expected_probability) : null,
           week_no: weekOk ? Number(m.pt_expected_renewal_week) : null,
-          contact_date: null, ot_date: null, memo: null
+          contact_date: null, ot_date: null, memo: m.pt_weekly_memo != null ? m.pt_weekly_memo : VIRTUAL_MEMO_DEFAULT
         });
       });
       return out;
@@ -1288,13 +1291,33 @@
             <td><select class="sheet-input week-band" data-care-id="${l._careId}" onchange="handleVirtualWeekChange(this)">${weekOptions}</select></td>
             <td class="muted" style="font-size:12px;">${Number(getMonthRange().monthStr.slice(5, 7))}월 ${l.week_no != null ? l.week_no + '주차 ' : ''}예정</td>
             <td><span class="badge badge-green">재등록</span></td>
-            <td title="${escapeHtml(l.name || '')}"><div class="cell-1line">${escapeHtml(l.name || '')}</div>${renewalBadgeHtml(l._memberId, l.name)}</td>
-            <td>${l.expected_amount != null ? Number(l.expected_amount).toLocaleString('ko-KR') : '<span class="muted">-</span>'}</td>
-            <td>${l.sessions != null ? l.sessions : '<span class="muted">-</span>'}</td>
+            <td><input class="sheet-input" type="text" value="${escapeHtml(l.name || '')}" data-care-id="${l._careId}" onchange="handleVirtualFieldSave(this,'name',false)" placeholder="이름" />${renewalBadgeHtml(l._memberId, l.name)}</td>
+            <td><input class="sheet-input money-input" type="text" inputmode="numeric" value="${l.expected_amount != null ? Number(l.expected_amount).toLocaleString('ko-KR') : ''}" data-care-id="${l._careId}" onchange="handleVirtualFieldSave(this,'pt_expected_amount',true)" placeholder="금액" /></td>
+            <td><input class="sheet-input" type="number" min="0" value="${l.sessions != null ? l.sessions : ''}" data-care-id="${l._careId}" onchange="handleVirtualFieldSave(this,'pt_expected_sessions',true)" placeholder="횟수" /></td>
             <td><select class="badge ${PROB_BADGE[val]} sheet-input" data-care-id="${l._careId}" onchange="handleVirtualProbChange(this)">${probOptions}</select></td>
-            <td class="muted" style="font-size:12px;"><span title="금액·횟수는 오른쪽 PT 회원 관리 표에서 수정해주세요">🔗 PT 회원 시트 자동 반영</span></td>
+            <td><input class="sheet-input" type="text" value="${escapeHtml(l.memo || '')}" data-care-id="${l._careId}" onchange="handleVirtualFieldSave(this,'pt_weekly_memo',false)" placeholder="메모" /></td>
             <td></td>
           </tr>`;
+    }
+    // 자동 반영 행의 이름·금액·횟수·메모를 이 표에서 바로 고침 - 같은 PT 회원 기록에 저장되므로
+    // 오른쪽 PT 회원 관리 표와 항상 같은 값이 보임 (메모는 pt_weekly_memo, migration_82)
+    async function handleVirtualFieldSave(inputEl, field, isNumber) {
+      const m = allCareCache.find(x => x.id === inputEl.dataset.careId);
+      if (!m) return;
+      let value = inputEl.value.trim();
+      if (field === 'name' && !value) { alert('이름은 비워둘 수 없어요.'); renderWeeklyTable(); return; }
+      if (isNumber) value = value === '' ? null : Number(value.replace(/,/g, ''));
+      // 메모는 비워도 null이 아니라 ''로 저장 (null이면 다시 기본 문구가 채워지므로)
+      try {
+        await updatePtCareLog(m.id, { [field]: value });
+        m[field] = value;
+        renderCareTable();
+        refreshCareDerived();
+      } catch (err) {
+        alert(field === 'pt_weekly_memo' && /pt_weekly_memo|column|schema/i.test(String(err.message))
+          ? '메모를 저장하려면 먼저 Supabase에서 migration_82_care_weekly_memo.sql을 실행해주세요.' : err.message);
+        renderWeeklyTable();
+      }
     }
     async function handleVirtualWeekChange(selectEl) {
       const m = allCareCache.find(x => x.id === selectEl.dataset.careId);
@@ -1827,6 +1850,6 @@
       reloadAll();
     })();
   </script>
-  <div id="pageVersion" style="text-align:center; font-size:11px; color:#94a3b8; padding:14px 0 22px;">PT 관리 화면 버전: 2026-10-10 확정매출 반영판 (이 문구가 보이면 최신 파일이 올라간 거예요)</div>
+  <div id="pageVersion" style="text-align:center; font-size:11px; color:#94a3b8; padding:14px 0 22px;">PT 관리 화면 버전: 2026-10-12 자동반영 행 수정판 (이 문구가 보이면 최신 파일이 올라간 거예요)</div>
 </body>
 </html>
