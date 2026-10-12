@@ -713,6 +713,7 @@ async function fetchExpiringItems(daysAhead = 14) {
 // - 재등록 처리하면 만료일이 뒤로 밀려 "45일 이내 만료" 목록에서 빠지는 경우가 많아서, 처리 완료 보관함이
 //   비지 않도록 tm_logs에서 재등록/이월/거부 기록이 있는 회원+상품도 따로 찾아서 함께 돌려줌
 const TM_ARCHIVE_STATUSES = ['renewed', 'rolled_over', 'declined'];
+let TM_NEXT_DATE_SUPPORTED = null; // migration_83 실행 여부(fetchExpiryBoard가 한 번 조회하며 알아냄)
 // 재등록 연락(TM) 대상이 아닌 1회성 이용권 - 종목명에 이 글자가 들어 있으면 헬스이용권 만료 목록에서 뺌
 const EXPIRY_EXCLUDED_MEMBERSHIP_KEYWORDS = ['일일입장권', '일일권', '추석패스'];
 function isExcludedFromExpiry(member, catKey) {
@@ -727,9 +728,16 @@ async function fetchExpiryBoard(daysAhead = 45) {
   const limitStr = limitDate.toISOString().slice(0, 10);
   const orClause = EXPIRY_CATEGORIES.filter(c => c.field).map(c => `${c.field}.lte.${limitStr}`).join(',');
 
+  // 연락 센터(migration_83)의 next_contact_date 칸이 아직 없는 DB에서도 기존 화면이 안 깨지게, 실패하면 칸 빼고 다시 조회
+  const tmLogsQuery = async () => {
+    const r = await fetchAllRows(`tm_logs?select=id,member_id,staff_id,status,category,contact_date,memo,created_at,next_contact_date&order=created_at.desc,id.asc`, headers);
+    if (!r.error) { TM_NEXT_DATE_SUPPORTED = true; return r; }
+    TM_NEXT_DATE_SUPPORTED = false;
+    return fetchAllRows('tm_logs?select=id,member_id,staff_id,status,category,contact_date,memo,created_at&order=created_at.desc,id.asc', headers);
+  };
   const [mRes, lRes, aRes] = await Promise.all([
     fetchAllRows(`members?select=*,trainer:profiles(name)&status=neq.left&or=(${orClause})&order=name.asc,id.asc`, headers),
-    fetchAllRows('tm_logs?select=id,member_id,status,category,contact_date,memo,created_at&order=created_at.desc,id.asc', headers),
+    tmLogsQuery(),
     fetchAllRows(
       `tm_logs?select=member_id,category,member:members(*,trainer:profiles(name))&status=in.(${TM_ARCHIVE_STATUSES.join(',')})` +
       `&category=not.is.null&order=created_at.desc,id.asc`, headers)
@@ -757,6 +765,8 @@ async function fetchExpiryBoard(daysAhead = 45) {
     }
     return { ...latest, memoIds };
   };
+  // 연락 센터 상세 보기용: 같은 회원+상품의 연락 이력 전체(최신순)
+  const historyFor = (memberId, catKey) => (logsByMember.get(memberId) || []).filter(l => l.category === catKey || !l.category);
   const labelFor = (m, cat) =>
     cat.key === 'membership' ? (m.membership_type || cat.label) :
     cat.key === 'group_pt' ? (m.group_pt_type || cat.label) : cat.label;
@@ -771,7 +781,7 @@ async function fetchExpiryBoard(daysAhead = 45) {
       if (isExcludedFromExpiry(m, cat.key)) continue; // 일일입장권 · 추석패스권은 제외
       seen.add(`${m.id}|${cat.key}`);
       items.push({ member: m, categoryKey: cat.key, categoryLabel: cat.label, productLabel: labelFor(m, cat),
-        expiryDate: endDate, latestTm: latestFor(m.id, cat.key) });
+        expiryDate: endDate, latestTm: latestFor(m.id, cat.key), tmHistory: historyFor(m.id, cat.key) });
     }
   }
   // 만료일이 이미 뒤로 밀린(=재등록돼서 목록에서 빠진) 회원+상품 중 처리 완료 기록이 있는 것
@@ -786,7 +796,7 @@ async function fetchExpiryBoard(daysAhead = 45) {
     if (!latest || !TM_ARCHIVE_STATUSES.includes(latest.status)) continue; // 그 뒤에 되돌린 건 제외
     seen.add(key);
     items.push({ member: m, categoryKey: cat.key, categoryLabel: cat.label, productLabel: labelFor(m, cat),
-      expiryDate: m[cat.field] || '', latestTm: latest, fromLogsOnly: true });
+      expiryDate: m[cat.field] || '', latestTm: latest, tmHistory: historyFor(m.id, cat.key), fromLogsOnly: true });
   }
   return items;
 }
@@ -824,12 +834,12 @@ function isDurationGroupPtType(typeText) {
 // 현재 이용 중인 그룹PT(올바른 운동 무제한, 기간제 상품만) 회원 목록 + 마지막 방문일로부터
 // 며칠 지났는지 + 가장 최근 전환TM 기록을 한 번에 계산해서 돌려줌
 async function fetchGroupPtRetentionItems() {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name),group_pt_retention_logs(id,status,contact_date,memo,created_at)` +
-    `&status=neq.left&group_pt_end_date=not.is.null` +
-    `&order=name.asc`,
-    { headers: await authHeaders() }
-  );
+  const retentionUrl = (cols) =>
+    `${SUPABASE_URL}/rest/v1/members?select=*,trainer:profiles(name),group_pt_retention_logs(${cols})` +
+    `&status=neq.left&group_pt_end_date=not.is.null&order=name.asc`;
+  const gptHeaders = await authHeaders();
+  let res = await fetch(retentionUrl('id,status,contact_date,memo,created_at,next_contact_date'), { headers: gptHeaders });
+  if (!res.ok) res = await fetch(retentionUrl('id,status,contact_date,memo,created_at'), { headers: gptHeaders }); // migration_83 전
   if (!res.ok) await throwApiError(res, '그룹PT 회원 목록을 불러오지 못했습니다.');
   const allMembers = await res.json();
   const members = allMembers.filter(m => isDurationGroupPtType(m.group_pt_type));
@@ -1800,7 +1810,7 @@ async function fetchPendingCallEvents() {
 // call_events 업데이트를 묶어서 처리. (예전엔 TM 기록으로 저장했는데, 센터폰 하나로 들어오는 전화는
 // 신규 문의가 대부분이라 신규상담·워크인 관리 쪽에 쌓이도록 바꿈)
 async function convertCallEventToConsultation(callEvent, {
-  consultDate, name, phone, gender, channel, interestGym, interestPt, interestGroupPt, memo, status, createdBy
+  consultDate, name, phone, gender, channel, interestGym, interestPt, interestGroupPt, memo, status, createdBy, extra
 }) {
   const created = await addWalkinConsultation({
     consult_date: consultDate,
@@ -1814,7 +1824,8 @@ async function convertCallEventToConsultation(callEvent, {
     memo: memo || null,
     status: status || 'considering',
     kind: 'tm', // 전화로 들어온 건 신규상담 화면의 "TM(전화상담)" 쪽에 쌓임 (migration_74)
-    created_by: createdBy || null
+    created_by: createdBy || null,
+    ...(extra || {}) // 연락 센터: contact1_date / next_contact_date 같은 추가 칸
   });
   const saved = Array.isArray(created) ? created[0] : created;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/call_events?id=eq.${callEvent.id}`, {
@@ -1824,6 +1835,16 @@ async function convertCallEventToConsultation(callEvent, {
   });
   if (!res.ok) await throwApiError(res, '통화 기록 상태 갱신에 실패했습니다.');
   return saved;
+}
+
+// 연락 센터: 통화 기록을 "이미 있는 상담/만료 TM 건에 이어서 기록"으로 정리할 때 - call_events만 갱신
+async function markCallEventLogged(id, { consultId, memo } = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/call_events?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ status: 'logged', summary_text: memo || null, consult_id: consultId || null })
+  });
+  if (!res.ok) await throwApiError(res, '통화 기록 상태 갱신에 실패했습니다.');
 }
 
 async function ignoreCallEvent(id) {

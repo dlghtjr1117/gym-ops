@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 연락 센터</title>
+<link rel="stylesheet" href="style.css?v=1791480155" />
+<style>
+  .count-pill { font-size: 11.5px; font-weight: 700; background: var(--slate-100); color: var(--slate-700); border-radius: 999px; padding: 2px 9px; }
+  .cc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 4px 0 14px; }
+  .cc-stat { border-radius: 14px; padding: 14px 16px; border: 1px solid var(--slate-200); background: var(--surface); }
+  .cc-stat .l { font-size: 12px; font-weight: 700; color: var(--slate-500); }
+  .cc-stat .v { font-size: 28px; font-weight: 900; margin-top: 2px; color: var(--slate-900); }
+  .cc-stat .v small { font-size: 13px; font-weight: 700; margin-left: 3px; }
+  .cc-stat .d { font-size: 11.5px; color: var(--slate-500); margin-top: 2px; }
+  .cc-stat.warn .v { color: #c2410c; }
+  .cc-stat.good .v { color: #16a34a; }
+  @media (max-width: 900px) { .cc-stats { grid-template-columns: repeat(2, 1fr); } }
+
+  .cc-tabs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 10px; }
+  .cc-tab { border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700); font-size: 13px; font-weight: 700;
+    padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+  .cc-tab i { font-style: normal; opacity: .75; margin-left: 4px; }
+  .cc-tab.active { background: var(--indigo-600); border-color: var(--indigo-600); color: #fff; }
+  .cc-tab.hot:not(.active) { border-color: #f9a58e; color: #c2410c; background: #fff4f0; }
+  .cc-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+  .cc-tools { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .cc-tools input, .cc-tools select { padding: 7px 10px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: var(--slate-900); }
+
+  .cc-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; overflow: hidden; margin-bottom: 14px; }
+  .cc-grp { padding: 10px 16px; font-weight: 900; font-size: 13.5px; display: flex; gap: 8px; align-items: center; background: var(--slate-50); border-bottom: 1px solid var(--slate-200); }
+  .cc-grp small { font-weight: 600; color: var(--slate-500); }
+  .cc-grp.red { background: #fff4f0; color: #c2410c; }
+  .cc-row { display: grid; grid-template-columns: 104px 158px 168px 196px minmax(150px, 1fr) 372px; gap: 10px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--slate-200); }
+  .cc-row:first-of-type { border-top: none; }
+  .cc-row.late { background: #fffaf8; }
+  .cc-row.head { font-size: 11.5px; color: var(--slate-500); font-weight: 800; background: var(--slate-50); padding: 7px 16px; }
+  @media (max-width: 1300px) { .cc-row { grid-template-columns: 100px 150px 150px 1fr; } .cc-row .c-memo { grid-column: 1 / -1; } .cc-row .c-act { grid-column: 1 / -1; } .cc-row.head { display: none; } }
+  .cc-nm { font-weight: 900; font-size: 14px; cursor: pointer; background: none; border: none; padding: 0; color: var(--slate-900); text-align: left; }
+  .cc-nm:hover { text-decoration: underline; }
+  .cc-ph { color: var(--slate-500); font-size: 12px; }
+  .cc-ph a { color: inherit; text-decoration: none; }
+  .cc-sub { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+  .cc-dd { font-weight: 800; font-size: 11.5px; border-radius: 6px; padding: 2px 7px; display: inline-block; background: var(--slate-100); color: var(--slate-700); }
+  .cc-dd.r { background: #fee2e2; color: #b91c1c; } .cc-dd.o { background: #ffedd5; color: #c2410c; }
+  .cc-steps { display: flex; gap: 4px; align-items: center; font-size: 11px; flex-wrap: wrap; }
+  .cc-dot { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; border: 1.5px solid var(--slate-300); color: var(--slate-400); }
+  .cc-dot.done { background: #10b981; border-color: #10b981; color: #fff; }
+  .cc-next { font-size: 11.5px; font-weight: 800; margin-top: 4px; }
+  .cc-next.late { color: #c2410c; } .cc-next.today { color: var(--indigo-600); } .cc-next.far { color: var(--slate-500); font-weight: 700; }
+  .c-memo { font-size: 12px; color: var(--slate-700); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
+  .c-act { display: flex; gap: 5px; flex-wrap: wrap; }
+  .cc-btn { padding: 6px 10px; border-radius: 8px; font-size: 11.5px; font-weight: 800; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700); cursor: pointer; white-space: nowrap; }
+  .cc-btn:disabled { opacity: .5; cursor: default; }
+  .cc-btn.ok { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
+  .cc-btn.no { background: #fff7ed; border-color: #fdba74; color: #c2410c; }
+  .cc-btn.th { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
+  .cc-btn.reg { background: var(--indigo-600); border-color: var(--indigo-600); color: #fff; }
+  .cc-btn.rj { background: var(--slate-100); color: var(--slate-500); }
+  .cc-btn.plan { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .cc-empty { padding: 26px 18px; color: var(--slate-500); text-align: center; font-size: 13.5px; }
+  .cc-more { display: block; width: 100%; padding: 10px; border: none; border-top: 1px solid var(--slate-200); background: var(--slate-50); color: var(--indigo-600); font-weight: 800; cursor: pointer; }
+  .cc-banner { border-radius: 12px; padding: 11px 14px; margin: 0 0 12px; font-size: 13px; line-height: 1.55; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; }
+
+  .cc-opt { display: inline-block; padding: 7px 14px; border-radius: 999px; border: 1.5px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-weight: 800; margin: 3px 4px 3px 0; font-size: 12.5px; cursor: pointer; }
+  .cc-opt.sel { background: var(--indigo-600); color: #fff; border-color: var(--indigo-600); }
+  .cc-tl { border-left: 3px solid var(--slate-200); margin: 6px 0 0 8px; padding-left: 14px; }
+  .cc-tl > div { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; position: relative; }
+  .cc-tl > div:before { content: ""; position: absolute; left: -21px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: #a5b4fc; border: 2px solid var(--surface); }
+  .cc-tl > div.today:before { background: #f97316; }
+  .cc-field { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: var(--slate-900); box-sizing: border-box; }
+  .cc-hint { font-size: 12px; color: #047857; background: #ecfdf5; border-radius: 10px; padding: 9px 12px; line-height: 1.55; margin-top: 12px; }
+  details.cc-fold > summary { cursor: pointer; font-weight: 800; padding: 10px 16px; background: var(--slate-50); }
+  .cc-call { border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; background: var(--surface); }
+  .cc-call .rowf { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; align-items: center; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="contact-center.html" class="active">📞 연락 센터</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="group-pt.html">그룹PT 관리</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="rules.html">센터 규정</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="payroll.html">급여 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <h2 style="margin:6px 0 4px;">📞 연락 센터</h2>
+    <p class="muted" style="margin:0 0 12px;">신규상담 · 만료회원 · 그룹PT를 한 곳에서 처리해요. 출근해서 <strong>일일업무</strong>만 위에서부터 돌리고, 결과 버튼을 누르면 <strong>다시 연락할 날에 자동으로 다시 올라와요</strong>. <span id="scopeNote"></span></p>
+
+    <div id="migrationBanner" class="cc-banner" style="display:none;"></div>
+    <div id="loadError" class="error-text" style="display:none;"></div>
+
+    <div class="cc-stats">
+      <div class="cc-stat"><div class="l">📞 오늘 연락할 사람</div><div class="v"><span id="statDaily">-</span><small>명</small></div><div class="d" id="statDailySub">&nbsp;</div></div>
+      <div class="cc-stat warn"><div class="l">⏰ 밀린 연락 (예정일 지남)</div><div class="v"><span id="statLate">-</span><small>명</small></div><div class="d">못 한 건 맨 위에 빨갛게 떠요</div></div>
+      <div class="cc-stat good"><div class="l">✅ 오늘 처리한 사람</div><div class="v"><span id="statDone">-</span><small>명</small></div><div class="d">연락 결과를 남기면 목록에서 빠져요</div></div>
+      <div class="cc-stat"><div class="l">🎯 이번 달 등록 전환</div><div class="v"><span id="statReg">-</span><small>건</small></div><div class="d">결과가 "등록"인 건수</div></div>
+    </div>
+
+    <div class="cc-card" id="callSection" style="display:none;">
+      <div class="cc-grp">📲 자동 통화 기록함 <span class="count-pill" id="callCount">0건</span>
+        <small>전화가 끝나면 30초 안에 자동으로 쌓여요. 메모(익시오 요약 등)를 붙여넣고 결과만 고르면 아래 일일업무에 반영돼요.</small></div>
+      <div id="callEventsList" style="padding:12px 14px 2px;"></div>
+    </div>
+
+    <div class="cc-tabs">
+      <button class="cc-tab active" data-tab="daily">📅 일일업무 <i id="tabDaily">0</i></button>
+      <button class="cc-tab" data-tab="todo">📋 미연락 <i id="tabTodo">0</i></button>
+      <button class="cc-tab" data-tab="later">⏳ 예정 · 진행중 <i id="tabLater">0</i></button>
+      <button class="cc-tab" data-tab="done">📦 처리 완료 보관함 <i id="tabDone">0</i></button>
+      <div class="cc-tools">
+        <select id="ownerFilter" style="display:none;"></select>
+        <input type="search" id="searchBox" placeholder="이름 · 전화번호 검색" />
+      </div>
+    </div>
+    <div class="cc-chips" id="chipRow"></div>
+
+    <div id="listArea"><div class="cc-card"><div class="cc-empty">불러오는 중...</div></div></div>
+
+    <p class="muted" style="margin:18px 2px 0; font-size:12px; display:flex; gap:14px; flex-wrap:wrap;">
+      <span>기존 상세 시트:</span>
+      <a href="consultations.html">신규상담 시트(문자 발송 포함)</a>
+      <a href="expiry.html">만료회원 · TM 시트</a>
+      <a href="group-pt.html">그룹PT 관리</a>
+      <span>— 연락 센터에서 남긴 기록은 이 시트들에도 그대로 이어져요.</span>
+    </p>
+    <p class="muted" id="pageVersion" style="margin:6px 2px 24px; font-size:11.5px; text-align:right;">연락 센터 · 2026-10-12 최초 버전 (재연락 날짜 · 자동통화 연동)</p>
+  </div>
+
+  <!-- 결과 입력 창 -->
+  <div class="modal-overlay" id="resultModal" style="display:none;">
+    <div class="modal-box" style="max-width:480px;">
+      <div class="modal-header"><div><h3 id="rmTitle"></h3><div class="muted" id="rmSub" style="font-size:12.5px;"></div></div>
+        <button class="modal-close" id="rmClose" type="button">×</button></div>
+      <div id="rmDateBox">
+        <div style="font-size:12px;color:var(--slate-500);font-weight:700;margin-bottom:4px;">언제 다시 연락할까요?</div>
+        <div id="rmChips"></div>
+        <input type="date" id="rmDate" class="cc-field" style="margin-top:6px;" />
+      </div>
+      <div id="rmInfo" class="cc-hint" style="display:none;"></div>
+      <div style="margin:12px 0 4px;font-size:12px;color:var(--slate-500);font-weight:700;">메모 (선택)</div>
+      <textarea id="rmMemo" rows="3" class="cc-field" placeholder="통화 내용을 간단히 적어주세요"></textarea>
+      <div id="rmMsg" class="error-text" style="display:none;margin-top:8px;"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;">
+        <button type="button" class="btn btn-primary" id="rmSave" style="width:auto;padding:8px 20px;">저장</button>
+        <button type="button" class="btn btn-outline" id="rmCancel" style="width:auto;padding:8px 16px;">취소</button>
+      </div>
+      <div class="cc-hint" id="rmHint"></div>
+    </div>
+  </div>
+
+  <!-- 상세(이력) 창 -->
+  <div class="modal-overlay" id="detailModal" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-header"><div><h3 id="dmTitle"></h3><div class="muted" id="dmSub" style="font-size:12.5px;"></div></div>
+        <button class="modal-close" id="dmClose" type="button">×</button></div>
+      <div id="dmBody"></div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791480155"></script>
+  <script src="data.js?v=1791640000"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    // ------------------------------------------------------------------
+    // 기본 값 / 도우미
+    // ------------------------------------------------------------------
+    const TODAY = formatDateStr(new Date());
+    const THIS_MONTH = TODAY.slice(0, 7);
+    const WD = ['일', '월', '화', '수', '목', '금', '토'];
+    const LEGACY_GAP = 7;          // 재연락일이 따로 없던 예전 "고민중" 건은 마지막 연락 + 7일 뒤에 자동으로 다시 올라옴
+    const LEGACY_STALE_DAYS = 14;  // 그 날짜가 14일도 넘게 지났으면 "방치된 건"으로 따로 모음(일일업무를 덮지 않게)
+    const NEVER_CONTACTED_WINDOW = 60; // 신규상담 미연락은 60일 이내 건만 미연락 칸에 (더 오래된 건 예정·진행중 > 방치)
+    const GPT_LOW_ATTEND_DAYS = 14;    // 그룹PT 무제한: 이 일수 이상 안 오면 미연락 칸에 올림
+    const RESULT_LABEL = { called: '통화완료', noanswer: '부재중', thinking: '고민중', registered: '등록', declined: '거절', rolled: '이월' };
+    const CHANNEL_LABEL = { phone_auto: '자동통화', naver_place: '네이버 플레이스', carrot: '당근', blog: '블로그', referral: '지인소개',
+      instagram: '인스타', meta_ads: '메타광고', flyer: '전단지', walk_by: '지나가다', re_registration_tm: '재등록TM' };
+    const CATEGORY_CHIP = { membership: 'membership', group_pt: 'group_pt', pt: 'pt' }; // 나머지는 'etc'(락커·운동복 등)
+
+    const addDays = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return formatDateStr(d); };
+    const diffDays = (a, b) => Math.round((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 86400000);
+    const mdw = (s) => { const d = new Date(s + 'T00:00:00'); return `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`; };
+    const md = (s) => `${Number(s.slice(5, 7))}/${Number(s.slice(8, 10))}`;
+    const digitsOf = (v) => String(v || '').replace(/\D/g, '');
+    const firstDayOfMonthAfter = (dateStr, n) => { const [y, m] = dateStr.split('-').map(Number); return formatDateStr(new Date(y, m - 1 + n, 1)); };
+    const esc = (s) => escapeHtml(String(s === null || s === undefined ? '' : s));
+    function lsGet(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장 못 해도 화면은 정상 */ } }
+
+    // ------------------------------------------------------------------
+    // 상태
+    // ------------------------------------------------------------------
+    let me = null, isManager = false;
+    let consultRows = [], expiryItems = [], gptItems = [], staffMap = {};
+    let tasks = [];
+    let HAS_NEXT = true;                 // migration_83(재연락 날짜 칸) 실행 여부
+    let activeTab = 'daily';
+    const subFilter = { daily: 'all', todo: 'all', later: 'all', done: 'all' };
+    let catFilter = 'all', doneScope = 'month', ownerFilter = 'all', searchText = '';
+    let autoDays = Number(lsGet('cc_auto_days', '7')) || 7;   // 만료 D-N일 이내 미연락 건을 일일업무에 자동 편입
+    const showLimit = {};                 // 그룹별 "더 보기" 개수
+    let resultCtx = null;
+
+    // ------------------------------------------------------------------
+    // 만료(TM) 항목 상태 계산 - expiry.html과 같은 규칙 (이월은 달이 바뀌면 다시 올라옴)
+    // ------------------------------------------------------------------
+    function tmStatusInfo(it) {
+      const raw = it.latestTm ? it.latestTm.status : 'not_contacted';
+      const logMonth = it.latestTm && it.latestTm.contact_date ? it.latestTm.contact_date.slice(0, 7) : THIS_MONTH;
+      const carried = raw === 'rolled_over' && logMonth < THIS_MONTH;
+      const done = TM_ARCHIVE_STATUSES.includes(raw) && !carried;
+      return { raw, carried, done };
+    }
+    const TM_RESULT_TO_STATUS = { called: 'in_progress', thinking: 'in_progress', noanswer: 'no_answer', registered: 'renewed', declined: 'declined', rolled: 'rolled_over' };
+    const GPT_RESULT_TO_STATUS = { called: 'contacted', thinking: 'proposed', noanswer: 'contacted', registered: 'converted', declined: 'declined', rolled: 'on_hold' };
+    const DONE_LABEL = { renewed: '등록', converted: '등록', registered: '등록', declined: '거절', rolled_over: '이월' };
+    const DONE_KEY = { renewed: 'registered', converted: 'registered', registered: 'registered', declined: 'declined', rolled_over: 'rolled' };
+
+    // ------------------------------------------------------------------
+    // 세 종류 데이터 → 통일된 "할 일(task)"로 변환
+    // ------------------------------------------------------------------
+    function maxDate(list) { const a = list.filter(Boolean).sort(); return a.length ? a[a.length - 1] : null; }
+
+    function consultTask(c) {
+      const contacts = [c.contact1_date, c.contact2_date, c.contact3_date].filter(Boolean);
+      const interests = [c.interest_gym && '헬스', c.interest_pt && 'PT', c.interest_group_pt && '그룹PT'].filter(Boolean).join(' · ');
+      const done = c.status !== 'considering';
+      return {
+        key: 'c:' + c.id, src: 'consult', kind: c.kind === 'tm' ? 'tm' : 'walkin', id: c.id, raw: c,
+        name: c.name, phone: c.phone, ownerId: c.created_by || null,
+        headline: interests ? interests + ' 관심' : '관심 상품 미입력', sub: CHANNEL_LABEL[c.channel] || '',
+        startDate: c.consult_date, contacts, lastContact: maxDate(contacts), nextDate: c.next_contact_date || null,
+        memo: c.memo || '', touched: contacts.length > 0, resultKey: c.status,
+        done, doneKey: DONE_KEY[c.status] || null, doneDate: maxDate(contacts) || c.consult_date
+      };
+    }
+
+    function expiryTask(it) {
+      const m = it.member, info = tmStatusInfo(it), tm = it.latestTm;
+      const contacts = [m.tm_contact1_date, m.tm_contact2_date, m.tm_contact3_date].filter(Boolean);
+      const touchedLog = !!(tm && tm.status !== 'not_contacted');
+      const lastContact = maxDate([touchedLog ? tm.contact_date : null, ...contacts]);
+      let nextDate = (tm && tm.next_contact_date) || null;
+      if (info.carried) nextDate = THIS_MONTH + '-01';
+      const daysLeft = it.expiryDate ? diffDays(it.expiryDate, TODAY) : null;
+      const kind = it.categoryKey === 'membership' ? 'exp_membership' : it.categoryKey === 'group_pt' ? 'exp_group_pt' : it.categoryKey === 'pt' ? 'exp_pt' : 'exp_etc';
+      return {
+        key: 'e:' + m.id + '|' + it.categoryKey, src: 'expiry', kind, item: it, memberId: m.id, raw: tm,
+        name: m.name, phone: m.phone, ownerId: m.assigned_trainer_id || null, ownerName: m.trainer && m.trainer.name,
+        headline: it.productLabel, sub: it.expiryDate ? '만료 ' + mdw(it.expiryDate) : '', expiryDate: it.expiryDate, daysLeft,
+        startDate: null, contacts, lastContact, nextDate, memo: (tm && tm.memo) || '', touched: touchedLog || contacts.length > 0,
+        resultKey: info.carried ? 'in_progress' : info.raw, carried: info.carried,
+        done: info.done, doneKey: DONE_KEY[info.raw] || null, doneDate: (tm && tm.contact_date) || lastContact
+      };
+    }
+
+    function gptTask(it) {
+      const m = it.member, lg = it.latestLog, st = lg ? lg.status : 'not_contacted';
+      const done = st === 'converted' || st === 'declined';
+      const low = it.daysSinceVisit !== null && it.daysSinceVisit >= GPT_LOW_ATTEND_DAYS;
+      const hasNext = !!(lg && lg.next_contact_date);
+      if (!done && st === 'not_contacted' && !low && !hasNext) return null; // 잘 나오는 회원은 연락 대상이 아님
+      return {
+        key: 'g:' + m.id, src: 'gpt', kind: 'gpt', item: it, memberId: m.id, raw: lg,
+        name: m.name, phone: m.phone, ownerId: m.assigned_trainer_id || null, ownerName: m.trainer && m.trainer.name,
+        headline: m.group_pt_type || '그룹PT 무제한',
+        sub: it.daysSinceVisit === null ? '방문 기록 없음' : `${it.daysSinceVisit}일째 안 옴`, daysSince: it.daysSinceVisit,
+        startDate: null, contacts: [], lastContact: lg && st !== 'not_contacted' ? lg.contact_date : null, nextDate: (lg && lg.next_contact_date) || null,
+        memo: (lg && lg.memo) || '', touched: !!(lg && st !== 'not_contacted'), resultKey: st,
+        done, doneKey: st === 'converted' ? 'registered' : st === 'declined' ? 'declined' : null, doneDate: lg ? lg.contact_date : null
+      };
+    }
+
+    // 어느 칸(일일업무/미연락/예정·진행중/보관함)에 둘지
+    function classify(t) {
+      t.stale = false; t.effNext = null;
+      if (t.done) return 'done';
+      if (t.nextDate) { t.effNext = t.nextDate; return t.nextDate <= TODAY ? 'daily' : 'later'; }
+      if (t.touched) {
+        // 재연락일 없이 "고민중"으로 남아있던 예전 기록 - 놓치지 않게 마지막 연락 + 7일(부재중은 +1일)에 자동으로 다시 올림
+        const base = t.lastContact || t.startDate || TODAY;
+        const eff = addDays(base, t.resultKey === 'no_answer' ? 1 : LEGACY_GAP);
+        t.effNext = eff;
+        if (diffDays(TODAY, eff) > LEGACY_STALE_DAYS) { t.stale = true; return 'later'; }
+        return eff <= TODAY ? 'daily' : 'later';
+      }
+      // 한 번도 연락 안 한 건
+      if (t.src === 'consult') {
+        const age = diffDays(TODAY, t.startDate || TODAY);
+        if (age <= 3) { t.autoDaily = true; t.effNext = TODAY; return 'daily'; }           // 갓 들어온 문의는 바로 오늘 첫 연락
+        if (age > NEVER_CONTACTED_WINDOW) { t.stale = true; return 'later'; }
+        return 'todo';
+      }
+      if (t.src === 'expiry') {
+        const main = t.kind !== 'exp_etc';
+        if (main && t.daysLeft !== null && t.daysLeft >= -7 && t.daysLeft <= autoDays) { t.autoDaily = true; t.effNext = TODAY; return 'daily'; } // 만료 직후 1주일까지는 놓치지 않게 계속 올림
+        return 'todo';
+      }
+      return 'todo';
+    }
+
+    function buildTasks() {
+      const out = [];
+      consultRows.forEach(c => out.push(consultTask(c)));
+      expiryItems.forEach(it => out.push(expiryTask(it)));
+      gptItems.forEach(it => { const t = gptTask(it); if (t) out.push(t); });
+      out.forEach(t => {
+        t.ownerName = t.ownerName || staffMap[t.ownerId] || '';
+        t.phoneDigits = digitsOf(t.phone);
+        t.bucket = classify(t);
+      });
+      tasks = out;
+    }
+
+    // 지점장은 전체, FC는 본인 담당(+담당 미배정) 건만
+    function visibleToMe(t) {
+      if (isManager) {
+        if (ownerFilter === 'all') return true;
+        if (ownerFilter === '__none') return !t.ownerId;
+        return t.ownerId === ownerFilter;
+      }
+      // FC: 본인 담당만. (회원 목록은 전 직원에게 조회가 열려 있어서 담당 미배정 회원까지 다 보이면 목록이 넘치니 신규상담만 미배정을 같이 보여줌)
+      return t.ownerId === (me && me.id) || (!t.ownerId && t.src === 'consult');
+    }
+    function matchesSearch(t) {
+      const q = searchText.trim().toLowerCase();
+      if (!q) return true;
+      const qd = q.replace(/\D/g, '');
+      return (t.name || '').toLowerCase().includes(q) || (qd && t.phoneDigits.includes(qd));
+    }
+    const scoped = () => tasks.filter(visibleToMe);
+
+    // ------------------------------------------------------------------
+    // 화면 그리기
+    // ------------------------------------------------------------------
+    function kindBadge(t) {
+      switch (t.kind) {
+        case 'walkin': return '<span class="badge badge-blue">워크인</span>';
+        case 'tm': return '<span class="badge badge-teal">TM상담</span>';
+        case 'exp_membership': return '<span class="badge badge-orange">만료 · 헬스</span>';
+        case 'exp_group_pt': return '<span class="badge badge-purple">만료 · 그룹PT</span>';
+        case 'exp_pt': return '<span class="badge badge-orange">만료 · PT</span>';
+        case 'exp_etc': return '<span class="badge badge-slate">만료 · 기타</span>';
+        case 'gpt': return '<span class="badge badge-purple">그룹PT 무제한</span>';
+      }
+      return '';
+    }
+    function ddayBadge(t) {
+      if (t.src === 'gpt') {
+        const d = t.daysSince;
+        return d === null ? '' : `<span class="cc-dd ${d >= 30 ? 'r' : 'o'}">${d}일 미방문</span>`;
+      }
+      if (t.src !== 'expiry' || t.daysLeft === null) return '';
+      const d = t.daysLeft;
+      if (d < 0) return `<span class="cc-dd r">만료 ${-d}일 지남</span>`;
+      if (d === 0) return '<span class="cc-dd r">오늘 만료</span>';
+      return `<span class="cc-dd ${d <= 3 ? 'r' : d <= 14 ? 'o' : ''}">D-${d}</span>`;
+    }
+    function nextLabel(t) {
+      const d = t.nextDate || t.effNext;
+      if (!d) return '<div class="cc-next far">재연락일 미정</div>';
+      const diff = diffDays(d, TODAY), auto = t.nextDate ? '' : ' (자동)';
+      if (diff < 0) return `<div class="cc-next late">⏰ ${mdw(d)} 예정 · ${-diff}일 밀림${auto}</div>`;
+      if (diff === 0) return `<div class="cc-next today">📞 오늘 연락${auto}</div>`;
+      return `<div class="cc-next far">다음 ${mdw(d)} · ${diff === 1 ? '내일' : diff + '일 뒤'}${auto}</div>`;
+    }
+    function stepsHtml(t) {
+      if (t.src === 'gpt') return t.touched ? `<div class="cc-steps"><span class="cc-dot done">✓</span><span>${md(t.lastContact)} 연락</span></div>` : '<div class="cc-steps"><span class="cc-dot">1</span><span>처음 연락</span></div>';
+      const cs = t.contacts.slice().sort();
+      const dots = [0, 1, 2].map(i => cs[i]
+        ? `<span class="cc-dot done" title="${i + 1}차 연락 ${cs[i]}">${i + 1}</span><span>${md(cs[i])}</span>`
+        : (i === cs.length ? `<span class="cc-dot" title="다음 연락">${i + 1}</span>` : '')).join('');
+      return `<div class="cc-steps">${dots || '<span class="cc-dot">1</span><span>처음 연락</span>'}</div>`;
+    }
+    function actionsHtml(t) {
+      const k = esc(t.key);
+      if (t.done) {
+        return `<button class="cc-btn" data-act="detail" data-key="${k}">이력</button><button class="cc-btn rj" data-act="restore" data-key="${k}">되돌리기</button>`;
+      }
+      const plan = t.bucket === 'todo' ? `<button class="cc-btn plan" data-act="today" data-key="${k}" title="재연락일을 오늘로 잡아 일일업무에 올려요">오늘 할 일에 담기</button>` : '';
+      return plan +
+        `<button class="cc-btn ok" data-act="called" data-key="${k}">통화완료</button>` +
+        `<button class="cc-btn no" data-act="noanswer" data-key="${k}">부재중</button>` +
+        `<button class="cc-btn th" data-act="thinking" data-key="${k}">고민중</button>` +
+        `<button class="cc-btn reg" data-act="registered" data-key="${k}">등록</button>` +
+        `<button class="cc-btn rj" data-act="declined" data-key="${k}">거절</button>` +
+        `<button class="cc-btn rj" data-act="rolled" data-key="${k}">이월</button>`;
+    }
+    function rowHtml(t) {
+      const late = !t.done && (t.nextDate || t.effNext) && (t.nextDate || t.effNext) < TODAY;
+      const phone = t.phone ? `<a href="tel:${esc(digitsOf(t.phone))}">${esc(formatPhone(t.phone) || t.phone)}</a>` : '<span class="cc-ph">번호 없음</span>';
+      const owner = isManager && t.ownerName ? `담당 ${esc(t.ownerName)}` : '';
+      const carriedBadge = t.carried ? ' <span class="badge badge-purple" title="지난달에 이월 처리돼서 이번 달로 넘어온 건">이월</span>' : '';
+      let c4 = t.done
+        ? `<span class="badge ${t.doneKey === 'registered' ? 'badge-green' : t.doneKey === 'declined' ? 'badge-red' : 'badge-purple'}">${esc(DONE_LABEL[t.resultKey] || RESULT_LABEL[t.doneKey] || '')}</span><div class="cc-sub">${t.doneDate ? '처리 ' + md(t.doneDate) : ''}</div>`
+        : stepsHtml(t) + nextLabel(t);
+      return `<div class="cc-row ${late ? 'late' : ''}">
+        <div>${kindBadge(t)}</div>
+        <div><button class="cc-nm" data-act="detail" data-key="${esc(t.key)}">${esc(t.name)}</button>${carriedBadge}
+          <div class="cc-ph">${phone}</div></div>
+        <div>${esc(t.headline)}<div class="cc-sub">${ddayBadge(t)} ${t.sub && t.src !== 'expiry' ? esc(t.sub) : ''}</div>${t.src === 'expiry' && t.sub ? `<div class="cc-sub">${esc(t.sub)}</div>` : ''}${owner ? `<div class="cc-sub">${owner}</div>` : ''}</div>
+        <div>${c4}</div>
+        <div class="c-memo" title="${esc(t.memo)}">${t.memo ? esc(t.memo) : '<span class="muted">메모 없음</span>'}</div>
+        <div class="c-act">${actionsHtml(t)}</div>
+      </div>`;
+    }
+    const HEAD_ROW = '<div class="cc-row head"><div>구분</div><div>이름 / 전화</div><div>상품 · 현황</div><div>연락 현황</div><div>마지막 메모</div><div>결과 처리</div></div>';
+
+    function groupHtml(gkey, title, sub, list, { red = false, empty = '' } = {}) {
+      if (!list.length) return empty ? `<div class="cc-card"><div class="cc-empty">${empty}</div></div>` : '';
+      const limit = showLimit[gkey] || 40;
+      const shown = list.slice(0, limit);
+      return `<div class="cc-card"><div class="cc-grp ${red ? 'red' : ''}">${title} <span class="count-pill">${list.length}명</span> ${sub ? `<small>${sub}</small>` : ''}</div>
+        ${HEAD_ROW}${shown.map(rowHtml).join('')}
+        ${list.length > limit ? `<button class="cc-more" data-more="${gkey}">${list.length - limit}명 더 보기</button>` : ''}</div>`;
+    }
+
+    const sortByNext = (a, b) => ((a.nextDate || a.effNext || '') < (b.nextDate || b.effNext || '') ? -1 : (a.nextDate || a.effNext || '') > (b.nextDate || b.effNext || '') ? 1 : (a.name || '').localeCompare(b.name || '', 'ko'));
+    const srcOf = (t) => t.src;
+
+    function renderChips(counts) {
+      const row = document.getElementById('chipRow');
+      let defs = [];
+      if (activeTab === 'daily') {
+        defs = [['all', '전체'], ['consult', '신규상담'], ['expiry', '만료 회원'], ['gpt', '그룹PT 무제한']];
+      } else if (activeTab === 'todo') {
+        defs = [['all', '전체'], ['membership', '🏋️ 회원권 임박'], ['group_pt', '🤸 그룹PT 임박'], ['etcsoon', '💪 PT·기타 임박'],
+          ['newconsult', '🆕 신규상담 미연락'], ['gptlow', '📉 그룹PT 참석 저조'], ['expired', '📦 만료자 DB']];
+      } else if (activeTab === 'later') {
+        defs = [['all', '전체'], ['planned', '날짜 잡힌 건'], ['stale', '방치된 건 (날짜 없이 오래됨)']];
+      } else {
+        defs = [['all', '전체'], ['registered', '✅ 등록'], ['declined', '🚫 거절(미스)'], ['rolled', '📦 이월']];
+      }
+      const cur = subFilter[activeTab];
+      let html = defs.map(([k, l]) => `<button class="filter-tab ${cur === k ? 'active' : ''}" data-chip="${k}">${l}${counts[k] !== undefined ? ` (${counts[k]})` : ''}</button>`).join('');
+      if (activeTab === 'todo' && cur === 'expired') {
+        html += '<span style="width:12px;"></span>' + [['all', '전체'], ['membership', '회원권'], ['group_pt', '그룹PT'], ['pt', 'PT'], ['etc', '기타']]
+          .map(([k, l]) => `<button class="filter-tab ${catFilter === k ? 'active' : ''}" data-cat="${k}">${l}</button>`).join('');
+      }
+      if (activeTab === 'daily') {
+        html += `<span class="muted" style="margin-left:auto; font-size:12px; align-self:center;">연락한 적 없는 만료 임박 건은
+          <select id="autoDaysSel" style="padding:3px 6px; border:1px solid var(--slate-300); border-radius:6px; background:var(--surface); color:var(--slate-900);">
+          ${[3, 7, 14, 21, 30].map(n => `<option value="${n}" ${n === autoDays ? 'selected' : ''}>D-${n}일</option>`).join('')}</select> 부터 자동으로 올라와요</span>`;
+      }
+      if (activeTab === 'done') {
+        html += `<select id="doneScopeSel" style="margin-left:auto; padding:5px 8px; border:1px solid var(--slate-300); border-radius:8px; background:var(--surface); color:var(--slate-900);">
+          <option value="month" ${doneScope === 'month' ? 'selected' : ''}>이번 달 처리분</option><option value="all" ${doneScope === 'all' ? 'selected' : ''}>전체 기간</option></select>`;
+      }
+      row.innerHTML = html;
+    }
+
+    function todoGroup(t) {
+      if (t.src === 'consult') return 'newconsult';
+      if (t.src === 'gpt') return 'gptlow';
+      if (t.daysLeft !== null && t.daysLeft < 0) return 'expired';
+      if (t.kind === 'exp_membership') return 'membership';
+      if (t.kind === 'exp_group_pt') return 'group_pt';
+      return 'etcsoon';
+    }
+
+    function renderList() {
+      const mine = scoped();
+      const bucketOf = (b) => mine.filter(t => t.bucket === b);
+      const q = (arr) => arr.filter(matchesSearch);
+      const area = document.getElementById('listArea');
+
+      // 탭 숫자 / 상단 카드
+      const daily = bucketOf('daily'), todo = bucketOf('todo'), later = bucketOf('later'), done = bucketOf('done');
+      document.getElementById('tabDaily').textContent = daily.length;
+      document.getElementById('tabTodo').textContent = todo.length;
+      document.getElementById('tabLater').textContent = later.length;
+      document.getElementById('tabDone').textContent = done.length;
+      document.querySelector('[data-tab="daily"]').classList.toggle('hot', daily.some(t => (t.nextDate || t.effNext) < TODAY));
+      const lateCnt = daily.filter(t => (t.nextDate || t.effNext) < TODAY).length;
+      const bySrc = (s) => daily.filter(t => t.src === s).length;
+      document.getElementById('statDaily').textContent = daily.length;
+      document.getElementById('statDailySub').textContent = `신규상담 ${bySrc('consult')} · 만료 ${bySrc('expiry')} · 그룹PT ${bySrc('gpt')}`;
+      document.getElementById('statLate').textContent = lateCnt;
+      const touchedToday = mine.filter(t => t.lastContact === TODAY);
+      document.getElementById('statDone').textContent = touchedToday.length;
+      document.getElementById('statReg').textContent = done.filter(t => t.doneKey === 'registered' && (t.doneDate || '').slice(0, 7) === THIS_MONTH).length;
+
+      let counts = {};
+      let html = '';
+      if (activeTab === 'daily') {
+        const f = subFilter.daily;
+        counts = { all: daily.length, consult: bySrc('consult'), expiry: bySrc('expiry'), gpt: bySrc('gpt') };
+        let list = q(daily).filter(t => f === 'all' || srcOf(t) === f);
+        const overdue = list.filter(t => (t.nextDate || t.effNext) < TODAY).sort(sortByNext);
+        const today = list.filter(t => (t.nextDate || t.effNext) >= TODAY).sort((a, b) => {
+          const o = { consult: 0, expiry: 1, gpt: 2 }; return o[a.src] - o[b.src] || (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
+        });
+        html += groupHtml('daily-late', '⏰ 밀린 연락', '예정일이 지났는데 아직 처리 안 한 사람이에요', overdue, { red: true });
+        html += groupHtml('daily-today', `📅 오늘 예정 · ${mdw(TODAY)}`, '', today,
+          { empty: overdue.length || daily.length === 0 ? (daily.length === 0 ? '🎉 오늘 연락할 사람이 없어요. "미연락" 탭에서 미리 연락할 사람을 담아도 좋아요.' : '') : '' });
+        if (!overdue.length && !today.length && daily.length > 0) html += '<div class="cc-card"><div class="cc-empty">검색/필터에 맞는 사람이 없어요.</div></div>';
+        // 오늘 처리한 사람
+        const tdone = q(touchedToday);
+        if (tdone.length) {
+          html += `<details class="cc-card cc-fold"><summary>✅ 오늘 처리한 사람 (${tdone.length}명)</summary>${HEAD_ROW}${tdone.map(rowHtml).join('')}</details>`;
+        }
+      } else if (activeTab === 'todo') {
+        const f = subFilter.todo;
+        todo.forEach(t => { t.tg = todoGroup(t); });
+        counts = { all: todo.length };
+        ['membership', 'group_pt', 'etcsoon', 'newconsult', 'gptlow', 'expired'].forEach(k => counts[k] = todo.filter(t => t.tg === k).length);
+        const base = q(todo);
+        const pick = (k) => base.filter(t => t.tg === k);
+        const byDays = (a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
+        const defs = [
+          ['membership', '🏋️ 회원권 임박', '남은 일수가 적은 순', pick('membership').sort(byDays)],
+          ['group_pt', '🤸 그룹PT 임박', '남은 일수가 적은 순', pick('group_pt').sort(byDays)],
+          ['etcsoon', '💪 PT · 기타 이용권 임박', '', pick('etcsoon').sort(byDays)],
+          ['newconsult', '🆕 신규상담 미연락', '아직 한 번도 연락 못 한 문의', pick('newconsult').sort((a, b) => (b.startDate || '') < (a.startDate || '') ? -1 : 1)],
+          ['gptlow', '📉 그룹PT 무제한 · 참석 저조', '오래 안 온 순', pick('gptlow').sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))],
+          ['expired', '📦 만료자 DB', '만료된 지 얼마 안 된 순 · 재등록 안 한 회원', pick('expired').filter(t => catFilter === 'all' || (CATEGORY_CHIP[t.item.categoryKey] || 'etc') === catFilter)
+            .sort((a, b) => b.daysLeft - a.daysLeft)]
+        ];
+        defs.forEach(([k, title, sub, list]) => { if (f === 'all' || f === k) html += groupHtml('todo-' + k, title, sub, list); });
+        if (!html) html = '<div class="cc-card"><div class="cc-empty">연락 안 한 사람이 없어요 👍</div></div>';
+      } else if (activeTab === 'later') {
+        const f = subFilter.later;
+        counts = { all: later.length, planned: later.filter(t => !t.stale).length, stale: later.filter(t => t.stale).length };
+        const list = q(later).filter(t => f === 'all' || (f === 'stale' ? t.stale : !t.stale));
+        const planned = list.filter(t => !t.stale).sort(sortByNext), stale = list.filter(t => t.stale).sort((a, b) => ((b.lastContact || b.startDate || '') < (a.lastContact || a.startDate || '') ? -1 : 1));
+        html += groupHtml('later-plan', '⏳ 재연락일이 잡힌 사람', '그 날이 되면 자동으로 일일업무에 올라와요', planned);
+        html += groupHtml('later-stale', '🕸 방치된 건', '연락일 없이 오래 남아있던 예전 기록이에요. "오늘 할 일에 담기"처럼 고민중으로 다시 처리하면 정리돼요', stale);
+        if (!html) html = '<div class="cc-card"><div class="cc-empty">예정된 연락이 없어요.</div></div>';
+      } else {
+        const f = subFilter.done;
+        let pool = done.filter(t => doneScope === 'all' || (t.doneDate || '').slice(0, 7) === THIS_MONTH);
+        counts = { all: pool.length, registered: pool.filter(t => t.doneKey === 'registered').length, declined: pool.filter(t => t.doneKey === 'declined').length, rolled: pool.filter(t => t.doneKey === 'rolled').length };
+        const list = q(pool).filter(t => f === 'all' || t.doneKey === f).sort((a, b) => ((b.doneDate || '') < (a.doneDate || '') ? -1 : 1));
+        html += groupHtml('done', '📦 처리 완료', '재연락일이 없는 완료 건이에요. 잘못 눌렀으면 "되돌리기"로 일일업무에 다시 올려요', list, { empty: '이 기간에 처리 완료된 건이 없어요.' });
+      }
+      area.innerHTML = html;
+      renderChips(counts);
+    }
+
+    // ------------------------------------------------------------------
+    // 결과 저장 (세 종류 원본 테이블에 각각 맞게 기록)
+    // ------------------------------------------------------------------
+    function composeMemo(prev, result, text, dateStr = TODAY) {
+      const line = `[${md(dateStr)} ${RESULT_LABEL[result]}]` + (text ? ' ' + text : '');
+      return prev ? prev + ' · ' + line : line;
+    }
+    function nextSlot(obj, prefix, suffix) {
+      // 오늘 날짜가 이미 어느 칸에 있으면 그대로, 아니면 첫 빈 칸(다 찼으면 마지막 칸을 최신 날짜로)
+      const keys = [1, 2, 3].map(n => `${prefix}${n}${suffix}`);
+      if (keys.some(k => obj[k] === TODAY)) return null;
+      return keys.find(k => !obj[k]) || keys[2];
+    }
+    const OPEN_RESULTS = ['called', 'noanswer', 'thinking'];
+
+    async function recordResult(t, result, { nextDate, memo }) {
+      const isOpen = OPEN_RESULTS.includes(result);
+      const nd = isOpen ? (nextDate || null) : null;
+      if (t.src === 'consult') {
+        const c = t.raw;
+        const patch = { memo: composeMemo(c.memo, result, memo) };
+        patch.status = result === 'registered' ? 'registered' : result === 'declined' ? 'declined' : result === 'rolled' ? 'rolled_over' : 'considering';
+        const slot = nextSlot(c, 'contact', '_date');
+        if (slot) patch[slot] = TODAY;
+        if (HAS_NEXT) patch.next_contact_date = nd;
+        const rows = await updateWalkinConsultation(c.id, patch);
+        Object.assign(c, (rows && rows[0]) || patch);
+        if (result === 'rolled') await carryOverConsult(c);
+      } else if (t.src === 'expiry') {
+        const it = t.item, m = it.member;
+        const payload = {
+          member_id: m.id, staff_id: (isManager && m.assigned_trainer_id) || me.id, category: it.categoryKey,
+          status: TM_RESULT_TO_STATUS[result], contact_date: TODAY, memo: composeMemo(t.memo, result, memo)
+        };
+        if (TM_NEXT_DATE_SUPPORTED !== false) payload.next_contact_date = nd; // migration_83 전이면 칸 자체를 빼고 저장
+        const rows = await addTmLog(payload);
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        it.latestTm = { ...row, memoIds: [row.id] };
+        it.tmHistory = [row, ...(it.tmHistory || [])];
+        const key = nextSlot(m, 'tm_contact', '_date');
+        if (key) { try { await updateMember(m.id, { [key]: TODAY }); m[key] = TODAY; } catch (e) { /* 연락일 표기 실패는 기록 저장에 영향 없음 */ } }
+        // 같은 회원의 다른 상품 줄에도 연락일이 보이도록 같은 member 객체를 쓰고 있음(fetchExpiryBoard가 한 번 불러온 객체)
+      } else {
+        const it = t.item, m = it.member;
+        const payload = {
+          member_id: m.id, staff_id: (isManager && m.assigned_trainer_id) || me.id,
+          status: GPT_RESULT_TO_STATUS[result], contact_date: TODAY, memo: composeMemo(t.memo, result, memo)
+        };
+        if (HAS_NEXT) payload.next_contact_date = result === 'rolled' ? firstDayOfMonthAfter(TODAY, 1) : nd;
+        const rows = await addGroupPtRetentionLog(payload);
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        it.latestLog = row;
+        (m.group_pt_retention_logs = m.group_pt_retention_logs || []).unshift(row);
+      }
+      buildTasks();
+    }
+
+    async function carryOverConsult(c) {
+      const first = firstDayOfMonthAfter(c.consult_date || TODAY, 1);
+      const end = firstDayOfMonthAfter(first, 1);
+      const dup = consultRows.find(x => x.id !== c.id && x.name === c.name && digitsOf(x.phone) === digitsOf(c.phone) && x.consult_date >= first && x.consult_date < end);
+      if (dup) return;
+      const payload = {
+        consult_date: first, name: c.name, phone: c.phone || null, gender: c.gender || null, channel: c.channel || null,
+        interest_gym: !!c.interest_gym, interest_pt: !!c.interest_pt, interest_group_pt: !!c.interest_group_pt,
+        memo: c.memo || null, status: 'considering', kind: c.kind || 'walkin',
+        contact1_date: c.contact1_date || null, contact2_date: c.contact2_date || null, contact3_date: c.contact3_date || null,
+        created_by: c.created_by || me.id
+      };
+      if (HAS_NEXT) payload.next_contact_date = first;
+      const created = await addWalkinConsultation(payload);
+      const rec = Array.isArray(created) ? created[0] : created;
+      if (rec) consultRows.push(rec);
+    }
+
+    async function restoreTask(t) {
+      if (t.src === 'consult') {
+        const patch = { status: 'considering', memo: composeMemo(t.raw.memo, 'thinking', '(되돌림)') };
+        if (HAS_NEXT) patch.next_contact_date = TODAY;
+        const rows = await updateWalkinConsultation(t.raw.id, patch);
+        Object.assign(t.raw, (rows && rows[0]) || patch);
+        buildTasks();
+      } else {
+        const wasDone = t.done;
+        const fake = { ...t, done: false };
+        // 되돌림도 새 연락 기록으로 남김: 고민중 + 오늘 재연락
+        await recordResult(t, 'thinking', { nextDate: TODAY, memo: '(보관함에서 되돌림)' });
+        void wasDone; void fake;
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 결과 입력 창
+    // ------------------------------------------------------------------
+    const DATE_CHOICES = [[1, '내일'], [3, '3일 뒤'], [7, '7일 뒤'], [14, '14일 뒤']];
+    function findTask(key) { return tasks.find(t => t.key === key); }
+
+    function openResult(t, result) {
+      const defaultDays = result === 'called' ? 7 : result === 'noanswer' ? 1 : 3;
+      resultCtx = { key: t.key, result, days: defaultDays };
+      const titleMap = { called: '📞 통화완료', thinking: '🤔 고민중', registered: '✅ 등록 처리', declined: '🚫 거절(미스) 처리', rolled: '📦 이월 처리', noanswer: '📵 부재중' };
+      document.getElementById('rmTitle').textContent = `${t.name} 님 · ${titleMap[result]}`;
+      document.getElementById('rmSub').textContent = `${t.headline}${t.sub ? ' · ' + t.sub : ''}`;
+      const open = OPEN_RESULTS.includes(result);
+      document.getElementById('rmDateBox').style.display = open ? '' : 'none';
+      const info = document.getElementById('rmInfo');
+      info.style.display = 'none';
+      if (result === 'registered') { info.style.display = ''; info.textContent = t.src === 'expiry' ? '재등록 처리해요. 결제 금액은 "매출 입력"에서 따로 등록해주세요.' : '등록 처리해요. 결제 금액은 "매출 입력"에서 따로 등록해주세요.'; }
+      if (result === 'rolled') { info.style.display = ''; info.textContent = t.src === 'consult' ? '이번 기록은 "이월"로 보관되고, 다음 달 1일자로 새 기록이 만들어져 그날 일일업무에 올라와요.' : t.src === 'expiry' ? '이월로 보관되고, 다음 달이 되면 자동으로 다시 일일업무에 올라와요.' : '보류로 기록되고 다음 달 1일에 다시 일일업무에 올라와요.'; }
+      if (result === 'declined') { info.style.display = ''; info.textContent = '처리 완료 보관함으로 이동해요. 잘못 눌렀으면 보관함에서 "되돌리기" 할 수 있어요.'; }
+      document.getElementById('rmChips').innerHTML = DATE_CHOICES.map(([n, l]) =>
+        `<span class="cc-opt ${n === defaultDays ? 'sel' : ''}" data-days="${n}">${l} (${md(addDays(TODAY, n))})</span>`).join('') + '<span class="cc-opt" data-days="0">📅 날짜 직접 선택</span>';
+      const dateEl = document.getElementById('rmDate');
+      dateEl.value = addDays(TODAY, defaultDays); dateEl.min = TODAY;
+      document.getElementById('rmMemo').value = '';
+      document.getElementById('rmMsg').style.display = 'none';
+      document.getElementById('rmSave').disabled = false;
+      document.getElementById('rmHint').style.display = open ? '' : 'none';
+      updateRmHint();
+      document.getElementById('resultModal').style.display = 'flex';
+      setTimeout(() => document.getElementById('rmMemo').focus(), 50);
+    }
+    function updateRmHint() {
+      const d = document.getElementById('rmDate').value;
+      document.getElementById('rmHint').innerHTML = d
+        ? `저장하면 ① 오늘 목록에서 빠지고 ② <b>${mdw(d)} 아침 일일업무에 자동으로 다시 올라오고</b> ③ 원래 시트의 연락일 · 상태 · 메모에도 기록돼요.` : '';
+    }
+    document.getElementById('rmChips').addEventListener('click', (e) => {
+      const el = e.target.closest('[data-days]'); if (!el) return;
+      const n = Number(el.dataset.days);
+      document.querySelectorAll('#rmChips .cc-opt').forEach(x => x.classList.toggle('sel', x === el));
+      if (n > 0) document.getElementById('rmDate').value = addDays(TODAY, n); else document.getElementById('rmDate').focus();
+      updateRmHint();
+    });
+    document.getElementById('rmDate').addEventListener('change', () => {
+      document.querySelectorAll('#rmChips .cc-opt').forEach(x => x.classList.toggle('sel', x.dataset.days === '0'));
+      updateRmHint();
+    });
+    const closeResult = () => { document.getElementById('resultModal').style.display = 'none'; resultCtx = null; };
+    document.getElementById('rmClose').addEventListener('click', closeResult);
+    document.getElementById('rmCancel').addEventListener('click', closeResult);
+    document.getElementById('rmSave').addEventListener('click', async () => {
+      if (!resultCtx) return;
+      const t = findTask(resultCtx.key), result = resultCtx.result;
+      const memo = document.getElementById('rmMemo').value.trim();
+      const open = OPEN_RESULTS.includes(result);
+      const nextDate = open ? document.getElementById('rmDate').value : null;
+      if (open && !nextDate) { const m = document.getElementById('rmMsg'); m.textContent = '다시 연락할 날짜를 골라주세요.'; m.style.display = ''; return; }
+      const btn = document.getElementById('rmSave'); btn.disabled = true;
+      try {
+        await recordResult(t, result, { nextDate, memo });
+        closeResult(); renderList();
+        showToast(open ? `${t.name} 님 · ${mdw(nextDate)}에 다시 일일업무에 올라와요.` : `${t.name} 님 · ${RESULT_LABEL[result]} 처리했어요.`);
+      } catch (err) {
+        const m = document.getElementById('rmMsg'); m.textContent = err.message; m.style.display = ''; btn.disabled = false;
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // 목록 클릭 처리 (이벤트 위임)
+    // ------------------------------------------------------------------
+    document.getElementById('listArea').addEventListener('click', async (e) => {
+      const more = e.target.closest('[data-more]');
+      if (more) { showLimit[more.dataset.more] = (showLimit[more.dataset.more] || 40) + 60; renderList(); return; }
+      const btn = e.target.closest('[data-act]'); if (!btn) return;
+      const t = findTask(btn.dataset.key); if (!t) return;
+      const act = btn.dataset.act;
+      if (act === 'detail') return openDetail(t);
+      if (act === 'noanswer') {
+        // 부재중은 한 번에: 연속으로 못 받을수록 간격을 늘려서(1·2·3일 뒤) 다시 올려줌
+        const gap = Math.min(3, noAnswerStreak(t) + 1);
+        btn.disabled = true;
+        try { await recordResult(t, 'noanswer', { nextDate: addDays(TODAY, gap), memo: '' }); renderList(); showToast(`${t.name} 님 · 부재중 처리, ${mdw(addDays(TODAY, gap))}에 다시 올라와요.`); }
+        catch (err) { alert(err.message); btn.disabled = false; }
+        return;
+      }
+      if (act === 'today') {
+        btn.disabled = true;
+        try {
+          await planForToday(t); renderList(); showToast(`${t.name} 님을 오늘 할 일에 담았어요.`);
+        } catch (err) { alert(err.message); btn.disabled = false; }
+        return;
+      }
+      if (act === 'restore') {
+        if (!confirm(`${t.name} 님을 다시 일일업무(오늘)로 되돌릴까요?`)) return;
+        btn.disabled = true;
+        try { await restoreTask(t); renderList(); showToast('오늘 일일업무로 되돌렸어요.'); } catch (err) { alert(err.message); btn.disabled = false; }
+        return;
+      }
+      openResult(t, act);
+    });
+    function noAnswerStreak(t) {
+      // 메모에 남은 "[M/D 부재중]" 표시가 마지막부터 몇 번 연속인지 (최대 2까지만 의미)
+      const parts = (t.memo || '').split(' · ').slice(-3);
+      let n = 0;
+      for (let i = parts.length - 1; i >= 0; i--) { if (/^\[\d+\/\d+ 부재중\]/.test(parts[i])) n++; else break; }
+      return Math.min(n, 2);
+    }
+    // "오늘 할 일에 담기": 재연락일만 오늘로 잡음(연락 상태는 그대로 - 연락했다고 기록되지 않음)
+    async function planForToday(t) {
+      if (!HAS_NEXT) throw new Error('재연락 날짜 기능을 쓰려면 Supabase에서 migration_83_contact_center.sql을 먼저 실행해주세요.');
+      if (t.src === 'consult') {
+        const rows = await updateWalkinConsultation(t.raw.id, { next_contact_date: TODAY });
+        Object.assign(t.raw, (rows && rows[0]) || { next_contact_date: TODAY });
+      } else if (t.src === 'expiry') {
+        const it = t.item;
+        const rows = await addTmLog({ member_id: it.member.id, staff_id: (isManager && it.member.assigned_trainer_id) || me.id, category: it.categoryKey,
+          status: (it.latestTm && it.latestTm.status) || 'not_contacted', contact_date: (it.latestTm && it.latestTm.contact_date) || TODAY,
+          memo: t.memo || null, next_contact_date: TODAY });
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        it.latestTm = { ...row, memoIds: row.memo ? [row.id] : [] };
+        it.tmHistory = [row, ...(it.tmHistory || [])];
+      } else {
+        const it = t.item;
+        const rows = await addGroupPtRetentionLog({ member_id: it.member.id, staff_id: (isManager && it.member.assigned_trainer_id) || me.id,
+          status: (it.latestLog && it.latestLog.status) || 'not_contacted', contact_date: TODAY, memo: t.memo || null, next_contact_date: TODAY });
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        it.latestLog = row; (it.member.group_pt_retention_logs = it.member.group_pt_retention_logs || []).unshift(row);
+      }
+      buildTasks();
+    }
+
+    // ------------------------------------------------------------------
+    // 상세(이력)
+    // ------------------------------------------------------------------
+    const TM_STATUS_KO = { not_contacted: '미연락', in_progress: '고민중', renewed: '재등록', rolled_over: '이월', declined: '거부', re_registration_planned: '재등록 예정', no_answer: '부재중' };
+    function openDetail(t) {
+      document.getElementById('dmTitle').textContent = `${t.name}${t.phone ? ' · ' + (formatPhone(t.phone) || t.phone) : ''}`;
+      document.getElementById('dmSub').innerHTML = `${kindBadge(t)} ${esc(t.headline)} ${t.sub ? '· ' + esc(t.sub) : ''}${t.ownerName ? ' · 담당 ' + esc(t.ownerName) : ''}`;
+      const ev = [];
+      const nd = t.nextDate || t.effNext;
+      if (!t.done && nd) ev.push({ d: nd, cls: nd <= TODAY ? 'today' : '', html: `<b>${mdw(nd)}</b> ${nd < TODAY ? '연락 예정이었어요 (밀림)' : nd === TODAY ? '오늘 연락 예정' : '연락 예정'}${t.nextDate ? '' : ' (자동)'}`, future: true });
+      if (t.src === 'consult') {
+        const c = t.raw;
+        const segs = (c.memo || '').split(' · ').filter(Boolean);
+        segs.forEach(s => ev.push({ d: '0', html: esc(s) }));
+        [1, 2, 3].forEach(n => c[`contact${n}_date`] && ev.push({ d: c[`contact${n}_date`], html: `<b>${md(c[`contact${n}_date`])}</b> ${n}차 연락` }));
+        ev.push({ d: c.consult_date, html: `<b>${md(c.consult_date)}</b> 상담 등록 (${c.kind === 'tm' ? 'TM' : '워크인'}${c.channel ? ' · ' + (CHANNEL_LABEL[c.channel] || '') : ''})` });
+      } else if (t.src === 'expiry') {
+        (t.item.tmHistory || []).forEach(l => ev.push({ d: l.contact_date || (l.created_at || '').slice(0, 10), html:
+          `<b>${md(l.contact_date || (l.created_at || '').slice(0, 10))}</b> ${esc(TM_STATUS_KO[l.status] || l.status)}${l.next_contact_date ? ` → ${md(l.next_contact_date)} 재연락` : ''}${l.memo ? `<div class="muted">${esc(l.memo)}</div>` : ''}` }));
+        if (t.expiryDate) ev.push({ d: t.expiryDate + '~', html: `<b>${md(t.expiryDate)}</b> ${esc(t.headline)} 만료${t.daysLeft < 0 ? '됨' : ' 예정'}` });
+      } else {
+        const logs = (t.item.member.group_pt_retention_logs || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        logs.forEach(l => ev.push({ d: l.contact_date || '', html: `<b>${md(l.contact_date || TODAY)}</b> ${esc(GROUP_PT_RETENTION_STATUS_LABEL[l.status] || l.status)}${l.next_contact_date ? ` → ${md(l.next_contact_date)} 재연락` : ''}${l.memo ? `<div class="muted">${esc(l.memo)}</div>` : ''}` }));
+      }
+      ev.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));
+      const links = t.src === 'consult' ? '<a href="consultations.html">신규상담 시트에서 보기</a>' : t.src === 'expiry' ? '<a href="expiry.html">만료회원 · TM 시트에서 보기</a> · <a href="members.html">회원 관리</a>' : '<a href="group-pt.html">그룹PT 관리에서 보기</a>';
+      document.getElementById('dmBody').innerHTML = `<div class="cc-tl">${ev.length ? ev.map(x => `<div class="${x.cls || ''}">${x.html}</div>`).join('') : '<div>아직 연락 기록이 없어요.</div>'}</div>
+        <div class="muted" style="margin-top:12px;font-size:12px;">${links}</div>`;
+      document.getElementById('detailModal').style.display = 'flex';
+    }
+    document.getElementById('dmClose').addEventListener('click', () => { document.getElementById('detailModal').style.display = 'none'; });
+    [['resultModal', closeResult], ['detailModal', () => { document.getElementById('detailModal').style.display = 'none'; }]].forEach(([id, fn]) => {
+      document.getElementById(id).addEventListener('click', (e) => { if (e.target.id === id) fn(); });
+    });
+
+    // ------------------------------------------------------------------
+    // 탭 / 필터 / 검색
+    // ------------------------------------------------------------------
+    document.querySelectorAll('.cc-tab').forEach(b => b.addEventListener('click', () => {
+      activeTab = b.dataset.tab;
+      document.querySelectorAll('.cc-tab').forEach(x => x.classList.toggle('active', x === b));
+      renderList();
+    }));
+    document.getElementById('chipRow').addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-chip]'), cat = e.target.closest('[data-cat]');
+      if (chip) { subFilter[activeTab] = chip.dataset.chip; renderList(); }
+      else if (cat) { catFilter = cat.dataset.cat; renderList(); }
+    });
+    document.getElementById('chipRow').addEventListener('change', (e) => {
+      if (e.target.id === 'autoDaysSel') { autoDays = Number(e.target.value); lsSet('cc_auto_days', String(autoDays)); buildTasks(); renderList(); }
+      if (e.target.id === 'doneScopeSel') { doneScope = e.target.value; renderList(); }
+    });
+    document.getElementById('searchBox').addEventListener('input', (e) => { searchText = e.target.value; renderList(); });
+    document.getElementById('ownerFilter').addEventListener('change', (e) => { ownerFilter = e.target.value; renderList(); });
+
+    // ------------------------------------------------------------------
+    // 자동 통화 기록함 (휴대폰 Tasker → call_events). 상담/만료 TM 건에 이어서 기록하거나 새 신규상담으로 저장
+    // ------------------------------------------------------------------
+    const CALL_DIR = { incoming: '수신', outgoing: '발신', missed: '놓친 전화', unknown: '통화' };
+    const fmtCallTime = (iso) => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+    const fmtDur = (s) => (s === null || s === undefined) ? '' : (s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`);
+    let callEvents = [], callTimer = null;
+
+    function callCandidates(ev) {
+      const d = digitsOf(ev.phone);
+      return tasks.filter(t => !t.done && ((d && t.phoneDigits === d) || (ev.matched_member_id && t.memberId === ev.matched_member_id)) && visibleToMe(t));
+    }
+    function renderCallCard(ev) {
+      const cands = callCandidates(ev);
+      const phoneLabel = formatPhone(ev.phone) || ev.phone || '번호 없음';
+      const missed = ev.direction === 'missed';
+      const targetOpts = cands.map(t => `<option value="${esc(t.key)}">${t.src === 'consult' ? '신규상담' : t.src === 'expiry' ? '만료 TM' : '그룹PT'} · ${esc(t.name)} · ${esc(t.headline)}</option>`).join('')
+        + '<option value="new">➕ 새 신규상담(TM)으로 저장</option>';
+      const defDays = missed ? 0 : 3;
+      return `<div class="cc-call" data-call-id="${ev.id}">
+        <div class="rowf" style="justify-content:space-between;"><strong>${esc(phoneLabel)}${ev.member ? ` <span class="badge badge-green">회원 ${esc(ev.member.name)}</span>` : ''}${missed ? ' <span class="badge badge-red">놓친 전화</span>' : ''}</strong>
+          <span class="muted" style="font-size:12px;">${fmtCallTime(ev.called_at)} · ${CALL_DIR[ev.direction] || '통화'} ${fmtDur(ev.duration_seconds)}</span></div>
+        <div class="rowf"><label class="muted" style="font-size:12px;">기록할 곳</label>
+          <select class="cc-field call-target" style="flex:1;min-width:220px;width:auto;">${targetOpts}</select></div>
+        <div class="rowf call-new-box">
+          <input type="text" class="cc-field call-name" placeholder="성함 입력" style="flex:1;min-width:110px;width:auto;" value="${ev.member ? esc(ev.member.name) : ''}" />
+          <select class="cc-field call-gender" style="width:80px;"><option value="">성별</option><option value="female">여</option><option value="male">남</option></select>
+          <label style="font-size:12.5px;"><input type="checkbox" class="call-gym" /> 헬스</label>
+          <label style="font-size:12.5px;"><input type="checkbox" class="call-pt" /> PT</label>
+          <label style="font-size:12.5px;"><input type="checkbox" class="call-gpt" /> 그룹PT</label>
+        </div>
+        <textarea class="cc-field call-memo" rows="2" placeholder="익시오 등에서 복사한 통화 요약(또는 통화 메모)을 붙여넣어주세요"></textarea>
+        <div class="rowf" style="margin-top:8px;">
+          <select class="cc-field call-result" style="width:auto;">
+            <option value="thinking" selected>고민중</option><option value="called">통화완료</option><option value="noanswer">부재중</option><option value="registered">등록</option><option value="declined">거절</option></select>
+          <select class="cc-field call-days" style="width:auto;">
+            ${missed ? '<option value="0" selected>오늘 콜백</option>' : ''}<option value="1">내일 재연락</option><option value="3" ${missed ? '' : 'selected'}>3일 뒤 재연락</option><option value="7">7일 뒤 재연락</option><option value="14">14일 뒤 재연락</option></select>
+          <button type="button" class="btn btn-primary call-save" style="width:auto;padding:7px 16px;font-size:12.5px;">저장</button>
+          <button type="button" class="btn-link call-ignore">무시</button>
+          <span class="call-msg muted" style="font-size:12px;"></span>
+        </div>
+      </div>`;
+    }
+    function syncCallCard(card) {
+      const isNew = card.querySelector('.call-target').value === 'new';
+      card.querySelector('.call-new-box').style.display = isNew ? '' : 'none';
+      const result = card.querySelector('.call-result').value;
+      card.querySelector('.call-days').style.display = OPEN_RESULTS.includes(result) ? '' : 'none';
+    }
+    function renderCallBox() {
+      const sec = document.getElementById('callSection');
+      const list = document.getElementById('callEventsList');
+      document.getElementById('callCount').textContent = callEvents.length + '건';
+      const existing = new Set(Array.from(list.querySelectorAll('[data-call-id]')).map(x => x.dataset.callId));
+      const incoming = new Set(callEvents.map(e => e.id));
+      existing.forEach(id => { if (!incoming.has(id)) { const el = list.querySelector(`[data-call-id="${id}"]`); if (el) el.remove(); } });
+      callEvents.forEach(ev => {
+        if (existing.has(ev.id)) return;      // 입력 중인 카드는 건드리지 않음
+        list.insertAdjacentHTML('beforeend', renderCallCard(ev));
+        const card = list.querySelector(`[data-call-id="${ev.id}"]`);
+        syncCallCard(card);
+        wireCallCard(card, ev);
+      });
+      if (!list.querySelector('[data-call-id]')) list.innerHTML = '<p class="muted" style="margin:0 0 12px;font-size:12.5px;">처리할 통화 기록이 없어요. 새 전화가 오면 30초 안에 자동으로 여기 쌓여요.</p>';
+      else { const p = list.querySelector(':scope > p'); if (p) p.remove(); }
+    }
+    function wireCallCard(card, ev) {
+      card.querySelector('.call-target').addEventListener('change', () => syncCallCard(card));
+      card.querySelector('.call-result').addEventListener('change', () => syncCallCard(card));
+      const msg = card.querySelector('.call-msg'), saveBtn = card.querySelector('.call-save');
+      saveBtn.addEventListener('click', async () => {
+        const target = card.querySelector('.call-target').value;
+        const result = card.querySelector('.call-result').value;
+        const memo = card.querySelector('.call-memo').value.trim();
+        const days = Number(card.querySelector('.call-days').value);
+        const nextDate = OPEN_RESULTS.includes(result) ? addDays(TODAY, days) : null;
+        saveBtn.disabled = true; msg.textContent = '저장 중...';
+        try {
+          let doneText;
+          if (target === 'new') {
+            const name = card.querySelector('.call-name').value.trim() || '전화상담';
+            const callDate = (ev.called_at ? formatDateStr(new Date(ev.called_at)) : '') || TODAY;
+            const talked = ev.direction !== 'missed';
+            const extra = {};
+            if (talked) extra.contact1_date = callDate;
+            if (HAS_NEXT && nextDate) extra.next_contact_date = nextDate;
+            const status = result === 'registered' ? 'registered' : result === 'declined' ? 'declined' : 'considering';
+            const saved = await convertCallEventToConsultation(ev, {
+              consultDate: callDate, name, phone: formatPhone(ev.phone) || null, gender: card.querySelector('.call-gender').value || null,
+              channel: 'phone_auto', interestGym: card.querySelector('.call-gym').checked, interestPt: card.querySelector('.call-pt').checked,
+              interestGroupPt: card.querySelector('.call-gpt').checked, memo: composeMemo('', result, memo, callDate),
+              status, createdBy: me.id, extra
+            });
+            if (saved) consultRows.unshift(saved);
+            doneText = nextDate ? `신규상담(TM)으로 저장했어요 · ${mdw(nextDate)} 일일업무에 올라와요.` : '신규상담(TM)으로 저장했어요.';
+          } else {
+            const t = findTask(target);
+            await recordResult(t, result, { nextDate, memo });
+            await markCallEventLogged(ev.id, { consultId: t.src === 'consult' ? t.id : null, memo });
+            doneText = `${t.name} 님 기록에 이어서 저장했어요${nextDate ? ' · ' + mdw(nextDate) + ' 재연락' : ''}.`;
+          }
+          callEvents = callEvents.filter(e => e.id !== ev.id);
+          buildTasks(); renderCallBox(); renderList(); showToast(doneText);
+        } catch (err) { msg.textContent = err.message; saveBtn.disabled = false; }
+      });
+      card.querySelector('.call-ignore').addEventListener('click', async () => {
+        if (!confirm('이 통화 기록을 무시할까요? (저장하지 않고 목록에서만 지워요)')) return;
+        try { await ignoreCallEvent(ev.id); callEvents = callEvents.filter(e => e.id !== ev.id); renderCallBox(); } catch (err) { msg.textContent = err.message; }
+      });
+    }
+    async function loadCallEvents() {
+      const sec = document.getElementById('callSection');
+      try {
+        callEvents = await fetchPendingCallEvents();
+        sec.style.display = '';
+        renderCallBox();
+      } catch (err) {
+        sec.style.display = 'none';   // migration_72 전이면 조용히 숨기고 polling도 멈춤
+        if (callTimer) { clearInterval(callTimer); callTimer = null; }
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 불러오기
+    // ------------------------------------------------------------------
+    async function probeNextDate() {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/walkin_consultations?select=next_contact_date&limit=1`, { headers: await authHeaders() });
+        return res.ok;
+      } catch (e) { return true; }
+    }
+    async function loadAll() {
+      try {
+        const [rows, board, gpt, staff, hasNext] = await Promise.all([
+          fetchWalkinConsultations(), fetchExpiryBoard(45),
+          fetchGroupPtRetentionItems().catch(() => []),
+          fetchStaff().catch(() => []), probeNextDate()
+        ]);
+        consultRows = rows; expiryItems = board; gptItems = gpt;
+        staff.forEach(p => { staffMap[p.id] = p.name; });
+        HAS_NEXT = hasNext && TM_NEXT_DATE_SUPPORTED !== false;
+        const banner = document.getElementById('migrationBanner');
+        if (!HAS_NEXT) {
+          banner.style.display = '';
+          banner.innerHTML = '⚠ <b>재연락 날짜 칸이 아직 없어요.</b> Supabase SQL Editor에서 <code>migration_83_contact_center.sql</code>을 한 번 실행해주세요. 그 전에는 "고민중 + 며칠 뒤" 예약이 저장되지 않고, 예전 방식(마지막 연락 후 7일)으로 대신 올라와요.';
+        }
+        if (isManager) {
+          const sel = document.getElementById('ownerFilter');
+          const ids = new Set();
+          [...consultRows.map(c => c.created_by), ...expiryItems.map(i => i.member.assigned_trainer_id)].forEach(id => id && ids.add(id));
+          sel.innerHTML = '<option value="all">담당: 전체</option>' + Array.from(ids).map(id => `<option value="${id}">${esc(staffMap[id] || '직원')}</option>`).join('') + '<option value="__none">담당 미배정</option>';
+          sel.style.display = '';
+        }
+        buildTasks();
+        renderList();
+        loadCallEvents();
+        callTimer = setInterval(loadCallEvents, 30000);
+      } catch (err) {
+        const el = document.getElementById('loadError'); el.textContent = err.message; el.style.display = 'block';
+        document.getElementById('listArea').innerHTML = '';
+      }
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        document.getElementById('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
+        applyRoleNav(profile);
+        me = profile; isManager = profile.role === 'manager';
+        document.getElementById('scopeNote').textContent = isManager ? '(지점장: 전체 직원 건을 볼 수 있어요)' : '(내 담당 건만 보여요)';
+        staffMap[profile.id] = profile.name;
+      } else { me = { id: null }; }
+      loadAll();
+    })();
+  </script>
+</body>
+</html>

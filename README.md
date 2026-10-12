@@ -1457,6 +1457,43 @@ v2에서 "확인 대기 중"으로 남겨뒀던 영업지원금/매출커미션 
 - 직원 화면(`group-pt-attendance.html`): "🛍️ 포인트 상점 관리"(필요 포인트 입력/미정·진열 on/off - 지점장만 수정) + "🎫 쿠폰 사용 처리"(회원명·쿠폰번호 검색, 사용 가능 먼저 정렬, 사용 처리/지점장 사용 취소). data.js: `fetchShopItems/updateShopItem/fetchCouponRedemptions/useCoupon/unuseCoupon`.
 - 검증: 로컬 Postgres로 SQL(미정 거부·포인트 부족·교환·잔액·쿠폰번호·30일·사용 1회·만료·권한)을 직접 실행, Playwright로 가짜 서버(SQL 규칙 동일)를 두고 회원/지점장/트레이너 화면 흐름 전체 확인.
 
+## 포인트 상점 관리 - 회원 휴대폰 화면 미리보기 패널 (2026-10-10) - SQL 없음
+- `group-pt-attendance.html`의 "포인트 상점 관리" 오른쪽에 `.pv-phone` 폰 모양 패널. 진열 체크박스를 누르면 즉시(저장 성공 전에도) 미리보기에 반영, 저장 실패 시 되돌림
+- 가격 입력칸에 입력만 해도(저장 전) 미리보기에 반영되고 "저장 전 미리보기" 배지 표시. "예시 포인트" 입력으로 교환하기/포인트 부족/곧 오픈!/준비중 상태 확인
+- 레이아웃: 왼쪽 휴대폰 상점 화면(sticky) + 오른쪽에 "상점 상품 관리"·"쿠폰 사용 처리" 카드를 크게 배치 (내 쿠폰함 폰 화면은 PC에 넣지 않음)
+- `renderShopPreview()`가 attend.html의 상점 화면과 같은 규칙(쿠폰/상품 구분, 가격 미정=준비중)으로 그림
+
+## PT 회원 관리 → 주차별 매출 기록 자동 반영 + 재등록 예상 "주차" (2026-10-10) - `migration_80_care_renewal_week.sql`
+- `pt_care_logs.pt_expected_renewal_week`(1~5) 추가. PT 회원 관리 표/추가 모달의 재등록예상시기가 "월 + 주차"
+- (2026-10-10 수정) 기준은 재등록예상시기 월이 아니라 "보고 있는 달의 PT 회원 시트"(period_month). 예상시기가 그 달일 때만 주차 사용, 아니면 "미정". 주차별 표에서 주차를 고르면 예상시기 월도 그 달로 맞춤
+- pt.html `ptCareVirtualLeads()`: (원래는 재등록예상시기가 보고 있는 달 기준이었음) 진행중 + 확률 25/50/75% 인 PT 회원 기록을 주차별 매출 기록에 "가상 행"으로 자동 표시(저장 X, 매번 계산). 이월·등록·미스·확률 미설정 제외, 같은 이름의 직접 입력 "재등록" 기록이 있으면 중복 제외
+- 가상 행은 예상 매출 카드, 재등록 확정 조사(예상 인원), 합계에 포함. 주차(미정 가능)·확률은 주차별 표에서도 바로 변경 가능(PT 회원 기록에 저장), 금액/횟수는 PT 회원 관리 표에서 수정
+- `getMonthItems()`가 loadRevenueCards / loadConfirmMiniStats / renderWeeklyTable 공통 근거, `refreshCareDerived()`가 PT 회원 칸 수정 후 화면 갱신
+
+## PT 재등록 N회 표시 (2026-10-10) - SQL 없음
+- data.js `fetchPtRenewalCounts()`: 매출 입력의 `pt_renewal` 건수를 member_id별로 셈(RLS상 트레이너는 본인 입력 매출만, 지점장은 전체)
+- pt.html `renewalBadgeHtml()`: PT 회원 관리·주차별 매출 기록(직접 입력행/자동 반영행) 이름 아래에 "PT 재등록 N회" 배지(0회는 숨김). 연동 안 된 행은 이름이 같은 회원이 정확히 1명일 때만 매칭
+- pt.html의 data.js ?v= 올림
+
+## PT 회원 자동 반영 행 - 등록/미스도 유지 (2026-10-10) - SQL 없음
+- PT 회원 시트에서 확률이 등록/미스로 바뀌어도 주차별 매출 기록의 자동 반영 행이 사라지지 않고 등록/미스 색으로 남음(예상 → 결과 확인용). 이월만 다음 달로 넘어가며 빠짐
+- (2026-10-10 수정) 자동 반영된 "등록" 행도 위쪽 확정 매출/남은 매출 카드에 포함 + 순위표 RPC(`migration_81_leaderboard_care_registered.sql`)도 그 달 PT 회원 시트의 등록 건을 합산(주차별 표에 같은 이름의 재등록/등록 기록이 있으면 이중 집계 방지로 제외). "예상 매출" 카드는 진행중(25/50/75%)만, 재등록 확정 조사에는 등록/미스 모두 반영
+
+## 주차별 표 자동 반영 행 직접 수정 (2026-10-12) - `migration_82_care_weekly_memo.sql`
+- PT 회원 시트에서 자동 반영된 행의 이름/금액/횟수/메모를 주차별 표에서 바로 수정(같은 PT 회원 기록에 저장 - `handleVirtualFieldSave`). 메모는 `pt_care_logs.pt_weekly_memo`, 한 번도 안 고친 행은 기본 문구 "PT회원시트 자동반영"이 채워지고 지우면 ''로 저장(다시 안 채워짐)
+- 화면 하단 버전 문구(`#pageVersion`)는 배포 확인용 - pt.html 수정할 때마다 문구 갱신
+
+## 📞 연락 센터 (2026-10-12) - `contact-center.html` + `migration_83_contact_center.sql`
+신규상담(워크인·TM) + 만료회원·TM + 그룹PT 무제한 전환TM을 **한 화면**으로 합친 통합 화면. 메뉴에서는 "신규상담"·"만료회원 · TM"을 빼고 "📞 연락 센터" 하나만 둠(기존 두 페이지와 group-pt.html은 상세 시트용으로 그대로 남아 있고, 연락 센터에서 남긴 기록이 거기에도 이어짐).
+- 탭: **일일업무**(오늘+밀린 연락) / **미연락**(회원권 임박·그룹PT 임박·PT기타 임박·신규상담 미연락·그룹PT 참석저조·만료자 DB) / **예정·진행중**(재연락일 잡힌 건 + 날짜 없이 오래된 "방치" 건) / **처리 완료 보관함**(등록·거절·이월, 되돌리기 가능).
+- 결과 버튼: 통화완료(기본 7일 뒤) · 부재중(원클릭, 연속이면 1→2→3일 뒤) · 고민중(내일/3/7/14일/날짜선택) · 등록 · 거절 · 이월. 저장하면 원본 테이블에 각각 기록: 신규상담 → `walkin_consultations`(status, contactN_date, next_contact_date, memo에 "[10/12 고민중] 내용" 누적), 만료 → `tm_logs` 새 행(+ `members.tm_contactN_date`), 그룹PT → `group_pt_retention_logs` 새 행.
+- **재연락 날짜 = `next_contact_date`** (migration_83이 세 테이블에 칸 추가). 그 날짜 ≤ 오늘이면 일일업무로 자동 등장. 칸이 없으면(미실행) 노란 안내 배너 + 예전 방식(마지막 연락+7일, 부재중 +1일) 자동 재등장으로 대체.
+- 자동 편입 규칙: 처음 들어온 신규상담(3일 이내) → 오늘 첫 연락 / 한 번도 연락 안 한 만료 임박 건 D-7일부터(화면에서 3·7·14·21·30일로 변경, localStorage 저장) 만료 후 7일까지 계속 / 이월은 달이 바뀌면(만료 TM) 또는 다음 달 1일자 복사본(신규상담)으로 다시 등장.
+- 보이는 범위: 지점장=전체(담당 선택 필터), FC=본인 담당(회원은 assigned_trainer_id, 신규상담은 created_by; 미배정 신규상담도 보임). 지점장이 FC 담당 회원에 기록하면 tm_logs.staff_id는 담당 FC로 저장(FC가 RLS상 볼 수 있게).
+- **자동 통화 기록함**(Tasker → `log_call_event` → `call_events`)이 연락 센터 상단에도 있음(30초 폴링). 번호가 기존 상담/만료/그룹PT 건과 같으면 "기록할 곳"에 그 건이 기본 선택돼서 중복 상담이 안 생기고(`markCallEventLogged`), 아니면 "새 신규상담(TM)". 놓친 전화(missed)는 기본 "오늘 콜백". consultations.html의 기록함도 그대로 동작.
+- data.js: `fetchExpiryBoard`가 `next_contact_date`·`staff_id`·`tmHistory`를 같이 가져옴(칸 없으면 자동으로 빼고 재조회, `TM_NEXT_DATE_SUPPORTED` 플래그), `fetchGroupPtRetentionItems` 동일 폴백, `convertCallEventToConsultation`에 `extra` 인자, `markCallEventLogged` 추가. 연락 센터는 data.js?v=1791640000 사용.
+- 테스트: 로컬 Postgres에 실제 migration 체인(2·6·8·9·44·52·63·72~75·83)을 적용하고 PostgREST 흉내 서버로 Playwright E2E(시계 조작으로 10/12→10/13→10/15→10/22→11/01).
+
 ## 아직 안 만든 것 / 예정
 
 - 데이터 백업 자동화 — 현재는 홈 화면에서 수동으로 버튼을 눌러 엑셀 백업. 데이터가 많아지면 주기적 자동 백업으로 발전시킬 예정 (사용자가 원할 때)
