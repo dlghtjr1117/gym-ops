@@ -1494,6 +1494,10 @@ v2에서 "확인 대기 중"으로 남겨뒀던 영업지원금/매출커미션 
 - data.js: `fetchExpiryBoard`가 `next_contact_date`·`staff_id`·`tmHistory`를 같이 가져옴(칸 없으면 자동으로 빼고 재조회, `TM_NEXT_DATE_SUPPORTED` 플래그), `fetchGroupPtRetentionItems` 동일 폴백, `convertCallEventToConsultation`에 `extra` 인자, `markCallEventLogged` 추가. 연락 센터는 data.js?v=1791640000 사용.
 - 테스트: 로컬 Postgres에 실제 migration 체인(2·6·8·9·44·52·63·72~75·83)을 적용하고 PostgREST 흉내 서버로 Playwright E2E(시계 조작으로 10/12→10/13→10/15→10/22→11/01).
 
+### 연락 센터 통합 마무리 (2026-10-12)
+- 메뉴에서 "신규상담"·"만료회원 · TM"·"그룹PT 관리"를 전부 제거하고 "📞 연락 센터" 하나로 통일(페이지 파일은 복구용으로 남겨둠, 링크만 없앰). 연락 센터에 "➕ 상담 추가"(워크인/TM 직접 입력, 재연락일 선택, 이미 등록 체크) 추가.
+- 연락 센터 하단 링크 하나만 남김: group-pt.html(바디코디 방문 기록 업로드 → 그룹PT 참석 저조 목록의 기준 데이터). 문자 발송(consultations.html)은 연락 센터로 아직 안 옮김 - 필요하면 consultations.html 직접 주소로 접근.
+
 ## 아직 안 만든 것 / 예정
 
 - 데이터 백업 자동화 — 현재는 홈 화면에서 수동으로 버튼을 눌러 엑셀 백업. 데이터가 많아지면 주기적 자동 백업으로 발전시킬 예정 (사용자가 원할 때)

@@ -86,7 +86,6 @@
       <a href="contact-center.html" class="active">📞 연락 센터</a>
       <a href="marketing.html">광고 관리</a>
       <a href="sales.html">매출 입력</a>
-      <a href="group-pt.html">그룹PT 관리</a>
       <a href="group-pt-attendance.html">그룹PT 출석</a>
       <a href="pt.html">PT 관리</a>
       <a href="ot.html">OT 관리</a>
@@ -132,6 +131,7 @@
       <button class="cc-tab" data-tab="later">⏳ 예정 · 진행중 <i id="tabLater">0</i></button>
       <button class="cc-tab" data-tab="done">📦 처리 완료 보관함 <i id="tabDone">0</i></button>
       <div class="cc-tools">
+        <button type="button" class="btn btn-primary" id="addConsultBtn" style="width:auto;padding:7px 14px;font-size:13px;">➕ 상담 추가</button>
         <select id="ownerFilter" style="display:none;"></select>
         <input type="search" id="searchBox" placeholder="이름 · 전화번호 검색" />
       </div>
@@ -140,14 +140,10 @@
 
     <div id="listArea"><div class="cc-card"><div class="cc-empty">불러오는 중...</div></div></div>
 
-    <p class="muted" style="margin:18px 2px 0; font-size:12px; display:flex; gap:14px; flex-wrap:wrap;">
-      <span>기존 상세 시트:</span>
-      <a href="consultations.html">신규상담 시트(문자 발송 포함)</a>
-      <a href="expiry.html">만료회원 · TM 시트</a>
-      <a href="group-pt.html">그룹PT 관리</a>
-      <span>— 연락 센터에서 남긴 기록은 이 시트들에도 그대로 이어져요.</span>
+    <p class="muted" style="margin:18px 2px 0; font-size:12px;">
+      그룹PT 무제한 회원의 "마지막 방문일" 데이터는 <a href="group-pt.html">바디코디 방문 기록 업로드</a>로 갱신해요 (그룹PT 참석 저조 목록의 기준).
     </p>
-    <p class="muted" id="pageVersion" style="margin:6px 2px 24px; font-size:11.5px; text-align:right;">연락 센터 · 2026-10-12 최초 버전 (재연락 날짜 · 자동통화 연동)</p>
+    <p class="muted" id="pageVersion" style="margin:6px 2px 24px; font-size:11.5px; text-align:right;">연락 센터 · 2026-10-12 통합판 (상담 직접 추가 포함)</p>
   </div>
 
   <!-- 결과 입력 창 -->
@@ -169,6 +165,38 @@
         <button type="button" class="btn btn-outline" id="rmCancel" style="width:auto;padding:8px 16px;">취소</button>
       </div>
       <div class="cc-hint" id="rmHint"></div>
+    </div>
+  </div>
+
+  <!-- 상담 직접 추가 창 -->
+  <div class="modal-overlay" id="addModal" style="display:none;">
+    <div class="modal-box" style="max-width:480px;">
+      <div class="modal-header"><div><h3>➕ 상담 추가</h3><div class="muted" style="font-size:12.5px;">워크인(방문) · 전화 문의를 바로 입력해요. 저장하면 연락 센터에 올라가요.</div></div>
+        <button class="modal-close" id="amClose" type="button">×</button></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <select id="amKind" class="cc-field" style="width:auto;"><option value="walkin">워크인(방문)</option><option value="tm">TM(전화상담)</option></select>
+        <input id="amName" class="cc-field" placeholder="성함" />
+        <select id="amGender" class="cc-field" style="width:80px;"><option value="">성별</option><option value="female">여</option><option value="male">남</option></select>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input id="amPhone" class="cc-field" placeholder="전화번호 (010-0000-0000)" inputmode="tel" />
+        <select id="amChannel" class="cc-field" style="width:auto;"><option value="">유입경로</option>
+          <option value="naver_place">네이버 플레이스</option><option value="carrot">당근</option><option value="blog">블로그</option><option value="referral">지인소개</option>
+          <option value="instagram">인스타</option><option value="meta_ads">메타광고</option><option value="flyer">전단지</option><option value="walk_by">지나가다</option></select>
+      </div>
+      <div style="display:flex;gap:14px;margin:6px 0 8px;font-size:13px;">
+        <label><input type="checkbox" id="amGym" /> 헬스</label><label><input type="checkbox" id="amPt" /> PT</label><label><input type="checkbox" id="amGpt" /> 그룹PT</label>
+      </div>
+      <textarea id="amMemo" rows="2" class="cc-field" placeholder="상담 내용 메모 (선택)"></textarea>
+      <div style="font-size:12px;color:var(--slate-500);font-weight:700;margin:10px 0 4px;">언제 다시 연락할까요?</div>
+      <div id="amChips"></div>
+      <input type="date" id="amDate" class="cc-field" style="margin-top:6px;" />
+      <label style="display:block;margin-top:10px;font-size:13px;"><input type="checkbox" id="amReg" /> 이미 등록했어요 (재연락 없이 보관함으로)</label>
+      <div id="amMsg" class="error-text" style="display:none;margin-top:8px;"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;">
+        <button type="button" class="btn btn-primary" id="amSave" style="width:auto;padding:8px 20px;">저장</button>
+        <button type="button" class="btn btn-outline" id="amCancel" style="width:auto;padding:8px 16px;">취소</button>
+      </div>
     </div>
   </div>
 
@@ -810,7 +838,7 @@
         logs.forEach(l => ev.push({ d: l.contact_date || '', html: `<b>${md(l.contact_date || TODAY)}</b> ${esc(GROUP_PT_RETENTION_STATUS_LABEL[l.status] || l.status)}${l.next_contact_date ? ` → ${md(l.next_contact_date)} 재연락` : ''}${l.memo ? `<div class="muted">${esc(l.memo)}</div>` : ''}` }));
       }
       ev.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));
-      const links = t.src === 'consult' ? '<a href="consultations.html">신규상담 시트에서 보기</a>' : t.src === 'expiry' ? '<a href="expiry.html">만료회원 · TM 시트에서 보기</a> · <a href="members.html">회원 관리</a>' : '<a href="group-pt.html">그룹PT 관리에서 보기</a>';
+      const links = t.src === 'consult' ? '' : '<a href="members.html">회원 관리에서 보기</a>';
       document.getElementById('dmBody').innerHTML = `<div class="cc-tl">${ev.length ? ev.map(x => `<div class="${x.cls || ''}">${x.html}</div>`).join('') : '<div>아직 연락 기록이 없어요.</div>'}</div>
         <div class="muted" style="margin-top:12px;font-size:12px;">${links}</div>`;
       document.getElementById('detailModal').style.display = 'flex';
@@ -818,6 +846,62 @@
     document.getElementById('dmClose').addEventListener('click', () => { document.getElementById('detailModal').style.display = 'none'; });
     [['resultModal', closeResult], ['detailModal', () => { document.getElementById('detailModal').style.display = 'none'; }]].forEach(([id, fn]) => {
       document.getElementById(id).addEventListener('click', (e) => { if (e.target.id === id) fn(); });
+    });
+
+
+    // ------------------------------------------------------------------
+    // 상담 직접 추가 (워크인 · 전화 문의)
+    // ------------------------------------------------------------------
+    function openAddModal() {
+      ['amName', 'amPhone', 'amMemo'].forEach(id => { document.getElementById(id).value = ''; });
+      ['amGym', 'amPt', 'amGpt', 'amReg'].forEach(id => { document.getElementById(id).checked = false; });
+      document.getElementById('amKind').value = 'walkin'; document.getElementById('amGender').value = ''; document.getElementById('amChannel').value = '';
+      document.getElementById('amChips').innerHTML = DATE_CHOICES.map(([n, l]) => `<span class="cc-opt ${n === 1 ? 'sel' : ''}" data-days="${n}">${l} (${md(addDays(TODAY, n))})</span>`).join('') + '<span class="cc-opt" data-days="0">📅 날짜 직접 선택</span>';
+      document.getElementById('amDate').value = addDays(TODAY, 1); document.getElementById('amDate').min = TODAY;
+      document.getElementById('amMsg').style.display = 'none'; document.getElementById('amSave').disabled = false;
+      document.getElementById('addModal').style.display = 'flex';
+      setTimeout(() => document.getElementById('amName').focus(), 50);
+    }
+    const closeAdd = () => { document.getElementById('addModal').style.display = 'none'; };
+    document.getElementById('addConsultBtn').addEventListener('click', openAddModal);
+    document.getElementById('amClose').addEventListener('click', closeAdd);
+    document.getElementById('amCancel').addEventListener('click', closeAdd);
+    document.getElementById('addModal').addEventListener('click', (e) => { if (e.target.id === 'addModal') closeAdd(); });
+    document.getElementById('amChips').addEventListener('click', (e) => {
+      const el = e.target.closest('[data-days]'); if (!el) return;
+      const n = Number(el.dataset.days);
+      document.querySelectorAll('#amChips .cc-opt').forEach(x => x.classList.toggle('sel', x === el));
+      if (n > 0) document.getElementById('amDate').value = addDays(TODAY, n); else document.getElementById('amDate').focus();
+    });
+    document.getElementById('amDate').addEventListener('change', () => document.querySelectorAll('#amChips .cc-opt').forEach(x => x.classList.toggle('sel', x.dataset.days === '0')));
+    document.getElementById('amDate').addEventListener('change', () => { document.getElementById('amReg').checked = false; });
+    document.getElementById('amSave').addEventListener('click', async () => {
+      const msg = document.getElementById('amMsg'); msg.style.display = 'none';
+      const name = document.getElementById('amName').value.trim();
+      const phoneRaw = document.getElementById('amPhone').value.trim();
+      const reg = document.getElementById('amReg').checked;
+      const nextDate = document.getElementById('amDate').value;
+      if (!name) { msg.textContent = '성함을 입력해주세요.'; msg.style.display = ''; return; }
+      if (!reg && !nextDate) { msg.textContent = '다시 연락할 날짜를 골라주세요.'; msg.style.display = ''; return; }
+      const kind = document.getElementById('amKind').value;
+      const memoText = document.getElementById('amMemo').value.trim();
+      const payload = {
+        consult_date: TODAY, name, phone: phoneRaw ? (formatPhone(normalizePhone(phoneRaw)) || phoneRaw) : null,
+        gender: document.getElementById('amGender').value || null, channel: document.getElementById('amChannel').value || null,
+        interest_gym: document.getElementById('amGym').checked, interest_pt: document.getElementById('amPt').checked, interest_group_pt: document.getElementById('amGpt').checked,
+        memo: memoText ? `[${md(TODAY)} ${reg ? '등록' : '상담'}] ${memoText}` : null,
+        status: reg ? 'registered' : 'considering', kind, created_by: me.id,
+        contact1_date: TODAY
+      };
+      if (HAS_NEXT && !reg) payload.next_contact_date = nextDate;
+      const btn = document.getElementById('amSave'); btn.disabled = true;
+      try {
+        const rows = await addWalkinConsultation(payload);
+        const rec = Array.isArray(rows) ? rows[0] : rows;
+        if (rec) consultRows.unshift(rec);
+        buildTasks(); renderList(); closeAdd();
+        showToast(reg ? `${name} 님을 등록 완료로 저장했어요.` : `${name} 님 상담을 저장했어요 · ${mdw(nextDate)} 일일업무에 올라와요.`);
+      } catch (err) { msg.textContent = err.message; msg.style.display = ''; btn.disabled = false; }
     });
 
     // ------------------------------------------------------------------
