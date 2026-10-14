@@ -20,7 +20,7 @@
   .sg-card.done { opacity: .8; }
   .sg-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--slate-500); margin-bottom: 8px; }
   .sg-body { white-space: pre-wrap; word-break: break-word; font-size: 14.5px; line-height: 1.6; color: var(--slate-900); }
-  .sg-contact { margin-top: 8px; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: #eef2ff; color: #3730a3; display: inline-block; }
+  .sg-contact-unused { margin-top: 8px; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: #eef2ff; color: #3730a3; display: inline-block; }
   .sg-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
   .sg-memo { flex: 1; min-width: 200px; padding: 6px 10px; font-size: 12.5px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: var(--slate-900); }
   .sg-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700); cursor: pointer; }
@@ -78,7 +78,7 @@
 
   <div class="wrap">
     <h2 style="margin:6px 0 4px;">💌 마음의 소리함</h2>
-    <p class="muted" style="margin:0 0 12px;">회원님이 엘리베이터 QR로 남긴 건의사항이 여기에 쌓여요. 누가 썼는지는 알 수 없고, 회원이 직접 적은 연락처만 보여요. <span id="roleNote"></span></p>
+    <p class="muted" style="margin:0 0 12px;">회원님이 엘리베이터 QR로 남긴 건의사항이 여기에 쌓여요. 이름·연락처를 받지 않는 완전 익명 글이에요. <span id="roleNote"></span></p>
     <div id="loadError" class="error-text" style="display:none;"></div>
     <div id="notManager" class="sg-empty" style="display:none;">마음의 소리함은 지점장만 볼 수 있어요.</div>
 
@@ -108,7 +108,7 @@
         </div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">마음의 소리함 · 2026-10-14 최초 버전</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">마음의 소리함 · 2026-10-14 익명판</p>
   </div>
 
   <div id="poster">
@@ -117,7 +117,7 @@
     <p class="p-sub">센터에 바라는 점 · 불편한 점 · 칭찬하고 싶은 점<br>편하게 남겨주세요</p>
     <div class="p-qr" id="posterQr"></div>
     <div class="p-step">휴대폰 카메라로 QR을 찍어주세요</div>
-    <div class="p-note">로그인 없이 바로 쓸 수 있어요 · 이름을 적지 않으면 익명으로 전달돼요<br>지점장이 직접 읽고 반영할게요</div>
+    <div class="p-note">로그인 없이 바로 쓸 수 있어요 · 이름도 연락처도 받지 않는 완전 익명이에요<br>지점장이 직접 읽고 반영할게요</div>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -173,7 +173,6 @@
       return `<div class="sg-card ${x.status}" data-card="${id}">
         <div class="sg-head"><span class="badge ${x.status === 'new' ? 'badge-orange' : x.status === 'done' ? 'badge-green' : 'badge-slate'}">${STATUS_LABEL[x.status] || x.status}</span><span>${fmt(x.created_at)}</span></div>
         <div class="sg-body">${esc(x.content)}</div>
-        ${x.contact ? `<div class="sg-contact">📞 답변 희망 · ${esc(x.contact)}</div>` : ''}
         <div class="sg-actions"><input class="sg-memo" data-memo="${id}" value="${esc(x.admin_memo || '')}" placeholder="처리 메모 (예: 샤워실 온도 조정함)" />${actions}</div>
       </div>`;
     }

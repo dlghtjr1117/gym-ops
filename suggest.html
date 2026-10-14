@@ -8,7 +8,7 @@
 <!--
   회원용 건의함 화면. attend.html처럼 "로그인 없이" 열리는 화면이라 auth.js/data.js를 쓰지 않고
   config.js의 공개 키(anon)로 submit_suggestion() 함수 하나만 호출해요 (migration_84).
-  입력 칸 말고는 아무 것도 안 보여줘요 - 다른 회원이 쓴 글이나 센터 내부 정보는 이 화면에서 절대 읽을 수 없어요.
+  이름·연락처 칸도 없는 완전 익명 화면이에요. 입력 칸 말고는 아무 것도 안 보여줘요 - 다른 회원이 쓴 글이나 센터 내부 정보는 이 화면에서 절대 읽을 수 없어요.
 -->
 <style>
   :root { --brand: #3D5FFF; --brand-dark: #2A46E0; --brand-bg: #EEF1FF; --ink: #16192E; --muted: #6B7280; --line: #E7E9F2; --panel: #F6F7FB; --green: #16A34A; --green-bg: #E7F8ED; --red: #DC2626; }
@@ -51,15 +51,12 @@
     <textarea id="content" maxlength="2000" placeholder="예) 샤워실 온도가 오후에 너무 차가워요 / 이런 수업이 생기면 좋겠어요" required></textarea>
     <div class="count"><span id="cnt">0</span> / 2000</div>
 
-    <label for="contact">이름 · 연락처 <small>(답변을 원하실 때만 적어주세요. 비워두면 익명으로 전달돼요)</small></label>
-    <input type="text" id="contact" maxlength="100" placeholder="선택 사항" />
-
     <!-- 자동 입력 프로그램(스팸) 걸러내기용 숨김 칸 - 사람은 못 보니 비어 있어야 정상 -->
     <input type="text" id="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
     <button type="submit" class="btn" id="sendBtn" disabled>보내기</button>
     <div class="err" id="err"></div>
-    <div class="note">로그인이나 회원 확인 없이 보낼 수 있어요.<br>이름·연락처를 적지 않으면 누가 썼는지 알 수 없어요.</div>
+    <div class="note">🔒 이름도 연락처도 받지 않아요.<br>완전히 익명으로 전달되니 편하게 적어주세요.</div>
   </form>
 
   <div class="done" id="done">
@@ -102,7 +99,7 @@
         const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_suggestion`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({ p_content: content, p_contact: $('contact').value.trim() || null })
+          body: JSON.stringify({ p_content: content, p_contact: null })
         });
         if (res.status === 404) throw new Error('건의함이 아직 준비 중이에요. 센터 직원에게 말씀해주세요.');
         let data = null;
@@ -124,7 +121,7 @@
       window.scrollTo(0, 0);
     }
     $('againBtn').addEventListener('click', () => {
-      contentEl.value = ''; $('contact').value = ''; refresh();
+      contentEl.value = ''; refresh();
       $('done').style.display = 'none'; $('form').style.display = 'block';
     });
     refresh();
