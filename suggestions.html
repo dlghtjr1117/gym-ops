@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 마음의 소리함</title>
+<link rel="stylesheet" href="style.css?v=1791480155" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  .count-pill { font-size: 11.5px; font-weight: 700; background: var(--slate-100); color: var(--slate-700); border-radius: 999px; padding: 2px 9px; }
+  .sg-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 8px 0 14px; }
+  .sg-stat { border: 1px solid var(--slate-200); background: var(--surface); border-radius: 14px; padding: 14px 16px; }
+  .sg-stat .l { font-size: 12px; font-weight: 700; color: var(--slate-500); }
+  .sg-stat .v { font-size: 28px; font-weight: 900; margin-top: 2px; }
+  .sg-stat.new .v { color: #c2410c; } .sg-stat.done .v { color: #16a34a; }
+  .sg-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; align-items: center; }
+  .sg-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
+  .sg-card.new { border-left: 4px solid #f97316; }
+  .sg-card.done { opacity: .8; }
+  .sg-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--slate-500); margin-bottom: 8px; }
+  .sg-body { white-space: pre-wrap; word-break: break-word; font-size: 14.5px; line-height: 1.6; color: var(--slate-900); }
+  .sg-contact { margin-top: 8px; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: #eef2ff; color: #3730a3; display: inline-block; }
+  .sg-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .sg-memo { flex: 1; min-width: 200px; padding: 6px 10px; font-size: 12.5px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: var(--slate-900); }
+  .sg-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700); cursor: pointer; }
+  .sg-btn.ok { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
+  .sg-btn.del { color: #b91c1c; }
+  .sg-empty { padding: 34px 16px; text-align: center; color: var(--slate-500); background: var(--surface); border: 1px dashed var(--slate-300); border-radius: 14px; }
+  .sg-qrbox { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+  #qrWrap { padding: 12px; background: #fff; border-radius: 14px; border: 1px solid var(--slate-200); }
+  .sg-url { font-size: 12.5px; word-break: break-all; color: var(--slate-500); margin: 6px 0 10px; }
+
+  /* 인쇄(엘리베이터에 붙일 포스터) - 인쇄할 때는 포스터만 나와요 */
+  #poster { display: none; }
+  @media print {
+    body > *:not(#poster) { display: none !important; }
+    #poster { display: block !important; text-align: center; padding: 40px 30px; font-family: -apple-system, "Malgun Gothic", "Noto Sans KR", sans-serif; color: #16192E; }
+    #poster .p-ic { font-size: 64px; }
+    #poster h1 { font-size: 54px; margin: 10px 0 8px; letter-spacing: -1px; }
+    #poster .p-sub { font-size: 24px; line-height: 1.6; margin: 0 0 30px; color: #374151; }
+    #poster .p-qr { display: inline-block; padding: 22px; border: 4px solid #3D5FFF; border-radius: 28px; }
+    #poster .p-qr img, #poster .p-qr canvas { width: 420px !important; height: 420px !important; }
+    #poster .p-step { font-size: 26px; font-weight: 800; margin-top: 30px; }
+    #poster .p-note { font-size: 18px; color: #6B7280; margin-top: 12px; line-height: 1.6; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="contact-center.html">📞 연락 센터</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="rules.html">센터 규정</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="suggestions.html" class="active">💌 마음의 소리함</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="payroll.html">급여 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <h2 style="margin:6px 0 4px;">💌 마음의 소리함</h2>
+    <p class="muted" style="margin:0 0 12px;">회원님이 엘리베이터 QR로 남긴 건의사항이 여기에 쌓여요. 누가 썼는지는 알 수 없고, 회원이 직접 적은 연락처만 보여요. <span id="roleNote"></span></p>
+    <div id="loadError" class="error-text" style="display:none;"></div>
+    <div id="notManager" class="sg-empty" style="display:none;">마음의 소리함은 지점장만 볼 수 있어요.</div>
+
+    <div id="mainArea">
+      <div class="sg-stats">
+        <div class="sg-stat"><div class="l">전체</div><div class="v"><span id="stAll">-</span></div></div>
+        <div class="sg-stat new"><div class="l">🆕 새 글 (아직 안 읽음)</div><div class="v"><span id="stNew">-</span></div></div>
+        <div class="sg-stat done"><div class="l">✅ 처리 완료</div><div class="v"><span id="stDone">-</span></div></div>
+      </div>
+
+      <div class="sg-tabs" id="tabs"></div>
+      <div id="list"><div class="sg-empty">불러오는 중...</div></div>
+
+      <div class="section" style="margin-top:26px;">
+        <h2>📱 회원용 QR</h2>
+        <div class="panel">
+          <div class="sg-qrbox">
+            <div id="qrWrap"></div>
+            <div style="flex:1; min-width:240px;">
+              <div style="font-weight:800;">엘리베이터에 붙일 QR</div>
+              <div class="muted" style="font-size:12.5px; margin-top:2px;">회원님이 이 QR을 휴대폰으로 찍으면 로그인 없이 <b>건의사항 입력 칸만</b> 나와요.</div>
+              <div class="sg-url" id="qrUrl"></div>
+              <button type="button" class="btn btn-primary" id="printBtn" style="width:auto;padding:8px 18px;">🖨 포스터 인쇄</button>
+              <button type="button" class="btn btn-outline" id="copyBtn" style="width:auto;padding:8px 16px;margin-left:6px;">링크 복사</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">마음의 소리함 · 2026-10-14 최초 버전</p>
+  </div>
+
+  <div id="poster">
+    <div class="p-ic">💌</div>
+    <h1>마음의 소리함</h1>
+    <p class="p-sub">센터에 바라는 점 · 불편한 점 · 칭찬하고 싶은 점<br>편하게 남겨주세요</p>
+    <div class="p-qr" id="posterQr"></div>
+    <div class="p-step">휴대폰 카메라로 QR을 찍어주세요</div>
+    <div class="p-note">로그인 없이 바로 쓸 수 있어요 · 이름을 적지 않으면 익명으로 전달돼요<br>지점장이 직접 읽고 반영할게요</div>
+  </div>
+
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791700000"></script>
+  <script src="data.js?v=1791640000"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+    let rows = [], tabKey = 'new', isManager = false;
+    const STATUS_LABEL = { new: '새 글', read: '확인함', done: '처리 완료' };
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => escapeHtml(String(s === null || s === undefined ? '' : s));
+    const fmt = (iso) => { const d = new Date(iso); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+    async function api(method, path, body, okMsg) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        method, headers: { ...(await authHeaders()), 'Prefer': 'return=representation' }, body: body ? JSON.stringify(body) : undefined
+      });
+      if (!res.ok) await throwApiError(res, okMsg);
+      return res.status === 204 ? [] : res.json();
+    }
+
+    async function load() {
+      try {
+        const { rows: r, error } = await fetchAllRows('suggestions?select=*&order=created_at.desc', await authHeaders());
+        if (error) {
+          let msg = '';
+          try { msg = (await error.json()).message || ''; } catch (e) { /* ignore */ }
+          if (error.status === 404 || /does not exist|schema cache/i.test(msg)) throw new Error('Supabase에서 migration_84_suggestions.sql을 먼저 실행해주세요.');
+          throw new Error(msg || '건의사항을 불러오지 못했어요.');
+        }
+        rows = r; render();
+      } catch (err) { $('loadError').textContent = err.message; $('loadError').style.display = 'block'; $('list').innerHTML = ''; }
+    }
+
+    function render() {
+      const n = (s) => rows.filter(x => x.status === s).length;
+      $('stAll').textContent = rows.length; $('stNew').textContent = n('new'); $('stDone').textContent = n('done');
+      const defs = [['new', `🆕 새 글 (${n('new')})`], ['read', `확인함 (${n('read')})`], ['done', `처리 완료 (${n('done')})`], ['all', `전체 (${rows.length})`]];
+      $('tabs').innerHTML = defs.map(([k, l]) => `<button class="filter-tab ${tabKey === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('');
+      const list = rows.filter(x => tabKey === 'all' || x.status === tabKey);
+      $('list').innerHTML = list.length ? list.map(card).join('') :
+        `<div class="sg-empty">${tabKey === 'new' ? '새로 들어온 의견이 없어요 🙌' : '해당하는 의견이 없어요.'}</div>`;
+    }
+
+    function card(x) {
+      const id = esc(x.id);
+      const actions = [
+        x.status === 'new' ? `<button class="sg-btn" data-act="read" data-id="${id}">확인했어요</button>` : '',
+        x.status !== 'done' ? `<button class="sg-btn ok" data-act="done" data-id="${id}">처리 완료</button>` : `<button class="sg-btn" data-act="new" data-id="${id}">다시 새 글로</button>`,
+        `<button class="sg-btn del" data-act="del" data-id="${id}">삭제</button>`
+      ].join('');
+      return `<div class="sg-card ${x.status}" data-card="${id}">
+        <div class="sg-head"><span class="badge ${x.status === 'new' ? 'badge-orange' : x.status === 'done' ? 'badge-green' : 'badge-slate'}">${STATUS_LABEL[x.status] || x.status}</span><span>${fmt(x.created_at)}</span></div>
+        <div class="sg-body">${esc(x.content)}</div>
+        ${x.contact ? `<div class="sg-contact">📞 답변 희망 · ${esc(x.contact)}</div>` : ''}
+        <div class="sg-actions"><input class="sg-memo" data-memo="${id}" value="${esc(x.admin_memo || '')}" placeholder="처리 메모 (예: 샤워실 온도 조정함)" />${actions}</div>
+      </div>`;
+    }
+
+    $('tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) { tabKey = b.dataset.tab; render(); } });
+    $('list').addEventListener('change', async (e) => {
+      const m = e.target.closest('[data-memo]'); if (!m) return;
+      const x = rows.find(r => r.id === m.dataset.memo); if (!x) return;
+      try { await api('PATCH', `suggestions?id=eq.${x.id}`, { admin_memo: m.value.trim() || null }, '메모 저장에 실패했습니다.'); x.admin_memo = m.value.trim() || null; showToast('메모를 저장했어요.'); }
+      catch (err) { alert(err.message); }
+    });
+    $('list').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      const x = rows.find(r => r.id === b.dataset.id); if (!x) return;
+      b.disabled = true;
+      try {
+        if (b.dataset.act === 'del') {
+          if (!confirm('이 의견을 완전히 삭제할까요? 되돌릴 수 없어요.')) { b.disabled = false; return; }
+          await api('DELETE', `suggestions?id=eq.${x.id}`, null, '삭제에 실패했습니다.');
+          rows = rows.filter(r => r.id !== x.id);
+        } else {
+          const status = b.dataset.act;
+          const memoEl = document.querySelector(`[data-memo="${x.id}"]`);
+          const patch = { status, handled_at: status === 'new' ? null : new Date().toISOString(), admin_memo: (memoEl && memoEl.value.trim()) || null };
+          const out = await api('PATCH', `suggestions?id=eq.${x.id}`, patch, '상태 변경에 실패했습니다.');
+          Object.assign(x, (out && out[0]) || patch);
+        }
+        render();
+      } catch (err) { alert(err.message); b.disabled = false; }
+    });
+
+    // QR: 회원용 주소(같은 사이트의 suggest.html)
+    function buildQr() {
+      const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'suggest.html';
+      $('qrUrl').textContent = url;
+      $('qrWrap').innerHTML = ''; $('posterQr').innerHTML = '';
+      try {
+        new QRCode($('qrWrap'), { text: url, width: 170, height: 170, correctLevel: QRCode.CorrectLevel.M });
+        new QRCode($('posterQr'), { text: url, width: 420, height: 420, correctLevel: QRCode.CorrectLevel.M });
+      } catch (e) { $('qrWrap').textContent = 'QR을 만들지 못했어요. 링크를 복사해서 쓰세요.'; }
+      $('copyBtn').onclick = async () => { try { await navigator.clipboard.writeText(url); showToast('링크를 복사했어요.'); } catch (e) { prompt('아래 링크를 복사하세요', url); } };
+      $('printBtn').onclick = () => window.print();
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        $('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
+        applyRoleNav(profile);
+        isManager = profile.role === 'manager';
+      }
+      if (!isManager) { $('mainArea').style.display = 'none'; $('notManager').style.display = 'block'; return; }
+      buildQr(); load();
+    })();
+  </script>
+</body>
+</html>
