@@ -39,6 +39,7 @@
   @media (max-width: 1300px) { .cc-row { grid-template-columns: 100px 150px 150px 1fr; } .cc-row .c-memo { grid-column: 1 / -1; } .cc-row .c-act { grid-column: 1 / -1; } .cc-row.head { display: none; } }
   .cc-nm { font-weight: 900; font-size: 14px; cursor: pointer; background: none; border: none; padding: 0; color: var(--slate-900); text-align: left; }
   .cc-nm:hover { text-decoration: underline; }
+  .cc-dup { display:inline-block; margin-left:4px; padding:1px 6px; border-radius:999px; font-size:10.5px; font-weight:800; background:#fef3c7; color:#92400e; }
   .cc-ph { color: var(--slate-500); font-size: 12px; }
   .cc-ph a { color: inherit; text-decoration: none; }
   .cc-sub { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
@@ -158,6 +159,7 @@
         <input type="date" id="rmDate" class="cc-field" style="margin-top:6px;" />
       </div>
       <div id="rmInfo" class="cc-hint" style="display:none;"></div>
+      <div id="rmSiblings" style="display:none;margin-top:10px;padding:10px 12px;border:1px solid var(--slate-300);border-radius:10px;background:var(--slate-50);"></div>
       <div style="margin:12px 0 4px;font-size:12px;color:var(--slate-500);font-weight:700;">메모 (선택)</div>
       <textarea id="rmMemo" rows="3" class="cc-field" placeholder="통화 내용을 간단히 적어주세요"></textarea>
       <div id="rmMsg" class="error-text" style="display:none;margin-top:8px;"></div>
@@ -290,9 +292,14 @@
       };
     }
 
+    let expiryRowCount = {};
     function expiryTask(it) {
       const m = it.member, info = tmStatusInfo(it), tm = it.latestTm;
-      const contacts = [m.tm_contact1_date, m.tm_contact2_date, m.tm_contact3_date].filter(Boolean);
+      // 연락 날짜는 "그 상품의 TM 기록"에서만 모음. 회원 단위 tm_contact1~3_date는 상품이 여러 개인 회원(헬스+PT 등)에서
+      // 한 상품만 연락해도 다른 상품 줄까지 "연락함"으로 보이게 만들어서, 상품 줄이 하나뿐인 예전 기록일 때만 보조로 씀
+      const histDates = Array.from(new Set((it.tmHistory || []).filter(l => l.status !== 'not_contacted' && l.contact_date).map(l => l.contact_date))).sort();
+      const legacy = (expiryRowCount[m.id] || 0) <= 1 ? [m.tm_contact1_date, m.tm_contact2_date, m.tm_contact3_date].filter(Boolean) : [];
+      const contacts = Array.from(new Set([...histDates, ...legacy])).sort().slice(-3);
       const touchedLog = !!(tm && tm.status !== 'not_contacted');
       const lastContact = maxDate([touchedLog ? tm.contact_date : null, ...contacts]);
       let nextDate = (tm && tm.next_contact_date) || null;
@@ -356,6 +363,8 @@
 
     function buildTasks() {
       const out = [];
+      expiryRowCount = {};
+      expiryItems.forEach(it => { expiryRowCount[it.member.id] = (expiryRowCount[it.member.id] || 0) + 1; });
       consultRows.forEach(c => out.push(consultTask(c)));
       expiryItems.forEach(it => out.push(expiryTask(it)));
       gptItems.forEach(it => { const t = gptTask(it); if (t) out.push(t); });
@@ -441,6 +450,11 @@
         `<button class="cc-btn rj" data-act="declined" data-key="${k}">거절</button>` +
         `<button class="cc-btn rj" data-act="rolled" data-key="${k}">이월</button>`;
     }
+    function dupBadge(t) {
+      if (t.done) return '';
+      const n = siblingsOf(t).length;
+      return n ? ` <span class="cc-dup" title="같은 사람의 다른 연락 건이 ${n}건 더 있어요. 등록 처리할 때 같이 정리할 수 있어요">동일인 +${n}</span>` : '';
+    }
     function rowHtml(t) {
       const late = !t.done && (t.nextDate || t.effNext) && (t.nextDate || t.effNext) < TODAY;
       const phone = t.phone ? `<a href="tel:${esc(digitsOf(t.phone))}">${esc(formatPhone(t.phone) || t.phone)}</a>` : '<span class="cc-ph">번호 없음</span>';
@@ -451,7 +465,7 @@
         : stepsHtml(t) + nextLabel(t);
       return `<div class="cc-row ${late ? 'late' : ''}">
         <div>${kindBadge(t)}</div>
-        <div><button class="cc-nm" data-act="detail" data-key="${esc(t.key)}">${esc(t.name)}</button>${carriedBadge}
+        <div><button class="cc-nm" data-act="detail" data-key="${esc(t.key)}">${esc(t.name)}</button>${carriedBadge}${dupBadge(t)}
           <div class="cc-ph">${phone}</div></div>
         <div>${esc(t.headline)}<div class="cc-sub">${ddayBadge(t)} ${t.sub && t.src !== 'expiry' ? esc(t.sub) : ''}</div>${t.src === 'expiry' && t.sub ? `<div class="cc-sub">${esc(t.sub)}</div>` : ''}${owner ? `<div class="cc-sub">${owner}</div>` : ''}</div>
         <div>${c4}</div>
@@ -607,6 +621,29 @@
     }
     const OPEN_RESULTS = ['called', 'noanswer', 'thinking'];
 
+    // 같은 사람이 여러 줄로 올라오는 경우(상담 중복 · 헬스+PT 동시 만료 · 상담+만료 동시)를 한 번에 정리하려고 찾음
+    function siblingsOf(t) {
+      const ph = t.phoneDigits && t.phoneDigits.length >= 9 ? t.phoneDigits : '';
+      return tasks.filter(o => o.key !== t.key && !o.done && o.bucket !== 'done' &&
+        ((t.memberId && o.memberId === t.memberId) || (ph && o.phoneDigits === ph)));
+    }
+    const SRC_LABEL = { consult: '신규상담', expiry: '만료', gpt: '그룹PT' };
+    function sibLabel(o) { return `${SRC_LABEL[o.src]} · ${o.headline}${o.sub && o.src === 'expiry' ? ' (' + o.sub + ')' : ''}`; }
+    function renderSiblings(t, result) {
+      const box = document.getElementById('rmSiblings');
+      const sibs = (result === 'registered' || result === 'declined' || result === 'rolled') ? siblingsOf(t) : [];
+      resultCtx.sibs = sibs.map(o => o.key);
+      if (!sibs.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      const word = RESULT_LABEL[result];
+      box.style.display = '';
+      box.innerHTML = `<div style="font-weight:800;font-size:12.5px;margin-bottom:6px;">⚠ 같은 사람의 다른 연락 건이 ${sibs.length}건 더 있어요 — 같이 ${word} 처리할까요?</div>` +
+        sibs.map(o => {
+          const sameKind = o.src === t.src && o.src === 'consult'; // 같은 사람의 상담이 두 줄이면 사실상 같은 건
+          return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:3px 0;cursor:pointer;"><input type="checkbox" class="rm-sib" data-key="${esc(o.key)}" ${sameKind ? 'checked' : ''} style="margin-top:2px;"> <span>${esc(sibLabel(o))}</span></label>`;
+        }).join('') +
+        `<div style="font-size:11.5px;color:var(--slate-500);margin-top:4px;">상품이 다르면(예: 헬스는 등록, PT는 아직) 체크하지 마세요. 체크 안 한 건은 그대로 일일업무에 남아요.</div>`;
+    }
+
     async function recordResult(t, result, { nextDate, memo }) {
       const isOpen = OPEN_RESULTS.includes(result);
       const nd = isOpen ? (nextDate || null) : null;
@@ -618,7 +655,8 @@
         if (slot) patch[slot] = TODAY;
         if (HAS_NEXT) patch.next_contact_date = nd;
         const rows = await updateWalkinConsultation(c.id, patch);
-        Object.assign(c, (rows && rows[0]) || patch);
+        if (!rows || !rows[0]) throw new Error('저장이 반영되지 않았어요(권한 또는 이미 삭제된 상담). 새로고침 후 다시 시도해주세요.');
+        Object.assign(c, rows[0]);
         if (result === 'rolled') await carryOverConsult(c);
       } else if (t.src === 'expiry') {
         const it = t.item, m = it.member;
@@ -711,6 +749,7 @@
       document.getElementById('rmSave').disabled = false;
       document.getElementById('rmHint').style.display = open ? '' : 'none';
       updateRmHint();
+      renderSiblings(t, result);
       document.getElementById('resultModal').style.display = 'flex';
       setTimeout(() => document.getElementById('rmMemo').focus(), 50);
     }
@@ -742,9 +781,14 @@
       if (open && !nextDate) { const m = document.getElementById('rmMsg'); m.textContent = '다시 연락할 날짜를 골라주세요.'; m.style.display = ''; return; }
       const btn = document.getElementById('rmSave'); btn.disabled = true;
       try {
+        const sibKeys = Array.from(document.querySelectorAll('#rmSiblings .rm-sib:checked')).map(x => x.dataset.key);
+        const sibTasks = sibKeys.map(findTask).filter(Boolean);
         await recordResult(t, result, { nextDate, memo });
+        for (const o of sibTasks) { // 같은 사람의 체크한 다른 건도 같은 결과로 함께 처리
+          const cur = findTask(o.key); if (cur && !cur.done) await recordResult(cur, result, { nextDate: null, memo: '(같은 분 다른 건과 함께 처리)' });
+        }
         closeResult(); renderList();
-        showToast(open ? `${t.name} 님 · ${mdw(nextDate)}에 다시 일일업무에 올라와요.` : `${t.name} 님 · ${RESULT_LABEL[result]} 처리했어요.`);
+        showToast(open ? `${t.name} 님 · ${mdw(nextDate)}에 다시 일일업무에 올라와요.` : `${t.name} 님 · ${RESULT_LABEL[result]} 처리했어요.${sibTasks.length ? ` (같은 분 ${sibTasks.length}건 함께)` : ''}`);
       } catch (err) {
         const m = document.getElementById('rmMsg'); m.textContent = err.message; m.style.display = ''; btn.disabled = false;
       }
@@ -1080,12 +1124,29 @@
         }
         buildTasks();
         renderList();
+        lastLoadedAt = Date.now();
         loadCallEvents();
         callTimer = setInterval(loadCallEvents, 30000);
       } catch (err) {
         const el = document.getElementById('loadError'); el.textContent = err.message; el.style.display = 'block';
         document.getElementById('listArea').innerHTML = '';
       }
+    }
+
+    // 다른 직원이 그 사이 처리한 건이 오래된 화면에 남아 "처리 안 된 것처럼" 보이지 않게, 화면에 다시 돌아오면 최신으로 갱신
+    let lastLoadedAt = Date.now();
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden || !me || Date.now() - lastLoadedAt < 60000) return;
+      const anyModal = Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display && m.style.display !== 'none');
+      if (anyModal) return;
+      await refreshQuiet();
+    });
+    async function refreshQuiet() {
+      try {
+        const [rows, board, gpt] = await Promise.all([fetchWalkinConsultations(), fetchExpiryBoard(45), fetchGroupPtRetentionItems().catch(() => gptItems)]);
+        consultRows = rows; expiryItems = board; gptItems = gpt; lastLoadedAt = Date.now();
+        buildTasks(); renderList();
+      } catch (e) { /* 조용히 무시 - 다음 기회에 다시 */ }
     }
 
     (async () => {
