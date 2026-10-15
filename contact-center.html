@@ -452,7 +452,8 @@
     }
     function dupBadge(t) {
       if (t.done) return '';
-      const n = siblingsOf(t).length;
+      const mk = new Set((t.merged || []).map(o => o.key));
+      const n = siblingsOf(t).filter(o => !mk.has(o.key)).length;
       return n ? ` <span class="cc-dup" title="같은 사람의 다른 연락 건이 ${n}건 더 있어요. 등록 처리할 때 같이 정리할 수 있어요">동일인 +${n}</span>` : '';
     }
     function rowHtml(t) {
@@ -460,16 +461,17 @@
       const phone = t.phone ? `<a href="tel:${esc(digitsOf(t.phone))}">${esc(formatPhone(t.phone) || t.phone)}</a>` : '<span class="cc-ph">번호 없음</span>';
       const owner = isManager && t.ownerName ? `담당 ${esc(t.ownerName)}` : '';
       const carriedBadge = t.carried ? ' <span class="badge badge-purple" title="지난달에 이월 처리돼서 이번 달로 넘어온 건">이월</span>' : '';
+      const memoShown = t.memo || (groupOf(t).find(x => x.memo) || {}).memo || '';
       let c4 = t.done
         ? `<span class="badge ${t.doneKey === 'registered' ? 'badge-green' : t.doneKey === 'declined' ? 'badge-red' : 'badge-purple'}">${esc(DONE_LABEL[t.resultKey] || RESULT_LABEL[t.doneKey] || '')}</span><div class="cc-sub">${t.doneDate ? '처리 ' + md(t.doneDate) : ''}</div>`
         : stepsHtml(t) + nextLabel(t);
       return `<div class="cc-row ${late ? 'late' : ''}">
-        <div>${kindBadge(t)}</div>
+        <div>${groupOf(t).map(kindBadge).join(' ')}</div>
         <div><button class="cc-nm" data-act="detail" data-key="${esc(t.key)}">${esc(t.name)}</button>${carriedBadge}${dupBadge(t)}
           <div class="cc-ph">${phone}</div></div>
-        <div>${esc(t.headline)}<div class="cc-sub">${ddayBadge(t)} ${t.sub && t.src !== 'expiry' ? esc(t.sub) : ''}</div>${t.src === 'expiry' && t.sub ? `<div class="cc-sub">${esc(t.sub)}</div>` : ''}${owner ? `<div class="cc-sub">${owner}</div>` : ''}</div>
+        <div>${groupOf(t).map(x => `<div>${esc(x.headline)}<div class="cc-sub">${ddayBadge(x)} ${x.sub && x.src !== 'expiry' ? esc(x.sub) : ''}</div>${x.src === 'expiry' && x.sub ? `<div class="cc-sub">${esc(x.sub)}</div>` : ''}</div>`).join('')}${owner ? `<div class="cc-sub">${owner}</div>` : ''}</div>
         <div>${c4}</div>
-        <div class="c-memo" title="${esc(t.memo)}">${t.memo ? esc(t.memo) : '<span class="muted">메모 없음</span>'}</div>
+        <div class="c-memo" title="${esc(memoShown)}">${memoShown ? esc(memoShown) : '<span class="muted">메모 없음</span>'}</div>
         <div class="c-act">${actionsHtml(t)}</div>
       </div>`;
     }
@@ -528,7 +530,7 @@
     }
 
     function renderList() {
-      const mine = scoped();
+      const mine = groupTasks(scoped());
       const bucketOf = (b) => mine.filter(t => t.bucket === b);
       const q = (arr) => arr.filter(matchesSearch);
       const area = document.getElementById('listArea');
@@ -621,6 +623,25 @@
     }
     const OPEN_RESULTS = ['called', 'noanswer', 'thinking'];
 
+    // 같은 사람이 같은 칸(일일업무 등)에 여러 줄로 올라오면 한 줄로 합쳐 보여줌 (예: 헬스이용권 · 운동복 만료)
+    function groupTasks(list) {
+      const phoneToMember = {};
+      tasks.forEach(t => { if (t.memberId && t.phoneDigits && t.phoneDigits.length >= 9) phoneToMember[t.phoneDigits] = t.memberId; });
+      const personKey = (t) => t.memberId ? 'm:' + t.memberId : (t.phoneDigits && t.phoneDigits.length >= 9 ? (phoneToMember[t.phoneDigits] ? 'm:' + phoneToMember[t.phoneDigits] : 'p:' + t.phoneDigits) : null);
+      const SRC_ORDER = { expiry: 0, gpt: 1, consult: 2 };
+      const buckets = {};
+      list.forEach(t => { t.merged = []; const k = !t.done && personKey(t); if (k) (buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] = buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] || []).push(t); });
+      const hidden = new Set();
+      Object.values(buckets).forEach(g => {
+        if (g.length < 2) return;
+        g.sort((a, b) => (a.bucket === 'daily' ? 0 : 1) - (b.bucket === 'daily' ? 0 : 1) || SRC_ORDER[a.src] - SRC_ORDER[b.src] || (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
+        g[0].merged = g.slice(1);
+        g.slice(1).forEach(o => hidden.add(o));
+      });
+      return list.filter(t => !hidden.has(t));
+    }
+    const groupOf = (t) => [t, ...(t.merged || [])];
+
     // 같은 사람이 여러 줄로 올라오는 경우(상담 중복 · 헬스+PT 동시 만료 · 상담+만료 동시)를 한 번에 정리하려고 찾음
     function siblingsOf(t) {
       const ph = t.phoneDigits && t.phoneDigits.length >= 9 ? t.phoneDigits : '';
@@ -631,17 +652,19 @@
     function sibLabel(o) { return `${SRC_LABEL[o.src]} · ${o.headline}${o.sub && o.src === 'expiry' ? ' (' + o.sub + ')' : ''}`; }
     function renderSiblings(t, result) {
       const box = document.getElementById('rmSiblings');
-      const sibs = (result === 'registered' || result === 'declined' || result === 'rolled') ? siblingsOf(t) : [];
+      const closing = (result === 'registered' || result === 'declined' || result === 'rolled');
+      const sibs = closing ? siblingsOf(t) : (t.merged || []);
       resultCtx.sibs = sibs.map(o => o.key);
       if (!sibs.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
       const word = RESULT_LABEL[result];
+      const merged = new Set((t.merged || []).map(o => o.key));
       box.style.display = '';
-      box.innerHTML = `<div style="font-weight:800;font-size:12.5px;margin-bottom:6px;">⚠ 같은 사람의 다른 연락 건이 ${sibs.length}건 더 있어요 — 같이 ${word} 처리할까요?</div>` +
+      box.innerHTML = `<div style="font-weight:800;font-size:12.5px;margin-bottom:6px;">같은 분의 다른 건 ${sibs.length}건 — 함께 ${word} 처리할까요?</div>` +
         sibs.map(o => {
-          const sameKind = o.src === t.src && o.src === 'consult'; // 같은 사람의 상담이 두 줄이면 사실상 같은 건
-          return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:3px 0;cursor:pointer;"><input type="checkbox" class="rm-sib" data-key="${esc(o.key)}" ${sameKind ? 'checked' : ''} style="margin-top:2px;"> <span>${esc(sibLabel(o))}</span></label>`;
+          const on = merged.has(o.key) || (o.src === t.src && o.src === 'consult');
+          return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:3px 0;cursor:pointer;"><input type="checkbox" class="rm-sib" data-key="${esc(o.key)}" ${on ? 'checked' : ''} style="margin-top:2px;"> <span>${esc(sibLabel(o))}${merged.has(o.key) ? '' : ' <span class="muted">(다른 칸에 있는 건)</span>'}</span></label>`;
         }).join('') +
-        `<div style="font-size:11.5px;color:var(--slate-500);margin-top:4px;">상품이 다르면(예: 헬스는 등록, PT는 아직) 체크하지 마세요. 체크 안 한 건은 그대로 일일업무에 남아요.</div>`;
+        `<div style="font-size:11.5px;color:var(--slate-500);margin-top:4px;">이 건만 처리하려면 체크를 해제하세요. 체크 안 한 건은 그대로 남아요.</div>`;
     }
 
     async function recordResult(t, result, { nextDate, memo }) {
@@ -785,7 +808,7 @@
         const sibTasks = sibKeys.map(findTask).filter(Boolean);
         await recordResult(t, result, { nextDate, memo });
         for (const o of sibTasks) { // 같은 사람의 체크한 다른 건도 같은 결과로 함께 처리
-          const cur = findTask(o.key); if (cur && !cur.done) await recordResult(cur, result, { nextDate: null, memo: '(같은 분 다른 건과 함께 처리)' });
+          const cur = findTask(o.key); if (cur && !cur.done) await recordResult(cur, result, { nextDate: null, memo });
         }
         closeResult(); renderList();
         showToast(open ? `${t.name} 님 · ${mdw(nextDate)}에 다시 일일업무에 올라와요.` : `${t.name} 님 · ${RESULT_LABEL[result]} 처리했어요.${sibTasks.length ? ` (같은 분 ${sibTasks.length}건 함께)` : ''}`);
@@ -808,14 +831,17 @@
         // 부재중은 한 번에: 연속으로 못 받을수록 간격을 늘려서(1·2·3일 뒤) 다시 올려줌
         const gap = Math.min(3, noAnswerStreak(t) + 1);
         btn.disabled = true;
-        try { await recordResult(t, 'noanswer', { nextDate: addDays(TODAY, gap), memo: '' }); renderList(); showToast(`${t.name} 님 · 부재중 처리, ${mdw(addDays(TODAY, gap))}에 다시 올라와요.`); }
+        const gkeys = groupOf(t).map(x => x.key);
+        try { for (const k of gkeys) { const x = findTask(k); if (x && !x.done) await recordResult(x, 'noanswer', { nextDate: addDays(TODAY, gap), memo: '' }); } renderList(); showToast(`${t.name} 님 · 부재중 처리, ${mdw(addDays(TODAY, gap))}에 다시 올라와요.`); }
         catch (err) { alert(err.message); btn.disabled = false; }
         return;
       }
       if (act === 'today') {
         btn.disabled = true;
         try {
-          await planForToday(t); renderList(); showToast(`${t.name} 님을 오늘 할 일에 담았어요.`);
+          const gkeys = groupOf(t).map(x => x.key);
+          for (const k of gkeys) { const x = findTask(k); if (x) await planForToday(x); }
+          renderList(); showToast(`${t.name} 님을 오늘 할 일에 담았어요.`);
         } catch (err) { alert(err.message); btn.disabled = false; }
         return;
       }
