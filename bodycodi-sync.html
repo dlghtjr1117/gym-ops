@@ -199,6 +199,10 @@
         <div class="bc-row"><button type="button" class="btn btn-primary" id="salesCheckBtn" style="width:auto;padding:8px 18px;">달별로 맞춰보기</button>
           <button type="button" class="btn btn-primary" id="salesFillBtn" style="width:auto;padding:8px 18px;">바디코디와 비교해서 빠진 매출 모두 채우기</button></div>
         <div class="bc-res" id="salesCheckRes"></div>
+        <div class="bc-row" style="margin-top:12px;"><button type="button" class="btn btn-primary" id="auditBtn" style="width:auto;padding:8px 18px;">일·주·월 정밀 점검 (바디코디와 하나씩 비교)</button>
+          <label class="bc-note" style="display:inline-flex;gap:6px;align-items:center;margin:0;"><input type="checkbox" id="auditAlign" /> 담당자(판매 강사)도 바디코디와 똑같이 맞추기</label></div>
+        <div class="bc-note">위 ②에서 고른 기간을 바디코디와 날짜별로 비교해요. 아무것도 바꾸지 않고, 차이 나는 날은 건별로 어느 쪽에 뭐가 더 있는지 보여줘요. 확인 후 아래 "점검 결과대로 정리하기"를 누르면 바로잡아요.</div>
+        <div class="bc-res" id="auditRes"></div>
       </div>
 
       <div class="bc-card">
@@ -207,7 +211,7 @@
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.9 · 2026-10-16</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v3.0 · 2026-10-16</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -275,7 +279,7 @@
         card('확실히 이어진 회원', s.matched, 'good') + card('애매한 회원(자동 반영 안 함)', s.ambiguous, s.ambiguous ? 'warn' : '') +
         card('바디코디에만 있는 회원', s.unmatched_body, s.unmatched_body ? 'warn' : '') + card('앱에만 있는 회원', s.unmatched_app) +
         card('바뀔 회원', s.will_change, 'good') + card('마지막 방문일이 바뀔 회원', s.will_change_last_visit, 'good') + card('이름이 바디코디와 똑같이 바뀔 회원', s.will_change_name || 0, s.will_change_name ? 'warn' : '') + card('이름이 가려져 와서 못 바꾸는 회원', s.name_masked || 0, s.name_masked ? 'warn' : '') + `</div>` +
-        `<div class="bc-note">이어진 방법: 이미 저장된 번호 ${esc(s.matched_by.id)}명 · 전화번호 전체 ${esc(s.matched_by.phone)}명 · 이름+뒤 4자리(+가입일) ${esc(s.matched_by.name_last4)}명 · 'PT'·'그룹PT' 같은 이름 앞 말머리를 빼고 이어준 ${esc(s.matched_by.prefix_name || 0)}명</div>`;
+        `<div class="bc-note">이어진 방법: 이미 저장된 번호 ${esc(s.matched_by.id)}명 · 전화번호 전체 ${esc(s.matched_by.phone)}명 · 이름+뒤 4자리(+가입일) ${esc(s.matched_by.name_last4)}명 · 'PT'·'그룹PT' 같은 이름 앞 말머리를 빼고 이어준 ${esc(s.matched_by.prefix_name || 0)}명 · 이름이 완전히 달라 전화번호만으로 이은(이름은 그대로 둠) ${esc(s.matched_by.phone_only || 0)}명</div>`;
     }
     function tableHtml(head, rows) {
       if (!rows.length) return '<div class="bc-note">없어요.</div>';
@@ -619,14 +623,14 @@
         (ops.length ? `<details class="bc-det"><summary>넣을 매출 (앞 ${ops.length}건 예시)</summary>${tableHtml(['날짜', '회원', '항목', '구분', '금액', '담당'],
           ops.map((o) => [o.date, o.member, o.item, CAT_KO[o.category] || o.category, won(o.amount), o.staff || '미지정']))}</details>` : '');
     }
-    async function runSales(action, from, to, history, onProgress) {
+    async function runSales(action, from, to, history, onProgress, extra = {}) {
       const chunks = salesChunks(from, to);
       const sum = { from, to, payment: 0, refund: 0, merged: 0, no_member: 0, canceled: 0, free: 0, review: 0, member_unmatched: 0, already: 0, inserted: 0, adopted: 0, matched_existing: 0, skipped_product: 0, new_products: 0, amount: 0, truncated: false };
       const ops = [], np = new Map(), left = []; let written = 0; const errors = [];
       for (let i = 0; i < chunks.length; i++) {
         onProgress(i + 1, chunks.length, chunks[i]);
         let r;
-        try { r = await callSync(action, { from: chunks[i][0], to: chunks[i][1], history }); }
+        try { r = await callSync(action, { from: chunks[i][0], to: chunks[i][1], history, ...extra }); }
         catch (e) { throw new Error(`${chunks[i][0]} ~ ${chunks[i][1]} 구간에서 멈췄어요: ${e.message}${i ? ' (앞 구간은 이미 처리됐어요. 다시 누르면 이어서 해요)' : ''}`); }
         for (const k of ['payment', 'refund', 'merged', 'no_member', 'canceled', 'free', 'review', 'member_unmatched', 'already', 'inserted', 'adopted', 'matched_existing', 'skipped_product', 'amount']) sum[k] += r.summary[k] || 0;
         if (r.summary.truncated) sum.truncated = true;
@@ -801,6 +805,66 @@
       finally { busy = false; $('salesFillBtn').disabled = false; $('salesCheckBtn').disabled = false; $('salesFillBtn').textContent = '바디코디와 비교해서 빠진 매출 모두 채우기'; }
       $('salesCheckBtn').click();
     });
+
+
+    // ----- 일·주·월 정밀 점검 -----
+    const mondayOf = (ds) => { const d = new Date(ds + 'T00:00:00Z'); const wd = (d.getUTCDay() + 6) % 7; return new Date(d.getTime() - wd * 86400000).toISOString().slice(0, 10); };
+    const sgn = (n) => (n > 0 ? '+' : '') + won(n);
+    function auditTable(head, rows) {
+      return `<table class="bc-table"><thead><tr>${head.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    }
+    const diffTd = (n) => `<td style="text-align:right;${n ? 'font-weight:700;color:#b45309' : 'color:#15803d'}">${n ? sgn(n) : '일치'}</td>`;
+    async function runAudit() {
+      const from = $('salesFrom').value, to = $('salesTo').value;
+      if (!from || !to || from > to) { alert('위 ②에서 기간을 정확히 골라주세요.'); return; }
+      if ((Date.parse(to) - Date.parse(from)) / 86400000 > 183) { alert('한 번에 최대 6개월까지 점검할 수 있어요. 기간을 줄여주세요.'); return; }
+      const align = $('auditAlign').checked;
+      busy = true; $('auditBtn').disabled = true; $('auditRes').innerHTML = '';
+      const days = [], detail = [], leftovers = []; const pend = { insert: 0, adopt: 0, relink: 0, merge: 0, staff_fixed: 0, unlinked_left: 0, review: 0 };
+      let err = null; const chunks = salesChunks(from, to);
+      try {
+        for (let i = 0; i < chunks.length; i++) {
+          $('auditBtn').textContent = `점검 중... ${i + 1}/${chunks.length}`;
+          const r = await callSync('sales_audit', { from: chunks[i][0], to: chunks[i][1], align_staff: align });
+          days.push(...r.days); detail.push(...r.detail); leftovers.push(...(r.leftovers || []));
+          for (const k of Object.keys(pend)) pend[k] += (r.pending && r.pending[k]) || 0;
+        }
+      } catch (e) { err = e.message; }
+      finally { busy = false; $('auditBtn').disabled = false; $('auditBtn').textContent = '일·주·월 정밀 점검 (바디코디와 하나씩 비교)'; }
+      if (err) { $('auditRes').innerHTML = `<div class="bc-bad">❌ ${esc(err)}</div>`; return; }
+      const group = (key) => { const m = new Map(); for (const x of days) { const k = key(x.date); const e = m.get(k) || { body: 0, app: 0 }; e.body += x.body; e.app += x.app; m.set(k, e); } return [...m].sort((a, b) => (a[0] < b[0] ? -1 : 1)); };
+      const row = (label, e) => `<tr><td>${esc(label)}</td><td style="text-align:right">${won(e.body)}</td><td style="text-align:right">${won(e.app)}</td>${diffTd(e.app - e.body)}</tr>`;
+      const bodyTot = days.reduce((a, x) => a + x.body, 0), appTot = days.reduce((a, x) => a + x.app, 0), bad = days.filter((x) => x.diff !== 0).length;
+      const todo = pend.insert + pend.adopt + pend.relink + pend.merge + pend.staff_fixed;
+      const head = ['', '바디코디', '앱', '차이(앱−바디코디)'];
+      $('auditRes').innerHTML =
+        (appTot === bodyTot && !bad ? `<div class="bc-ok">✅ ${esc(from)} ~ ${esc(to)} 전 기간 날짜별 매출이 바디코디와 모두 일치해요. (합계 ${won(bodyTot)})</div>`
+          : `<div class="bc-bad">⚠ 날짜별로 안 맞는 날이 ${esc(bad)}일 있어요. 바디코디 ${won(bodyTot)} · 앱 ${won(appTot)} (차이 ${sgn(appTot - bodyTot)})</div>`) +
+        `<div class="bc-note">바디코디 쪽 숫자는 결제−환불이고, 앱에 일부러 안 넣는 음료 등은 뺀 값이에요. 취소된 판매는 양쪽 다 빠져요.</div>` +
+        `<details class="bc-det" open><summary>월별</summary>${auditTable(['월', ...head.slice(1)], group((d) => d.slice(0, 7)).map(([k, e]) => row(k, e)))}</details>` +
+        `<details class="bc-det"><summary>주별 (월요일 시작)</summary>${auditTable(['주', ...head.slice(1)], group(mondayOf).map(([k, e]) => row(`${k.slice(5)} ~ ${addDays(k, 6).slice(5)}`, e)))}</details>` +
+        `<details class="bc-det" ${bad ? 'open' : ''}><summary>일별 ${bad ? '(안 맞는 날 ' + esc(bad) + '일)' : ''}</summary>${auditTable(['날짜', ...head.slice(1)], days.map((x) => row(x.date, x)))}</details>` +
+        detail.map((x) => `<details class="bc-det" open><summary>${esc(x.date)} — 바디코디 ${won(x.body)} / 앱 ${won(x.app)} (${sgn(x.diff)})</summary>` +
+          `<div class="bc-note">바디코디 거래 ${esc(x.body_rows.length)}건</div>${auditTable(['회원', '상품', '금액', '판매 담당'], x.body_rows.map((b) => `<tr><td>${esc(b.who)}</td><td>${esc(b.product)}</td><td style="text-align:right">${won(b.amount)}</td><td>${esc(b.staff || '-')}</td></tr>`))}` +
+          `<div class="bc-note" style="margin-top:6px;">앱 매출 ${esc(x.app_rows.length)}건</div>${auditTable(['회원', '구분', '금액', '담당', '입력 방식'], x.app_rows.map((a) => `<tr><td>${esc(a.member)}</td><td>${esc(CAT_KO[a.category] || a.category)}</td><td style="text-align:right">${won(a.amount)}</td><td>${esc(a.staff || '-')}</td><td>${esc(a.source)}</td></tr>`))}</details>`).join('') +
+        `<div class="bc-note" style="margin-top:8px;">정리하면 바뀔 내용 — 새로 넣기 ${esc(pend.insert)}건 · 직접 입력분에 번호 잇기 ${esc(pend.adopt)}건 · 같은 매출 두 번 들어간 것 합치기 ${esc(pend.merge)}건 · 회원 이어주기 ${esc(pend.relink)}건 · 담당자 맞추기 ${esc(pend.staff_fixed)}건 · 확인 필요 ${esc(pend.review)}건</div>` +
+        (leftovers.length ? `<div class="bc-bad">회원이 안 이어진 채 남은 매출 ${esc(leftovers.length)}건: ${esc(leftovers.slice(0, 8).map((o) => `${o.date} ${o.who} ${won(o.amount)}`).join(' / '))}</div>` : '') +
+        (todo ? `<div class="bc-row" style="margin-top:8px;"><button type="button" class="btn btn-primary" id="auditFixBtn" style="width:auto;padding:8px 18px;">점검 결과대로 정리하기</button></div>` : '');
+      const fix = $('auditFixBtn');
+      if (fix) fix.addEventListener('click', async () => {
+        if (busy) return;
+        if (!confirm(`${from} ~ ${to} 기간을 바디코디 기준으로 정리할게요.\n- 앱에 없는 매출은 넣고\n- 같은 매출이 두 번 들어간 건은 자동 입력분을 지우고 하나로 합쳐요${align ? '\n- 담당자도 바디코디 판매 담당으로 바꿔요' : ''}\n계속할까요?`)) return;
+        busy = true; fix.disabled = true;
+        try {
+          const r = await runSales('sales_apply', from, to, from < addDays(kstDay(), -10), (i, n, c) => { fix.textContent = `정리 중... ${i}/${n}`; }, { align_staff: align });
+          $('salesRes').innerHTML = `<div class="bc-ok">✅ 정리했어요 (넣은 ${esc(r.summary.inserted)}건 · 합친 ${esc(r.summary.merged || 0)}건).</div>` + salesSummaryHtml(r.summary) + salesLeftHtml(r.leftovers);
+          loadLogs();
+        } catch (e) { $('auditRes').insertAdjacentHTML('afterbegin', `<div class="bc-bad">❌ ${esc(e.message)}</div>`); }
+        finally { busy = false; }
+        runAudit();
+      });
+    }
+    $('auditBtn').addEventListener('click', () => { if (!busy) runAudit(); });
 
     // ----- 이용기간 맞추기 (회원 30명씩) -----
     let datesPreviewed = null;
