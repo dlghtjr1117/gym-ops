@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 바디코디 연동</title>
+<link rel="stylesheet" href="style.css?v=1791480155" />
+<style>
+  .bc-card { border: 1px solid var(--slate-200); background: var(--surface); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+  .bc-card h3 { margin: 0 0 4px; font-size: 16px; }
+  .bc-step { display: inline-block; background: #2563eb; color: #fff; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 2px 9px; margin-right: 6px; }
+  .bc-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .bc-res { margin-top: 12px; font-size: 13.5px; line-height: 1.7; }
+  .bc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+  .bc-stat { border: 1px solid var(--slate-200); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
+  .bc-stat .l { font-size: 11.5px; font-weight: 700; color: var(--slate-500); }
+  .bc-stat .v { font-size: 24px; font-weight: 900; margin-top: 2px; }
+  .bc-stat.warn .v { color: #d97706; } .bc-stat.good .v { color: #16a34a; }
+  .bc-ok { color: #16a34a; font-weight: 800; } .bc-bad { color: #dc2626; font-weight: 800; }
+  .bc-note { font-size: 12px; color: var(--slate-500); margin-top: 6px; }
+  table.bc-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
+  table.bc-table th, table.bc-table td { padding: 6px 8px; border-bottom: 1px solid var(--slate-200); text-align: left; }
+  details.bc-det { margin-top: 10px; } details.bc-det summary { cursor: pointer; font-weight: 800; font-size: 13px; }
+  @media (max-width: 720px) { .bc-stats { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="contact-center.html">📞 연락 센터</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="supplies.html">📦 비품 재고</a>
+      <a href="rules.html">센터 규정</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="suggestions.html">💌 마음의 소리함</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="payroll.html">급여 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="bodycodi-sync.html" class="active">🔗 바디코디 연동</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <h2 style="margin:6px 0 4px;">🔗 바디코디 연동</h2>
+    <p class="muted" style="margin:0 0 12px;">바디코디에 있는 회원 정보를 읽어와서 우리 앱 회원의 <b>마지막 방문일</b>과 <b>이용권 상태</b>를 최신으로 맞춰요. 바디코디 데이터는 읽기만 하고, 바디코디를 바꾸지는 않아요. 지점장만 쓸 수 있어요.</p>
+    <div id="denied" class="error-text" style="display:none;">지점장 계정만 사용할 수 있는 화면이에요.</div>
+
+    <div id="mainArea">
+      <div class="bc-card">
+        <h3><span class="bc-step">1</span>연결 확인</h3>
+        <div class="muted">바디코디 API 키가 제대로 연결됐는지 확인해요. 회원 정보는 앱에 저장하지 않고 개수만 보여줘요.</div>
+        <div class="bc-row"><button type="button" class="btn btn-primary" id="pingBtn" style="width:auto;padding:8px 18px;">연결 확인하기</button></div>
+        <div class="bc-res" id="pingRes"></div>
+      </div>
+
+      <div class="bc-card">
+        <h3><span class="bc-step">2</span>미리보기 (아직 아무것도 안 바뀌어요)</h3>
+        <div class="muted">바디코디 회원과 우리 앱 회원을 이름·전화 뒤 4자리·가입일로 이어보고, "이렇게 바뀔 예정"만 보여줘요. 회원이 많으면 1분 정도 걸릴 수 있어요.</div>
+        <div class="bc-row"><button type="button" class="btn btn-primary" id="previewBtn" style="width:auto;padding:8px 18px;">미리보기</button></div>
+        <div class="bc-res" id="previewRes"></div>
+      </div>
+
+      <div class="bc-card">
+        <h3><span class="bc-step">3</span>앱에 반영하기</h3>
+        <div class="muted">미리보기에서 <b>확실히 이어진 회원만</b> 반영해요. 마지막 방문일은 바디코디 날짜가 더 최근일 때만 바꾸고, 애매한 회원·못 찾은 회원은 건드리지 않아요.</div>
+        <div class="bc-row"><button type="button" class="btn btn-primary" id="applyBtn" style="width:auto;padding:8px 18px;" disabled>미리보기 후 반영하기</button></div>
+        <div class="bc-res" id="applyRes"></div>
+      </div>
+
+      <div class="bc-card">
+        <h3>최근 동기화 기록</h3>
+        <div id="logs" class="muted">불러오는 중...</div>
+      </div>
+    </div>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v1 · 2026-10-16</p>
+  </div>
+
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791700000"></script>
+  <script src="data.js?v=1791640000"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => escapeHtml(String(s === null || s === undefined ? '' : s));
+    // Supabase 에디터가 함수 주소를 자동으로 'clever-action'으로 만들었어요(이름은 bodycodi-sync로 보이지만 주소는 그대로).
+    // 나중에 함수를 다른 주소로 다시 만들면 여기 한 줄만 바꾸면 돼요.
+    const SYNC_FN = 'clever-action';
+    let previewed = null;   // 마지막 미리보기 요약 (반영 버튼 활성 조건)
+    let busy = false;
+
+    async function callSync(action) {
+      const token = await getValidAccessToken();
+      let res;
+      try {
+        res = await fetch(`${SUPABASE_URL}/functions/v1/${SYNC_FN}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ action })
+        });
+      } catch (e) {
+        throw new Error('서버에 연결하지 못했어요. 인터넷 연결을 확인해주세요.');
+      }
+      if (res.status === 404) throw new Error('바디코디 연동 함수가 아직 배포되지 않았거나 주소가 달라요. BODYCODI_SYNC_SETUP.md의 순서대로 먼저 설정해주세요.');
+      let data = null;
+      try { data = await res.json(); } catch (e) { /* 아래에서 처리 */ }
+      if (!res.ok) throw new Error((data && (data.error || data.message)) || `요청에 실패했어요. (${res.status})`);
+      return data;
+    }
+
+    function setBusy(on, btn, label) {
+      busy = on;
+      ['pingBtn', 'previewBtn', 'applyBtn'].forEach((id) => { $(id).disabled = on || (id === 'applyBtn' && !previewed); });
+      if (btn) btn.textContent = on ? '진행 중... 잠시만요' : label;
+    }
+    const fmtDate = (d) => (d ? d : '없음');
+
+    $('pingBtn').addEventListener('click', async () => {
+      if (busy) return;
+      $('pingRes').innerHTML = '';
+      setBusy(true, $('pingBtn'), '연결 확인하기');
+      try {
+        const r = await callSync('ping');
+        const masked = r.names_masked > 0 || r.phones_masked > 0;
+        $('pingRes').innerHTML =
+          `<div class="bc-ok">✅ 바디코디와 연결됐어요.</div>` +
+          `<div>전체 회원 <b>${r.total === null ? '(총 수는 안 알려줘요)' : esc(r.total) + '명'}</b> · 첫 페이지 ${esc(r.first_page_count)}명 확인</div>` +
+          `<div>이름 가림: <b>${r.names_masked ? '있음' : '없음'}</b> · 전화번호 가림: <b>${r.phones_masked ? '있음 (뒤 4자리로 매칭해요)' : '없음 (전체 번호로 매칭해요)'}</b>${r.phones_empty ? ` · 번호 없는 회원 ${esc(r.phones_empty)}명(첫 페이지)` : ''}</div>` +
+          `<div>마지막 방문일이 들어온 회원: ${esc(r.with_last_visit)}명 / ${esc(r.first_page_count)}명</div>` +
+          `<details class="bc-det"><summary>자세히(기술 정보)</summary><div class="bc-note">주소 ${esc(r.base_url)} · page는 ${esc(r.page_base)}부터 · 받은 항목: ${esc((r.fields || []).join(', '))}<br>이용권 상태 분포(첫 페이지): ${esc(JSON.stringify(r.pass_states))}</div></details>`;
+      } catch (e) {
+        $('pingRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`;
+      } finally { setBusy(false, $('pingBtn'), '연결 확인하기'); }
+    });
+
+    function summaryHtml(s) {
+      const card = (l, v, cls = '') => `<div class="bc-stat ${cls}"><div class="l">${l}</div><div class="v">${esc(v)}</div></div>`;
+      return `<div class="bc-stats">` +
+        card('바디코디 회원', s.body_fetched) + card('우리 앱 회원', s.app_total) +
+        card('확실히 이어진 회원', s.matched, 'good') + card('애매한 회원(자동 반영 안 함)', s.ambiguous, s.ambiguous ? 'warn' : '') +
+        card('바디코디에만 있는 회원', s.unmatched_body, s.unmatched_body ? 'warn' : '') + card('앱에만 있는 회원', s.unmatched_app) +
+        card('바뀔 회원', s.will_change, 'good') + card('마지막 방문일이 바뀔 회원', s.will_change_last_visit, 'good') + `</div>` +
+        `<div class="bc-note">이어진 방법: 이미 저장된 번호 ${esc(s.matched_by.id)}명 · 전화번호 전체 ${esc(s.matched_by.phone)}명 · 이름+뒤 4자리(+가입일) ${esc(s.matched_by.name_last4)}명</div>`;
+    }
+    function tableHtml(head, rows) {
+      if (!rows.length) return '<div class="bc-note">없어요.</div>';
+      return `<table class="bc-table"><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>` +
+        rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('') + `</tbody></table>`;
+    }
+    const l4 = (p) => { const m = String(p || '').match(/(\d{4})\s*$/); return m ? m[1] : '-'; };
+
+    $('previewBtn').addEventListener('click', async () => {
+      if (busy) return;
+      $('previewRes').innerHTML = ''; previewed = null; $('applyRes').innerHTML = '';
+      setBusy(true, $('previewBtn'), '미리보기');
+      try {
+        const r = await callSync('preview');
+        previewed = r.summary;
+        const s = r.samples;
+        $('previewRes').innerHTML = summaryHtml(r.summary) +
+          (r.summary.truncated ? `<div class="bc-bad" style="margin-top:8px;">⚠ 바디코디 회원을 끝까지 다 받지 못했어요. 숫자가 실제보다 작을 수 있어요. 다시 시도해주세요.</div>` : '') +
+          `<details class="bc-det"><summary>바뀔 예정 (앞 ${s.changes.length}명 예시)</summary>${tableHtml(['이름', '마지막 방문일', '번호 연결'], s.changes.map((c) => [c.name, c.last_visit ? `${fmtDate(c.last_visit.from)} → ${c.last_visit.to}` : '그대로', c.link ? '새로 연결' : '이미 연결']))}</details>` +
+          `<details class="bc-det"><summary>애매한 회원 (앞 ${s.ambiguous.length}명)</summary><div class="bc-note">같은 이름·같은 뒤 4자리·같은 가입일이 여러 명이면 자동으로 못 정해요.</div>${tableHtml(['바디코디(이름/번호)', '앱 후보'], s.ambiguous.map((a) => [`${a.body.name} / ${l4(a.body.phone)}`, a.candidates.map((c) => `${c.name} ${c.phone_last4}`).join(', ')]))}</details>` +
+          `<details class="bc-det"><summary>바디코디에만 있는 회원 (앞 ${s.unmatched_body.length}명)</summary><div class="bc-note">앱에 아직 등록이 안 됐거나, 이름/번호가 서로 달라서 못 찾은 회원이에요.</div>${tableHtml(['이름', '전화 뒤4자리', '등록일'], s.unmatched_body.map((b) => [b.name, l4(b.phone), (b.registeredAt || '').slice(0, 10)]))}</details>` +
+          `<details class="bc-det"><summary>앱에만 있는 회원 (앞 ${s.unmatched_app.length}명)</summary>${tableHtml(['이름', '전화 뒤4자리', '가입일'], s.unmatched_app.map((a) => [a.name, a.phone_last4 || '-', a.join_date || '-']))}</details>`;
+      } catch (e) {
+        $('previewRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`;
+      } finally {
+        setBusy(false, $('previewBtn'), '미리보기');
+        $('applyBtn').textContent = previewed ? `반영하기 (${previewed.will_change}명)` : '미리보기 후 반영하기';
+        $('applyBtn').disabled = !previewed || previewed.truncated || previewed.will_change === 0;
+      }
+    });
+
+    $('applyBtn').addEventListener('click', async () => {
+      if (busy || !previewed) return;
+      if (!confirm(`확실히 이어진 회원 ${previewed.will_change}명의 정보를 앱에 반영할까요?\n(마지막 방문일은 더 최근일 때만 바뀌고, 애매한 회원은 건드리지 않아요)`)) return;
+      $('applyRes').innerHTML = '';
+      setBusy(true, $('applyBtn'), '반영하기');
+      try {
+        const r = await callSync('apply');
+        $('applyRes').innerHTML = `<div class="bc-ok">✅ ${esc(r.updated)}명 반영했어요.</div>` +
+          (r.error_count ? `<div class="bc-bad">일부 실패 ${esc(r.error_count)}건: ${esc((r.errors || []).join(' / '))}</div>` : '') +
+          summaryHtml(r.summary);
+        previewed = null;
+        loadLogs();
+      } catch (e) {
+        $('applyRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`;
+      } finally {
+        setBusy(false, $('applyBtn'), '미리보기 후 반영하기');
+        $('applyBtn').disabled = !previewed;
+      }
+    });
+
+    async function loadLogs() {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/bodycodi_sync_logs?select=*&order=run_at.desc&limit=10`, { headers: await authHeaders() });
+        if (!res.ok) {
+          $('logs').textContent = res.status === 404 || res.status === 400 ? '아직 기록 표가 없어요. migration_88_bodycodi_sync.sql을 먼저 실행해주세요.' : '기록을 불러오지 못했어요.';
+          return;
+        }
+        const rows = await res.json();
+        if (!rows.length) { $('logs').textContent = '아직 반영한 기록이 없어요.'; return; }
+        const kst = (iso) => new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16);
+        $('logs').innerHTML = tableHtml(['시각(한국)', '방식', '바디코디 회원', '이어짐', '애매', '반영', '실패'],
+          rows.map((x) => [kst(x.run_at), x.trigger === 'scheduled' ? '자동' : '수동', x.body_total, x.matched, x.ambiguous, x.updated, x.error_count]));
+      } catch (e) { $('logs').textContent = '기록을 불러오지 못했어요.'; }
+    }
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        $('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
+        applyRoleNav(profile);
+      } else { $('roleBadge').textContent = ''; }
+      if (!profile || profile.role !== 'manager') {
+        $('denied').style.display = 'block'; $('mainArea').style.display = 'none';
+        return;
+      }
+      loadLogs();
+    })();
+  </script>
+</body>
+</html>
