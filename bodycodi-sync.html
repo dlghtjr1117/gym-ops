@@ -59,7 +59,7 @@
 
   <div class="wrap">
     <h2 style="margin:6px 0 4px;">🔗 바디코디 연동</h2>
-    <p class="muted" style="margin:0 0 12px;">바디코디에 있는 회원 정보를 읽어와서 우리 앱 회원의 <b>마지막 방문일</b>과 <b>이용권 상태</b>를 최신으로 맞춰요. 바디코디 데이터는 읽기만 하고, 바디코디를 바꾸지는 않아요. 지점장만 쓸 수 있어요.</p>
+    <p class="muted" style="margin:0 0 12px;">바디코디에 있는 회원 정보를 읽어와서 우리 앱 회원의 <b>마지막 방문일</b>과 <b>이용권 상태</b>를 최신으로 맞추고, 선생님들의 <b>개인 PT 일정·출석</b>을 앱 PT 스케줄에 옮겨 <b>잔여횟수</b>를 자동으로 차감해요. 바디코디 데이터는 읽기만 하고, 바디코디를 바꾸지는 않아요. 지점장만 쓸 수 있어요.</p>
     <div id="denied" class="error-text" style="display:none;">지점장 계정만 사용할 수 있는 화면이에요.</div>
 
     <div id="mainArea">
@@ -84,13 +84,42 @@
         <div class="bc-res" id="applyRes"></div>
       </div>
 
+      <div class="bc-card" id="ptCard">
+        <h3><span class="bc-step">4</span>PT 일정·출석 → 앱 PT 스케줄 자동 연동</h3>
+        <div class="muted">선생님이 바디코디에서 개인 PT 일정을 잡고 출석·결석·취소 처리하면 앱 PT 스케줄에 같은 일정이 생기고, <b>출석·결석이면 잔여횟수 1회 차감, 취소하면 복구</b>돼요(앱의 기존 규칙 그대로). PT 관리 시트는 회원의 잔여횟수를 그대로 보여줘서 같이 바뀌어요. 10분마다 자동으로 반영돼요.</div>
+        <div class="bc-note" style="margin-top:8px;">⚠ 연동을 켠 뒤에는 PT 일정·출석을 <b>바디코디에서만</b> 입력하세요. 앱 PT 스케줄에 직접 입력하면 같은 시간·같은 회원·같은 선생님은 이어 붙이지만, 그 외에는 중복으로 보일 수 있어요.</div>
+
+        <h4 style="margin:14px 0 4px; font-size:14px;">① 연동 시작일</h4>
+        <div class="bc-note">이 날짜 이후의 일정만 앱에 반영해요. 그날 이전에 앱에서 이미 차감한 횟수와 겹치지 않도록, <b>보통 내일</b>로 정해요.</div>
+        <div class="bc-row">
+          <input type="date" id="ptStart" style="padding:7px 10px;border:1px solid var(--slate-200);border-radius:8px;background:var(--surface);color:inherit;" />
+          <button type="button" class="btn btn-primary" id="ptStartSave" style="width:auto;padding:8px 16px;">저장</button>
+          <span id="ptStartState" class="bc-note"></span>
+        </div>
+
+        <h4 style="margin:16px 0 4px; font-size:14px;">② 선생님 연결</h4>
+        <div class="bc-note">바디코디 강사와 앱 직원 계정을 이어줘요. 이름이 같은 사람은 자동으로 이어졌고, 안 이어진 선생님만 직접 골라주세요.</div>
+        <div id="coachRes" class="bc-res"><button type="button" class="btn" id="ptSetupBtn" style="width:auto;padding:7px 14px;">선생님 목록 불러오기</button></div>
+
+        <h4 style="margin:16px 0 4px; font-size:14px;">③ 미리보기 → 반영</h4>
+        <div class="bc-row">
+          <button type="button" class="btn btn-primary" id="ptPreviewBtn" style="width:auto;padding:8px 18px;">PT 일정 미리보기</button>
+          <button type="button" class="btn btn-primary" id="ptApplyBtn" style="width:auto;padding:8px 18px;" disabled>미리보기 후 반영하기</button>
+        </div>
+        <div class="bc-res" id="ptRes"></div>
+        <div id="autoStateSch" class="bc-note" style="margin-top:8px;"></div>
+
+        <h4 style="margin:16px 0 4px; font-size:14px;">검토 목록 <span class="bc-note">(자동으로 못 옮긴 일정)</span></h4>
+        <div id="issues" class="bc-res"><span class="muted">선생님 목록을 불러오면 함께 보여요.</span></div>
+      </div>
+
       <div class="bc-card">
         <h3>최근 동기화 기록</h3>
         <div id="autoState" class="bc-note" style="margin:2px 0 8px;"></div>
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v1.2 · 2026-10-16</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.0 · 2026-10-16</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -107,14 +136,14 @@
     let previewed = null;   // 마지막 미리보기 요약 (반영 버튼 활성 조건)
     let busy = false;
 
-    async function callSync(action) {
+    async function callSync(action, extra = {}) {
       const token = await getValidAccessToken();
       let res;
       try {
         res = await fetch(`${SUPABASE_URL}/functions/v1/${SYNC_FN}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ action })
+          body: JSON.stringify({ action, ...extra })
         });
       } catch (e) {
         throw new Error('서버에 연결하지 못했어요. 인터넷 연결을 확인해주세요.');
@@ -211,20 +240,119 @@
     });
 
     // 자동(예약) 실행 상태: 가장 최근 '자동' 기록이 몇 분 전인지 / 실패였는지
-    function showAutoState(rows) {
-      const last = rows.find((x) => x.trigger === 'scheduled');
-      if (!last) { $('autoState').innerHTML = '⏱ 자동 최신화: <b>아직 꺼져 있어요</b> (migration_89를 실행하면 30분마다 자동으로 반영돼요)'; return; }
+    // ===== ④ PT 일정·출석 연동 =====
+    let ptPreviewed = null;
+    const STATUS_KO = { booked: '예약', attended: '출석', absent: '결석', cancelled: '취소' };
+    function ptSummaryHtml(s) {
+      const card = (l, v, cls = '') => `<div class="bc-stat ${cls}"><div class="l">${l}</div><div class="v">${esc(v)}</div></div>`;
+      return `<div class="bc-stats">` +
+        card('조회 기간', `${s.from.slice(5)}~${s.to.slice(5)}`) + card('개인 PT 일정', s.appointment) +
+        card('새로 만들 예약', s.inserted, 'good') + card('바뀔 예약', s.updated + s.adopted, 'good') +
+        card('잔여횟수 차감', s.deduct, 'good') + card('잔여횟수 복구', s.restore) +
+        card('못 옮긴 일정(회원 못 찾음)', s.unmatched_member, s.unmatched_member ? 'warn' : '') + card('못 옮긴 일정(선생님 연결 안 됨)', s.unmapped_coach, s.unmapped_coach ? 'warn' : '') + `</div>` +
+        `<div class="bc-note">변화 없음 ${esc(s.unchanged)}건 · 시작일 이전이라 건너뜀 ${esc(s.before_start)}건 · 이미 취소된 새 일정 건너뜀 ${esc(s.skipped_cancelled_new)}건 · 앱에 직접 입력해둔 예약과 이어 붙인 ${esc(s.adopted)}건 · 방금 자동으로 이어진 선생님 ${esc(s.auto_linked_coaches)}명</div>`;
+    }
+    function ptOpsHtml(ops) {
+      if (!ops.length) return '';
+      const kind = { insert: '새로 만듦', update: '수정', adopt: '앱 예약과 이어붙임' };
+      return `<details class="bc-det"><summary>반영 예정 (앞 ${ops.length}건 예시)</summary>${tableHtml(['일정(한국시간)', '회원', '선생님', '상태', '잔여횟수', '구분'],
+        ops.map((o) => [o.start, o.member, o.trainer, o.prev_status && o.prev_status !== o.status ? `${STATUS_KO[o.prev_status] || o.prev_status} → ${STATUS_KO[o.status] || o.status}` : (STATUS_KO[o.status] || o.status), o.delta < 0 ? `${o.delta}회` : o.delta > 0 ? `+${o.delta}회 복구` : '그대로', kind[o.kind] || o.kind]))}</details>`;
+    }
+    function ptIssuesHtml(list) {
+      if (!list.length) return '<div class="bc-note">없어요. 👍</div>';
+      return `<table class="bc-table"><thead><tr><th>내용</th><th>건수</th><th></th></tr></thead><tbody>` +
+        list.map((it) => `<tr><td>${esc(it.summary)}</td><td>${esc((it.detail && it.detail.count) || 1)}</td><td><button type="button" class="btn-link" data-resolve="${esc(it.id)}">처리됨</button></td></tr>`).join('') + `</tbody></table>` +
+        `<div class="bc-note">회원: 바디코디 회원이 앱에 아직 없거나 연결이 안 된 경우예요(위 1~3단계 반영 후 자동 해결). 선생님: 위 ②에서 연결해주세요.</div>`;
+    }
+    function bindResolve() {
+      document.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', async () => {
+        try { await callSync('resolve_issue', { id: b.getAttribute('data-resolve') }); b.closest('tr').remove(); } catch (e) { alert(e.message); }
+      }));
+    }
+    async function loadPtSetup() {
+      $('coachRes').innerHTML = '<span class="muted">불러오는 중...</span>';
+      try {
+        const r = await callSync('schedule_setup');
+        if (r.start_date) { $('ptStart').value = r.start_date; $('ptStartState').innerHTML = `<span class="bc-ok">${esc(r.start_date)}</span> 부터 연동돼요 (오늘은 ${esc(r.today)})`; }
+        else $('ptStartState').innerHTML = '<span class="bc-bad">아직 정하지 않았어요</span> — 정해야 연동이 시작돼요';
+        if (!$('ptStart').value) { const t = new Date(Date.now() + 33 * 3600 * 1000).toISOString().slice(0, 10); $('ptStart').value = t; }
+        const opts = (sel) => `<option value="">연결 안 함</option>` + r.profiles.map((p) => `<option value="${esc(p.id)}" ${sel === p.id ? 'selected' : ''}>${esc(p.name)}${p.role === 'manager' ? ' (지점장)' : ''}</option>`).join('');
+        const active = r.coaches.filter((c) => c.status !== 'INACTIVE');
+        const inactive = r.coaches.filter((c) => c.status === 'INACTIVE');
+        const rows = (list) => list.map((c) => `<tr><td>${esc(c.name)}${c.positionTitle ? ` <span class="muted">${esc(c.positionTitle)}</span>` : ''}</td><td>${esc(c.branchName || '')}</td><td><select data-coach="${esc(c.coachId)}" style="padding:5px 8px;border:1px solid var(--slate-200);border-radius:8px;background:var(--surface);color:inherit;">${opts(c.profile_id)}</select></td><td class="cstate">${c.profile_id ? '<span class="bc-ok">연결됨</span>' : '<span class="bc-bad">안 이어짐</span>'}</td></tr>`).join('');
+        $('coachRes').innerHTML =
+          (r.coach_error ? `<div class="bc-bad">강사 목록을 못 불러왔어요: ${esc(r.coach_error)}</div>` : '') +
+          (r.auto_linked ? `<div class="bc-ok">이름이 같은 선생님 ${esc(r.auto_linked)}명을 방금 자동으로 이었어요.</div>` : '') +
+          `<table class="bc-table"><thead><tr><th>바디코디 강사</th><th>지점</th><th>앱 직원 계정</th><th></th></tr></thead><tbody>${rows(active)}</tbody></table>` +
+          (inactive.length ? `<details class="bc-det"><summary>퇴사·휴직 강사 ${inactive.length}명</summary><table class="bc-table"><tbody>${rows(inactive)}</tbody></table></details>` : '');
+        $('coachRes').querySelectorAll('select[data-coach]').forEach((sel) => sel.addEventListener('change', async () => {
+          const st = sel.closest('tr').querySelector('.cstate');
+          try { await callSync('link_coach', { coachId: sel.getAttribute('data-coach'), profileId: sel.value || null }); st.innerHTML = sel.value ? '<span class="bc-ok">연결됨</span>' : '<span class="bc-bad">안 이어짐</span>'; }
+          catch (e) { st.innerHTML = `<span class="bc-bad">${esc(e.message)}</span>`; }
+        }));
+        $('issues').innerHTML = ptIssuesHtml(r.issues || []); bindResolve();
+      } catch (e) { $('coachRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div><button type="button" class="btn" id="ptSetupBtn2" style="width:auto;padding:7px 14px;margin-top:6px;">다시 시도</button>`; const b2 = $('ptSetupBtn2'); if (b2) b2.addEventListener('click', loadPtSetup); }
+    }
+    $('ptSetupBtn').addEventListener('click', loadPtSetup);
+    $('ptStartSave').addEventListener('click', async () => {
+      const v = $('ptStart').value;
+      if (!v) { alert('날짜를 골라주세요.'); return; }
+      if (!confirm(`${v} 부터의 PT 일정·출석을 바디코디에서 가져와 앱에 반영할게요.\n(그 전 날짜는 건드리지 않아요) 맞나요?`)) return;
+      try { await callSync('set_pt_start', { date: v }); $('ptStartState').innerHTML = `<span class="bc-ok">${esc(v)}</span> 부터 연동돼요`; }
+      catch (e) { $('ptStartState').innerHTML = `<span class="bc-bad">${esc(e.message)}</span>`; }
+    });
+    function ptBusy(on) { $('ptPreviewBtn').disabled = on; $('ptApplyBtn').disabled = on || !ptPreviewed; busy = on; }
+    $('ptPreviewBtn').addEventListener('click', async () => {
+      if (busy) return;
+      $('ptRes').innerHTML = ''; ptPreviewed = null; ptBusy(true); $('ptPreviewBtn').textContent = '진행 중... 잠시만요';
+      try {
+        const r = await callSync('schedule_preview');
+        ptPreviewed = r.summary;
+        $('ptRes').innerHTML = ptSummaryHtml(r.summary) + ptOpsHtml(r.samples.ops) +
+          (r.summary.truncated ? `<div class="bc-bad" style="margin-top:8px;">⚠ 일정을 끝까지 다 받지 못했어요. 다시 시도해주세요.</div>` : '') +
+          (r.samples.issues.length ? `<details class="bc-det" open><summary>못 옮기는 일정 ${r.samples.issues.length}종류</summary>${ptIssuesHtml(r.samples.issues.map((x) => ({ ...x, id: '' })))}</details>` : '');
+      } catch (e) { $('ptRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally {
+        ptBusy(false); $('ptPreviewBtn').textContent = 'PT 일정 미리보기';
+        const n = ptPreviewed ? ptPreviewed.inserted + ptPreviewed.updated + ptPreviewed.adopted : 0;
+        $('ptApplyBtn').textContent = ptPreviewed ? `반영하기 (${n}건)` : '미리보기 후 반영하기';
+        $('ptApplyBtn').disabled = !ptPreviewed || ptPreviewed.truncated || n === 0;
+      }
+    });
+    $('ptApplyBtn').addEventListener('click', async () => {
+      if (busy || !ptPreviewed) return;
+      if (!confirm('미리보기대로 앱 PT 스케줄에 반영하고, 출석·결석 건은 회원 잔여횟수를 차감할까요?\n(이미 반영된 일정은 다시 차감하지 않아요)')) return;
+      ptBusy(true); $('ptApplyBtn').textContent = '반영 중... 잠시만요';
+      try {
+        const r = await callSync('schedule_apply');
+        ptPreviewed = null;
+        $('ptRes').innerHTML = `<div class="bc-ok">✅ ${esc(r.written)}건 반영했어요.</div>` +
+          (r.error_count ? `<div class="bc-bad">일부 실패 ${esc(r.error_count)}건: ${esc((r.errors || []).join(' / '))}</div>` : '') + ptSummaryHtml(r.summary);
+        loadLogs(); loadPtSetup();
+      } catch (e) { $('ptRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally { ptBusy(false); $('ptApplyBtn').textContent = '미리보기 후 반영하기'; $('ptApplyBtn').disabled = !ptPreviewed; }
+    });
+
+    function autoLine(rows, kind, label, every) {
+      const last = rows.find((x) => x.trigger === 'scheduled' && (x.kind || 'member') === kind);
+      if (!last) return `⏱ ${label} 자동 최신화: <b>아직 꺼져 있어요</b>`;
       const mins = Math.max(0, Math.round((Date.now() - new Date(last.run_at).getTime()) / 60000));
       const ago = mins < 60 ? `${mins}분 전` : `${Math.floor(mins / 60)}시간 ${mins % 60}분 전`;
       const failed = last.error_count > 0 && !(last.updated > 0);
-      $('autoState').innerHTML = failed
-        ? `⏱ 자동 최신화: <span class="bc-bad">마지막 실행(${ago})이 실패했어요</span> ${esc(last.error_text || '')}`
-        : `⏱ 자동 최신화: <span class="bc-ok">켜져 있어요</span> · 마지막 자동 실행 ${ago}${last.updated !== null && last.updated !== undefined ? ` (${esc(last.updated)}명 반영)` : ''}`;
+      return failed
+        ? `⏱ ${label} 자동 최신화: <span class="bc-bad">마지막 실행(${ago})이 실패했어요</span> ${esc(last.error_text || '')}`
+        : `⏱ ${label} 자동 최신화: <span class="bc-ok">켜져 있어요</span> (${every}마다) · 마지막 자동 실행 ${ago}${last.updated !== null && last.updated !== undefined ? ` (${esc(last.updated)}건 반영)` : ''}`;
+    }
+    function showAutoState(rows) {
+      const m = autoLine(rows, 'member', '회원 정보', '30분');
+      $('autoState').innerHTML = m.includes('아직 꺼져') ? m + ' <span class="muted">(migration_89를 실행하면 30분마다 자동으로 반영돼요)</span>' : m;
+      const sc = autoLine(rows, 'schedule', 'PT 일정', '10분');
+      $('autoStateSch').innerHTML = sc.includes('아직 꺼져') ? sc + ' <span class="muted">(연동 시작일을 저장하고 migration_91을 실행하면 켜져요)</span>' : sc;
     }
 
     async function loadLogs() {
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/bodycodi_sync_logs?select=*&order=run_at.desc&limit=10`, { headers: await authHeaders() });
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/bodycodi_sync_logs?select=*&order=run_at.desc&limit=20`, { headers: await authHeaders() });
         if (!res.ok) {
           $('logs').textContent = res.status === 404 || res.status === 400 ? '아직 기록 표가 없어요. migration_88_bodycodi_sync.sql을 먼저 실행해주세요.' : '기록을 불러오지 못했어요.';
           return;
@@ -233,8 +361,8 @@
         showAutoState(rows);
         if (!rows.length) { $('logs').textContent = '아직 반영한 기록이 없어요.'; return; }
         const kst = (iso) => new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16);
-        $('logs').innerHTML = tableHtml(['시각(한국)', '방식', '바디코디 회원', '이어짐', '애매', '반영', '실패'],
-          rows.map((x) => [kst(x.run_at), x.trigger === 'scheduled' ? '자동' : '수동', x.body_total ?? '-', x.matched ?? '-', x.ambiguous ?? '-', x.updated ?? '-', x.error_count]));
+        $('logs').innerHTML = tableHtml(['시각(한국)', '종류', '방식', '바디코디 건수', '이어짐', '애매', '반영', '실패'],
+          rows.map((x) => [kst(x.run_at), (x.kind || 'member') === 'schedule' ? 'PT 일정' : '회원', x.trigger === 'scheduled' ? '자동' : '수동', x.body_total ?? '-', x.matched ?? '-', x.ambiguous ?? '-', x.updated ?? '-', x.error_count]));
       } catch (e) { $('logs').textContent = '기록을 불러오지 못했어요.'; }
     }
 
@@ -249,6 +377,7 @@
         return;
       }
       loadLogs();
+      loadPtSetup();
     })();
   </script>
 </body>
