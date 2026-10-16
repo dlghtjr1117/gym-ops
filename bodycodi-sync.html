@@ -207,7 +207,7 @@
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.7 · 2026-10-16</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.9 · 2026-10-16</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -274,7 +274,7 @@
         card('바디코디 회원', s.body_fetched) + card('우리 앱 회원', s.app_total) +
         card('확실히 이어진 회원', s.matched, 'good') + card('애매한 회원(자동 반영 안 함)', s.ambiguous, s.ambiguous ? 'warn' : '') +
         card('바디코디에만 있는 회원', s.unmatched_body, s.unmatched_body ? 'warn' : '') + card('앱에만 있는 회원', s.unmatched_app) +
-        card('바뀔 회원', s.will_change, 'good') + card('마지막 방문일이 바뀔 회원', s.will_change_last_visit, 'good') + card('이름이 바디코디와 똑같이 바뀔 회원', s.will_change_name || 0, s.will_change_name ? 'warn' : '') + `</div>` +
+        card('바뀔 회원', s.will_change, 'good') + card('마지막 방문일이 바뀔 회원', s.will_change_last_visit, 'good') + card('이름이 바디코디와 똑같이 바뀔 회원', s.will_change_name || 0, s.will_change_name ? 'warn' : '') + card('이름이 가려져 와서 못 바꾸는 회원', s.name_masked || 0, s.name_masked ? 'warn' : '') + `</div>` +
         `<div class="bc-note">이어진 방법: 이미 저장된 번호 ${esc(s.matched_by.id)}명 · 전화번호 전체 ${esc(s.matched_by.phone)}명 · 이름+뒤 4자리(+가입일) ${esc(s.matched_by.name_last4)}명 · 'PT'·'그룹PT' 같은 이름 앞 말머리를 빼고 이어준 ${esc(s.matched_by.prefix_name || 0)}명</div>`;
     }
     function tableHtml(head, rows) {
@@ -610,6 +610,10 @@
         card('새로 만들 상품', s.new_products) + `</div>` +
         `<div class="bc-note">0원 무료 등록 ${esc(s.free)}건 · 음료 등 제외 ${esc(s.skipped_product)}건 · 직접 입력해둔 매출에 바디코디 번호만 이어붙인 ${esc(s.adopted)}건 (금액은 안 바뀌어요)</div>`;
     }
+    function salesLeftHtml(left) {
+      return left && left.length ? `<div class="bc-bad" style="margin-top:8px;">⚠ 회원이 안 이어진 채 남은 매출 ${esc(left.length)}건 — 직접 입력해둔 같은 매출을 못 찾아서 합치지 못했어요. 앱 매출 목록에서 회원이 "-"로 보이는 건이에요.</div>` +
+        `<details class="bc-det" open><summary>합치지 못한 매출</summary>${tableHtml(['날짜', '바디코디 회원(가려진 이름)', '상품', '금액'], left.map((o) => [o.date, o.who, o.product || '-', won(o.amount)]))}</details>` : '';
+    }
     function salesOpsHtml(ops, newProducts) {
       return (newProducts && newProducts.length ? `<div class="bc-note" style="margin-top:6px;">새로 만들 상품: ${esc(newProducts.map((p) => p.name).join(', '))}</div>` : '') +
         (ops.length ? `<details class="bc-det"><summary>넣을 매출 (앞 ${ops.length}건 예시)</summary>${tableHtml(['날짜', '회원', '항목', '구분', '금액', '담당'],
@@ -618,7 +622,7 @@
     async function runSales(action, from, to, history, onProgress) {
       const chunks = salesChunks(from, to);
       const sum = { from, to, payment: 0, refund: 0, merged: 0, no_member: 0, canceled: 0, free: 0, review: 0, member_unmatched: 0, already: 0, inserted: 0, adopted: 0, matched_existing: 0, skipped_product: 0, new_products: 0, amount: 0, truncated: false };
-      const ops = [], np = new Map(); let written = 0; const errors = [];
+      const ops = [], np = new Map(), left = []; let written = 0; const errors = [];
       for (let i = 0; i < chunks.length; i++) {
         onProgress(i + 1, chunks.length, chunks[i]);
         let r;
@@ -628,10 +632,11 @@
         if (r.summary.truncated) sum.truncated = true;
         for (const p of (r.samples.new_products || [])) np.set(p.name, p);
         if (ops.length < 30) ops.push(...(r.samples.ops || []).slice(0, 30 - ops.length));
+        if (left.length < 30) left.push(...(r.samples.leftovers || []).slice(0, 30 - left.length));
         written += r.written || 0; errors.push(...(r.errors || []));
       }
       sum.new_products = np.size;
-      return { summary: sum, ops, newProducts: [...np.values()], written, errors, chunks: chunks.length };
+      return { summary: sum, ops, leftovers: left, newProducts: [...np.values()], written, errors, chunks: chunks.length };
     }
     function salesBusy(on) { $('salesPreviewBtn').disabled = on; $('salesApplyBtn').disabled = on || !salesPreviewed; busy = on; }
     $('salesTo').value = kstDay(); $('salesFrom').value = addDays(kstDay(), -7);
@@ -643,7 +648,7 @@
       try {
         const r = await runSales('sales_preview', from, to, from < addDays(kstDay(), -10), (i, n, c) => { $('salesPreviewBtn').textContent = `조회 중... ${i}/${n} (${c[0].slice(2)} ~ ${c[1].slice(2)})`; });
         salesPreviewed = { from, to, summary: r.summary, chunks: r.chunks };
-        $('salesRes').innerHTML = salesSummaryHtml(r.summary) + salesOpsHtml(r.ops, r.newProducts) +
+        $('salesRes').innerHTML = salesSummaryHtml(r.summary) + salesLeftHtml(r.leftovers) + salesOpsHtml(r.ops, r.newProducts) +
           (r.summary.truncated ? `<div class="bc-bad" style="margin-top:8px;">⚠ 일부 구간의 매출을 끝까지 다 받지 못했어요. 기간을 줄여서 다시 해보세요.</div>` : '');
       } catch (e) { $('salesRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
       finally {
@@ -790,7 +795,7 @@
       try {
         const r = await runSales('sales_apply', from, to, from < addDays(kstDay(), -10), (i, n, c) => { $('salesFillBtn').textContent = `채우는 중... ${i}/${n} (${c[0].slice(2)} ~ ${c[1].slice(2)})`; });
         const sm = r.summary;
-        $('salesRes').innerHTML = `<div class="bc-ok">✅ 앱에 ${esc(sm.inserted + sm.adopted)}건을 채웠어요 (환불 마이너스 ${esc(sm.refund || 0)}건 포함).${sm.merged ? ` 같은 매출이 두 번 들어가 있던 ${esc(sm.merged)}건은 하나로 합쳤어요.` : ''}</div>` + salesSummaryHtml(sm);
+        $('salesRes').innerHTML = `<div class="bc-ok">✅ 앱에 ${esc(sm.inserted + sm.adopted)}건을 채웠어요 (환불 마이너스 ${esc(sm.refund || 0)}건 포함).${sm.merged ? ` 같은 매출이 두 번 들어가 있던 ${esc(sm.merged)}건은 하나로 합쳤어요.` : ''}</div>` + salesSummaryHtml(sm) + salesLeftHtml(r.leftovers);
         loadLogs();
       } catch (e) { $('salesRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
       finally { busy = false; $('salesFillBtn').disabled = false; $('salesCheckBtn').disabled = false; $('salesFillBtn').textContent = '바디코디와 비교해서 빠진 매출 모두 채우기'; }
