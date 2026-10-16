@@ -2945,7 +2945,7 @@ async function fetchPtBookingsForMonth(startStr, endStr) {
 async function fetchPtSalesForPricing(beforeStr) {
   const { rows, error } = await fetchAllRows(
     `sales?category=in.(pt_new,pt_renewal)&sale_date=lt.${beforeStr}` +
-    `&select=member_id,amount,sale_date,payment_method,product:products(sessions)&order=sale_date.asc`,
+    `&select=id,member_id,amount,sale_date,payment_method,memo,category,product:products(name,sessions)&order=sale_date.asc,id.asc`,
     await authHeaders()
   );
   if (error) await throwApiError(error, 'PT 매출 내역을 불러오지 못했습니다.');
@@ -3063,10 +3063,28 @@ function buildPtPricingIndex(ptSales) {
     if (s.amount == null) continue;
     const unitPrice = s.amount / s.product.sessions;
     if (!byMember[s.member_id]) byMember[s.member_id] = [];
-    byMember[s.member_id].push({ date: s.sale_date, unitPrice, paymentMethod: s.payment_method || null });
+    // 화면에서 "이 단가가 어느 결제에서 나왔는지" 보여줄 수 있게 근거(결제금액·회차수·상품명·메모)도 같이 들고 있음
+    byMember[s.member_id].push({
+      date: s.sale_date, unitPrice, paymentMethod: s.payment_method || null,
+      saleId: s.id || null, amount: Number(s.amount), sessions: Number(s.product.sessions),
+      productName: s.product.name || '', memo: s.memo || '', flag: classifyUnitPrice(unitPrice)
+    });
   }
   Object.values(byMember).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));
   return byMember;
+}
+
+// 회당단가가 현실적인 범위를 벗어나면 표시해 주려는 기준(이 센터 정가 기준 회당 약 4만~8만원).
+// 'high' = 15만원 초과(보통 상품 회차수가 실제보다 적게 잡혔거나 엉뚱한 상품이 연결된 경우),
+// 'low'  = 2만원 미만이면서 0원이 아님(보통 분납/부분결제라 결제금액이 총액보다 작은 경우),
+// 'zero' = 0원(무료체험권 등 - 그 뒤에 정상 결제가 없으면 소진매출이 0이 됨)
+const PT_UNIT_PRICE_MAX = 150000;
+const PT_UNIT_PRICE_MIN = 20000;
+function classifyUnitPrice(unitPrice) {
+  if (unitPrice === 0) return 'zero';
+  if (unitPrice > PT_UNIT_PRICE_MAX) return 'high';
+  if (unitPrice < PT_UNIT_PRICE_MIN) return 'low';
+  return null;
 }
 
 // 세션(부킹) 날짜 기준으로 "그 시점에 적용됐을" 결제 건(단가+결제수단)을 찾음 - 그 날짜 이전(당일
@@ -3177,7 +3195,7 @@ function computeTrainerPayroll({
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession,
+    buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession, classifyUnitPrice,
     computeTrainerConsumption, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr
   };
 }
