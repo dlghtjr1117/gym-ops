@@ -2945,7 +2945,7 @@ async function fetchPtBookingsForMonth(startStr, endStr) {
 async function fetchPtSalesForPricing(beforeStr) {
   const { rows, error } = await fetchAllRows(
     `sales?category=in.(pt_new,pt_renewal)&sale_date=lt.${beforeStr}` +
-    `&select=id,member_id,amount,sale_date,payment_method,memo,category,product:products(name,sessions)&order=sale_date.asc,id.asc`,
+    `&select=id,member_id,amount,sale_date,payment_method,memo,category,external_sale_no,product:products(name,sessions)&order=sale_date.asc,id.asc`,
     await authHeaders()
   );
   if (error) await throwApiError(error, 'PT 매출 내역을 불러오지 못했습니다.');
@@ -3058,17 +3058,28 @@ async function upsertTrainerPayrollRecord(row) {
 // paymentMethod도 같이 들고 있어야 카드수수료를 "카드로 결제한 건"에만 비례해서 매길 수 있음.
 function buildPtPricingIndex(ptSales) {
   const byMember = {};
+  const groups = {}; // 분납: 같은 회원·같은 이용권(바디코디 componentId)으로 나눠 낸 결제는 합쳐서 한 건으로 봄
   for (const s of ptSales) {
     if (!s.member_id || !s.product || s.product.sessions == null || s.product.sessions <= 0) continue;
-    if (s.amount == null) continue;
+    if (s.amount == null || Number(s.amount) < 0) continue; // 환불(마이너스) 행은 단가 근거로 안 씀
+    // 바디코디 자동 연동 매출의 번호는 bc:{결제번호}:{이용권(구성) 번호}. 분납이면 결제번호만 다르고 이용권 번호는 같음
+    const m = /^bc:[^:]*:(\d{10,})$/.exec(s.external_sale_no || '');
+    const gk = m ? s.member_id + '|' + m[1] : null;
+    if (gk && groups[gk]) {
+      const g = groups[gk]; g.amount += Number(s.amount); g.parts += 1;
+      g.unitPrice = g.amount / g.sessions; g.flag = classifyUnitPrice(g.unitPrice);
+      continue;
+    }
     const unitPrice = s.amount / s.product.sessions;
     if (!byMember[s.member_id]) byMember[s.member_id] = [];
     // 화면에서 "이 단가가 어느 결제에서 나왔는지" 보여줄 수 있게 근거(결제금액·회차수·상품명·메모)도 같이 들고 있음
-    byMember[s.member_id].push({
+    const entry = {
       date: s.sale_date, unitPrice, paymentMethod: s.payment_method || null,
-      saleId: s.id || null, amount: Number(s.amount), sessions: Number(s.product.sessions),
+      saleId: s.id || null, amount: Number(s.amount), sessions: Number(s.product.sessions), parts: 1,
       productName: s.product.name || '', memo: s.memo || '', flag: classifyUnitPrice(unitPrice)
-    });
+    };
+    byMember[s.member_id].push(entry);
+    if (gk) groups[gk] = entry;
   }
   Object.values(byMember).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));
   return byMember;

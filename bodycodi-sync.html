@@ -211,7 +211,7 @@
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v3.0 · 2026-10-16</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v3.1 · 2026-10-17</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -611,7 +611,7 @@
         card('앱에 새로 넣을 매출', s.inserted, 'good') + card('넣을 금액 합계', won(s.amount), 'good') +
         card('이미 앱에 있어 건너뜀', s.matched_existing + s.already + s.adopted) +
         card('환불(마이너스로 넣을 건)', s.refund || 0) + card('확인 필요(환불 처리 중 등)', s.review, s.review ? 'warn' : '') + card('회원 미연결로 넣음', s.no_member || 0, s.no_member ? 'warn' : '') + card('취소로 되돌림', s.canceled || 0) + card('중복 합침(앱에서 지움)', s.merged || 0, s.merged ? 'warn' : '') +
-        card('새로 만들 상품', s.new_products) + `</div>` +
+        card('상품 바로잡기(PT 횟수 틀린 것)', s.product_fixed || 0, s.product_fixed ? 'warn' : '') + card('새로 만들 상품', s.new_products) + `</div>` +
         `<div class="bc-note">0원 무료 등록 ${esc(s.free)}건 · 음료 등 제외 ${esc(s.skipped_product)}건 · 직접 입력해둔 매출에 바디코디 번호만 이어붙인 ${esc(s.adopted)}건 (금액은 안 바뀌어요)</div>`;
     }
     function salesLeftHtml(left) {
@@ -625,14 +625,14 @@
     }
     async function runSales(action, from, to, history, onProgress, extra = {}) {
       const chunks = salesChunks(from, to);
-      const sum = { from, to, payment: 0, refund: 0, merged: 0, no_member: 0, canceled: 0, free: 0, review: 0, member_unmatched: 0, already: 0, inserted: 0, adopted: 0, matched_existing: 0, skipped_product: 0, new_products: 0, amount: 0, truncated: false };
+      const sum = { from, to, payment: 0, refund: 0, product_fixed: 0, merged: 0, no_member: 0, canceled: 0, free: 0, review: 0, member_unmatched: 0, already: 0, inserted: 0, adopted: 0, matched_existing: 0, skipped_product: 0, new_products: 0, amount: 0, truncated: false };
       const ops = [], np = new Map(), left = []; let written = 0; const errors = [];
       for (let i = 0; i < chunks.length; i++) {
         onProgress(i + 1, chunks.length, chunks[i]);
         let r;
         try { r = await callSync(action, { from: chunks[i][0], to: chunks[i][1], history, ...extra }); }
         catch (e) { throw new Error(`${chunks[i][0]} ~ ${chunks[i][1]} 구간에서 멈췄어요: ${e.message}${i ? ' (앞 구간은 이미 처리됐어요. 다시 누르면 이어서 해요)' : ''}`); }
-        for (const k of ['payment', 'refund', 'merged', 'no_member', 'canceled', 'free', 'review', 'member_unmatched', 'already', 'inserted', 'adopted', 'matched_existing', 'skipped_product', 'amount']) sum[k] += r.summary[k] || 0;
+        for (const k of ['payment', 'refund', 'product_fixed', 'merged', 'no_member', 'canceled', 'free', 'review', 'member_unmatched', 'already', 'inserted', 'adopted', 'matched_existing', 'skipped_product', 'amount']) sum[k] += r.summary[k] || 0;
         if (r.summary.truncated) sum.truncated = true;
         for (const p of (r.samples.new_products || [])) np.set(p.name, p);
         if (ops.length < 30) ops.push(...(r.samples.ops || []).slice(0, 30 - ops.length));
@@ -799,7 +799,7 @@
       try {
         const r = await runSales('sales_apply', from, to, from < addDays(kstDay(), -10), (i, n, c) => { $('salesFillBtn').textContent = `채우는 중... ${i}/${n} (${c[0].slice(2)} ~ ${c[1].slice(2)})`; });
         const sm = r.summary;
-        $('salesRes').innerHTML = `<div class="bc-ok">✅ 앱에 ${esc(sm.inserted + sm.adopted)}건을 채웠어요 (환불 마이너스 ${esc(sm.refund || 0)}건 포함).${sm.merged ? ` 같은 매출이 두 번 들어가 있던 ${esc(sm.merged)}건은 하나로 합쳤어요.` : ''}</div>` + salesSummaryHtml(sm) + salesLeftHtml(r.leftovers);
+        $('salesRes').innerHTML = `<div class="bc-ok">✅ 앱에 ${esc(sm.inserted + sm.adopted)}건을 채웠어요 (환불 마이너스 ${esc(sm.refund || 0)}건 포함).${sm.merged ? ` 같은 매출이 두 번 들어가 있던 ${esc(sm.merged)}건은 하나로 합쳤어요.` : ''}${sm.product_fixed ? ` PT 횟수가 잘못 이어져 있던 ${esc(sm.product_fixed)}건은 바디코디 기준 상품으로 바로잡았어요.` : ''}</div>` + salesSummaryHtml(sm) + salesLeftHtml(r.leftovers);
         loadLogs();
       } catch (e) { $('salesRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
       finally { busy = false; $('salesFillBtn').disabled = false; $('salesCheckBtn').disabled = false; $('salesFillBtn').textContent = '바디코디와 비교해서 빠진 매출 모두 채우기'; }
@@ -820,7 +820,7 @@
       if ((Date.parse(to) - Date.parse(from)) / 86400000 > 183) { alert('한 번에 최대 6개월까지 점검할 수 있어요. 기간을 줄여주세요.'); return; }
       const align = $('auditAlign').checked;
       busy = true; $('auditBtn').disabled = true; $('auditRes').innerHTML = '';
-      const days = [], detail = [], leftovers = []; const pend = { insert: 0, adopt: 0, relink: 0, merge: 0, staff_fixed: 0, unlinked_left: 0, review: 0 };
+      const days = [], detail = [], leftovers = []; const pend = { insert: 0, adopt: 0, relink: 0, merge: 0, staff_fixed: 0, product_fixed: 0, unlinked_left: 0, review: 0 };
       let err = null; const chunks = salesChunks(from, to);
       try {
         for (let i = 0; i < chunks.length; i++) {
@@ -835,7 +835,7 @@
       const group = (key) => { const m = new Map(); for (const x of days) { const k = key(x.date); const e = m.get(k) || { body: 0, app: 0 }; e.body += x.body; e.app += x.app; m.set(k, e); } return [...m].sort((a, b) => (a[0] < b[0] ? -1 : 1)); };
       const row = (label, e) => `<tr><td>${esc(label)}</td><td style="text-align:right">${won(e.body)}</td><td style="text-align:right">${won(e.app)}</td>${diffTd(e.app - e.body)}</tr>`;
       const bodyTot = days.reduce((a, x) => a + x.body, 0), appTot = days.reduce((a, x) => a + x.app, 0), bad = days.filter((x) => x.diff !== 0).length;
-      const todo = pend.insert + pend.adopt + pend.relink + pend.merge + pend.staff_fixed;
+      const todo = pend.insert + pend.adopt + pend.relink + pend.merge + pend.staff_fixed + pend.product_fixed;
       const head = ['', '바디코디', '앱', '차이(앱−바디코디)'];
       $('auditRes').innerHTML =
         (appTot === bodyTot && !bad ? `<div class="bc-ok">✅ ${esc(from)} ~ ${esc(to)} 전 기간 날짜별 매출이 바디코디와 모두 일치해요. (합계 ${won(bodyTot)})</div>`
@@ -847,7 +847,7 @@
         detail.map((x) => `<details class="bc-det" open><summary>${esc(x.date)} — 바디코디 ${won(x.body)} / 앱 ${won(x.app)} (${sgn(x.diff)})</summary>` +
           `<div class="bc-note">바디코디 거래 ${esc(x.body_rows.length)}건</div>${auditTable(['회원', '상품', '금액', '판매 담당'], x.body_rows.map((b) => `<tr><td>${esc(b.who)}</td><td>${esc(b.product)}</td><td style="text-align:right">${won(b.amount)}</td><td>${esc(b.staff || '-')}</td></tr>`))}` +
           `<div class="bc-note" style="margin-top:6px;">앱 매출 ${esc(x.app_rows.length)}건</div>${auditTable(['회원', '구분', '금액', '담당', '입력 방식'], x.app_rows.map((a) => `<tr><td>${esc(a.member)}</td><td>${esc(CAT_KO[a.category] || a.category)}</td><td style="text-align:right">${won(a.amount)}</td><td>${esc(a.staff || '-')}</td><td>${esc(a.source)}</td></tr>`))}</details>`).join('') +
-        `<div class="bc-note" style="margin-top:8px;">정리하면 바뀔 내용 — 새로 넣기 ${esc(pend.insert)}건 · 직접 입력분에 번호 잇기 ${esc(pend.adopt)}건 · 같은 매출 두 번 들어간 것 합치기 ${esc(pend.merge)}건 · 회원 이어주기 ${esc(pend.relink)}건 · 담당자 맞추기 ${esc(pend.staff_fixed)}건 · 확인 필요 ${esc(pend.review)}건</div>` +
+        `<div class="bc-note" style="margin-top:8px;">정리하면 바뀔 내용 — 새로 넣기 ${esc(pend.insert)}건 · 직접 입력분에 번호 잇기 ${esc(pend.adopt)}건 · 같은 매출 두 번 들어간 것 합치기 ${esc(pend.merge)}건 · 회원 이어주기 ${esc(pend.relink)}건 · 담당자 맞추기 ${esc(pend.staff_fixed)}건 · 상품(PT 횟수) 바로잡기 ${esc(pend.product_fixed)}건 · 확인 필요 ${esc(pend.review)}건</div>` +
         (leftovers.length ? `<div class="bc-bad">회원이 안 이어진 채 남은 매출 ${esc(leftovers.length)}건: ${esc(leftovers.slice(0, 8).map((o) => `${o.date} ${o.who} ${won(o.amount)}`).join(' / '))}</div>` : '') +
         (todo ? `<div class="bc-row" style="margin-top:8px;"><button type="button" class="btn btn-primary" id="auditFixBtn" style="width:auto;padding:8px 18px;">점검 결과대로 정리하기</button></div>` : '');
       const fix = $('auditFixBtn');
