@@ -166,6 +166,11 @@
           <button type="button" class="btn btn-primary" id="datesApplyBtn" style="width:auto;padding:8px 18px;" disabled>미리보기 후 맞추기</button>
         </div>
         <div class="bc-res" id="datesRes"></div>
+
+        <h4 style="margin:16px 0 4px; font-size:14px;">④ 바디코디 매출 합계와 맞춰보기</h4>
+        <div class="bc-note">위 ②에서 고른 기간을 <b>달별로</b> 나눠, 바디코디가 집계한 <b>결제금액 합계</b>와 앱 매출 합계를 나란히 보여줘요. 차이는 보통 <b>환불</b>(앱에 자동으로 안 넣어요)·음료 제외·앱에만 있는 직접 입력 매출에서 생겨요. 과거 매출을 가져온 뒤 급여 계산 전에 한 번 확인해보세요. (한 번에 최대 14개월)</div>
+        <div class="bc-row"><button type="button" class="btn btn-primary" id="salesCheckBtn" style="width:auto;padding:8px 18px;">달별로 맞춰보기</button></div>
+        <div class="bc-res" id="salesCheckRes"></div>
       </div>
 
       <div class="bc-card">
@@ -607,6 +612,47 @@
       const next = !salesOn;
       if (next && !confirm('지금부터 바디코디 결제가 앱 매출에 자동으로 들어가요(10분마다, 최근 3일 확인). 켤까요?')) return;
       try { await callSync('sales_set_enabled', { enabled: next }); await loadSalesSetup(); } catch (e) { alert(e.message); }
+    });
+
+
+    // ----- 바디코디 매출 집계와 맞춰보기 (달별) -----
+    function monthRanges(from, to) {
+      const out = [];
+      let y = Number(from.slice(0, 4)), m = Number(from.slice(5, 7));
+      for (;;) {
+        const first = `${y}-${String(m).padStart(2, '0')}-01`;
+        const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+        out.push([first < from ? from : first, last > to ? to : last]);
+        if (last >= to) break;
+        m += 1; if (m > 12) { m = 1; y += 1; }
+      }
+      return out;
+    }
+    $('salesCheckBtn').addEventListener('click', async () => {
+      if (busy) return;
+      const from = $('salesFrom').value, to = $('salesTo').value;
+      if (!from || !to || from > to) { alert('위 ②에서 기간을 정확히 골라주세요.'); return; }
+      const months = monthRanges(from, to);
+      if (months.length > 14) { alert('한 번에 최대 14개월까지 맞춰볼 수 있어요. 기간을 줄여주세요.'); return; }
+      busy = true; $('salesCheckBtn').disabled = true; $('salesCheckRes').innerHTML = '';
+      const rows = []; let err = null;
+      try {
+        for (let i = 0; i < months.length; i++) {
+          $('salesCheckBtn').textContent = `확인 중... ${i + 1}/${months.length}`;
+          const r = await callSync('sales_check', { from: months[i][0], to: months[i][1] });
+          rows.push({ label: months[i][0].slice(0, 7), r });
+        }
+      } catch (e) { err = e.message; }
+      finally { busy = false; $('salesCheckBtn').disabled = false; $('salesCheckBtn').textContent = '달별로 맞춰보기'; }
+      const body = rows.map(({ label, r }) => {
+        const sum = r.bodycodi_summary && r.bodycodi_summary.paymentAmount != null ? r.bodycodi_summary.paymentAmount : null;
+        const diff = sum == null ? null : sum - r.app_total;
+        return `<tr><td>${esc(label)}</td><td style="text-align:right">${sum == null ? '-' : won(sum)}</td><td style="text-align:right">${won(r.tx_payment + r.tx_refund)}</td><td style="text-align:right">${won(r.app_total)}</td><td style="text-align:right;${diff ? 'font-weight:600' : ''}">${diff == null ? '-' : (diff > 0 ? '+' : '') + won(diff)}</td><td style="text-align:right">${won(r.tx_refund)}</td></tr>`;
+      }).join('');
+      $('salesCheckRes').innerHTML = (rows.length ? `<table class="bc-table"><thead><tr><th>달</th><th>바디코디 집계 결제금액</th><th>거래내역 결제−환불</th><th>앱 매출</th><th>차이(집계−앱)</th><th>그중 환불</th></tr></thead><tbody>${body}</tbody></table>` +
+        (rows.some((x) => x.r.summary_error) ? `<div class="bc-bad" style="margin-top:6px;">집계를 못 받은 달이 있어요: ${esc(rows.find((x) => x.r.summary_error).r.summary_error)}</div>` : '') +
+        `<div class="bc-note">"차이"가 환불 합계(음수)와 비슷하면 정상이에요 — 환불은 앱에 자동으로 넣지 않고 검토 목록에서 직접 처리해요. 그 외 큰 차이는 앱에 회원이 없어 건너뛴 결제(검토 목록)나 아직 가져오지 않은 기간일 수 있어요.</div>` : '') +
+        (err ? `<div class="bc-bad">❌ ${esc(err)}</div>` : '');
     });
 
     // ----- 이용기간 맞추기 (회원 30명씩) -----
