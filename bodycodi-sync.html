@@ -124,6 +124,14 @@
           <div class="bc-res" id="ptHistRes"></div>
         </details>
 
+        <h4 style="margin:16px 0 4px; font-size:14px;">④ 잔여횟수 바로잡기 (바디코디 기준)</h4>
+        <div class="bc-note">앱의 개인PT 잔여횟수가 안 맞는 회원(재등록이 앱에 반영 안 됨, 예전에 차감 누락, 마이너스 등)을 <b>바디코디 이용권의 남은 횟수</b>로 맞춰요. 먼저 <b>차이만 미리 보여드리고</b>, 확인한 뒤에 맞춰요. 대상은 앱에 PT 잔여횟수가 기록된 회원과 최근 4개월 안에 PT 예약이 있는 회원이에요. 유료 개인PT 이용권(이용 중·홀딩)의 남은 횟수를 합산하고, 0원 무료 체험권은 빼요. 이 작업은 연동 시작일을 저장하기 <b>전에</b> 한 번 하는 게 좋고, 그 뒤로는 일정이 바뀐 회원이 자동으로 맞춰져요.</div>
+        <div class="bc-row">
+          <button type="button" class="btn btn-primary" id="ptRemPreviewBtn" style="width:auto;padding:8px 18px;">잔여횟수 차이 미리보기</button>
+          <button type="button" class="btn btn-primary" id="ptRemApplyBtn" style="width:auto;padding:8px 18px;" disabled>미리보기 후 맞추기</button>
+        </div>
+        <div class="bc-res" id="ptRemRes"></div>
+
         <h4 style="margin:16px 0 4px; font-size:14px;">검토 목록 <span class="bc-note">(자동으로 못 옮긴 일정)</span></h4>
         <div id="issues" class="bc-res"><span class="muted">선생님 목록을 불러오면 함께 보여요.</span></div>
       </div>
@@ -424,6 +432,63 @@
       finally { histBusy(false); $('ptHistApplyBtn').textContent = '미리보기 후 가져오기'; $('ptHistApplyBtn').disabled = !histPreviewed; }
     });
     $('ptHistFrom').value = '2025-09-01';
+
+    // ----- 잔여횟수 바로잡기 (회원을 30명씩 나눠 차례로 처리) -----
+    let remPreviewed = null;
+    async function runRem(action, onProgress) {
+      const all = []; let offset = 0; let total = null; const limit = 30;
+      for (;;) {
+        let r;
+        try { r = await callSync(action, { offset, limit }); }
+        catch (e) { throw new Error(`${offset}번째 회원 근처에서 멈췄어요: ${e.message}${offset ? ' (앞의 회원들은 이미 처리됐어요. 다시 누르면 이어서 해요)' : ''}`); }
+        total = r.total; all.push(...r.rows); offset += r.processed;
+        onProgress(Math.min(offset, total), total);
+        if (!r.processed || offset >= total) break;
+      }
+      return { rows: all, total };
+    }
+    function remHtml(rows, applied) {
+      const diffs = rows.filter((x) => x.changed);
+      const errs = rows.filter((x) => x.error);
+      const ok = rows.length - errs.length;
+      return `<div class="bc-stats">` +
+        `<div class="bc-stat"><div class="l">확인한 회원</div><div class="v">${esc(rows.length)}</div></div>` +
+        `<div class="bc-stat good"><div class="l">${applied ? '맞춘 회원' : '바뀔 회원'}</div><div class="v">${esc(diffs.length)}</div></div>` +
+        `<div class="bc-stat"><div class="l">이미 일치</div><div class="v">${esc(ok - diffs.length)}</div></div>` +
+        `<div class="bc-stat ${errs.length ? 'warn' : ''}"><div class="l">확인 못 한 회원</div><div class="v">${esc(errs.length)}</div></div></div>` +
+        (diffs.length ? `<details class="bc-det" open><summary>${applied ? '맞춘' : '바뀔'} 회원 (앞 ${Math.min(diffs.length, 150)}명)</summary>${tableHtml(['회원', '앱 잔여', '바디코디 남은 횟수', '차이'],
+          diffs.slice().sort((a, b) => (a.app == null ? 0 : a.app) - (b.app == null ? 0 : b.app)).slice(0, 150).map((x) => [x.name, x.app == null ? '기록 없음' : `${x.app}회`, `${x.body}회`, x.app == null ? '새로 기록' : `${x.body - x.app > 0 ? '+' : ''}${x.body - x.app}회`]))}</details>` : '<div class="bc-ok" style="margin-top:8px;">모두 일치해요. 👍</div>') +
+        (errs.length ? `<details class="bc-det"><summary>확인 못 한 회원 ${errs.length}명</summary>${tableHtml(['회원', '이유'], errs.slice(0, 30).map((x) => [x.name, x.error]))}</details>` : '');
+    }
+    function remBusy(on) { $('ptRemPreviewBtn').disabled = on; $('ptRemApplyBtn').disabled = on || !remPreviewed; busy = on; }
+    $('ptRemPreviewBtn').addEventListener('click', async () => {
+      if (busy) return;
+      $('ptRemRes').innerHTML = ''; remPreviewed = null; remBusy(true);
+      try {
+        const r = await runRem('pt_remaining_preview', (i, n) => { $('ptRemPreviewBtn').textContent = `확인 중... ${i}/${n}명`; });
+        remPreviewed = r;
+        $('ptRemRes').innerHTML = remHtml(r.rows, false);
+      } catch (e) { $('ptRemRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally {
+        remBusy(false); $('ptRemPreviewBtn').textContent = '잔여횟수 차이 미리보기';
+        const n = remPreviewed ? remPreviewed.rows.filter((x) => x.changed).length : 0;
+        $('ptRemApplyBtn').textContent = remPreviewed ? `바디코디 기준으로 맞추기 (${n}명)` : '미리보기 후 맞추기';
+        $('ptRemApplyBtn').disabled = !remPreviewed || n === 0;
+      }
+    });
+    $('ptRemApplyBtn').addEventListener('click', async () => {
+      if (busy || !remPreviewed) return;
+      const n = remPreviewed.rows.filter((x) => x.changed).length;
+      if (!confirm(`${n}명의 앱 개인PT 잔여횟수를 바디코디의 남은 횟수로 바꿀게요.\n(앱에 있던 숫자는 사라지고 바디코디 숫자로 덮어써져요) 계속할까요?`)) return;
+      remBusy(true);
+      try {
+        const r = await runRem('pt_remaining_apply', (i, t) => { $('ptRemApplyBtn').textContent = `맞추는 중... ${i}/${t}명`; });
+        remPreviewed = null;
+        $('ptRemRes').innerHTML = `<div class="bc-ok">✅ ${esc(r.rows.filter((x) => x.changed && !x.error).length)}명의 잔여횟수를 바디코디 기준으로 맞췄어요.</div>` + remHtml(r.rows, true);
+        loadLogs();
+      } catch (e) { $('ptRemRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally { remBusy(false); $('ptRemApplyBtn').textContent = '미리보기 후 맞추기'; $('ptRemApplyBtn').disabled = !remPreviewed; }
+    });
 
     function autoLine(rows, kind, label, every) {
       const last = rows.find((x) => x.trigger === 'scheduled' && (x.kind || 'member') === kind);
