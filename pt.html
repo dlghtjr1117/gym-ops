@@ -900,7 +900,13 @@
       return rows;
     }
     // 관리자 권한자의 직급 문구(지점장/팀장) - job_title은 staffCache(fetchStaff)에 들어 있음
-    function managerTitleOf(id) { return roleLabelOf((staffCache || []).find(s => s.id === id) || { role: 'manager' }); }
+    // 트레이너 계정은 직원 목록(RLS)에서 본인만 보여서, 다른 사람(팀장님)의 직급은 순위 함수가 돌려주는 trainer_job_title로 판단함 (migration_85)
+    function managerTitleOf(id) {
+      const s = (staffCache || []).find(x => x.id === id);
+      if (s) return roleLabelOf(s);
+      const lb = (leaderboardCache || []).find(x => x.trainer_id === id);
+      return roleLabelOf({ role: 'manager', job_title: lb ? lb.trainer_job_title : null });
+    }
     async function openTrainerRevenueDetail(trainerId) {
       const lb = (leaderboardCache || []).find(x => x.trainer_id === trainerId);
       const trainerName = lb ? lb.trainer_name : staffName(trainerId);
