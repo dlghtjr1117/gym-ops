@@ -115,7 +115,7 @@
           <div class="bc-row">
             <label class="bc-note" for="ptHistFrom">가져올 시작 날짜</label>
             <input type="date" id="ptHistFrom" style="padding:7px 10px;border:1px solid var(--slate-200);border-radius:8px;background:var(--surface);color:inherit;" />
-            <span class="bc-note">~ 연동 시작일 전날까지 (바디코디는 90일씩 나눠 받아요)</span>
+            <span class="bc-note" id="ptHistRange">~ 연동 시작일 전날까지</span>
           </div>
           <div class="bc-row">
             <button type="button" class="btn btn-primary" id="ptHistPreviewBtn" style="width:auto;padding:8px 18px;">과거 일정 미리보기</button>
@@ -288,6 +288,7 @@
       $('coachRes').innerHTML = '<span class="muted">불러오는 중...</span>';
       try {
         const r = await callSync('schedule_setup');
+        ptStartDate = r.start_date || null; $('ptHistRange').textContent = histRangeText();
         if (r.start_date) { $('ptStart').value = r.start_date; $('ptStartState').innerHTML = `<span class="bc-ok">${esc(r.start_date)}</span> 부터 연동돼요 (오늘은 ${esc(r.today)})`; }
         else $('ptStartState').innerHTML = '<span class="bc-bad">아직 정하지 않았어요</span> — 정해야 연동이 시작돼요';
         if (!$('ptStart').value) { const t = new Date(Date.now() + 33 * 3600 * 1000).toISOString().slice(0, 10); $('ptStart').value = t; }
@@ -313,7 +314,7 @@
       const v = $('ptStart').value;
       if (!v) { alert('날짜를 골라주세요.'); return; }
       if (!confirm(`${v} 부터의 PT 일정·출석을 바디코디에서 가져와 앱에 반영할게요.\n(그 전 날짜는 건드리지 않아요) 맞나요?`)) return;
-      try { await callSync('set_pt_start', { date: v }); $('ptStartState').innerHTML = `<span class="bc-ok">${esc(v)}</span> 부터 연동돼요`; }
+      try { await callSync('set_pt_start', { date: v }); ptStartDate = v; $('ptHistRange').textContent = histRangeText(); $('ptStartState').innerHTML = `<span class="bc-ok">${esc(v)}</span> 부터 연동돼요`; }
       catch (e) { $('ptStartState').innerHTML = `<span class="bc-bad">${esc(e.message)}</span>`; }
     });
     function ptBusy(on) { $('ptPreviewBtn').disabled = on; $('ptApplyBtn').disabled = on || !ptPreviewed; busy = on; }
@@ -348,8 +349,33 @@
       finally { ptBusy(false); $('ptApplyBtn').textContent = '미리보기 후 반영하기'; $('ptApplyBtn').disabled = !ptPreviewed; }
     });
 
-    // ----- 과거 이력 가져오기 -----
+    // ----- 과거 이력 가져오기 (긴 기간은 90일씩 나눠서 차례로 처리) -----
     let histPreviewed = null;
+    let ptStartDate = null;
+    const addDays = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+    const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const histEnd = () => (ptStartDate ? addDays(ptStartDate, -1) : kstToday());
+    function histChunks(from, to) {
+      const out = []; let cur = from;
+      while (cur <= to) { const e = addDays(cur, 89) < to ? addDays(cur, 89) : to; out.push([cur, e]); cur = addDays(e, 1); }
+      return out;
+    }
+    async function runHist(action, from, to, onProgress) {
+      const chunks = histChunks(from, to);
+      const sum = { from, to, appointment: 0, inserted: 0, adopted: 0, updated: 0, unchanged: 0, unmatched_member: 0, unmapped_coach: 0, skipped_cancelled_new: 0, truncated: false };
+      const ops = []; const errors = []; let written = 0;
+      for (let i = 0; i < chunks.length; i++) {
+        onProgress(i + 1, chunks.length, chunks[i]);
+        let r;
+        try { r = await callSync(action, { from: chunks[i][0], to: chunks[i][1] }); }
+        catch (e) { throw new Error(`${chunks[i][0]} ~ ${chunks[i][1]} 구간에서 멈췄어요: ${e.message}${i ? ` (앞의 ${i}개 구간은 이미 처리됐어요. 다시 누르면 이어서 해요)` : ''}`); }
+        for (const k of ['appointment', 'inserted', 'adopted', 'updated', 'unchanged', 'unmatched_member', 'unmapped_coach', 'skipped_cancelled_new']) sum[k] += r.summary[k] || 0;
+        if (r.summary.truncated) sum.truncated = true;
+        if (ops.length < 25) ops.push(...(r.samples.ops || []).slice(0, 25 - ops.length));
+        written += r.written || 0; errors.push(...(r.errors || []));
+      }
+      return { summary: sum, ops, written, errors, chunks: chunks.length };
+    }
     function histSummaryHtml(s) {
       const card = (l, v, cls = '') => `<div class="bc-stat ${cls}"><div class="l">${l}</div><div class="v">${esc(v)}</div></div>`;
       return `<div class="bc-stats">` +
@@ -360,39 +386,44 @@
         `<div class="bc-note">잔여횟수는 바뀌지 않아요. 이미 취소된 일정은 새로 만들지 않아요(${esc(s.skipped_cancelled_new)}건).</div>`;
     }
     function histBusy(on) { $('ptHistPreviewBtn').disabled = on; $('ptHistApplyBtn').disabled = on || !histPreviewed; busy = on; }
+    function histRangeText() { const f = $('ptHistFrom').value; return f ? `${f} ~ ${histEnd()} (${histChunks(f, histEnd()).length}번에 나눠 처리)` : ''; }
+    $('ptHistFrom').addEventListener('change', () => { $('ptHistRange').textContent = histRangeText(); });
     $('ptHistPreviewBtn').addEventListener('click', async () => {
       if (busy) return;
       const from = $('ptHistFrom').value;
       if (!from) { alert('가져올 시작 날짜를 골라주세요.'); return; }
-      $('ptHistRes').innerHTML = ''; histPreviewed = null; histBusy(true); $('ptHistPreviewBtn').textContent = '진행 중... 잠시만요 (기간이 길면 1분 정도 걸려요)';
+      const to = histEnd();
+      if (from > to) { alert('시작 날짜가 연동 시작일 전날보다 늦어요. 날짜를 확인해주세요.'); return; }
+      $('ptHistRes').innerHTML = ''; histPreviewed = null; histBusy(true);
       try {
-        const r = await callSync('schedule_history_preview', { from });
-        histPreviewed = r.summary;
-        $('ptHistRes').innerHTML = histSummaryHtml(r.summary) + ptOpsHtml(r.samples.ops) +
-          (r.summary.truncated ? `<div class="bc-bad" style="margin-top:8px;">⚠ 일정을 끝까지 다 받지 못했어요. 기간을 줄여서 다시 해보세요.</div>` : '');
+        const r = await runHist('schedule_history_preview', from, to, (i, n, c) => { $('ptHistPreviewBtn').textContent = `조회 중... ${i}/${n} (${c[0]} ~ ${c[1]})`; });
+        histPreviewed = { from, to, chunks: r.chunks, summary: r.summary };
+        $('ptHistRes').innerHTML = histSummaryHtml(r.summary) + ptOpsHtml(r.ops) +
+          (r.summary.truncated ? `<div class="bc-bad" style="margin-top:8px;">⚠ 일부 구간의 일정을 끝까지 다 받지 못했어요. 기간을 줄여서 다시 해보세요.</div>` : '');
       } catch (e) { $('ptHistRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
       finally {
         histBusy(false); $('ptHistPreviewBtn').textContent = '과거 일정 미리보기';
-        const n = histPreviewed ? histPreviewed.inserted + histPreviewed.adopted + histPreviewed.updated : 0;
-        $('ptHistApplyBtn').textContent = histPreviewed ? `가져오기 (${n}건)` : '미리보기 후 가져오기';
-        $('ptHistApplyBtn').disabled = !histPreviewed || histPreviewed.truncated || n === 0;
+        const sm = histPreviewed && histPreviewed.summary;
+        const n = sm ? sm.inserted + sm.adopted + sm.updated : 0;
+        $('ptHistApplyBtn').textContent = sm ? `가져오기 (${n}건)` : '미리보기 후 가져오기';
+        $('ptHistApplyBtn').disabled = !sm || sm.truncated || n === 0;
       }
     });
     $('ptHistApplyBtn').addEventListener('click', async () => {
       if (busy || !histPreviewed) return;
-      if (!confirm('과거 일정을 앱 PT 스케줄에 기록으로 남길게요.\n회원 잔여횟수는 바뀌지 않아요. 계속할까요?')) return;
-      const from = $('ptHistFrom').value;
-      histBusy(true); $('ptHistApplyBtn').textContent = '가져오는 중... 잠시만요';
+      if (!confirm(`${histPreviewed.from} ~ ${histPreviewed.to} 의 과거 일정을 앱 PT 스케줄에 기록으로 남길게요.\n회원 잔여횟수는 바뀌지 않아요. 계속할까요?`)) return;
+      const { from, to } = histPreviewed;
+      histBusy(true);
       try {
-        const r = await callSync('schedule_history_apply', { from });
+        const r = await runHist('schedule_history_apply', from, to, (i, n, c) => { $('ptHistApplyBtn').textContent = `가져오는 중... ${i}/${n} (${c[0]} ~ ${c[1]})`; });
         histPreviewed = null;
         $('ptHistRes').innerHTML = `<div class="bc-ok">✅ ${esc(r.written)}건을 앱 PT 스케줄에 남겼어요. (잔여횟수는 그대로)</div>` +
-          (r.error_count ? `<div class="bc-bad">일부 실패 ${esc(r.error_count)}건: ${esc((r.errors || []).join(' / '))}</div>` : '') + histSummaryHtml(r.summary);
+          (r.errors.length ? `<div class="bc-bad">일부 실패 ${esc(r.errors.length)}건: ${esc(r.errors.slice(0, 10).join(' / '))}</div>` : '') + histSummaryHtml(r.summary);
         loadLogs();
       } catch (e) { $('ptHistRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
       finally { histBusy(false); $('ptHistApplyBtn').textContent = '미리보기 후 가져오기'; $('ptHistApplyBtn').disabled = !histPreviewed; }
     });
-    (() => { const d = new Date(Date.now() + 9 * 3600 * 1000); d.setUTCMonth(d.getUTCMonth() - 3); $('ptHistFrom').value = d.toISOString().slice(0, 10); })();
+    $('ptHistFrom').value = '2025-09-01';
 
     function autoLine(rows, kind, label, every) {
       const last = rows.find((x) => x.trigger === 'scheduled' && (x.kind || 'member') === kind);
