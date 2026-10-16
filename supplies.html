@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 비품 재고</title>
+<link rel="stylesheet" href="style.css?v=1791480155" />
+<style>
+  .sp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 8px 0 14px; }
+  .sp-stat { border: 1px solid var(--slate-200); background: var(--surface); border-radius: 14px; padding: 14px 16px; }
+  .sp-stat .l { font-size: 12px; font-weight: 700; color: var(--slate-500); }
+  .sp-stat .v { font-size: 28px; font-weight: 900; margin-top: 2px; }
+  .sp-stat.low .v { color: #dc2626; }
+  .sp-buy { border: 1px solid #fecaca; background: #fef2f2; border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; }
+  :root[data-theme="dark"] .sp-buy { background: #3b1414; border-color: #7f1d1d; }
+  .sp-buy b { color: #b91c1c; } :root[data-theme="dark"] .sp-buy b { color: #fca5a5; }
+  .sp-buy-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .sp-chip { font-size: 12.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid #fca5a5; color: var(--slate-900); text-decoration: none; }
+  .sp-chip small { color: #dc2626; font-weight: 800; margin-left: 4px; }
+  .sp-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
+  .sp-search { padding: 7px 10px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: var(--slate-900); font-size: 13px; width: 180px; }
+  .sp-wrap { overflow-x: auto; }
+  table.sp-table td, table.sp-table th { padding: 9px 10px; vertical-align: middle; }
+  table.sp-table th { text-align: center; white-space: nowrap; }
+  table.sp-table td.c { text-align: center; }
+  tr.sp-low { background: #fef2f2; } :root[data-theme="dark"] tr.sp-low { background: #3b1414; }
+  .sp-name { font-weight: 800; }
+  .sp-need { display: inline-block; background: #dc2626; color: #fff; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 6px; }
+  .sp-ok { color: var(--slate-400); font-size: 12px; }
+  .sp-step { display: inline-flex; align-items: center; gap: 4px; }
+  .sp-step button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700); font-weight: 900; cursor: pointer; line-height: 1; }
+  .sp-step input { width: 66px; text-align: center; font-weight: 900; font-size: 14px; padding: 4px 2px; border: 1px solid var(--slate-300); border-radius: 7px; background: var(--surface); color: var(--slate-900); }
+  .sp-safe { font-weight: 800; color: #16a34a; }
+  .sp-empty { padding: 34px 16px; text-align: center; color: var(--slate-500); background: var(--surface); border: 1px dashed var(--slate-300); border-radius: 14px; }
+  .sp-link { font-size: 12.5px; font-weight: 700; }
+  .sp-note { font-size: 11.5px; color: var(--slate-500); margin-top: 2px; }
+  .sp-btn { padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 800; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-700); cursor: pointer; }
+  .sp-field { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: var(--slate-900); box-sizing: border-box; }
+  .sp-lab { font-size: 12px; font-weight: 700; color: var(--slate-500); margin: 10px 0 4px; }
+  @media (max-width: 720px) { .sp-stats { grid-template-columns: 1fr 1fr 1fr; } .sp-stat .v { font-size: 22px; } }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="logo-badge" style="width:28px;height:28px;font-size:13px;margin:0;">C</span>센터 매출 관리</div>
+    <div class="topnav">
+      <a href="home.html">홈</a>
+      <a href="dashboard.html">대시보드</a>
+      <a href="members.html">회원 관리</a>
+      <a href="contact-center.html">📞 연락 센터</a>
+      <a href="marketing.html">광고 관리</a>
+      <a href="sales.html">매출 입력</a>
+      <a href="group-pt-attendance.html">그룹PT 출석</a>
+      <a href="pt.html">PT 관리</a>
+      <a href="ot.html">OT 관리</a>
+      <a href="schedule.html">PT 스케줄</a>
+      <a href="tasks.html">업무 리스트</a>
+      <a href="supplies.html" class="active">📦 비품 재고</a>
+      <a href="rules.html">센터 규정</a>
+      <a href="meetings.html">미팅 기록</a>
+      <a href="suggestions.html">💌 마음의 소리함</a>
+      <a href="products.html">이용권 관리</a>
+      <a href="staff.html">직원 관리</a>
+      <a href="payroll.html">급여 관리</a>
+      <a href="accounts.html">계정 관리</a>
+      <a href="metrics.html">지표 분석</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="user-badge" id="roleBadge">로딩 중...</div>
+      <button class="btn-link" id="logoutBtn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <h2 style="margin:6px 0 4px;">📦 비품 재고</h2>
+    <p class="muted" style="margin:0 0 12px;">현재 재고가 <b>안전재고보다 적으면</b> 빨간 "발주필요"가 떠요. 재고 숫자는 직원 누구나 고칠 수 있고, 품목 추가·안전재고·구매링크 수정은 지점장만 해요. <span id="roleNote"></span></p>
+    <div id="loadError" class="error-text" style="display:none;"></div>
+
+    <div id="mainArea">
+      <div class="sp-stats">
+        <div class="sp-stat"><div class="l">전체 품목</div><div class="v"><span id="stAll">-</span></div></div>
+        <div class="sp-stat low"><div class="l">🛒 발주 필요</div><div class="v"><span id="stLow">-</span></div></div>
+        <div class="sp-stat"><div class="l">재고 안 세는 품목</div><div class="v"><span id="stNone">-</span></div></div>
+      </div>
+
+      <div id="buyBox" class="sp-buy" style="display:none;"></div>
+
+      <div class="sp-bar">
+        <span id="catTabs" style="display:contents;"></span>
+        <label style="font-size:13px;font-weight:700;display:flex;gap:5px;align-items:center;margin-left:4px;"><input type="checkbox" id="onlyLow" /> 발주필요만</label>
+        <input type="search" id="q" class="sp-search" placeholder="품목 검색" />
+        <button type="button" class="btn btn-primary" id="addBtn" style="display:none;width:auto;padding:7px 16px;margin-left:auto;">+ 품목 추가</button>
+      </div>
+
+      <div class="sp-wrap"><div id="list"><div class="sp-empty">불러오는 중...</div></div></div>
+    </div>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">비품 재고 · 2026-10-16</p>
+  </div>
+
+  <div class="modal-overlay" id="itemModal" style="display:none;">
+    <div class="modal-box" style="max-width:460px;">
+      <div class="modal-header"><div><h3 id="imTitle">품목 추가</h3></div><button class="modal-close" id="imClose" type="button">×</button></div>
+      <div class="sp-lab" style="margin-top:0;">구분</div>
+      <select id="imCat" class="sp-field"><option>중요관리</option><option>청소용</option><option>사무용</option><option>그 외</option></select>
+      <div class="sp-lab">품목명</div>
+      <input id="imName" class="sp-field" maxlength="60" />
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><div class="sp-lab">단위(선택)</div><input id="imUnit" class="sp-field" placeholder="개, 롤, 박스" maxlength="10" /></div>
+        <div><div class="sp-lab">현재 재고</div><input id="imStock" type="number" min="0" step="any" class="sp-field" placeholder="비우면 X" /></div>
+        <div><div class="sp-lab">안전재고</div><input id="imSafe" type="number" min="0" step="any" class="sp-field" placeholder="기준" /></div>
+      </div>
+      <div class="muted" style="font-size:11.5px;margin-top:4px;">현재 재고를 비우면 "재고를 안 세는 품목(X)"이 되고, 안전재고를 비우면 발주필요 표시를 하지 않아요.</div>
+      <div class="sp-lab">구매링크</div>
+      <input id="imLink" class="sp-field" placeholder="https://..." />
+      <div class="sp-lab">구매 메모 (선택)</div>
+      <input id="imNote" class="sp-field" placeholder="예: 코맷 1겹 점보롤 500m" maxlength="120" />
+      <div id="imMsg" class="error-text" style="display:none;margin-top:8px;"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
+        <button type="button" class="btn btn-primary" id="imSave" style="width:auto;padding:8px 20px;">저장</button>
+        <button type="button" class="btn btn-outline" id="imCancel" style="width:auto;padding:8px 16px;">취소</button>
+        <button type="button" class="sp-btn" id="imDel" style="margin-left:auto;color:#b91c1c;display:none;">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791700000"></script>
+  <script src="data.js?v=1791640000"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => escapeHtml(String(s === null || s === undefined ? '' : s));
+    const CATS = ['중요관리', '청소용', '사무용', '그 외'];
+    const CAT_BADGE = { '중요관리': 'badge-orange', '청소용': 'badge-green', '사무용': 'badge-blue', '그 외': 'badge-slate' };
+    let rows = [], catKey = 'all', onlyLow = false, search = '', isManager = false, editingId = null;
+
+    const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+    const isLow = (r) => num(r.stock) !== null && num(r.safety_stock) !== null && num(r.stock) < num(r.safety_stock);
+    const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '');
+    const fmtN = (n) => (n === null ? '' : Number(n).toLocaleString('ko-KR'));
+    const mdOf = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()}`; };
+
+    async function api(method, path, body, errMsg) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        method, headers: { ...(await authHeaders()), 'Prefer': 'return=representation' }, body: body ? JSON.stringify(body) : undefined
+      });
+      if (!res.ok) await throwApiError(res, errMsg);
+      return res.status === 204 ? [] : res.json();
+    }
+
+    async function load() {
+      try {
+        const { rows: r, error } = await fetchAllRows('supplies?select=*&is_active=eq.true&order=category.asc,sort_order.asc,name.asc', await authHeaders());
+        if (error) {
+          let msg = '';
+          try { msg = (await error.json()).message || ''; } catch (e) { /* ignore */ }
+          if (error.status === 404 || /does not exist|schema cache/i.test(msg)) throw new Error('Supabase에서 migration_86_supplies.sql을 먼저 실행해주세요.');
+          throw new Error(msg || '비품 목록을 불러오지 못했어요.');
+        }
+        rows = r.sort((a, b) => CATS.indexOf(a.category) - CATS.indexOf(b.category) || (a.sort_order || 0) - (b.sort_order || 0) || String(a.name).localeCompare(String(b.name), 'ko'));
+        render();
+      } catch (err) { $('loadError').textContent = err.message; $('loadError').style.display = 'block'; $('list').innerHTML = ''; }
+    }
+
+    function render() {
+      const low = rows.filter(isLow);
+      $('stAll').textContent = rows.length; $('stLow').textContent = low.length;
+      $('stNone').textContent = rows.filter(r => num(r.stock) === null).length;
+      // 발주 필요 요약
+      const bb = $('buyBox');
+      if (low.length) {
+        bb.style.display = '';
+        bb.innerHTML = `<div><b>🛒 구매가 필요한 품목 ${low.length}개</b> <span class="muted" style="font-size:12px;">현재 재고 / 안전재고</span></div><div class="sp-buy-list">` +
+          low.map(r => {
+            const u = safeUrl(r.buy_link);
+            const inner = `${esc(r.name)}<small>${fmtN(num(r.stock))}/${fmtN(num(r.safety_stock))}</small>`;
+            return u ? `<a class="sp-chip" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="구매 링크 열기">${inner} ↗</a>` : `<span class="sp-chip">${inner}</span>`;
+          }).join('') + '</div>';
+      } else { bb.style.display = 'none'; bb.innerHTML = ''; }
+      // 구분 탭
+      const cnt = (c) => rows.filter(r => c === 'all' || r.category === c).length;
+      $('catTabs').innerHTML = ['all', ...CATS].map(c => `<button class="filter-tab ${catKey === c ? 'active' : ''}" data-cat="${esc(c)}">${c === 'all' ? '전체' : c} (${cnt(c)})</button>`).join('');
+      const q = search.trim().toLowerCase();
+      const list = rows.filter(r => (catKey === 'all' || r.category === catKey) && (!onlyLow || isLow(r)) && (!q || (r.name || '').toLowerCase().includes(q)));
+      $('list').innerHTML = list.length ? table(list) : `<div class="sp-empty">${onlyLow ? '발주가 필요한 품목이 없어요 👍' : '해당하는 품목이 없어요.'}</div>`;
+    }
+
+    function table(list) {
+      const body = list.map(r => {
+        const id = esc(r.id), low = isLow(r), u = safeUrl(r.buy_link), st = num(r.stock), sf = num(r.safety_stock);
+        return `<tr class="${low ? 'sp-low' : ''}" data-row="${id}">
+          <td class="c"><span class="badge ${CAT_BADGE[r.category] || 'badge-slate'}">${esc(r.category)}</span></td>
+          <td><div class="sp-name">${esc(r.name)}</div>${r.buy_note ? `<div class="sp-note">${esc(r.buy_note)}</div>` : ''}</td>
+          <td class="c">${esc(r.unit || '')}</td>
+          <td class="c"><span class="sp-step"><button type="button" data-step="-1" data-id="${id}" aria-label="하나 줄이기">−</button>
+            <input type="number" min="0" step="any" value="${st === null ? '' : st}" placeholder="X" data-stock="${id}" aria-label="${esc(r.name)} 현재 재고" />
+            <button type="button" data-step="1" data-id="${id}" aria-label="하나 늘리기">+</button></span></td>
+          <td class="c"><span class="sp-safe">${sf === null ? '<span class="muted">-</span>' : fmtN(sf)}</span></td>
+          <td class="c">${low ? '<span class="sp-need">발주필요</span>' : '<span class="sp-ok">' + (st === null || sf === null ? '' : '충분') + '</span>'}</td>
+          <td>${u ? `<a class="sp-link" href="${esc(u)}" target="_blank" rel="noopener noreferrer">구매링크 ↗</a>` : '<span class="muted">-</span>'}</td>
+          <td class="c" style="font-size:11.5px;color:var(--slate-500);white-space:nowrap;">${mdOf(r.updated_at)}</td>
+          <td class="c">${isManager ? `<button type="button" class="sp-btn" data-edit="${id}">수정</button>` : ''}</td>
+        </tr>`;
+      }).join('');
+      return `<table class="sp-table"><thead><tr><th>구분</th><th style="text-align:left;">품목명</th><th>단위</th><th>현재 재고</th><th>안전재고</th><th>발주여부</th><th style="text-align:left;">구매링크</th><th>수정일</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    // ---- 재고 숫자 수정 (누구나) ----
+    async function setStock(id, value) {
+      const r = rows.find(x => x.id === id); if (!r) return;
+      const before = r.stock, wasLow = isLow(r);
+      r.stock = value; render();
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_supply_stock`, {
+          method: 'POST', headers: await authHeaders(), body: JSON.stringify({ p_id: id, p_stock: value })
+        });
+        if (!res.ok) await throwApiError(res, '재고를 저장하지 못했어요.');
+        const saved = await res.json(); const row = Array.isArray(saved) ? saved[0] : saved;
+        if (row) { r.updated_at = row.updated_at; }
+        render();
+        if (!wasLow && isLow(r)) showToast(`${r.name} · 안전재고 아래예요. 발주가 필요해요.`, 'danger');
+      } catch (err) {
+        r.stock = before; render(); showToast(err.message, 'danger');
+      }
+    }
+    $('list').addEventListener('click', (e) => {
+      const st = e.target.closest('[data-step]');
+      if (st) {
+        const r = rows.find(x => x.id === st.dataset.id); if (!r) return;
+        const cur = num(r.stock) === null ? 0 : num(r.stock);
+        setStock(r.id, Math.max(0, cur + Number(st.dataset.step)));
+        return;
+      }
+      const ed = e.target.closest('[data-edit]'); if (ed) openItem(ed.dataset.edit);
+    });
+    $('list').addEventListener('change', (e) => {
+      const inp = e.target.closest('[data-stock]'); if (!inp) return;
+      const v = inp.value.trim();
+      if (v !== '' && (isNaN(Number(v)) || Number(v) < 0)) { render(); return; }
+      setStock(inp.dataset.stock, v === '' ? null : Number(v));
+    });
+    $('list').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-stock]')) e.target.blur(); });
+
+    $('catTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; catKey = b.dataset.cat; render(); });
+    $('onlyLow').addEventListener('change', (e) => { onlyLow = e.target.checked; render(); });
+    $('q').addEventListener('input', (e) => { search = e.target.value; render(); });
+
+    // ---- 품목 추가·수정 (지점장) ----
+    function openItem(id) {
+      editingId = id || null;
+      const r = id ? rows.find(x => x.id === id) : null;
+      $('imTitle').textContent = r ? '품목 수정' : '품목 추가';
+      $('imCat').value = r ? r.category : (catKey !== 'all' ? catKey : '중요관리');
+      $('imName').value = r ? r.name : ''; $('imUnit').value = r ? (r.unit || '') : '';
+      $('imStock').value = r && num(r.stock) !== null ? r.stock : ''; $('imSafe').value = r && num(r.safety_stock) !== null ? r.safety_stock : '';
+      $('imLink').value = r ? (r.buy_link || '') : ''; $('imNote').value = r ? (r.buy_note || '') : '';
+      $('imDel').style.display = r ? '' : 'none'; $('imMsg').style.display = 'none'; $('imSave').disabled = false;
+      $('itemModal').style.display = 'flex'; setTimeout(() => $('imName').focus(), 50);
+    }
+    const closeItem = () => { $('itemModal').style.display = 'none'; editingId = null; };
+    $('addBtn').addEventListener('click', () => openItem(null));
+    $('imClose').addEventListener('click', closeItem); $('imCancel').addEventListener('click', closeItem);
+    $('imSave').addEventListener('click', async () => {
+      const msg = (t) => { $('imMsg').textContent = t; $('imMsg').style.display = ''; };
+      const name = $('imName').value.trim(); if (!name) return msg('품목명을 입력해주세요.');
+      const link = $('imLink').value.trim(); if (link && !safeUrl(link)) return msg('구매링크는 https:// 로 시작하는 주소를 넣어주세요.');
+      const stockV = $('imStock').value.trim(), safeV = $('imSafe').value.trim();
+      if ((stockV !== '' && Number(stockV) < 0) || (safeV !== '' && Number(safeV) < 0)) return msg('재고는 0 이상으로 입력해주세요.');
+      const payload = { category: $('imCat').value, name, unit: $('imUnit').value.trim() || null, stock: stockV === '' ? null : Number(stockV),
+        safety_stock: safeV === '' ? null : Number(safeV), buy_link: link || null, buy_note: $('imNote').value.trim() || null, updated_at: new Date().toISOString() };
+      $('imSave').disabled = true;
+      try {
+        if (editingId) {
+          const out = await api('PATCH', `supplies?id=eq.${editingId}`, payload, '품목을 저장하지 못했어요.');
+          if (!out.length) throw new Error('저장이 반영되지 않았어요. 지점장 계정인지 확인해주세요.');
+          Object.assign(rows.find(x => x.id === editingId), out[0]);
+        } else {
+          const maxOrder = Math.max(0, ...rows.filter(x => x.category === payload.category).map(x => x.sort_order || 0));
+          const out = await api('POST', 'supplies', { ...payload, sort_order: maxOrder + 1 }, '품목을 추가하지 못했어요.');
+          rows.push(out[0]);
+        }
+        rows.sort((a, b) => CATS.indexOf(a.category) - CATS.indexOf(b.category) || (a.sort_order || 0) - (b.sort_order || 0));
+        closeItem(); render(); showToast('저장했어요.');
+      } catch (err) { msg(err.message); $('imSave').disabled = false; }
+    });
+    $('imDel').addEventListener('click', async () => {
+      const r = rows.find(x => x.id === editingId); if (!r) return;
+      if (!confirm(`"${r.name}" 품목을 삭제할까요?`)) return;
+      try {
+        const out = await api('DELETE', `supplies?id=eq.${editingId}`, null, '삭제하지 못했어요.');
+        if (!out.length) throw new Error('삭제가 반영되지 않았어요. 지점장 계정인지 확인해주세요.');
+        rows = rows.filter(x => x.id !== editingId); closeItem(); render(); showToast('삭제했어요.');
+      } catch (err) { $('imMsg').textContent = err.message; $('imMsg').style.display = ''; }
+    });
+
+    (async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        $('roleBadge').textContent = `${roleLabelOf(profile)} · ${profile.name}`;
+        applyRoleNav(profile);
+        isManager = profile.role === 'manager';
+      } else { $('roleBadge').textContent = ''; }
+      $('roleNote').textContent = isManager ? '(지점장: 품목 추가·수정 가능)' : '';
+      $('addBtn').style.display = isManager ? '' : 'none';
+      load();
+    })();
+  </script>
+</body>
+</html>
