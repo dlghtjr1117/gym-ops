@@ -92,6 +92,7 @@
       <a href="ot.html">OT 관리</a>
       <a href="schedule.html">PT 스케줄</a>
       <a href="tasks.html">업무 리스트</a>
+      <a href="supplies.html">📦 비품 재고</a>
       <a href="rules.html">센터 규정</a>
       <a href="meetings.html">미팅 기록</a>
       <a href="suggestions.html">💌 마음의 소리함</a>
@@ -456,6 +457,14 @@
       const n = siblingsOf(t).filter(o => !mk.has(o.key)).length;
       return n ? ` <span class="cc-dup" title="같은 사람의 다른 연락 건이 ${n}건 더 있어요. 등록 처리할 때 같이 정리할 수 있어요">동일인 +${n}</span>` : '';
     }
+    // 상품·현황 칸: 한 건이면 예전처럼 두 줄, 여러 건이 묶였으면 상품마다 한 줄로 컴팩트하게
+    function productCell(t) {
+      const g = groupOf(t);
+      if (g.length === 1) return `<div>${esc(t.headline)}<div class="cc-sub">${ddayBadge(t)} ${t.sub && t.src !== 'expiry' ? esc(t.sub) : ''}</div>${t.src === 'expiry' && t.sub ? `<div class="cc-sub">${esc(t.sub)}</div>` : ''}</div>`;
+      const seen = new Set();
+      return g.filter(x => { const k = x.src + '|' + x.headline + '|' + (x.sub || ''); if (seen.has(k)) return false; seen.add(k); return true; })
+        .map(x => `<div style="padding:1px 0;">${esc(x.headline)} ${ddayBadge(x)}${x.src === 'expiry' && x.expiryDate ? ` <span class="cc-sub">${mdw(x.expiryDate)}</span>` : ''}${x.src === 'consult' ? ' <span class="cc-sub">상담</span>' : ''}</div>`).join('');
+    }
     function rowHtml(t) {
       const late = !t.done && (t.nextDate || t.effNext) && (t.nextDate || t.effNext) < TODAY;
       const phone = t.phone ? `<a href="tel:${esc(digitsOf(t.phone))}">${esc(formatPhone(t.phone) || t.phone)}</a>` : '<span class="cc-ph">번호 없음</span>';
@@ -466,10 +475,10 @@
         ? `<span class="badge ${t.doneKey === 'registered' ? 'badge-green' : t.doneKey === 'declined' ? 'badge-red' : 'badge-purple'}">${esc(DONE_LABEL[t.resultKey] || RESULT_LABEL[t.doneKey] || '')}</span><div class="cc-sub">${t.doneDate ? '처리 ' + md(t.doneDate) : ''}</div>`
         : stepsHtml(t) + nextLabel(t);
       return `<div class="cc-row ${late ? 'late' : ''}">
-        <div>${groupOf(t).map(kindBadge).join(' ')}</div>
+        <div>${Array.from(new Set(groupOf(t).map(kindBadge))).join(' ')}</div>
         <div><button class="cc-nm" data-act="detail" data-key="${esc(t.key)}">${esc(t.name)}</button>${carriedBadge}${dupBadge(t)}
           <div class="cc-ph">${phone}</div></div>
-        <div>${groupOf(t).map(x => `<div>${esc(x.headline)}<div class="cc-sub">${ddayBadge(x)} ${x.sub && x.src !== 'expiry' ? esc(x.sub) : ''}</div>${x.src === 'expiry' && x.sub ? `<div class="cc-sub">${esc(x.sub)}</div>` : ''}</div>`).join('')}${owner ? `<div class="cc-sub">${owner}</div>` : ''}</div>
+        <div>${productCell(t)}${owner ? `<div class="cc-sub">${owner}</div>` : ''}</div>
         <div>${c4}</div>
         <div class="c-memo" title="${esc(memoShown)}">${memoShown ? esc(memoShown) : '<span class="muted">메모 없음</span>'}</div>
         <div class="c-act">${actionsHtml(t)}</div>
