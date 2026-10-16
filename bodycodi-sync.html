@@ -165,7 +165,7 @@
 
       <div class="bc-card" id="salesCard">
         <h3>⑤ 매출 자동 연동 <span class="bc-note">(바디코디 결제 → 앱 매출 · 이용권 상품 · 만료일)</span></h3>
-        <div class="bc-note">바디코디에서 결제(헬스이용권·PT·그룹PT·락커·운동복·일일권 등)가 등록되면 앱 <b>매출</b>에 자동으로 한 줄씩 들어가요. 금액은 <b>실제 결제금액</b>(해피아워 등 할인가 그대로), 담당은 <b>그 이용권을 판매한 선생님</b>이에요. 종류·횟수·기간을 보고 앱의 이용권 상품에 자동으로 연결하고(PT 40·60·80회처럼 정해진 상품이 없는 횟수는 "개인PT N회"를 자동으로 만들어요), 결제가 들어온 회원의 <b>이용권 만료일·PT 잔여횟수</b>도 바디코디 기준으로 맞춰요. 아메리카노 같은 음료와 0원 무료 등록은 매출에 넣지 않아요. <b>환불</b>은 환불 금액이 <b>마이너스 매출</b>로 자동으로 들어가요(원래 결제와 같은 종류·담당 선생님으로, 환불한 날짜 기준이라 원래 결제는 그대로 남고 합계는 자동으로 맞아요). <b>취소·양도·업그레이드</b>, 환불 처리 중인 건과 앱에서 회원을 못 찾은 결제는 아래 검토 목록으로 보내요. 이미 앱에 있는 같은 매출(직접 입력·엑셀로 가져온 것)은 회원·날짜·금액이 같으면 <b>중복으로 또 넣지 않아요</b>.</div>
+        <div class="bc-note">바디코디에서 결제(헬스이용권·PT·그룹PT·락커·운동복·일일권 등)가 등록되면 앱 <b>매출</b>에 자동으로 한 줄씩 들어가요. 금액은 <b>실제 결제금액</b>(해피아워 등 할인가 그대로), 담당은 <b>그 이용권을 판매한 선생님</b>이에요. 종류·횟수·기간을 보고 앱의 이용권 상품에 자동으로 연결하고(PT 40·60·80회처럼 정해진 상품이 없는 횟수는 "개인PT N회"를 자동으로 만들어요), 결제가 들어온 회원의 <b>이용권 만료일·PT 잔여횟수</b>도 바디코디 기준으로 맞춰요. 아메리카노 같은 음료와 0원 무료 등록은 매출에 넣지 않아요. <b>환불</b>은 환불 금액이 <b>마이너스 매출</b>로 자동으로 들어가요(원래 결제와 같은 종류·담당 선생님으로, 환불한 날짜 기준이라 원래 결제는 그대로 남고 합계는 자동으로 맞아요). <b>양도·업그레이드·교환·결합</b> 결제도 모두 앱 매출에 들어가고(양도는 "양도" 종류), <b>취소된 판매</b>는 앱에 이미 들어가 있으면 같은 금액이 마이너스로 되돌려져요. 앱에서 회원을 못 찾은 결제도 매출은 "회원 미연결"로 일단 넣고(합계가 안 빠지게), 회원을 이으면 자동으로 회원이 붙어요. 검토 목록은 안내용이에요. 이미 앱에 있는 같은 매출(직접 입력·엑셀로 가져온 것)은 회원·날짜·금액이 같으면 <b>중복으로 또 넣지 않아요</b>.</div>
 
         <h4 style="margin:12px 0 4px; font-size:14px;">① 자동 반영 켜기 (10분마다)</h4>
         <div class="bc-row">
@@ -196,7 +196,8 @@
 
         <h4 style="margin:16px 0 4px; font-size:14px;">④ 바디코디 매출 합계와 맞춰보기</h4>
         <div class="bc-note">위 ②에서 고른 기간을 <b>달별로</b> 나눠, 바디코디가 집계한 <b>결제금액 합계</b>와 앱 매출 합계를 나란히 보여줘요. 환불도 마이너스로 앱에 들어가 있어서, 차이는 보통 음료 제외·검토 목록의 취소/양도·앱에만 있는 직접 입력 매출에서 생겨요. 과거 매출을 가져온 뒤 급여 계산 전에 한 번 확인해보세요. (한 번에 최대 14개월)</div>
-        <div class="bc-row"><button type="button" class="btn btn-primary" id="salesCheckBtn" style="width:auto;padding:8px 18px;">달별로 맞춰보기</button></div>
+        <div class="bc-row"><button type="button" class="btn btn-primary" id="salesCheckBtn" style="width:auto;padding:8px 18px;">달별로 맞춰보기</button>
+          <button type="button" class="btn btn-primary" id="salesFillBtn" style="width:auto;padding:8px 18px;">바디코디와 비교해서 빠진 매출 모두 채우기</button></div>
         <div class="bc-res" id="salesCheckRes"></div>
       </div>
 
@@ -206,7 +207,7 @@
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.4 · 2026-10-16</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.5 · 2026-10-16</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -349,7 +350,7 @@
       if (!list.length) return '<div class="bc-note">없어요. 👍</div>';
       return `<table class="bc-table"><thead><tr><th>내용</th><th>건수</th><th></th></tr></thead><tbody>` +
         list.map((it) => `<tr><td>${esc(it.summary)}</td><td>${esc((it.detail && it.detail.count) || 1)}</td><td>${it.kind === 'member_dup' && it.id && it.detail && it.detail.bodycodi_member_id ? `<button type="button" class="btn-link" data-newmember="${esc(it.detail.bodycodi_member_id)}">새 회원으로 만들기</button> · ` : ''}<button type="button" class="btn-link" data-resolve="${esc(it.id)}">처리됨</button></td></tr>`).join('') + `</tbody></table>` +
-        `<div class="bc-note">회원: 바디코디 회원이 앱에 아직 없거나 연결이 안 된 경우예요(위 1~3단계 반영 후 자동 해결). 선생님: 위 ②에서 연결해주세요. [취소]/[양도]/[업그레이드]/[환불 처리 중]으로 시작하는 건은 앱에 자동으로 넣지 않았어요 — 필요하면 매출 입력에서 직접 처리하고 "처리됨"을 눌러주세요. (완료된 환불은 마이너스 매출로 자동 입력돼요)</div>`;
+        `<div class="bc-note">회원: 바디코디 회원이 앱에 아직 없거나 연결이 안 된 경우예요(위 1~3단계 반영 후 자동 해결). 선생님: 위 ②에서 연결해주세요. [환불 처리 중]·[환불 취소]로 시작하는 건은 아직 앱에 넣지 않았어요(처리가 끝나면 자동으로 들어가요). 완료된 환불은 마이너스 매출로, 양도·업그레이드·취소도 자동으로 반영돼요.</div>`;
     }
     function bindResolve() {
       document.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', async () => {
@@ -605,7 +606,7 @@
       return `<div class="bc-stats">` + card('조회 기간', `${s.from.slice(2)}~${s.to.slice(2)}`) + card('바디코디 결제', s.payment) +
         card('앱에 새로 넣을 매출', s.inserted, 'good') + card('넣을 금액 합계', won(s.amount), 'good') +
         card('이미 앱에 있어 건너뜀', s.matched_existing + s.already + s.adopted) +
-        card('환불(마이너스로 넣을 건)', s.refund || 0) + card('취소·양도 등 (검토 목록)', s.review, s.review ? 'warn' : '') + card('앱에 회원이 없어 건너뜀', s.member_unmatched, s.member_unmatched ? 'warn' : '') +
+        card('환불(마이너스로 넣을 건)', s.refund || 0) + card('확인 필요(환불 처리 중 등)', s.review, s.review ? 'warn' : '') + card('회원 미연결로 넣음', s.no_member || 0, s.no_member ? 'warn' : '') + card('취소로 되돌림', s.canceled || 0) +
         card('새로 만들 상품', s.new_products) + `</div>` +
         `<div class="bc-note">0원 무료 등록 ${esc(s.free)}건 · 음료 등 제외 ${esc(s.skipped_product)}건 · 직접 입력해둔 매출에 바디코디 번호만 이어붙인 ${esc(s.adopted)}건 (금액은 안 바뀌어요)</div>`;
     }
@@ -616,14 +617,14 @@
     }
     async function runSales(action, from, to, history, onProgress) {
       const chunks = salesChunks(from, to);
-      const sum = { from, to, payment: 0, refund: 0, free: 0, review: 0, member_unmatched: 0, already: 0, inserted: 0, adopted: 0, matched_existing: 0, skipped_product: 0, new_products: 0, amount: 0, truncated: false };
+      const sum = { from, to, payment: 0, refund: 0, no_member: 0, canceled: 0, free: 0, review: 0, member_unmatched: 0, already: 0, inserted: 0, adopted: 0, matched_existing: 0, skipped_product: 0, new_products: 0, amount: 0, truncated: false };
       const ops = [], np = new Map(); let written = 0; const errors = [];
       for (let i = 0; i < chunks.length; i++) {
         onProgress(i + 1, chunks.length, chunks[i]);
         let r;
         try { r = await callSync(action, { from: chunks[i][0], to: chunks[i][1], history }); }
         catch (e) { throw new Error(`${chunks[i][0]} ~ ${chunks[i][1]} 구간에서 멈췄어요: ${e.message}${i ? ' (앞 구간은 이미 처리됐어요. 다시 누르면 이어서 해요)' : ''}`); }
-        for (const k of ['payment', 'refund', 'free', 'review', 'member_unmatched', 'already', 'inserted', 'adopted', 'matched_existing', 'skipped_product', 'amount']) sum[k] += r.summary[k] || 0;
+        for (const k of ['payment', 'refund', 'no_member', 'canceled', 'free', 'review', 'member_unmatched', 'already', 'inserted', 'adopted', 'matched_existing', 'skipped_product', 'amount']) sum[k] += r.summary[k] || 0;
         if (r.summary.truncated) sum.truncated = true;
         for (const p of (r.samples.new_products || [])) np.set(p.name, p);
         if (ops.length < 30) ops.push(...(r.samples.ops || []).slice(0, 30 - ops.length));
@@ -771,12 +772,29 @@
       const body = rows.map(({ label, r }) => {
         const sum = r.bodycodi_summary && r.bodycodi_summary.paymentAmount != null ? r.bodycodi_summary.paymentAmount : null;
         const diff = sum == null ? null : sum - r.app_total;
-        return `<tr><td>${esc(label)}</td><td style="text-align:right">${sum == null ? '-' : won(sum)}</td><td style="text-align:right">${won(r.tx_payment + r.tx_refund)}</td><td style="text-align:right">${won(r.app_total)}</td><td style="text-align:right;${diff ? 'font-weight:600' : ''}">${diff == null ? '-' : (diff > 0 ? '+' : '') + won(diff)}</td><td style="text-align:right">${won(r.tx_refund)}</td></tr>`;
+        return `<tr><td>${esc(label)}</td><td style="text-align:right">${sum == null ? '-' : won(sum)}</td><td style="text-align:right">${won(r.tx_payment + r.tx_refund)}</td><td style="text-align:right">${won(r.app_total)}</td><td style="text-align:right;${diff ? 'font-weight:600' : ''}">${diff == null ? '-' : (diff > 0 ? '+' : '') + won(diff)}</td><td style="text-align:right">${won(r.tx_refund)}</td><td style="text-align:right;${r.pending && r.pending.count ? 'font-weight:600;color:#b45309' : ''}">${r.pending ? `${r.pending.count}건 · ${won(r.pending.amount)}` : '-'}</td><td style="text-align:right">${r.pending ? won(r.pending.skipped_amount) : '-'}</td></tr>`;
       }).join('');
-      $('salesCheckRes').innerHTML = (rows.length ? `<table class="bc-table"><thead><tr><th>달</th><th>바디코디 집계 결제금액</th><th>거래내역 결제−환불</th><th>앱 매출</th><th>차이(집계−앱)</th><th>그중 환불</th></tr></thead><tbody>${body}</tbody></table>` +
+      $('salesCheckRes').innerHTML = (rows.length ? `<table class="bc-table"><thead><tr><th>달</th><th>바디코디 집계 결제금액</th><th>거래내역 결제−환불</th><th>앱 매출</th><th>차이(집계−앱)</th><th>그중 환불</th><th>아직 앱에 없는 결제</th><th>음료 등 일부러 뺀 금액</th></tr></thead><tbody>${body}</tbody></table>` +
         (rows.some((x) => x.r.summary_error) ? `<div class="bc-bad" style="margin-top:6px;">집계를 못 받은 달이 있어요: ${esc(rows.find((x) => x.r.summary_error).r.summary_error)}</div>` : '') +
         `<div class="bc-note">"차이"는 0에 가까워야 해요 — 환불도 마이너스로 앱에 들어가 있어요. 큰 차이는 앱에 회원이 없어 건너뛴 결제(검토 목록)나 아직 가져오지 않은 기간일 수 있어요.</div>` : '') +
         (err ? `<div class="bc-bad">❌ ${esc(err)}</div>` : '');
+    });
+
+    // 위 ②에서 고른 기간을 바디코디와 비교해서, 앱에 없는 결제·환불·취소를 전부 채운 뒤 달별로 다시 맞춰봐요
+    $('salesFillBtn').addEventListener('click', async () => {
+      if (busy) return;
+      const from = $('salesFrom').value, to = $('salesTo').value;
+      if (!from || !to || from > to) { alert('위 ②에서 기간을 정확히 골라주세요.'); return; }
+      if (!confirm(`${from} ~ ${to} 기간의 바디코디 매출을 앱과 비교해서, 앱에 없는 결제·환불(마이너스)·취소 정리를 모두 채울게요.\n이미 있는 매출은 건드리지 않고 중복으로 넣지 않아요. 계속할까요?`)) return;
+      busy = true; $('salesFillBtn').disabled = true; $('salesCheckBtn').disabled = true; $('salesCheckRes').innerHTML = '';
+      try {
+        const r = await runSales('sales_apply', from, to, from < addDays(kstDay(), -10), (i, n, c) => { $('salesFillBtn').textContent = `채우는 중... ${i}/${n} (${c[0].slice(2)} ~ ${c[1].slice(2)})`; });
+        const sm = r.summary;
+        $('salesRes').innerHTML = `<div class="bc-ok">✅ 앱에 ${esc(sm.inserted + sm.adopted)}건을 채웠어요 (환불 마이너스 ${esc(sm.refund || 0)}건 포함).</div>` + salesSummaryHtml(sm);
+        loadLogs();
+      } catch (e) { $('salesRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally { busy = false; $('salesFillBtn').disabled = false; $('salesCheckBtn').disabled = false; $('salesFillBtn').textContent = '바디코디와 비교해서 빠진 매출 모두 채우기'; }
+      $('salesCheckBtn').click();
     });
 
     // ----- 이용기간 맞추기 (회원 30명씩) -----
