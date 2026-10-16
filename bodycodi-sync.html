@@ -132,6 +132,14 @@
         </div>
         <div class="bc-res" id="ptRemRes"></div>
 
+        <h4 style="margin:16px 0 4px; font-size:14px;">출석 수 맞춰보기 <span class="bc-note">(선생님별 · 바디코디 ↔ 앱)</span></h4>
+        <div class="bc-note">급여 계산 전에, 고른 달의 <b>개인PT 출석·결석 수</b>를 선생님별로 바디코디와 앱을 나란히 보여드려요. 차이가 나면 <b>이유</b>도 같이 알려줘요 — 회원이 앱과 안 이어져서 못 옮긴 수업, 선생님이 앱 직원과 안 이어진 수업, 아직 안 가져온 과거 수업, 앱에만 직접 입력된 수업, 같은 시각에 두 번 들어간 중복 예약. 아무것도 바꾸지 않아요.</div>
+        <div class="bc-row">
+          <input type="month" id="cmpMonth" style="padding:7px 10px;border:1px solid var(--slate-200);border-radius:8px;background:var(--surface);color:inherit;" />
+          <button type="button" class="btn btn-primary" id="cmpBtn" style="width:auto;padding:8px 18px;">비교하기</button>
+        </div>
+        <div class="bc-res" id="cmpRes"></div>
+
         <h4 style="margin:16px 0 4px; font-size:14px;">검토 목록 <span class="bc-note">(자동으로 못 옮긴 일정·매출)</span></h4>
         <div id="issues" class="bc-res"><span class="muted">선생님 목록을 불러오면 함께 보여요.</span></div>
       </div>
@@ -198,7 +206,7 @@
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.2 · 2026-10-16</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v2.3 · 2026-10-16</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -555,6 +563,41 @@
     const CAT_KO = { membership_new: '헬스 신규', membership_renewal: '헬스 재등록', pt_new: 'PT 신규', pt_renewal: 'PT 재등록', group_pt_new: '그룹PT 신규', group_pt_renewal: '그룹PT 재등록', locker: '락커', clothes: '운동복', day_pass: '일일권', etc: '기타' };
     const won = (n) => Number(n || 0).toLocaleString('ko-KR') + '원';
     const kstDay = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+
+    // ===== 출석 수 맞춰보기 =====
+    function cmpHtml(r) {
+      const t = r.total; const num = (n) => (n ? String(n) : '-');
+      const rows = r.coaches.map((c) => {
+        const body = c.body_attended + c.body_absent, app = c.app_attended + c.app_absent, diff = app - body;
+        const why = [];
+        if (c.missing.member_unmatched) why.push(`회원이 앱과 안 이어짐 ${c.missing.member_unmatched}`);
+        if (c.missing.coach_unmapped) why.push(`선생님이 앱 직원과 안 이어짐 ${c.missing.coach_unmapped}`);
+        if (c.missing.not_imported) why.push(`아직 안 가져옴 ${c.missing.not_imported}`);
+        if (c.missing.status_diff) why.push(`앱의 상태가 다름 ${c.missing.status_diff}`);
+        if (c.extra.manual_only) why.push(`앱에만 직접 입력 ${c.extra.manual_only}`);
+        if (c.extra.orphan) why.push(`바디코디에서 사라진·바뀐 일정 ${c.extra.orphan}`);
+        if (c.extra.duplicate) why.push(`같은 시각 중복 ${c.extra.duplicate}`);
+        const name = c.profile_name && c.profile_name !== c.coach_name ? `${c.coach_name} (앱: ${c.profile_name})` : c.coach_name;
+        return [name + (c.linked ? '' : ' ⚠앱 직원과 안 이어짐'), `${c.body_attended} / ${c.body_absent}`, `${c.app_attended} / ${c.app_absent}`, diff === 0 ? '일치' : (diff > 0 ? '+' : '') + diff, why.join(' · ') || '-'];
+      });
+      const sumMissing = t.member_unmatched + t.coach_unmapped + t.not_imported + t.status_diff;
+      return `<div class="bc-stats"><div class="bc-stat"><div class="l">바디코디 출석+결석</div><div class="v">${esc(t.body)}</div></div>` +
+        `<div class="bc-stat"><div class="l">앱 출석+결석</div><div class="v">${esc(t.app)}</div></div>` +
+        `<div class="bc-stat ${sumMissing ? 'warn' : 'good'}"><div class="l">앱에 빠진 수업</div><div class="v">${esc(sumMissing)}</div></div></div>` +
+        tableHtml(['선생님', '바디코디 출석/결석', '앱 출석/결석', '앱−바디코디', '차이 이유(건수)'], rows) +
+        (r.unmatched_members.length ? `<details class="bc-det"><summary>앱과 안 이어진 회원 (수업이 많은 순 ${r.unmatched_members.length}명)</summary>${tableHtml(['바디코디 회원', '빠진 수업'], r.unmatched_members.map((x) => [x.name, x.count]))}<div class="bc-note">위 ①~③ 단계에서 회원을 이은 뒤 "과거 일정 가져오기"를 다시 하면 들어와요. 같은 사람이 앱에 두 줄이면 먼저 합쳐주세요.</div></details>` : '') +
+        `<div class="bc-note">연동 시작일: ${esc(r.start_date || '아직 안 정함')} · 그보다 앞 날짜의 수업은 "과거 일정 가져오기"를 해야 들어와요. 앱 출석 수가 더 많으면 중복·직접 입력을 확인하세요. 앱의 이상한 예약은 PT 스케줄 화면에서 지울 수 있어요.</div>`;
+    }
+    $('cmpMonth').value = kstDay().slice(0, 7);
+    $('cmpBtn').addEventListener('click', async () => {
+      if (busy) return;
+      const ym = $('cmpMonth').value; if (!/^\d{4}-\d{2}$/.test(ym)) { alert('달을 골라주세요.'); return; }
+      const last = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).toISOString().slice(0, 10);
+      busy = true; $('cmpBtn').disabled = true; $('cmpBtn').textContent = '비교 중... 잠시만요'; $('cmpRes').innerHTML = '';
+      try { const r = await callSync('pt_compare', { from: ym + '-01', to: last }); $('cmpRes').innerHTML = cmpHtml(r); }
+      catch (e) { $('cmpRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally { busy = false; $('cmpBtn').disabled = false; $('cmpBtn').textContent = '비교하기'; }
+    });
     function salesChunks(from, to) { const out = []; for (let c = from; c <= to; ) { const e = addDays(c, 29) < to ? addDays(c, 29) : to; out.push([c, e]); c = addDays(e, 1); } return out; }
     let salesPreviewed = null, salesOn = false;
     function salesSummaryHtml(s) {
