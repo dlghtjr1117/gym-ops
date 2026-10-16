@@ -19,6 +19,7 @@
      다크 모드에서도 항상 또렷하게 보이도록 함 */
   .role-select.role-manager { background-color: #e0e7ff; color: #4338ca; }
   .role-select.role-lead { background-color: #d1fae5; color: #047857; }
+  .role-select.role-fc { background-color: #fce7f3; color: #be185d; }
   .role-select.role-trainer { background-color: var(--slate-200); color: var(--slate-700); }
 </style>
 </head>
@@ -122,9 +123,9 @@
     }
 
     // 직급 3가지: trainer(트레이너) / lead(팀장 - 관리자 권한 + job_title '팀장') / manager(지점장)
-    const KIND_LABEL = { trainer: '트레이너', lead: '팀장', manager: '지점장' };
-    function kindOf(p) { return p.role !== 'manager' ? 'trainer' : (p.job_title === '팀장' ? 'lead' : 'manager'); }
-    function roleClass(p) { return kindOf(p) === 'trainer' ? 'role-trainer' : (kindOf(p) === 'lead' ? 'role-lead' : 'role-manager'); }
+    const KIND_LABEL = { trainer: '트레이너', lead: '팀장', fc: 'FC', manager: '지점장' };
+    function kindOf(p) { return p.role !== 'manager' ? 'trainer' : (p.job_title === '팀장' ? 'lead' : p.job_title === 'FC' ? 'fc' : 'manager'); }
+    function roleClass(p) { return kindOf(p) === 'trainer' ? 'role-trainer' : (kindOf(p) === 'lead' ? 'role-lead' : (kindOf(p) === 'fc' ? 'role-fc' : 'role-manager')); }
 
     let allProfiles = [];
     function renderStaffTable(fullList) {
@@ -148,6 +149,7 @@
             <select class="role-select ${roleClass(p)}" data-id="${p.id}" ${canEdit ? '' : 'disabled'}>
               <option value="trainer" ${kindOf(p) === 'trainer' ? 'selected' : ''}>트레이너</option>
               <option value="lead" ${kindOf(p) === 'lead' ? 'selected' : ''}>팀장</option>
+              <option value="fc" ${kindOf(p) === 'fc' ? 'selected' : ''}>FC</option>
               <option value="manager" ${kindOf(p) === 'manager' ? 'selected' : ''}>지점장</option>
             </select>
           </td>
@@ -184,7 +186,7 @@
             sel.disabled = true;
             try {
               await updateProfileRole(id, newKind);
-              if (person) { person.role = newKind === 'trainer' ? 'trainer' : 'manager'; person.job_title = newKind === 'lead' ? '팀장' : null; }
+              if (person) { person.role = newKind === 'trainer' ? 'trainer' : 'manager'; person.job_title = newKind === 'lead' ? '팀장' : newKind === 'fc' ? 'FC' : null; }
               sel.className = 'role-select ' + (person ? roleClass(person) : 'role-trainer');
               showToast(`${roleLabel}(으)로 변경되었습니다.`);
             } catch (err) {

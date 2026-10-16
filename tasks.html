@@ -22,6 +22,10 @@
   .tk-chip { font-size: 12px; padding: 3px 9px; border-radius: 8px; background: var(--slate-100); color: var(--slate-800); border: 1px solid var(--slate-200); }
   .tk-chip.late { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; font-weight: 700; }
   .tk-chip.more { color: var(--slate-500); background: transparent; border-style: dashed; cursor: pointer; }
+  .tk-fc { font-size: 10.5px; font-weight: 900; padding: 1px 6px; border-radius: 6px; background: #fce7f3; color: #be185d; }
+  .tk-sec { font-size: 14px; font-weight: 900; margin: 6px 2px 10px; display: flex; align-items: center; gap: 8px; }
+  .tk-sec small { font-weight: 600; color: var(--slate-500); font-size: 12px; }
+  .tk-sec + .tk-board { margin-bottom: 18px; }
   .tk-alldone { font-size: 12.5px; color: var(--slate-500); padding-top: 10px; border-top: 1px solid var(--slate-200); }
   .tk-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; align-items: start; }
   .tk-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; overflow: hidden; }
@@ -414,15 +418,18 @@
       return a.due_time.localeCompare(b.due_time);
     }
     function staffBuckets() {
-      const active = trainersCache.filter(isActiveStaff);
-      const known = new Set(active.map(s => s.id));
-      const out = active.map(s => ({ id: s.id, name: s.name, role: roleLabelOf(s), tasks: [] }));
+      // 지점장은 이 보드/미완료 패널에서 뺌. 트레이너·팀장은 'staff', FC는 'fc'로 따로 묶음
+      const groupOf = (s) => s.role !== 'manager' ? 'staff' : (s.job_title === '팀장' ? 'staff' : (s.job_title === 'FC' ? 'fc' : 'boss'));
+      const active = trainersCache.filter(isActiveStaff).filter(s => groupOf(s) !== 'boss');
+      const out = active.map(s => ({ id: s.id, name: s.name, role: roleLabelOf(s), group: groupOf(s), tasks: [] }));
       const byId = new Map(out.map(o => [o.id, o]));
       let other = null;
+      const bossIds = new Set(trainersCache.filter(s => groupOf(s) === 'boss').map(s => s.id));
       tasksCache.forEach(t => {
         const b = byId.get(t.assignee_id);
         if (b) b.tasks.push(t);
-        else { if (!other) { other = { id: '__other', name: (t.assignee && t.assignee.name) ? '그 외/퇴사 직원' : '담당자 미지정', role: '', tasks: [] }; } other.tasks.push(t); }
+        else if (bossIds.has(t.assignee_id)) { /* 지점장 업무는 보드에서 제외 (상단 탭에서 따로 확인) */ }
+        else { if (!other) { other = { id: '__other', name: (t.assignee && t.assignee.name) ? '그 외/퇴사 직원' : '담당자 미지정', role: '', group: 'staff', tasks: [] }; } other.tasks.push(t); }
       });
       if (other) out.push(other);
       out.forEach(o => {
@@ -437,7 +444,7 @@
       const box = document.getElementById('pendingPanel');
       if (currentUserRole !== 'manager' || !trainersCache.length) { box.style.display = 'none'; return; }
       const buckets = staffBuckets().filter(b => b.tasks.length);
-      const withPending = buckets.filter(b => b.pending.length).sort((a, b) => b.pending.length - a.pending.length || a.name.localeCompare(b.name, 'ko'));
+      const withPending = buckets.filter(b => b.pending.length).sort((a, b) => (a.group === 'fc' ? 1 : 0) - (b.group === 'fc' ? 1 : 0) || b.pending.length - a.pending.length || a.name.localeCompare(b.name, 'ko'));
       const clean = buckets.filter(b => !b.pending.length);
       const total = withPending.reduce((n, b) => n + b.pending.length, 0);
       const late = withPending.reduce((n, b) => n + b.pending.filter(t => isLate(t)).length, 0);
@@ -448,18 +455,16 @@
         withPending.map(b => {
           const list = b.pending.slice().sort(sortForCard);
           const shown = list.slice(0, MAX), rest = list.length - shown.length;
-          return `<div class="tk-prow"><button type="button" class="tk-pname" data-jump="${escapeHtml(b.id)}">${escapeHtml(b.name)} <span class="tk-cnt">미완료 ${b.pending.length}</span></button>
+          return `<div class="tk-prow"><button type="button" class="tk-pname" data-jump="${escapeHtml(b.id)}">${escapeHtml(b.name)}${b.group === 'fc' ? ' <span class="tk-fc">FC</span>' : ''} <span class="tk-cnt">미완료 ${b.pending.length}</span></button>
             <div class="tk-chips">${shown.map(t => `<span class="tk-chip ${isLate(t) ? 'late' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}${isLate(t) ? ' · 밀림' : ''}</span>`).join('')}
             ${rest > 0 ? `<span class="tk-chip more" data-jump="${escapeHtml(b.id)}">외 ${rest}개 ›</span>` : ''}</div></div>`;
         }).join('') +
-        (clean.length ? `<div class="tk-alldone">✅ 오늘 할 일 완료: ${clean.map(b => escapeHtml(b.name)).join(', ')}</div>` : '');
+        (clean.length ? `<div class="tk-alldone">✅ 오늘 할 일 완료: ${clean.map(b => escapeHtml(b.name) + (b.group === 'fc' ? ' (FC)' : '')).join(', ')}</div>` : '');
     }
 
     function renderBoard(container) {
       const buckets = staffBuckets();
-      const withTasks = buckets.filter(b => b.tasks.length);
-      const idle = buckets.filter(b => !b.tasks.length);
-      container.innerHTML = `<div class="tk-board">${withTasks.map(b => {
+      const cardHtml = (b) => {
         const dueTotal = b.pending.length + b.done.length;
         const pct = dueTotal ? Math.round((b.done.length / dueTotal) * 100) : 100;
         const pend = b.pending.slice().sort(sortForCard);
@@ -473,8 +478,19 @@
             ${pend.length ? pend.map(t => cardRow(t, false)).join('') : '<div class="tk-none">오늘 할 일을 모두 끝냈어요 👏</div>'}
             ${rest.length ? `<details class="tk-fold"><summary>완료 ${b.done.length}개${b.upcoming.length ? ` · 예정 ${b.upcoming.length}개` : ''} 보기</summary>${rest.map(t => cardRow(t, true)).join('')}</details>` : ''}
           </div></div>`;
-      }).join('')}</div>
-      ${idle.length ? `<p class="tk-idle">등록된 업무가 없는 직원: ${idle.map(b => escapeHtml(b.name)).join(', ')}</p>` : ''}`;
+      };
+      const section = (title, sub, list) => {
+        const withTasks = list.filter(b => b.tasks.length);
+        const idle = list.filter(b => !b.tasks.length);
+        if (!withTasks.length && !idle.length) return '';
+        return `<div class="tk-sec">${title} <small>${sub}</small></div>` +
+          (withTasks.length ? `<div class="tk-board">${withTasks.map(cardHtml).join('')}</div>` : '') +
+          (idle.length ? `<p class="tk-idle">등록된 업무가 없는 직원: ${idle.map(b => escapeHtml(b.name)).join(', ')}</p>` : '');
+      };
+      container.innerHTML =
+        section('🏋️ 트레이너 · 팀장', '지점장은 제외', buckets.filter(b => b.group === 'staff')) +
+        section('🧑‍💼 FC', '프런트 데스크', buckets.filter(b => b.group === 'fc'));
+      if (!container.innerHTML) container.innerHTML = '<p class="muted" style="padding:16px;">트레이너 · 팀장 · FC에게 배정된 업무가 없어요. 지점장 업무는 위의 이름 탭에서 볼 수 있어요.</p>';
     }
 
     function cardRow(t, quiet) {

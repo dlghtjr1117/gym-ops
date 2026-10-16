@@ -131,7 +131,7 @@ function requireLogin() {
 // 직급 표시 문구: 권한이 manager여도 job_title이 '팀장'이면 팀장, 아니면 지점장. (migration_77 - 컬럼이 아직 없어도 동작)
 function roleLabelOf(p) {
   if (!p) return '트레이너';
-  if (p.role === 'manager') return p.job_title === '팀장' ? '팀장' : '지점장';
+  if (p.role === 'manager') return p.job_title === '팀장' ? '팀장' : p.job_title === 'FC' ? 'FC' : '지점장'; // FC는 관리자 권한 + 직급 FC (migration_87)
   return '트레이너';
 }
 
