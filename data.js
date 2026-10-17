@@ -2942,9 +2942,11 @@ async function fetchPtBookingsForMonth(startStr, endStr) {
 // 매출만 의미가 있지만, 필터링은 buildPtPricingIndex()에서 하고 여기서는 그냥 기준일 이전 전체를 가져옴
 // ("직접 입력"으로 상품 연결 없이 기록된 매출도 같이 받아온 다음 순수 함수 쪽에서 걸러야, 나중에
 // 필터 기준이 바뀌어도 이 fetch 함수는 안 건드려도 됨). payment_method는 카드수수료 계산에 씀.
+// (선금 후 잔금: 잔금이 "조회하는 달이 지난 뒤" 결제돼도, 먼저 진행한 수업의 단가가 총액 기준으로 소급돼 바뀌어야 해서
+//  기준일 이후 결제도 일부러 같이 가져옴 - "그 세션 날짜 이전에 처음 결제된 이용권" 고르는 건 findPricingEntryForSession이 알아서 함)
 async function fetchPtSalesForPricing(beforeStr) {
   const { rows, error } = await fetchAllRows(
-    `sales?category=in.(pt_new,pt_renewal)&sale_date=lt.${beforeStr}` +
+    `sales?category=in.(pt_new,pt_renewal)` +
     `&select=id,member_id,amount,sale_date,payment_method,memo,category,external_sale_no,product:products(name,sessions)&order=sale_date.asc,id.asc`,
     await authHeaders()
   );

@@ -442,7 +442,7 @@
       const memo = (e.memo || '').replace(/바디코디 자동 연동 /, '').slice(0, 40);
       return `${e.date} 결제 ${formatWon(e.amount)}${e.parts > 1 ? `(분납 ${e.parts}회 합산)` : ''} ÷ ${e.sessions}회 (${e.productName || '상품 이름 없음'})${memo ? ' · ' + memo : ''}`;
     }
-    function oddLabel(flag) { return flag === 'high' ? '너무 높음' : flag === 'low' ? '너무 낮음' : flag === 'zero' ? '0원' : ''; }
+    function oddLabel(flag) { return flag === 'high' ? '너무 높음' : flag === 'low' ? '낮음(선금·분납 중일 수 있음)' : flag === 'zero' ? '0원' : ''; }
     function renderOddPriceWarning() {
       const box = document.getElementById('oddPriceWarning');
       const seen = new Map();
