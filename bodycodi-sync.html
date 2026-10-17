@@ -132,6 +132,14 @@
         </div>
         <div class="bc-res" id="ptRemRes"></div>
 
+        <h4 style="margin:16px 0 4px; font-size:14px;">양수·이전 이용권 단가 찾기 <span class="bc-note">(급여의 "단가 미확인" 정리)</span></h4>
+        <div class="bc-note">다른 회원에게서 <b>양도받은 PT 이용권</b>은 그 회원 이름으로 된 결제가 없어서 급여가 회당단가를 못 찾아요. 바디코디 이용권의 <b>회당단가·횟수</b>를 읽어 급여 계산이 쓰도록 기록해요. 매출 금액은 바뀌지 않아요. 먼저 migration_95_pt_pass_pricing.sql을 한 번 실행해야 해요. 최근 14개월 안에 PT 수업이 있었던 회원이 대상이고, 이후엔 일정이 연동될 때 자동으로 기록돼요.</div>
+        <div class="bc-row">
+          <button type="button" class="btn btn-primary" id="ptTrPreviewBtn" style="width:auto;padding:8px 18px;">양수 이용권 찾아보기</button>
+          <button type="button" class="btn btn-primary" id="ptTrApplyBtn" style="width:auto;padding:8px 18px;" disabled>찾은 단가를 급여에 적용</button>
+        </div>
+        <div class="bc-res" id="ptTrRes"></div>
+
         <h4 style="margin:16px 0 4px; font-size:14px;">출석 수 맞춰보기 <span class="bc-note">(선생님별 · 바디코디 ↔ 앱)</span></h4>
         <div class="bc-note">급여 계산 전에, 고른 달의 <b>개인PT 출석·결석 수</b>를 선생님별로 바디코디와 앱을 나란히 보여드려요. 차이가 나면 <b>이유</b>도 같이 알려줘요 — 회원이 앱과 안 이어져서 못 옮긴 수업, 선생님이 앱 직원과 안 이어진 수업, 아직 안 가져온 과거 수업, 앱에만 직접 입력된 수업, 같은 시각에 두 번 들어간 중복 예약. 아무것도 바꾸지 않아요.</div>
         <div class="bc-row">
@@ -211,7 +219,7 @@
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v3.2 · 2026-10-17</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v3.3 · 2026-10-18</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -563,6 +571,47 @@
       finally { remBusy(false); $('ptRemApplyBtn').textContent = '미리보기 후 맞추기'; $('ptRemApplyBtn').disabled = !remPreviewed; }
     });
 
+
+    // ----- 양수·이전 이용권 단가 (회원을 30명씩 나눠 차례로 처리) -----
+    let trPreviewed = null;
+    function trHtml(rows, applied, total) {
+      const found = rows.filter((x) => x.passes && x.passes.length), errs = rows.filter((x) => x.error);
+      const passes = found.reduce((a, x) => a + x.passes.length, 0);
+      return `<div class="bc-stats"><div class="bc-stat"><div class="l">확인한 회원</div><div class="v">${esc(total)}</div></div>` +
+        `<div class="bc-stat good"><div class="l">${applied ? '단가를 기록한 이용권' : '찾은 양수·이전 이용권'}</div><div class="v">${esc(passes)}</div></div>` +
+        `<div class="bc-stat ${errs.length ? 'warn' : ''}"><div class="l">확인 못 한 회원</div><div class="v">${esc(errs.length)}</div></div></div>` +
+        (found.length ? `<details class="bc-det" open><summary>양수·이전 이용권 ${esc(passes)}건</summary>${tableHtml(['회원', '이용권', '시작일', '회당단가', '횟수', '상태'],
+          found.flatMap((x) => x.passes.map((p) => [x.name, p.product || '-', p.start, won(p.unit), `${p.sessions}회`, p.status === 'ACTIVE' ? '이용 중' : p.status === 'EXPIRED' ? '만료' : p.status])))}</details>`
+          : '<div class="bc-ok">본인 결제 없이 갖고 있는 PT 이용권이 없어요.</div>') +
+        (errs.length ? `<details class="bc-det"><summary>확인 못 한 회원 ${errs.length}명</summary>${tableHtml(['회원', '이유'], errs.slice(0, 30).map((x) => [x.name, x.error]))}</details>` : '') +
+        `<div class="bc-note">급여 관리 화면의 해당 수업 "단가 근거"에 "양수·이전 이용권 — 바디코디 회당단가"로 표시돼요.</div>`;
+    }
+    function trBusy(on) { $('ptTrPreviewBtn').disabled = on; $('ptTrApplyBtn').disabled = on || !trPreviewed; busy = on; }
+    $('ptTrPreviewBtn').addEventListener('click', async () => {
+      if (busy) return;
+      $('ptTrRes').innerHTML = ''; trPreviewed = null; trBusy(true);
+      try {
+        const r = await runRem('pt_transfer_preview', (i, n) => { $('ptTrPreviewBtn').textContent = `찾는 중... ${i}/${n}명`; });
+        trPreviewed = r; $('ptTrRes').innerHTML = trHtml(r.rows, false, r.total);
+      } catch (e) { $('ptTrRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally {
+        trBusy(false); $('ptTrPreviewBtn').textContent = '양수 이용권 찾아보기';
+        const n = trPreviewed ? trPreviewed.rows.reduce((a, x) => a + ((x.passes || []).length), 0) : 0;
+        $('ptTrApplyBtn').disabled = !trPreviewed || n === 0;
+      }
+    });
+    $('ptTrApplyBtn').addEventListener('click', async () => {
+      if (busy || !trPreviewed) return;
+      if (!confirm('찾은 양수·이전 이용권의 회당단가를 급여 계산에 쓰도록 기록할게요. (매출 금액은 바뀌지 않아요) 계속할까요?')) return;
+      trBusy(true);
+      try {
+        const r = await runRem('pt_transfer_apply', (i, t) => { $('ptTrApplyBtn').textContent = `기록 중... ${i}/${t}명`; });
+        trPreviewed = null;
+        $('ptTrRes').innerHTML = `<div class="bc-ok">✅ ${esc(r.rows.reduce((a, x) => a + ((x.passes || []).length), 0))}건의 단가를 기록했어요. 급여 관리를 새로고침하세요.</div>` + trHtml(r.rows, true, r.total);
+        loadLogs();
+      } catch (e) { $('ptTrRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
+      finally { trBusy(false); $('ptTrApplyBtn').textContent = '찾은 단가를 급여에 적용'; $('ptTrApplyBtn').disabled = !trPreviewed; }
+    });
 
     // ----- ⑤ 매출 자동 연동 -----
     const CAT_KO = { membership_new: '헬스 신규', membership_renewal: '헬스 재등록', pt_new: 'PT 신규', pt_renewal: 'PT 재등록', group_pt_new: '그룹PT 신규', group_pt_renewal: '그룹PT 재등록', locker: '락커', clothes: '운동복', day_pass: '일일권', etc: '기타' };

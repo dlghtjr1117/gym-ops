@@ -2954,6 +2954,17 @@ async function fetchPtSalesForPricing(beforeStr) {
   return rows;
 }
 
+// 양수(양도받은)·옮겨온 PT 이용권의 회당단가 (migration_95 + 바디코디 연동이 채움). 표가 아직 없거나 못 읽어도 급여 계산은 그대로 되게 빈 목록을 돌려줘요.
+async function fetchPtPassPricing() {
+  try {
+    const { rows, error } = await fetchAllRows(
+      `pt_pass_pricing?select=member_id,start_date,unit_price,sessions,product_name,bodycodi_pass_id&order=start_date.asc,id.asc`,
+      await authHeaders()
+    );
+    return error ? [] : rows;
+  } catch (e) { return []; }
+}
+
 async function fetchTrainerSalarySettings() {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/trainer_salary_settings?select=*`, { headers: await authHeaders() });
   if (!res.ok) await throwApiError(res, '급여 조건을 불러오지 못했습니다.');
@@ -3058,7 +3069,7 @@ async function upsertTrainerPayrollRecord(row) {
 // PT 매출 목록을 회원별로 묶어서, 날짜순으로 정렬해둠. 상품이 연결 안 됐거나(product null) 그
 // 상품에 회차수가 없는(sessions null/0) 매출, amount가 없는 매출은 회당단가를 알 수 없어서 뺌.
 // paymentMethod도 같이 들고 있어야 카드수수료를 "카드로 결제한 건"에만 비례해서 매길 수 있음.
-function buildPtPricingIndex(ptSales) {
+function buildPtPricingIndex(ptSales, passPricing) {
   const byMember = {};
   // 분납(선금 후 잔금): 같은 회원이 "같은 이용권"으로 나눠 낸 결제는 합쳐서 한 건으로 봄. 같은 이용권인지는 아래 번호 중 하나라도 같으면 같은 것으로 봐요.
   //  - 바디코디 자동 연동 매출의 번호 bc:{결제번호}:{이용권번호} 의 이용권번호 (분납이면 결제번호만 다르고 이용권번호는 같음)
@@ -3118,6 +3129,18 @@ function buildPtPricingIndex(ptSales) {
     if (!g) continue;
     g.amount += Number(s.amount); g.parts += 1; if (s.sale_date < g.date) g.date = s.sale_date;
     g.unitPrice = g.amount / g.sessions; g.flag = classifyUnitPrice(g.unitPrice);
+  }
+  // 양수·이전 이용권(본인 결제 없음): 바디코디 이용권의 회당단가를 이용권 시작일부터 적용
+  for (const pp of (Array.isArray(passPricing) ? passPricing : [])) {
+    if (!pp || !pp.member_id || !pp.start_date) continue;
+    const unitPrice = Number(pp.unit_price), sessions = Number(pp.sessions);
+    if (!(unitPrice >= 0) || !(sessions > 0)) continue;
+    if (!byMember[pp.member_id]) byMember[pp.member_id] = [];
+    byMember[pp.member_id].push({
+      date: String(pp.start_date).slice(0, 10), unitPrice, paymentMethod: null, saleId: null,
+      amount: unitPrice * sessions, sessions, parts: 1, productName: pp.product_name || '', memo: '양수·이전 이용권(바디코디 단가)',
+      flag: classifyUnitPrice(unitPrice), transfer: true
+    });
   }
   Object.values(byMember).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));
   return byMember;

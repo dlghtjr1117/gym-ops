@@ -347,7 +347,7 @@
 
       const { startStr, endStr, monthStr } = getMonthRange();
       // 서로 무관한 요청은 한꺼번에 보냄
-      const [bookingsR, salesR, confirmedRevR, settingsR, payrollSettingsR, ptTiersR, groupTiersR, otR, recordsR, membersR] = await Promise.allSettled([
+      const [bookingsR, salesR, confirmedRevR, settingsR, payrollSettingsR, ptTiersR, groupTiersR, otR, recordsR, membersR, passPricingR] = await Promise.allSettled([
         fetchPtBookingsForMonth(startStr, endStr),
         fetchPtSalesForPricing(endStr),
         fetchConfirmedRevenueForMonth(startStr, endStr),
@@ -357,7 +357,8 @@
         fetchGroupPtPayrollTiers(),
         fetchOtDoneCountsForMonth(startStr, endStr),
         fetchTrainerPayrollRecords(monthStr),
-        fetchMembers()
+        fetchMembers(),
+        fetchPtPassPricing()
       ]);
 
       // 구간 판정이 확정매출에 달려 있어서 그 fetch도 필수로 묶음 - 실패하면 전원 구간 잘못 계산될 수
@@ -387,7 +388,7 @@
       document.getElementById('rateBusinessTax').value = payrollSettingsCache.business_tax_rate;
       document.getElementById('rateLocalTaxMultiplier').value = payrollSettingsCache.local_tax_multiplier;
 
-      const pricingIndex = buildPtPricingIndex(ptSales);
+      const pricingIndex = buildPtPricingIndex(ptSales, passPricingR.status === 'fulfilled' ? passPricingR.value : []);
       const consumption = computeTrainerConsumption(bookings, pricingIndex);
       consumptionCache = consumption;
 
@@ -456,6 +457,7 @@
     // 회당단가가 비정상(15만원 초과 / 2만원 미만 / 0원)인 출석 세션을 한곳에 모아 "어느 결제 때문인지" 보여줌
     function srcText(e) {
       if (!e) return '';
+      if (e.transfer) return `${e.date}부터 양수·이전 이용권 — 바디코디 회당단가 ${formatWon(Math.round(e.unitPrice))} × ${e.sessions}회${e.productName ? ' (' + e.productName + ')' : ''}`;
       const memo = (e.memo || '').replace(/바디코디 자동 연동 /, '').slice(0, 40);
       return `${e.date} 결제 ${formatWon(e.amount)}${e.parts > 1 ? `(분납 ${e.parts}회 합산)` : ''} ÷ ${e.sessions}회 (${e.productName || '상품 이름 없음'})${memo ? ' · ' + memo : ''}`;
     }
