@@ -201,7 +201,7 @@
         <div class="bc-res" id="salesCheckRes"></div>
         <div class="bc-row" style="margin-top:12px;"><button type="button" class="btn btn-primary" id="auditBtn" style="width:auto;padding:8px 18px;">일·주·월 정밀 점검 (바디코디와 하나씩 비교)</button>
           <label class="bc-note" style="display:inline-flex;gap:6px;align-items:center;margin:0;"><input type="checkbox" id="auditAlign" /> 담당자(판매 강사)도 바디코디와 똑같이 맞추기</label></div>
-        <div class="bc-note">위 ②에서 고른 기간을 바디코디와 날짜별로 비교해요. 아무것도 바꾸지 않고, 차이 나는 날은 건별로 어느 쪽에 뭐가 더 있는지 보여줘요. 확인 후 아래 "점검 결과대로 정리하기"를 누르면 바로잡아요.</div>
+        <div class="bc-note">위 ②에서 고른 기간을 바디코디와 날짜별로 비교해요. 아무것도 바꾸지 않고, 차이 나는 날은 건별로 어느 쪽에 뭐가 더 있는지 보여줘요. 빠진 매출·중복·담당자는 "점검 결과대로 정리하기"로, 앱에만 더 들어가 있는 매출은 "앱에만 있는 매출" 목록에서 골라 정리해요.</div>
         <div class="bc-res" id="auditRes"></div>
       </div>
 
@@ -211,7 +211,7 @@
         <div id="logs" class="muted">불러오는 중...</div>
       </div>
     </div>
-    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v3.1 · 2026-10-17</p>
+    <p class="muted" id="pageVersion" style="margin:18px 2px 24px; font-size:11.5px; text-align:right;">바디코디 연동 v3.2 · 2026-10-17</p>
   </div>
 
   <script src="config.js?v=1791480155"></script>
@@ -820,13 +820,14 @@
       if ((Date.parse(to) - Date.parse(from)) / 86400000 > 460) { alert('한 번에 최대 15개월까지 점검할 수 있어요. 기간을 줄여주세요.'); return; }
       const align = $('auditAlign').checked;
       busy = true; $('auditBtn').disabled = true; $('auditRes').innerHTML = '';
-      const days = [], detail = [], leftovers = []; const pend = { insert: 0, adopt: 0, relink: 0, merge: 0, staff_fixed: 0, product_fixed: 0, unlinked_left: 0, review: 0 };
+      const days = [], detail = [], leftovers = [], onlyRows = []; let onlyTotal = 0; const pend = { insert: 0, adopt: 0, relink: 0, merge: 0, staff_fixed: 0, product_fixed: 0, unlinked_left: 0, review: 0 };
       let err = null; const chunks = salesChunks(from, to);
       try {
         for (let i = 0; i < chunks.length; i++) {
           $('auditBtn').textContent = `점검 중... ${i + 1}/${chunks.length}`;
           const r = await callSync('sales_audit', { from: chunks[i][0], to: chunks[i][1], align_staff: align });
           days.push(...r.days); detail.push(...r.detail); leftovers.push(...(r.leftovers || []));
+          for (const o of (r.app_only || [])) onlyRows.push({ ...o, cf: chunks[i][0], ct: chunks[i][1] }); onlyTotal += r.app_only_total || 0;
           for (const k of Object.keys(pend)) pend[k] += (r.pending && r.pending[k]) || 0;
         }
       } catch (e) { err = e.message; }
@@ -847,9 +848,11 @@
         detail.map((x) => `<details class="bc-det" open><summary>${esc(x.date)} — 바디코디 ${won(x.body)} / 앱 ${won(x.app)} (${sgn(x.diff)})</summary>` +
           `<div class="bc-note">바디코디 거래 ${esc(x.body_rows.length)}건</div>${auditTable(['회원', '상품', '금액', '판매 담당'], x.body_rows.map((b) => `<tr><td>${esc(b.who)}</td><td>${esc(b.product)}</td><td style="text-align:right">${won(b.amount)}</td><td>${esc(b.staff || '-')}</td></tr>`))}` +
           `<div class="bc-note" style="margin-top:6px;">앱 매출 ${esc(x.app_rows.length)}건</div>${auditTable(['회원', '구분', '금액', '담당', '입력 방식'], x.app_rows.map((a) => `<tr><td>${esc(a.member)}</td><td>${esc(CAT_KO[a.category] || a.category)}</td><td style="text-align:right">${won(a.amount)}</td><td>${esc(a.staff || '-')}</td><td>${esc(a.source)}</td></tr>`))}</details>`).join('') +
+        onlyHtml(onlyRows, onlyTotal, appTot - bodyTot) +
         `<div class="bc-note" style="margin-top:8px;">정리하면 바뀔 내용 — 새로 넣기 ${esc(pend.insert)}건 · 직접 입력분에 번호 잇기 ${esc(pend.adopt)}건 · 같은 매출 두 번 들어간 것 합치기 ${esc(pend.merge)}건 · 회원 이어주기 ${esc(pend.relink)}건 · 담당자 맞추기 ${esc(pend.staff_fixed)}건 · 상품(PT 횟수) 바로잡기 ${esc(pend.product_fixed)}건 · 확인 필요 ${esc(pend.review)}건</div>` +
         (leftovers.length ? `<div class="bc-bad">회원이 안 이어진 채 남은 매출 ${esc(leftovers.length)}건: ${esc(leftovers.slice(0, 8).map((o) => `${o.date} ${o.who} ${won(o.amount)}`).join(' / '))}</div>` : '') +
         (todo ? `<div class="bc-row" style="margin-top:8px;"><button type="button" class="btn btn-primary" id="auditFixBtn" style="width:auto;padding:8px 18px;">점검 결과대로 정리하기</button></div>` : '');
+      wireOnly(onlyRows, runAudit);
       const fix = $('auditFixBtn');
       if (fix) fix.addEventListener('click', async () => {
         if (busy) return;
@@ -862,6 +865,68 @@
         } catch (e) { $('auditRes').insertAdjacentHTML('afterbegin', `<div class="bc-bad">❌ ${esc(e.message)}</div>`); }
         finally { busy = false; }
         runAudit();
+      });
+    }
+
+    // ----- 앱에만 있는 매출 (바디코디에는 없는데 앱에 더 들어가 있어서 + 차액이 생기는 원인) -----
+    const ONLY_ORDER = ['orphan_auto', 'amount_diff', 'manual_dup', 'manual_maybe', 'manual_only'];
+    const ONLY_KO = { orphan_auto: '바디코디에서 사라진 자동 입력 매출', amount_diff: '바디코디와 금액이 달라진 자동 입력 매출', manual_dup: '직접 입력했는데 자동 입력과 겹친 매출 (같은 결제가 두 번)', manual_maybe: '직접 입력 — 바디코디 결제와 금액은 같은데 확실하지 않은 매출', manual_only: '직접 입력 — 바디코디에서 짝을 못 찾은 매출' };
+    const ONLY_HELP = { orphan_auto: '바디코디에서 지우거나 고쳐서 다시 등록한 결제예요. 앱에는 예전 것이 남아 있어요. 지우면 바디코디와 맞아요.', amount_diff: '바디코디에서 금액을 고쳤어요. 바디코디 금액으로 바로잡으면 맞아요.', manual_dup: '같은 결제가 바디코디 자동 입력으로 이미 앱에 있어요. 직접 입력한 쪽을 지우면 맞아요.', manual_maybe: '금액·날짜·이름이 비슷한 바디코디 결제가 있지만 확실하지 않아요. 직접 보고 고르세요.', manual_only: '바디코디에는 없는 매출이에요. 현금으로 따로 받은 것처럼 진짜 있었던 매출일 수 있으니 하나씩 확인하세요.' };
+    const SURE_KINDS = new Set(['orphan_auto', 'amount_diff', 'manual_dup']);
+    function onlyHtml(rows, total, gap) {
+      if (!rows.length) return gap ? `<div class="bc-note" style="margin-top:8px;">앱에만 있는 매출은 찾지 못했어요. 차이가 남아 있다면 바디코디 쪽에 앱에 안 들어간 결제가 있는 거예요 — 위 "정리하면 바뀔 내용"을 확인해주세요.</div>` : '';
+      const sum = {}; for (const r of rows) { const e = sum[r.kind] || (sum[r.kind] = { n: 0, a: 0 }); e.n++; e.a += r.delta; }
+      const all = rows.reduce((a, r) => a + r.delta, 0);
+      const head = `<div class="bc-bad" style="margin-top:10px;">🔎 차액 ${sgn(gap)}의 원인 — 앱에는 있는데 바디코디에는 없는(또는 금액이 다른) 매출 ${esc(rows.length)}건, 합계 ${sgn(all)}</div>` +
+        (total > rows.length ? `<div class="bc-note">구간마다 700건까지만 보여줘요. 정리한 뒤 다시 점검하면 나머지가 나와요.</div>` : '') +
+        auditTable(['종류', '건수', '차액에 미치는 금액'], ONLY_ORDER.filter((k) => sum[k]).map((k) => `<tr><td>${esc(ONLY_KO[k])}</td><td style="text-align:right">${esc(sum[k].n)}</td><td style="text-align:right">${sgn(sum[k].a)}</td></tr>`));
+      const blocks = ONLY_ORDER.filter((k) => sum[k]).map((k) => {
+        const list = rows.map((r, i) => [r, i]).filter(([r]) => r.kind === k);
+        const trs = list.map(([r, i]) => `<tr><td><input type="checkbox" class="onlyChk" data-i="${i}" data-k="${k}" ${SURE_KINDS.has(k) ? 'checked' : ''} /></td><td>${esc(r.date)}</td><td>${esc(r.member)}</td><td style="text-align:right">${k === 'amount_diff' ? `${won(r.amount)} → ${won(r.expected)}` : won(r.amount)}</td><td>${esc(CAT_KO[r.category] || r.category)}</td><td>${esc(r.staff || '-')}</td><td>${esc(r.note)}</td></tr>`);
+        return `<details class="bc-det" ${SURE_KINDS.has(k) ? 'open' : ''}><summary>${esc(ONLY_KO[k])} — ${esc(sum[k].n)}건 (${sgn(sum[k].a)})</summary><div class="bc-note">${esc(ONLY_HELP[k])}</div>` +
+          `<label class="bc-note" style="display:inline-flex;gap:6px;align-items:center;"><input type="checkbox" class="onlyAll" data-k="${k}" ${SURE_KINDS.has(k) ? 'checked' : ''} /> 이 종류 전부 선택</label>` +
+          auditTable(['', '날짜', '회원', '금액', '구분', '담당', '이유'], trs) + `</details>`;
+      }).join('');
+      return head + blocks + `<div class="bc-row" style="margin-top:8px;"><button type="button" class="btn" id="onlyCsvBtn" style="width:auto;padding:8px 18px;">목록 파일로 저장 (지우기 전 백업)</button> <button type="button" class="btn btn-primary" id="onlyFixBtn" style="width:auto;padding:8px 18px;">선택한 매출 정리하기</button> <span class="bc-note" id="onlyCount"></span></div>` +
+        `<div class="bc-note">"확실한" 3가지 종류만 처음에 체크돼 있어요. 선택한 것만 정리하고, 정리 전에 바디코디와 다시 대조해서 지금도 앱에만 있는 것만 건드려요. 지우기 전에 위 "목록 파일로 저장"으로 백업해두세요.</div>`;
+    }
+    function wireOnly(rows, rerun) {
+      const fixBtn = $('onlyFixBtn'); if (!fixBtn) return;
+      const chks = () => [...document.querySelectorAll('.onlyChk')];
+      const picked = () => chks().filter((c) => c.checked).map((c) => rows[Number(c.dataset.i)]);
+      const refresh = () => { const p = picked(); const delta = p.reduce((a, r) => a + r.delta, 0); $('onlyCount').textContent = `선택 ${p.length}건 · 정리되면 차액이 ${sgn(-delta)} 바뀌어요`; };
+      chks().forEach((c) => c.addEventListener('change', refresh));
+      document.querySelectorAll('.onlyAll').forEach((a) => a.addEventListener('change', () => { chks().filter((c) => c.dataset.k === a.dataset.k).forEach((c) => { c.checked = a.checked; }); refresh(); }));
+      refresh();
+      $('onlyCsvBtn').addEventListener('click', () => {
+        const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+        const lines = [['번호', '날짜', '회원', '금액', '바디코디 금액', '구분', '담당', '입력 방식', '종류', '이유'].map(q).join(',')];
+        for (const r of rows) lines.push([r.id, r.date, r.member, r.amount, r.expected ?? '', CAT_KO[r.category] || r.category, r.staff || '', r.source, ONLY_KO[r.kind], r.note].map(q).join(','));
+        const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `앱에만_있는_매출_${kstDay()}.csv`; document.body.appendChild(a); a.click(); a.remove();
+      });
+      fixBtn.addEventListener('click', async () => {
+        if (busy) return;
+        const p = picked(); if (!p.length) { alert('정리할 매출을 골라주세요.'); return; }
+        const del = p.filter((r) => r.kind !== 'amount_diff'), fx = p.filter((r) => r.kind === 'amount_diff');
+        if (!confirm(`선택한 ${p.length}건을 정리할게요.\n- 앱에서 지우는 매출 ${del.length}건 (합계 ${won(del.reduce((a, r) => a + r.delta, 0))})\n- 바디코디 금액으로 바로잡는 매출 ${fx.length}건\n\n지운 매출은 되돌릴 수 없어요. "목록 파일로 저장"으로 백업하셨나요? 계속할까요?`)) return;
+        busy = true; fixBtn.disabled = true; const res = { deleted: 0, fixed: 0, skipped: 0, errors: [] };
+        try {
+          const groups = new Map(); for (const r of p) { const k = r.cf + '|' + r.ct; (groups.get(k) || groups.set(k, []).get(k)).push(r); }
+          let gi = 0;
+          for (const [k, list] of groups) {
+            const [cf, ct] = k.split('|');
+            for (let i = 0; i < list.length; i += 250) {
+              fixBtn.textContent = `정리 중... ${++gi}`;
+              const r = await callSync('sales_extra_fix', { from: cf, to: ct, ids: list.slice(i, i + 250).map((x) => x.id) });
+              res.deleted += r.deleted; res.fixed += r.fixed; res.skipped += r.skipped; res.errors.push(...(r.errors || []));
+            }
+          }
+        } catch (e) { res.errors.push(e.message); }
+        finally { busy = false; }
+        $('salesRes').innerHTML = `<div class="${res.errors.length ? 'bc-bad' : 'bc-ok'}">${res.errors.length ? '⚠' : '✅'} 지운 매출 ${esc(res.deleted)}건 · 금액을 바로잡은 매출 ${esc(res.fixed)}건${res.skipped ? ` · 다시 대조해보니 이미 정리돼 건너뛴 ${esc(res.skipped)}건` : ''}${res.errors.length ? '<br>' + esc(res.errors.slice(0, 5).join(' / ')) : ''}</div>`;
+        loadLogs();
+        rerun();
       });
     }
     $('auditBtn').addEventListener('click', () => { if (!busy) runAudit(); });
