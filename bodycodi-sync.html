@@ -133,7 +133,7 @@
         <div class="bc-res" id="ptRemRes"></div>
 
         <h4 style="margin:16px 0 4px; font-size:14px;">양수·이전 이용권 단가 찾기 <span class="bc-note">(급여의 "단가 미확인" 정리)</span></h4>
-        <div class="bc-note">다른 회원에게서 <b>양도받은 PT 이용권</b>은 그 회원 이름으로 된 결제가 없어서 급여가 회당단가를 못 찾아요. 바디코디 이용권의 <b>회당단가·횟수</b>를 읽어 급여 계산이 쓰도록 기록해요. 매출 금액은 바뀌지 않아요. 먼저 migration_95_pt_pass_pricing.sql을 한 번 실행해야 해요. 최근 14개월 안에 PT 수업이 있었던 회원이 대상이고, 이후엔 일정이 연동될 때 자동으로 기록돼요.</div>
+        <div class="bc-note">다른 회원에게서 <b>양도받은 PT 이용권</b>은 그 회원 이름으로 된 결제가 없어서 급여가 회당단가를 못 찾아요. 바디코디 이용권의 <b>회당단가·횟수</b>를 읽어 급여 계산이 쓰도록 기록해요. 매출 금액은 바뀌지 않아요. 먼저 migration_95_pt_pass_pricing.sql(양도한 회원 이름까지 저장하려면 migration_96_pt_pass_transfer_source.sql도)을 한 번 실행해야 해요. 최근 14개월 안에 PT 수업이 있었던 회원이 대상이고, 이후엔 일정이 연동될 때 자동으로 기록돼요.</div>
         <div class="bc-row">
           <button type="button" class="btn btn-primary" id="ptTrPreviewBtn" style="width:auto;padding:8px 18px;">양수 이용권 찾아보기</button>
           <button type="button" class="btn btn-primary" id="ptTrApplyBtn" style="width:auto;padding:8px 18px;" disabled>찾은 단가를 급여에 적용</button>
@@ -517,16 +517,16 @@
     // ----- 잔여횟수 바로잡기 (회원을 30명씩 나눠 차례로 처리) -----
     let remPreviewed = null;
     async function runRem(action, onProgress) {
-      const all = []; let offset = 0; let total = null; const limit = 30;
+      const all = []; let offset = 0; let total = null; let note = ''; const limit = 30;
       for (;;) {
         let r;
         try { r = await callSync(action, { offset, limit }); }
         catch (e) { throw new Error(`${offset}번째 회원 근처에서 멈췄어요: ${e.message}${offset ? ' (앞의 회원들은 이미 처리됐어요. 다시 누르면 이어서 해요)' : ''}`); }
-        total = r.total; all.push(...r.rows); offset += r.processed;
+        total = r.total; all.push(...r.rows); offset += r.processed; if (r.note) note = r.note;
         onProgress(Math.min(offset, total), total);
         if (!r.processed || offset >= total) break;
       }
-      return { rows: all, total };
+      return { rows: all, total, note };
     }
     function remHtml(rows, applied) {
       const diffs = rows.filter((x) => x.changed);
@@ -580,11 +580,11 @@
       return `<div class="bc-stats"><div class="bc-stat"><div class="l">확인한 회원</div><div class="v">${esc(total)}</div></div>` +
         `<div class="bc-stat good"><div class="l">${applied ? '단가를 기록한 이용권' : '찾은 양수·이전 이용권'}</div><div class="v">${esc(passes)}</div></div>` +
         `<div class="bc-stat ${errs.length ? 'warn' : ''}"><div class="l">확인 못 한 회원</div><div class="v">${esc(errs.length)}</div></div></div>` +
-        (found.length ? `<details class="bc-det" open><summary>양수·이전 이용권 ${esc(passes)}건</summary>${tableHtml(['회원', '이용권', '시작일', '회당단가', '횟수', '상태'],
-          found.flatMap((x) => x.passes.map((p) => [x.name, p.product || '-', p.start, won(p.unit), `${p.sessions}회`, p.status === 'ACTIVE' ? '이용 중' : p.status === 'EXPIRED' ? '만료' : p.status])))}</details>`
+        (found.length ? `<details class="bc-det" open><summary>양수·이전 이용권 ${esc(passes)}건</summary>${tableHtml(['회원', '양도한 회원', '이용권', '시작일', '회당단가', '횟수', '상태'],
+          found.flatMap((x) => x.passes.map((p) => [x.name, p.from_name ? `${p.from_name}${p.from_how === 'time' ? ' (시각으로 추정)' : ''}` : (p.from_why || '미확인'), p.product || '-', p.start, won(p.unit), `${p.sessions}회`, p.status === 'ACTIVE' ? '이용 중' : p.status === 'EXPIRED' ? '만료' : p.status])))}</details>`
           : '<div class="bc-ok">본인 결제 없이 갖고 있는 PT 이용권이 없어요.</div>') +
         (errs.length ? `<details class="bc-det"><summary>확인 못 한 회원 ${errs.length}명</summary>${tableHtml(['회원', '이유'], errs.slice(0, 30).map((x) => [x.name, x.error]))}</details>` : '') +
-        `<div class="bc-note">급여 관리 화면의 해당 수업 "단가 근거"에 "양수·이전 이용권 — 바디코디 회당단가"로 표시돼요.</div>`;
+        `<div class="bc-note">급여 관리 화면의 해당 수업 "단가 근거"에 "양수·이전 이용권 — 바디코디 회당단가"로 표시돼요. 양도한 회원은 바디코디 이용권 변경 이력에서 찾아요(없으면 "미확인"). 급여 금액에는 영향이 없어요.</div>`;
     }
     function trBusy(on) { $('ptTrPreviewBtn').disabled = on; $('ptTrApplyBtn').disabled = on || !trPreviewed; busy = on; }
     $('ptTrPreviewBtn').addEventListener('click', async () => {
@@ -607,7 +607,7 @@
       try {
         const r = await runRem('pt_transfer_apply', (i, t) => { $('ptTrApplyBtn').textContent = `기록 중... ${i}/${t}명`; });
         trPreviewed = null;
-        $('ptTrRes').innerHTML = `<div class="bc-ok">✅ ${esc(r.rows.reduce((a, x) => a + ((x.passes || []).length), 0))}건의 단가를 기록했어요. 급여 관리를 새로고침하세요.</div>` + trHtml(r.rows, true, r.total);
+        $('ptTrRes').innerHTML = `<div class="bc-ok">✅ ${esc(r.rows.reduce((a, x) => a + ((x.passes || []).length), 0))}건의 단가를 기록했어요. 급여 관리를 새로고침하세요.</div>` + (r.note ? `<div class="bc-note" style="margin:6px 0;color:#b45309;">⚠️ ${esc(r.note)}</div>` : '') + trHtml(r.rows, true, r.total);
         loadLogs();
       } catch (e) { $('ptTrRes').innerHTML = `<div class="bc-bad">❌ ${esc(e.message)}</div>`; }
       finally { trBusy(false); $('ptTrApplyBtn').textContent = '찾은 단가를 급여에 적용'; $('ptTrApplyBtn').disabled = !trPreviewed; }

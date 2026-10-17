@@ -3019,11 +3019,12 @@ async function fetchPtSalesForPricing(beforeStr) {
 // 양수(양도받은)·옮겨온 PT 이용권의 회당단가 (migration_95 + 바디코디 연동이 채움). 표가 아직 없거나 못 읽어도 급여 계산은 그대로 되게 빈 목록을 돌려줘요.
 async function fetchPtPassPricing() {
   try {
-    const { rows, error } = await fetchAllRows(
-      `pt_pass_pricing?select=member_id,start_date,unit_price,sessions,product_name,bodycodi_pass_id&order=start_date.asc,id.asc`,
-      await authHeaders()
-    );
-    return error ? [] : rows;
+    // migration_96(양도한 회원 이름)을 아직 안 돌렸으면 그 칸 없이 다시 읽어요(급여 단가는 항상 읽혀야 해요)
+    const base = 'member_id,start_date,unit_price,sessions,product_name,bodycodi_pass_id';
+    const headers = await authHeaders();
+    let r = await fetchAllRows(`pt_pass_pricing?select=${base},transferred_from_name&order=start_date.asc,id.asc`, headers);
+    if (r.error) r = await fetchAllRows(`pt_pass_pricing?select=${base}&order=start_date.asc,id.asc`, headers);
+    return r.error ? [] : r.rows;
   } catch (e) { return []; }
 }
 
@@ -3254,7 +3255,7 @@ function buildPtPricingIndex(ptSales, passPricing) {
     byMember[pp.member_id].push({
       date: String(pp.start_date).slice(0, 10), unitPrice, paymentMethod: null, saleId: null,
       amount: unitPrice * sessions, sessions, parts: 1, productName: pp.product_name || '', memo: '양수·이전 이용권(바디코디 단가)',
-      flag: classifyUnitPrice(unitPrice), transfer: true
+      flag: classifyUnitPrice(unitPrice), transfer: true, fromName: pp.transferred_from_name || ''
     });
   }
   Object.values(byMember).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));

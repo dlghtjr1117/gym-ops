@@ -521,7 +521,7 @@
     // 회당단가가 비정상(15만원 초과 / 2만원 미만 / 0원)인 출석 세션을 한곳에 모아 "어느 결제 때문인지" 보여줌
     function srcText(e) {
       if (!e) return '';
-      if (e.transfer) return `${e.date}부터 양수·이전 이용권 — 바디코디 회당단가 ${formatWon(Math.round(e.unitPrice))} × ${e.sessions}회${e.productName ? ' (' + e.productName + ')' : ''}`;
+      if (e.transfer) return `${e.date}부터 양수·이전 이용권${e.fromName ? '(' + e.fromName + ' 님에게서 받음)' : ''} — 바디코디 회당단가 ${formatWon(Math.round(e.unitPrice))} × ${e.sessions}회${e.productName ? ' (' + e.productName + ')' : ''}`;
       const memo = (e.memo || '').replace(/바디코디 자동 연동 /, '').slice(0, 40);
       return `${e.date} 결제 ${formatWon(e.amount)}${e.parts > 1 ? `(분납 ${e.parts}회 합산)` : ''} ÷ ${e.sessions}회 (${e.productName || '상품 이름 없음'})${memo ? ' · ' + memo : ''}`;
     }
