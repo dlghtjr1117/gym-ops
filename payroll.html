@@ -308,14 +308,17 @@
     }
 
     function computeOneTrainer(t, consumption) {
-      const cons = consumption[t.id] || { attended: 0, absent: 0, unpriced: 0, revenue: 0, cardRevenue: 0, otherRevenue: 0 };
+      const cons = consumption[t.id] || { attended: 0, absent: 0, ot: 0, unpriced: 0, revenue: 0, cardRevenue: 0, otherRevenue: 0 };
       const confirmedRevenue = confirmedRevenueCache[t.id] || 0;
       const settings = salarySettingsCache[t.id] || { card_fee_rate: 0 };
       // 구간(기본급·정률·OT보너스/성과금)은 확정매출로 판정하고, 실제 수당 계산(아래 grossCommission)은
       // 소진매출(cons.revenue)에 그 구간 정률을 곱해서 함 - 계약만 하고 수업을 안 한 만큼은 구간만
       // 정해질 뿐 수당은 안 나감(호석님 확인 완료).
       const tier = findPtTier(ptTiersCache, confirmedRevenue);
-      const otDoneCount = otDoneCountsCache[t.id] || 0;
+      // OT 완료 횟수 = 바디코디 일정에서 읽은 OT 출석("무료 1:1 PT" 등)과 앱 OT 관리(ot.html)에 직접 기록한 완료 건수 중 큰 값
+      // (같은 OT를 두 곳에 다 기록했을 때 두 번 세지 않으려고 더하지 않고 큰 값을 씀)
+      const otFromSchedule = cons.ot || 0, otFromLeads = otDoneCountsCache[t.id] || 0;
+      const otDoneCount = Math.max(otFromSchedule, otFromLeads);
       const confirmed = confirmedRecordsCache[t.id];
       // 입력칸 초기값: 이번 화면에서 이미 입력한 값(draftInputs) > 이 달에 확정 저장된 값 > 0
       if (!draftInputs[t.id]) {
@@ -391,9 +394,10 @@
       // 상세 모달용 - 부킹마다 회원 이름 + 상태 + 그 시점 단가를 미리 계산해둠
       bookingsWithMemberName = bookings.map(b => {
         const dateStr = formatDateStr(new Date(b.start_at));
-        const entry = b.status === 'absent' ? null : findPricingEntryForSession(pricingIndex, b.member_id, dateStr);
+        const ot = isOtBooking(b);
+        const entry = b.status === 'absent' || ot ? null : findPricingEntryForSession(pricingIndex, b.member_id, dateStr);
         const m = membersById[b.member_id];
-        return { trainer_id: b.trainer_id, dateStr, status: b.status, memberName: m ? m.name : '(알 수 없음)', price: entry ? entry.unitPrice : null, entry };
+        return { trainer_id: b.trainer_id, dateStr, status: b.status, memberName: m ? m.name : '(알 수 없음)', price: entry ? entry.unitPrice : null, entry, isOt: ot };
       }).sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
       const trainers = payrollTargets();
@@ -411,7 +415,7 @@
         totalFinal += result.finalSalary;
         totalUnpriced += cons.unpriced;
         if (cons.unpriced > 0) {
-          bookingsWithMemberName.filter(b => b.trainer_id === t.id && b.status !== 'absent' && b.price == null).forEach(b => unpricedMembers.add(b.memberName));
+          bookingsWithMemberName.filter(b => b.trainer_id === t.id && b.status !== 'absent' && !b.isOt && b.price == null).forEach(b => unpricedMembers.add(b.memberName));
         }
         const bonusLabel = tier && tier.ot_bonus_threshold != null
           ? `OT보너스 ${result.otBonusAmount > 0 ? '달성' : `미달성(${otDoneCount}/${tier.ot_bonus_threshold}회)`}`
@@ -419,7 +423,7 @@
         return `
         <tr data-trainer-id="${t.id}">
           <td>${escapeHtml(t.name)}${confirmed ? '<div class="confirmed-badge">✅ 확정됨</div>' : ''}</td>
-          <td class="num">${cons.attended} / ${cons.absent}${cons.unpriced > 0 ? `<span class="muted" style="font-size:11px;"><br/>단가미확인 ${cons.unpriced}</span>` : ''}</td>
+          <td class="num">${cons.attended} / ${cons.absent}${cons.ot > 0 ? `<span class="muted" style="font-size:11px;"><br/>OT ${cons.ot}회</span>` : ''}${cons.unpriced > 0 ? `<span class="muted" style="font-size:11px;"><br/>단가미확인 ${cons.unpriced}</span>` : ''}</td>
           <td class="num">${formatWon(Math.round(confirmedRevenue))}${tier ? `<div class="tier-badge">${tier.tier_order}구간</div>` : ''}<div class="muted" style="font-size:10.5px;">소진 ${formatWon(Math.round(cons.revenue))}</div></td>
           <td class="num">${formatWon(Math.round(result.individualConfirmedFee))}</td>
           <td class="num">${formatWon(result.basePay + result.otBonusAmount + result.performanceBonus)}<div class="muted" style="font-size:10.5px;">기본급 ${formatWon(result.basePay)} · ${bonusLabel}</div></td>
@@ -615,13 +619,13 @@
       const calc = calcCache[trainerId];
       if (!calc) return;
       document.getElementById('detailTitle').textContent = `${trainerName(trainerId)} · ${monthLabelText()} 급여 상세`;
-      document.getElementById('detailSub').textContent = `출석 ${calc.cons.attended}회 · 결석 ${calc.cons.absent}회 (단가미확인 ${calc.cons.unpriced}건)`;
+      document.getElementById('detailSub').textContent = `출석 ${calc.cons.attended}회 · 결석 ${calc.cons.absent}회 · OT ${calc.cons.ot || 0}회 (단가미확인 ${calc.cons.unpriced}건)`;
       const r = calc.result, c = calc.cons, tier = calc.tier, s = calc.settings, d = calc.draft;
       const tierLine = tier
         ? `${tier.tier_order}구간 (${tierRangeLabel(tier)}) · 기본급 ${formatWon(Number(tier.base_pay) || 0)} · 정률 ${tier.rate}%`
         : '해당 구간 없음';
       const bonusLine = tier && tier.ot_bonus_threshold != null
-        ? `OT보너스: 이번 달 OT완료 ${calc.otDoneCount}회 / 기준 ${tier.ot_bonus_threshold}회 → ${r.otBonusAmount > 0 ? formatWon(r.otBonusAmount) + ' 달성' : '미달성(0원)'}`
+        ? `OT보너스: 이번 달 OT완료 ${calc.otDoneCount}회(바디코디 일정 ${c.ot || 0}회 · OT관리 기록 ${otDoneCountsCache[trainerId] || 0}회 중 큰 값) / 기준 ${tier.ot_bonus_threshold}회 → ${r.otBonusAmount > 0 ? formatWon(r.otBonusAmount) + ' 달성' : '미달성(0원)'}`
         : `성과금(매출 구간 고정): ${formatWon(r.performanceBonus)}`;
       document.getElementById('detailFormula').innerHTML = `
         <div class="row" style="font-weight:700;"><span>적용 구간</span><span>${tierLine}</span></div>
@@ -642,12 +646,12 @@
       const sessions = bookingsWithMemberName.filter(b => b.trainer_id === trainerId);
       const statusLabel = { attended: '출석', absent: '결석(매출 제외)' };
       document.getElementById('detailSessionTbody').innerHTML = sessions.map(s2 => `
-        <tr class="${s2.status !== 'absent' && s2.price == null ? 'unpriced-row' : ''} ${s2.status !== 'absent' && s2.entry && s2.entry.flag ? 'odd-price-row' : ''}">
+        <tr class="${s2.status !== 'absent' && !s2.isOt && s2.price == null ? 'unpriced-row' : ''} ${s2.status !== 'absent' && s2.entry && s2.entry.flag ? 'odd-price-row' : ''}">
           <td>${escapeHtml(s2.dateStr)}</td>
           <td>${escapeHtml(s2.memberName)}</td>
           <td>${statusLabel[s2.status] || s2.status}</td>
-          <td class="num">${s2.status === 'absent' ? '-' : (s2.price == null ? '단가 미확인' : formatWon(Math.round(s2.price)))}${s2.status !== 'absent' && s2.entry && s2.entry.flag ? `<span class="odd-badge">${oddLabel(s2.entry.flag)}</span>` : ''}</td>
-          <td class="src-note">${s2.status === 'absent' || !s2.entry ? '' : escapeHtml(srcText(s2.entry))}</td>
+          <td class="num">${s2.status === 'absent' ? '-' : (s2.isOt ? 'OT' : (s2.price == null ? '단가 미확인' : formatWon(Math.round(s2.price))))}${s2.status !== 'absent' && s2.entry && s2.entry.flag ? `<span class="odd-badge">${oddLabel(s2.entry.flag)}</span>` : ''}</td>
+          <td class="src-note">${s2.isOt ? 'OT(무료 체험 수업) - 단가 없이 OT 횟수로만 셈' : (s2.status === 'absent' || !s2.entry ? '' : escapeHtml(srcText(s2.entry)))}</td>
         </tr>`).join('') || '<tr><td colspan="5" class="muted">이번 달 소진 세션이 없습니다.</td></tr>';
       document.getElementById('detailOverlay').style.display = 'flex';
     }

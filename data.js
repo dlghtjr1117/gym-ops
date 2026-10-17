@@ -2931,7 +2931,7 @@ const unuseCoupon = (id) => callCouponRpc('group_pt_unuse_coupon', id, '쿠폰 �
 async function fetchPtBookingsForMonth(startStr, endStr) {
   const { rows, error } = await fetchAllRows(
     `pt_bookings?start_at=gte.${startStr}&start_at=lt.${endStr}&status=in.(attended,absent)` +
-    `&select=id,trainer_id,member_id,start_at,status`,
+    `&select=id,trainer_id,member_id,start_at,status,memo`,
     await authHeaders()
   );
   if (error) await throwApiError(error, 'PT 스케줄을 불러오지 못했습니다.');
@@ -3123,14 +3123,20 @@ function findUnitPriceForSession(pricingIndex, memberId, sessionDateStr) {
 // -> { [trainer_id]: { attended, absent, unpriced, revenue, cardRevenue, otherRevenue } }
 // 결석(absent)은 "당월 출석/결석" 건수 표시용으로만 집계하고, 매출·카드매출에는 절대 더하지 않음
 // (호석님 확인: 노쇼 세션은 수당 계산에서 제외).
+// OT(체험 레슨)는 바디코디 연동이 PT 스케줄 메모에 [OT] 표시를 남겨 둠 - 단가 계산 없이 OT 횟수로만 셈(OT 보너스 조건용)
+const OT_MEMO_TAG = '[OT]';
+function isOtBooking(b) {
+  return typeof b.memo === 'string' && b.memo.startsWith(OT_MEMO_TAG);
+}
 function computeTrainerConsumption(bookings, pricingIndex) {
   const byTrainer = {};
   for (const b of bookings) {
     if (!byTrainer[b.trainer_id]) {
-      byTrainer[b.trainer_id] = { attended: 0, absent: 0, unpriced: 0, revenue: 0, cardRevenue: 0, otherRevenue: 0 };
+      byTrainer[b.trainer_id] = { attended: 0, absent: 0, ot: 0, unpriced: 0, revenue: 0, cardRevenue: 0, otherRevenue: 0 };
     }
     const t = byTrainer[b.trainer_id];
     if (b.status === 'absent') { t.absent += 1; continue; }
+    if (isOtBooking(b)) { t.ot += 1; continue; } // OT 출석: 일반 PT 출석/단가미확인에 안 넣고 OT로만 셈
     t.attended += 1;
     const dateStr = formatDateStr(new Date(b.start_at));
     const entry = findPricingEntryForSession(pricingIndex, b.member_id, dateStr);
@@ -3209,6 +3215,6 @@ function computeTrainerPayroll({
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession, classifyUnitPrice,
-    computeTrainerConsumption, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr
+    computeTrainerConsumption, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr
   };
 }
