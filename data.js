@@ -3062,6 +3062,21 @@ async function fetchGroupClassCounts(fromStr, toStr) {
   if (!res.ok) throw new Error((data && (data.error || data.message)) || `그룹수업 횟수를 불러오지 못했어요. (${res.status})`);
   return data;
 }
+// PT 스케줄 화면용: 한 주(최대 14일)의 그룹수업을 바디코디에서 읽어와요. 지점장은 profileId로 직원을 고르고, 트레이너는 본인 것만 와요.
+// 돌려주는 값: { classes:[{id,start,end,title,attended,members,capacity,counted,reason}], linked }
+async function fetchGroupClassSchedule(fromStr, toStr, profileId) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${BODYCODI_SYNC_FN_NAME}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ action: 'group_class_schedule', from: fromStr, to: toStr, profile_id: profileId || undefined })
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* 아래에서 처리 */ }
+  if (res.status === 404) throw new Error('바디코디 연동 함수를 찾지 못했어요(함수 업데이트가 아직 안 됐을 수 있어요).');
+  if (res.status === 403) throw new Error('바디코디 연동 함수가 아직 최신 코드가 아니에요(함수 업데이트 필요).');
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || `그룹수업을 불러오지 못했어요. (${res.status})`);
+  return data;
+}
 // 그룹PT 확정수업료(자동값) = 진행한 수업 횟수 × 회당 수업비
 function groupFeeForCount(count) { return Math.max(0, Math.round(Number(count) || 0)) * GROUP_PT_FEE_PER_CLASS; }
 

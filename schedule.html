@@ -36,6 +36,24 @@
   .sg-slot.sg-absent .sg-remain { color: #475569; }
   .sg-slot.sg-cancelled { background: var(--slate-100); opacity: 0.65; }
   .sg-slot.sg-cancelled .sg-name { text-decoration: line-through; }
+  /* 그룹PT 수업(바디코디): 개인PT와 한눈에 구분되도록 주황/호박색 + 왼쪽 굵은 띠. 다크 모드에서도 글자가 보이게 색을 고정 */
+  .sg-slot.sg-group, .sg-item.sg-group { background: #fef3c7; color: #0f172a; border-left: 4px solid #f59e0b; cursor: default; }
+  .sg-slot.sg-group .sg-remain, .sg-item.sg-group .sg-remain { color: #92400e; }
+  .sg-slot.sg-group:hover { outline: none; }
+  .sg-slot.sg-group.sg-cancelled .sg-remain, .sg-item.sg-group.sg-cancelled .sg-remain { color: var(--slate-500); }
+  .sg-slot.sg-group.sg-cancelled, .sg-item.sg-group.sg-cancelled { background: var(--slate-100); border-left-color: var(--slate-300); opacity: 0.65; color: var(--slate-600); }
+  /* 같은 시간대에 개인PT와 그룹수업이 같이 있으면 한 칸 안에 위아래로 나눠서 보여줌 */
+  .sg-slot.sg-multi { padding: 0; display: flex; flex-direction: column; gap: 1px; cursor: default; }
+  .sg-slot.sg-multi:hover { outline: none; }
+  .sg-item { padding: 4px 6px; flex: 1; cursor: pointer; }
+  .sg-item.sg-booked { background: #e0e7ff; color: #0f172a; }
+  .sg-item.sg-attended { background: #dcfce7; color: #0f172a; }
+  .sg-item.sg-absent { background: #fee2e2; color: #0f172a; }
+  .sg-item.sg-cancelled { background: var(--slate-100); opacity: 0.65; }
+  .sg-item.sg-cancelled .sg-name { text-decoration: line-through; }
+  .sg-item .sg-remain { color: #475569; }
+  .sg-legend { display:flex; gap:12px; flex-wrap:wrap; margin: 10px 2px 0; font-size: 12px; align-items:center; }
+  .sg-legend i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:5px; vertical-align:-2px; border:1px solid rgba(15,23,42,.15); }
   .sg-time { font-weight: 700; font-size: 10.5px; }
   .sg-name { font-weight: 700; margin-top: 1px; }
   .sg-remain { color: var(--slate-500); font-size: 10.5px; margin-top: 1px; }
@@ -86,11 +104,18 @@
       <button type="button" class="report-nav-arrow" id="weekNextBtn">▶</button>
     </div>
 
-    <p class="muted" style="margin:10px 2px 0;">빈 칸을 누르면 새 예약을 잡을 수 있고, 이미 잡힌 예약을 누르면 출석/결석/취소 처리를 할 수 있어요. 출석 처리하면 그 회원의 개인PT 잔여횟수가 1회 자동으로 차감돼요.</p>
+    <p class="muted" style="margin:10px 2px 0;">빈 칸을 누르면 새 예약을 잡을 수 있고, 이미 잡힌 예약을 누르면 출석/결석/취소 처리를 할 수 있어요. 출석 처리하면 그 회원의 개인PT 잔여횟수가 1회 자동으로 차감돼요. 주황색 칸은 바디코디의 그룹PT 수업이에요(자동으로 불러오며 여기서는 수정하지 않아요).</p>
 
+    <div class="sg-legend">
+      <span><i style="background:#e0e7ff"></i>개인PT 예약</span>
+      <span><i style="background:#dcfce7"></i>출석</span>
+      <span><i style="background:#fee2e2"></i>결석</span>
+      <span><i style="background:#fef3c7; border-left:4px solid #f59e0b"></i>그룹PT 수업 (바디코디 연동)</span>
+    </div>
     <div class="sg-wrap">
       <div class="sg-grid" id="scheduleGrid"></div>
     </div>
+    <p class="muted" id="groupNote" style="margin:8px 2px 0; display:none; font-size:12px;"></p>
   </div>
 
   <!-- 새 예약 모달 -->
@@ -160,6 +185,8 @@
     let staffCache = [];
     let membersCache = [];
     let bookingsCache = [];
+    let groupClassesCache = []; // 바디코디 그룹수업(읽기 전용)
+    let groupNoteText = '';
     let weekAnchor = new Date();
     let activeBookingId = null;
     let pendingSlot = null; // { dateStr, hour }
@@ -205,6 +232,37 @@
       `;
     }
 
+    const GROUP_STATUS_LABEL = { future: '예정', cancelled: '취소', no_attendance: '출석 0명', '': '진행' };
+    function groupInnerHtml(c) {
+      const start = new Date(c.start), end = new Date(c.end);
+      const timeLabel = `${pad(start.getHours())}:${pad(start.getMinutes())}-${pad(end.getHours())}:${pad(end.getMinutes())}`;
+      const label = GROUP_STATUS_LABEL[c.reason] || '진행';
+      const who = c.reason === 'future' ? `신청 ${c.members}명${c.capacity ? ` / 정원 ${c.capacity}` : ''}` : `출석 ${c.attended}명${c.members ? ` / 신청 ${c.members}` : ''}`;
+      return `<div class="sg-time">${timeLabel} · 그룹 ${label}</div><div class="sg-name">${escapeHtml(c.title || '그룹수업')}</div><div class="sg-remain">${who}</div>`;
+    }
+    function groupTitleAttr(c) {
+      return escapeHtml(`그룹PT 수업(바디코디) · ${c.title || ''}${c.counted ? ' · 급여 20,000원 반영' : ''}`);
+    }
+    function renderGroupCell(c) {
+      return `<div class="sg-slot sg-group ${c.reason === 'cancelled' ? 'sg-cancelled' : ''}" title="${groupTitleAttr(c)}">${groupInnerHtml(c)}</div>`;
+    }
+    // 같은 날·같은 시(hour)에 시작하는 개인PT 예약/그룹수업을 한 칸에 모아 그림. 하나뿐이면 예전 모양 그대로.
+    function renderCellFor(dateStr, h) {
+      const bks = bookingsCache.filter(b => { const bd = new Date(b.start_at); return formatDateStr(bd) === dateStr && bd.getHours() === h; });
+      const grs = groupClassesCache.filter(c => { const cd = new Date(c.start); return formatDateStr(cd) === dateStr && cd.getHours() === h; });
+      if (bks.length === 0 && grs.length === 0) return `<div class="sg-slot" onclick="openNewBookingModal('${dateStr}', ${h})"></div>`;
+      if (bks.length === 1 && grs.length === 0) return renderBookingCell(bks[0]);
+      if (bks.length === 0 && grs.length === 1) return renderGroupCell(grs[0]);
+      const items = bks.map(b => ({ t: new Date(b.start_at).getTime(), html: ((b) => {
+        const start = new Date(b.start_at), end = new Date(b.end_at);
+        const timeLabel = `${pad(start.getHours())}:${pad(start.getMinutes())}-${pad(end.getHours())}:${pad(end.getMinutes())}`;
+        const remain = (b.member && b.member.pt_remaining_sessions != null) ? `잔여 ${b.member.pt_remaining_sessions}회` : '';
+        return `<div class="sg-item ${STATUS_CLASS[b.status] || ''}" onclick="openActionModal('${b.id}')"><div class="sg-time">${timeLabel} · ${STATUS_LABEL[b.status] || b.status}</div><div class="sg-name">${b.member ? escapeHtml(b.member.name) : '(삭제된 회원)'}</div><div class="sg-remain">${remain}</div></div>`;
+      })(b) })).concat(grs.map(c => ({ t: new Date(c.start).getTime(), html: `<div class="sg-item sg-group ${c.reason === 'cancelled' ? 'sg-cancelled' : ''}" title="${groupTitleAttr(c)}">${groupInnerHtml(c)}</div>` })));
+      items.sort((a, b) => a.t - b.t);
+      return `<div class="sg-slot sg-multi">${items.map(x => x.html).join('')}</div>`;
+    }
+
     function renderGrid() {
       const { days } = getWeekRange(weekAnchor);
       const todayStr = formatDateStr(new Date());
@@ -215,18 +273,7 @@
       });
       for (let h = START_HOUR; h <= END_HOUR; h++) {
         html += `<div class="sg-timecol">${pad(h)}:00</div>`;
-        days.forEach((d) => {
-          const dateStr = formatDateStr(d);
-          const booking = bookingsCache.find(b => {
-            const bd = new Date(b.start_at);
-            return formatDateStr(bd) === dateStr && bd.getHours() === h;
-          });
-          if (booking) {
-            html += renderBookingCell(booking);
-          } else {
-            html += `<div class="sg-slot" onclick="openNewBookingModal('${dateStr}', ${h})"></div>`;
-          }
-        });
+        days.forEach((d) => { html += renderCellFor(formatDateStr(d), h); });
       }
       document.getElementById('scheduleGrid').innerHTML = html;
     }
@@ -235,19 +282,35 @@
       const counts = { booked: 0, attended: 0, absent: 0, cancelled: 0 };
       bookingsCache.forEach(b => { if (counts[b.status] !== undefined) counts[b.status] += 1; });
       document.getElementById('weekSummary').innerHTML =
-        `<span>예약 <b>${counts.booked}</b></span><span>출석 <b>${counts.attended}</b></span><span>결석 <b>${counts.absent}</b></span><span>취소 <b>${counts.cancelled}</b></span>`;
+        `<span>예약 <b>${counts.booked}</b></span><span>출석 <b>${counts.attended}</b></span><span>결석 <b>${counts.absent}</b></span><span>취소 <b>${counts.cancelled}</b></span>` +
+        (groupClassesCache.length ? `<span>그룹PT <b>${groupClassesCache.filter(c => c.counted).length}</b></span>` : '');
     }
 
     async function reloadBookings() {
-      const { start, end, label } = getWeekRange(weekAnchor);
+      const { start, end, label, days } = getWeekRange(weekAnchor);
       document.getElementById('weekLabel').textContent = label;
       document.getElementById('scheduleGrid').innerHTML = '<div class="muted" style="padding:16px; grid-column: 1 / -1;">불러오는 중...</div>';
-      try {
-        bookingsCache = await fetchPtBookings(selectedTrainerId, start.toISOString(), end.toISOString());
-      } catch (err) {
-        document.getElementById('scheduleGrid').innerHTML = `<div class="error-text" style="display:block; grid-column: 1 / -1;">${err.message}</div>`;
+      // 개인PT 예약(앱 DB)과 그룹수업(바디코디)을 동시에 불러옴. 그룹수업을 못 불러와도 개인PT 스케줄은 그대로 보여줌
+      const last = days[6];
+      const [bkR, grR] = await Promise.allSettled([
+        fetchPtBookings(selectedTrainerId, start.toISOString(), end.toISOString()),
+        fetchGroupClassSchedule(formatDateStr(days[0]), formatDateStr(last), selectedTrainerId)
+      ]);
+      if (bkR.status !== 'fulfilled') {
+        document.getElementById('scheduleGrid').innerHTML = `<div class="error-text" style="display:block; grid-column: 1 / -1;">${bkR.reason.message}</div>`;
         return;
       }
+      bookingsCache = bkR.value;
+      groupNoteText = '';
+      if (grR.status === 'fulfilled') {
+        groupClassesCache = grR.value.classes || [];
+        if (grR.value.linked === false) groupNoteText = '이 직원은 바디코디 코치와 연결되어 있지 않아 그룹PT 수업이 표시되지 않아요. (바디코디 연동 화면에서 코치를 연결해주세요)';
+      } else {
+        groupClassesCache = [];
+        groupNoteText = `그룹PT 수업은 불러오지 못했어요: ${grR.reason.message}`;
+      }
+      const noteEl = document.getElementById('groupNote');
+      noteEl.textContent = groupNoteText; noteEl.style.display = groupNoteText ? '' : 'none';
       renderGrid();
       renderSummary();
     }
