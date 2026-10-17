@@ -3060,15 +3060,45 @@ async function upsertTrainerPayrollRecord(row) {
 // paymentMethod도 같이 들고 있어야 카드수수료를 "카드로 결제한 건"에만 비례해서 매길 수 있음.
 function buildPtPricingIndex(ptSales) {
   const byMember = {};
-  const groups = {}; // 분납: 같은 회원·같은 이용권(바디코디 componentId)으로 나눠 낸 결제는 합쳐서 한 건으로 봄
+  // 분납(선금 후 잔금): 같은 회원이 "같은 이용권"으로 나눠 낸 결제는 합쳐서 한 건으로 봄. 같은 이용권인지는 아래 번호 중 하나라도 같으면 같은 것으로 봐요.
+  //  - 바디코디 자동 연동 매출의 번호 bc:{결제번호}:{이용권번호} 의 이용권번호 (분납이면 결제번호만 다르고 이용권번호는 같음)
+  //  - 메모에 남겨둔 [이용권번호 N] (엑셀로 가져온 매출에 연동이 남겨둠)
+  //  - 엑셀로 가져온 매출의 판매번호 (번호 칸이 숫자만이거나, 메모의 "판매번호 N")
+  // 한 결제가 번호 두 종류를 같이 갖고 있으면(예: 엑셀 선금 + 자동 연동 잔금이 같은 이용권번호를 메모에 가진 경우) 두 묶음을 하나로 이어요.
+  const keysOf = (s) => {
+    const ks = [];
+    const ext = String(s.external_sale_no || ''); const memo = String(s.memo || '');
+    let m = /^bc:[^:]*:(\d{10,})$/.exec(ext); if (m) ks.push('c:' + m[1]);
+    m = /이용권번호\s*(\d{10,})/.exec(memo); if (m) ks.push('c:' + m[1]);
+    if (/^\d{5,}$/.test(ext)) ks.push('n:' + ext);
+    m = /판매번호\s*(\d{5,})/.exec(memo); if (m) ks.push('n:' + m[1]);
+    return ks.map((k) => s.member_id + '|' + k);
+  };
+  const parent = {};
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[rb] = ra; };
+  const usable = [];
   for (const s of ptSales) {
     if (!s.member_id || !s.product || s.product.sessions == null || s.product.sessions <= 0) continue;
     if (s.amount == null || Number(s.amount) < 0) continue; // 환불(마이너스) 행은 단가 근거로 안 씀
-    // 바디코디 자동 연동 매출의 번호는 bc:{결제번호}:{이용권(구성) 번호}. 분납이면 결제번호만 다르고 이용권 번호는 같음
-    const m = /^bc:[^:]*:(\d{10,})$/.exec(s.external_sale_no || '');
-    const gk = m ? s.member_id + '|' + m[1] : null;
+    const ks = keysOf(s);
+    for (const k of ks) if (!(k in parent)) parent[k] = k;
+    for (let i = 1; i < ks.length; i++) union(ks[0], ks[i]);
+    usable.push({ s, ks });
+  }
+  // 상품이 연결 안 된 결제라도(직접 입력 선금 등) 같은 이용권으로 묶이는 번호를 갖고 있으면 총액에는 더해요
+  const orphans = [];
+  for (const s of ptSales) {
+    if (!s.member_id || s.amount == null || Number(s.amount) < 0) continue;
+    if (s.product && s.product.sessions != null && s.product.sessions > 0) continue;
+    const ks = keysOf(s); if (ks.length) orphans.push({ s, ks });
+  }
+  const groups = {}; // 묶음 대표 키 -> 대표 entry
+  for (const { s, ks } of usable) {
+    const gk = ks.length ? find(ks[0]) : null;
     if (gk && groups[gk]) {
       const g = groups[gk]; g.amount += Number(s.amount); g.parts += 1;
+      g.sessions = Number(s.product.sessions); // 가장 나중 결제의 회차수(바디코디 기준으로 바로잡힌 값)를 씀
       g.unitPrice = g.amount / g.sessions; g.flag = classifyUnitPrice(g.unitPrice);
       continue;
     }
@@ -3082,6 +3112,12 @@ function buildPtPricingIndex(ptSales) {
     };
     byMember[s.member_id].push(entry);
     if (gk) groups[gk] = entry;
+  }
+  for (const { s, ks } of orphans) {
+    const k = ks.find((x) => x in parent); const g = k ? groups[find(k)] : null;
+    if (!g) continue;
+    g.amount += Number(s.amount); g.parts += 1; if (s.sale_date < g.date) g.date = s.sale_date;
+    g.unitPrice = g.amount / g.sessions; g.flag = classifyUnitPrice(g.unitPrice);
   }
   Object.values(byMember).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));
   return byMember;
