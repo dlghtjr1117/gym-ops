@@ -3044,6 +3044,27 @@ function computePtSalesByTrainer(ptSales, startStr, endStr) {
   return out;
 }
 
+// 그룹PT 수업 1번(진행한 수업)당 고정 수업비 - 바꾸려면 이 숫자만 바꾸면 돼요
+const GROUP_PT_FEE_PER_CLASS = 20000;
+// 바디코디 연동 함수 주소(bodycodi-sync.html의 SYNC_FN과 같아야 해요)
+const BODYCODI_SYNC_FN_NAME = 'clever-action';
+// 기간(from~to, 날짜 포함) 안에 트레이너별로 진행한 그룹PT 수업이 몇 번인지 바디코디에서 읽어와요(지점장만).
+// 돌려주는 값: { trainers:[{profile_id,name,counted,not_counted,classes:[...]}], unlinked:[{name,counted,...}], total_classes }
+async function fetchGroupClassCounts(fromStr, toStr) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${BODYCODI_SYNC_FN_NAME}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ action: 'group_class_counts', from: fromStr, to: toStr })
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* 아래에서 처리 */ }
+  if (res.status === 404) throw new Error('바디코디 연동 함수를 찾지 못했어요(함수 업데이트가 아직 안 됐을 수 있어요).');
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || `그룹수업 횟수를 불러오지 못했어요. (${res.status})`);
+  return data;
+}
+// 그룹PT 확정수업료(자동값) = 진행한 수업 횟수 × 회당 수업비
+function groupFeeForCount(count) { return Math.max(0, Math.round(Number(count) || 0)) * GROUP_PT_FEE_PER_CLASS; }
+
 async function fetchTrainerSalarySettings() {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/trainer_salary_settings?select=*`, { headers: await authHeaders() });
   if (!res.ok) await throwApiError(res, '급여 조건을 불러오지 못했습니다.');
@@ -3353,7 +3374,7 @@ function computeTrainerPayroll({
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession, classifyUnitPrice,
-    computeTrainerConsumption, computePtSalesByTrainer, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr,
+    computeTrainerConsumption, computePtSalesByTrainer, groupFeeForCount, GROUP_PT_FEE_PER_CLASS, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr,
     isRedDay, payrollPaydayOf, payrollPeriodOf, payrollMonthForDate, addDaysStr, holidayNameOf
   };
 }

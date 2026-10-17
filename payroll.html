@@ -132,6 +132,7 @@
       </div>
 
       <div id="oddPriceWarning" class="oddprice-warning"></div>
+      <div id="groupClassNotice" class="unpriced-warning" style="display:none;"></div>
 
       <div class="section">
         <h2>트레이너별 급여</h2>
@@ -144,7 +145,7 @@
           (계약만 하고 아직 진행 안 한 수업분은 구간만 정해질 뿐 수당은 안 나감 - 수업을 실제로 진행한 만큼만 지급) ·
           최종급여 = (개인PT확정수업료+구간기본급+OT보너스/성과금+그룹PT확정수업료) − 프리랜서세(사업소득세+지방소득세)
         </p>
-        <div class="legend-note"><span class="legend-dot"></span>파란 입력칸(그룹PT확정수업료)은 매달 직접 입력하는 값이에요(아래 그룹PT 구간표를 참고해서 입력해주세요). 입력 후 "이번 달 급여 확정 저장"을 눌러야 저장돼요.</div>
+        <div class="legend-note"><span class="legend-dot"></span>파란 입력칸(그룹PT확정수업료)에는 바디코디 그룹수업 횟수 × 20,000원이 자동으로 들어가요(고치면 고친 값이 쓰여요). 입력 후 "이번 달 급여 확정 저장"을 눌러야 저장돼요.</div>
         <div id="errorBox" class="error-text"></div>
         <div id="successBox" class="success-text"></div>
         <div style="overflow-x:auto;">
@@ -182,7 +183,7 @@
 
       <div class="section">
         <h2>그룹PT 급여 구간표 <span class="muted" style="font-weight:400; font-size:12px;">· 참고용, 그룹PT 매출 기준</span></h2>
-        <p class="muted" style="margin:-6px 0 12px; font-size:12px;">그룹수업 진행 기록이 앱에 아직 없어서 그룹PT 매출을 자동으로 알 수 없어요. 이번 달 그룹PT 매출 구간에 맞는 회당 단가를 아래에서 확인하고, 위 표의 "그룹PT 확정수업료" 칸에 직접 계산해서 입력해주세요.</p>
+        <p class="muted" style="margin:-6px 0 12px; font-size:12px;">그룹PT 수업비는 바디코디 그룹수업 일정에서 <b>진행한 수업 1번당 20,000원 고정</b>으로 자동 계산돼서 위 표의 "그룹PT 확정수업료" 칸에 들어가요(끝났고 출석한 회원이 1명 이상인 수업만 셈, 입력칸을 고치면 그 값이 쓰여요). 아래 구간표는 참고용이에요.</p>
         <div style="overflow-x:auto;">
           <table class="tier-ref-table" id="groupTierRefTable" style="max-width:480px;">
             <thead><tr><th>구간</th><th>그룹PT 매출 범위</th><th>수업 1회당 단가</th></tr></thead>
@@ -270,6 +271,8 @@
     let groupTiersCache = [];       // group_pt_payroll_tiers 전체(참고용)
     let otDoneCountsCache = {};     // trainer_id -> 이 달 OT완료 건수(OT1+OT2)
     let confirmedRevenueCache = {}; // trainer_id -> 그 달 PT 매출(매출 입력 기준 · 대시보드 성과 지표와 동일) - 구간 판정에만 씀
+    let groupClassCache = {};        // profile_id -> 그 기간 그룹PT 수업(바디코디) 집계 {counted, not_counted, classes[]}
+    let groupClassMeta = { ok: false, error: '', unlinked: [], total: 0 };
     let ptManageRevenueCache = null; // trainer_id -> PT 관리 "등록" 처리 금액(참고용)
     let confirmedRecordsCache = {}; // trainer_id -> record(확정 저장된 값 - 있으면 입력칸 초기값으로 씀)
     let draftInputs = {};           // trainer_id -> { group_confirmed_fee } (이번 화면에서 입력 중인 값)
@@ -344,8 +347,12 @@
       const otDoneCount = Math.max(otFromSchedule, otFromLeads);
       const confirmed = confirmedRecordsCache[t.id];
       // 입력칸 초기값: 이번 화면에서 이미 입력한 값(draftInputs) > 이 달에 확정 저장된 값 > 0
+      // 그룹PT 확정수업료: 진행한 그룹PT 수업 횟수 × 20,000원(바디코디 기준)이 기본값이에요. 이미 확정 저장한 달은 저장된 값을 먼저 보여주고, 입력칸을 고치면 그 값을 써요.
+      const grp = groupClassCache[t.id];
+      const groupCount = grp ? grp.counted : 0;
+      const groupAuto = groupClassMeta.ok ? groupFeeForCount(groupCount) : null;
       if (!draftInputs[t.id]) {
-        draftInputs[t.id] = { group_confirmed_fee: confirmed ? Number(confirmed.group_confirmed_fee) || 0 : 0 };
+        draftInputs[t.id] = { group_confirmed_fee: confirmed ? Number(confirmed.group_confirmed_fee) || 0 : (groupAuto || 0) };
       }
       const draft = draftInputs[t.id];
       const result = computeTrainerPayroll({
@@ -359,7 +366,7 @@
         businessTaxRate: Number(payrollSettingsCache.business_tax_rate) || 0,
         localTaxMultiplier: Number(payrollSettingsCache.local_tax_multiplier) || 0
       });
-      return { cons, confirmedRevenue, settings, tier, otDoneCount, draft, result, confirmed };
+      return { trainerId: t.id, cons, confirmedRevenue, settings, tier, otDoneCount, draft, result, confirmed, groupCount, groupAuto, groupNotCounted: grp ? grp.not_counted : 0 };
     }
 
     async function reloadAll() {
@@ -368,9 +375,9 @@
       document.getElementById('successBox').style.display = 'none';
       document.getElementById('payrollTbody').innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr>';
 
-      const { startStr, endStr, monthStr, calStartStr, calEndStr } = getMonthRange();
+      const { startStr, endStr, lastDay, monthStr, calStartStr, calEndStr } = getMonthRange();
       // 서로 무관한 요청은 한꺼번에 보냄
-      const [bookingsR, salesR, confirmedRevR, settingsR, payrollSettingsR, ptTiersR, groupTiersR, otR, recordsR, membersR, passPricingR] = await Promise.allSettled([
+      const [bookingsR, salesR, confirmedRevR, settingsR, payrollSettingsR, ptTiersR, groupTiersR, otR, recordsR, membersR, passPricingR, groupClassR] = await Promise.allSettled([
         fetchPtBookingsForMonth(startStr, endStr),
         fetchPtSalesForPricing(endStr),
         fetchConfirmedRevenueForMonth(calStartStr, calEndStr),
@@ -381,7 +388,8 @@
         fetchOtDoneCountsForMonth(calStartStr, calEndStr),
         fetchTrainerPayrollRecords(monthStr),
         fetchMembers(),
-        fetchPtPassPricing()
+        fetchPtPassPricing(),
+        fetchGroupClassCounts(startStr, lastDay)
       ]);
 
       // 구간 판정이 확정매출에 달려 있어서 그 fetch도 필수로 묶음 - 실패하면 전원 구간 잘못 계산될 수
@@ -400,6 +408,14 @@
       confirmedRevenueCache = {};
       Object.keys(ptSalesByTrainer).forEach(id => { confirmedRevenueCache[id] = ptSalesByTrainer[id].amount; });
       ptManageRevenueCache = confirmedRevR.status === 'fulfilled' ? confirmedRevR.value : null;
+      // 그룹PT 수업 횟수(바디코디) - 못 불러와도 급여 화면은 그대로 떠요(입력칸에 직접 넣으면 돼요)
+      groupClassCache = {};
+      if (groupClassR.status === 'fulfilled') {
+        (groupClassR.value.trainers || []).forEach(g => { groupClassCache[g.profile_id] = g; });
+        groupClassMeta = { ok: true, error: '', unlinked: groupClassR.value.unlinked || [], total: groupClassR.value.total_classes || 0 };
+      } else {
+        groupClassMeta = { ok: false, error: (groupClassR.reason && groupClassR.reason.message) || '알 수 없는 오류', unlinked: [], total: 0 };
+      }
       salarySettingsCache = {};
       (settingsR.status === 'fulfilled' ? settingsR.value : []).forEach(r => { salarySettingsCache[r.trainer_id] = r; });
       payrollSettingsCache = payrollSettingsR.status === 'fulfilled' ? payrollSettingsR.value : payrollSettingsCache;
@@ -455,7 +471,7 @@
           <td class="num">${formatWon(Math.round(confirmedRevenue))}${tier ? `<div class="tier-badge">${tier.tier_order}구간</div>` : ''}<div class="muted" style="font-size:10.5px;">소진 ${formatWon(Math.round(cons.revenue))}</div></td>
           <td class="num">${formatWon(Math.round(result.individualConfirmedFee))}</td>
           <td class="num">${formatWon(result.basePay + result.otBonusAmount + result.performanceBonus)}<div class="muted" style="font-size:10.5px;">기본급 ${formatWon(result.basePay)} · ${bonusLabel}</div></td>
-          <td class="num"><input type="text" inputmode="numeric" class="inline-money" data-trainer-id="${t.id}" data-field="group_confirmed_fee" value="${(Number(draft.group_confirmed_fee) || 0).toLocaleString('ko-KR')}" onchange="handleDraftInputChange(this)" /></td>
+          <td class="num"><input type="text" inputmode="numeric" class="inline-money" data-trainer-id="${t.id}" data-field="group_confirmed_fee" value="${(Number(draft.group_confirmed_fee) || 0).toLocaleString('ko-KR')}" onchange="handleDraftInputChange(this)" /><div class="muted group-note" style="font-size:10.5px;" data-html="${escapeHtml(groupCellNote(calc))}">${groupCellNote(calc)}</div></td>
           <td class="num">${formatWon(Math.round(result.preTaxTotal))}</td>
           <td class="num final-cell">${formatWon(Math.round(result.finalSalary))}</td>
           <td style="text-align:center;"><button type="button" class="btn-link" style="font-size:12px;" onclick="openDetail('${t.id}')">상세보기</button></td>
@@ -477,8 +493,29 @@
       }
 
       renderOddPriceWarning();
+      renderGroupClassNotice(trainers);
       renderTierRefTables(trainers);
       renderSettingsTable(trainers);
+    }
+
+    // 그룹PT 수업비 안내: 못 불러왔을 때 / 담당 강사가 앱 직원과 연결 안 된 수업 / 급여 대상이 아닌 강사의 수업
+    function renderGroupClassNotice(trainers) {
+      const box = document.getElementById('groupClassNotice');
+      const parts = [];
+      if (!groupClassMeta.ok) {
+        parts.push(`⚠️ <b>그룹PT 수업 횟수를 바디코디에서 불러오지 못했어요.</b> (${escapeHtml(groupClassMeta.error)}) 그룹PT 확정수업료 칸에 직접 입력해주세요. 바디코디 연동 함수를 최신 코드로 올렸는지도 확인해주세요.`);
+      } else {
+        const targetIds = new Set(trainers.map(t => t.id));
+        const others = Object.values(groupClassCache).filter(g => !targetIds.has(g.profile_id) && g.counted > 0);
+        const missing = [...(groupClassMeta.unlinked || []).filter(u => u.counted > 0).map(u => `${u.name} ${u.counted}회`), ...others.map(g => `${g.name} ${g.counted}회(급여 대상 아님)`)];
+        if (missing.length) {
+          parts.push(`ℹ️ 그룹PT 수업 중 <b>급여에 안 잡힌 수업</b>: ${missing.map(escapeHtml).join(', ')}. 바디코디에서 담당 강사가 앱 직원과 연결되지 않았거나(예: "기본 관리자"로 잡힌 수업) 급여 대상이 아닌 강사예요. 실제로 수업한 강사가 따로 있으면 바디코디에서 수업 담당 강사를 바로잡아주세요.`);
+        }
+        const notCounted = Object.values(groupClassCache).filter(g => targetIds.has(g.profile_id)).reduce((a, g) => a + g.not_counted, 0);
+        if (notCounted > 0) parts.push(`출석한 회원이 0명이라 뺀 수업이 ${notCounted}회 있어요(상세보기에서 확인). 이런 수업도 수업비를 주려면 그룹PT 칸에 직접 더해주세요.`);
+      }
+      box.innerHTML = parts.join('<br/>');
+      box.style.display = parts.length ? 'block' : 'none';
     }
 
     // 회당단가가 비정상(15만원 초과 / 2만원 미만 / 0원)인 출석 세션을 한곳에 모아 "어느 결제 때문인지" 보여줌
@@ -532,6 +569,23 @@
     // 그룹PT확정수업료 입력칸 - 이 달 확정 저장 전까지는 화면에서만 들고 있다가(draftInputs),
     // "이번 달 급여 확정 저장"을 눌러야 DB에 반영됨. 입력할 때마다 전체 다시 불러오지 않고 그 행만
     // 다시 계산해서 화면을 갱신함(포커스 유지, 불필요한 네트워크 요청 방지).
+    // 그룹PT 칸 아래 작은 안내: "그룹 8회 × 20,000원" / 직접 고친 값이면 자동값으로 되돌리는 링크
+    function groupCellNote(calc) {
+      if (calc.groupAuto == null) return '그룹수업 횟수를 못 불러왔어요(직접 입력)';
+      const cur = Number(calc.draft.group_confirmed_fee) || 0;
+      let t = `그룹 ${calc.groupCount}회 × ${GROUP_PT_FEE_PER_CLASS.toLocaleString('ko-KR')}원`;
+      if (calc.groupNotCounted > 0) t += ` · 출석0명 ${calc.groupNotCounted}회 제외`;
+      if (cur !== calc.groupAuto) t += ` · <a href="#" class="btn-link" style="font-size:10.5px;" onclick="applyGroupAuto('${calc.trainerId}'); return false;">자동값 ${formatWon(calc.groupAuto)}으로</a>`;
+      return t;
+    }
+    function applyGroupAuto(trainerId) {
+      const calc = calcCache[trainerId];
+      if (!calc || calc.groupAuto == null) return;
+      const input = document.querySelector(`#payrollTbody input[data-trainer-id="${trainerId}"][data-field="group_confirmed_fee"]`);
+      if (!input) return;
+      input.value = calc.groupAuto.toLocaleString('ko-KR');
+      handleDraftInputChange(input);
+    }
     function handleDraftInputChange(input) {
       const trainerId = input.dataset.trainerId;
       const field = input.dataset.field;
@@ -548,6 +602,9 @@
       calcCache[trainerId] = calc;
       const row = document.querySelector(`#payrollTbody tr[data-trainer-id="${trainerId}"]`);
       if (!row) return;
+      // 내용이 그대로면 다시 그리지 않아요(입력칸에서 바로 옆 링크를 누를 때, 칸을 벗어나며 다시 그려지면 클릭이 사라져요)
+      const note = row.querySelector('.group-note');
+      if (note) { const html = groupCellNote(calc); if (note.dataset.html !== html) { note.innerHTML = html; note.dataset.html = html; } }
       row.children[6].textContent = formatWon(Math.round(calc.result.preTaxTotal));
       row.children[7].textContent = formatWon(Math.round(calc.result.finalSalary));
     }
@@ -644,6 +701,18 @@
       }
     });
 
+    function groupClassListHtml(trainerId) {
+      const g = groupClassCache[trainerId];
+      if (!g || !g.classes || !g.classes.length) return '';
+      const reasonLabel = { future: '아직 진행 전', cancelled: '취소', no_attendance: '출석 0명(제외)' };
+      const rows = g.classes.map(c => {
+        const d = c.start ? c.start.slice(5, 10).replace('-', '/') : '';
+        const tm = c.start ? c.start.slice(11, 16) : '';
+        return `<div class="row sub"><span>${escapeHtml(d)} ${escapeHtml(tm)} · ${escapeHtml(c.title)} (출석 ${c.attended}명)</span><span>${c.counted ? formatWon(GROUP_PT_FEE_PER_CLASS) : escapeHtml(reasonLabel[c.reason] || '제외')}</span></div>`;
+      }).join('');
+      return `<details style="margin:2px 0 6px;"><summary class="muted" style="font-size:12px; cursor:pointer;">그룹PT 수업 ${g.classes.length}건 보기</summary>${rows}</details>`;
+    }
+
     function openDetail(trainerId) {
       const calc = calcCache[trainerId];
       if (!calc) return;
@@ -667,7 +736,8 @@
         <div class="row total"><span>개인PT 확정수업료</span><span>${formatWon(Math.round(r.individualConfirmedFee))}</span></div>
         <div class="row" style="margin-top:8px;"><span>+ 구간 기본급</span><span>${formatWon(r.basePay)}</span></div>
         <div class="row"><span style="max-width:70%;">+ ${bonusLine}</span><span></span></div>
-        <div class="row"><span>+ 그룹PT 확정수업료</span><span>${formatWon(Number(d.group_confirmed_fee) || 0)}</span></div>
+        <div class="row"><span>+ 그룹PT 확정수업료${calc.groupAuto != null ? ` (진행한 그룹 수업 ${calc.groupCount}회 × ${GROUP_PT_FEE_PER_CLASS.toLocaleString('ko-KR')}원${(Number(d.group_confirmed_fee) || 0) !== calc.groupAuto ? ' → 직접 수정한 값' : ''})` : ''}</span><span>${formatWon(Number(d.group_confirmed_fee) || 0)}</span></div>
+        ${groupClassListHtml(trainerId)}
         <div class="row total"><span>세전 합계</span><span>${formatWon(Math.round(r.preTaxTotal))}</span></div>
         <div class="row sub"><span>− 사업소득세(${payrollSettingsCache.business_tax_rate}%, 10원단위 내림)</span><span>${formatWon(r.businessTaxAmount)}</span></div>
         <div class="row sub"><span>− 지방소득세(사업소득세×${payrollSettingsCache.local_tax_multiplier}%, 10원단위 내림)</span><span>${formatWon(r.localTaxAmount)}</span></div>
