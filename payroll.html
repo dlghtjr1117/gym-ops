@@ -251,6 +251,18 @@
     requireLogin();
     let isManagerFlag = false;
     let staffCache = [];
+    let consumptionCache = {};
+    // 급여 계산 대상: 트레이너 + 팀장(지점장 권한이지만 직급이 "팀장"이라 PT 수업도 하는 직원).
+    // 퇴사 처리한 직원은 빼되, 그 달에 수업(출석/결석) 기록이나 확정 저장된 급여가 있으면 그 달에는 계속 보여줘요(지난달 급여 확인용).
+    function payrollTargets() {
+      return staffCache.filter(s => {
+        const isLead = s.role === 'manager' && s.job_title === '팀장';
+        if (s.role !== 'trainer' && !isLead) return false;
+        if (isActiveStaff(s)) return true;
+        const c = consumptionCache[s.id];
+        return !!(c && (c.attended > 0 || c.absent > 0)) || !!confirmedRecordsCache[s.id];
+      });
+    }
     let salarySettingsCache = {};   // trainer_id -> { card_fee_rate }
     let payrollSettingsCache = { vat_rate: 10, business_tax_rate: 3, local_tax_multiplier: 10 };
     let ptTiersCache = [];          // pt_payroll_tiers 전체(전체 트레이너 공통)
@@ -374,6 +386,7 @@
 
       const pricingIndex = buildPtPricingIndex(ptSales);
       const consumption = computeTrainerConsumption(bookings, pricingIndex);
+      consumptionCache = consumption;
 
       // 상세 모달용 - 부킹마다 회원 이름 + 상태 + 그 시점 단가를 미리 계산해둠
       bookingsWithMemberName = bookings.map(b => {
@@ -383,7 +396,7 @@
         return { trainer_id: b.trainer_id, dateStr, status: b.status, memberName: m ? m.name : '(알 수 없음)', price: entry ? entry.unitPrice : null, entry };
       }).sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
-      const trainers = staffCache.filter(s => s.role === 'trainer');
+      const trainers = payrollTargets();
       calcCache = {};
       let totalConfirmedRevenue = 0, totalConsumedRevenue = 0, totalClassFee = 0, totalFinal = 0, totalUnpriced = 0;
       const unpricedMembers = new Set();
@@ -547,7 +560,7 @@
     }
 
     document.getElementById('confirmAllBtn').addEventListener('click', async () => {
-      const trainers = staffCache.filter(s => s.role === 'trainer');
+      const trainers = payrollTargets();
       const { monthStr } = getMonthRange();
       const alreadyConfirmed = trainers.some(t => confirmedRecordsCache[t.id]);
       if (alreadyConfirmed && !confirm('이미 확정 저장된 달이에요. 지금 입력·계산된 값으로 덮어쓸까요?')) return;
