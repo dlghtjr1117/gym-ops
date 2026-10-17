@@ -106,7 +106,7 @@
       <div class="hero-grid" id="payrollHeroGrid">
         <div class="hero-card hero-blue">
           <div class="hero-icon">🏋️</div>
-          <div class="hero-label">개인PT 확정 매출(계산 기간 기준 · 구간 판정)</div>
+          <div class="hero-label">개인PT 확정 매출(PT관리 화면과 동일 · 구간 판정 기준)</div>
           <div class="hero-value hero-value-money"><span id="heroConsumedRevenue">0</span><span class="hero-unit">원</span></div>
           <div class="hero-sub" id="heroConsumedSub">불러오는 중...</div>
         </div>
@@ -136,9 +136,9 @@
       <div class="section">
         <h2>트레이너별 급여</h2>
         <p class="muted" style="margin:-6px 0 6px; font-size:12px;">
-          <b>계산 기간</b> = 지난달 지급일 ~ 이번달 지급일 전날(지급일 당일 수업은 다음 급여). 급여는 매달 15일에 지급하고, 15일이 토·일·공휴일이면 전날로(전날도 쉬면 그 전날로) 앞당겨요 ·
-          <b>매출구간</b>(기본급·정률·OT보너스/성과금 결정) = PT 관리(pt.html)의 "확정 매출"과 같은 기준(신규/재등록 "등록" 처리된 계약금액 합계)을
-          위 계산 기간에 맞춰 합산한 숫자로 판정(PT 관리 화면은 달력 기준이라 숫자가 다를 수 있어요) - 계약되는 즉시 그 기간 구간이 정해짐 ·
+          <b>수업 개수 기간</b> = 지난달 지급일 ~ 이번달 지급일 전날(지급일 당일 수업은 다음 급여). 급여는 매달 15일에 지급하고, 15일이 토·일·공휴일이면 전날로(전날도 쉬면 그 전날로) 앞당겨요.
+          이 기간은 <b>수업 개수(출석·결석·OT 수업)</b>에만 적용돼요 ·
+          <b>매출구간</b>(기본급·정률·OT보너스/성과금 결정) = PT 관리(pt.html)의 "확정 매출"과 완전히 같은 숫자(그 달 1일~말일 신규/재등록 "등록" 처리된 계약금액 합계)로 판정 - 계약되는 즉시 그 달 구간이 정해짐 ·
           <b>개인PT 소진매출</b> = 이번 계산 기간에 <b>출석</b> 처리된 세션마다 그 시점 결제금액÷회차수를 곱해서 합산(결석/노쇼는 제외) ·
           개인PT 확정수업료(실제 지급 수당) = 소진매출×구간정률 → 부가세 10% 제외 → 카드결제 세션분만 카드수수료 제외
           (계약만 하고 아직 진행 안 한 수업분은 구간만 정해질 뿐 수당은 안 나감 - 수업을 실제로 진행한 만큼만 지급) ·
@@ -280,7 +280,10 @@
     // 급여 계산 기간: 지난달 지급일(그날 포함) ~ 이번달 지급일 전날. 지급일은 매달 15일, 쉬는 날이면 앞당김(data.js payrollPeriodOf)
     function getMonthRange() {
       const p = payrollPeriodOf(payMonth.year, payMonth.month);
-      return { ...p, start: new Date(p.startStr + 'T00:00:00'), end: new Date(p.endStr + 'T00:00:00') };
+      // 수업 개수(출석·결석·OT 수업)만 위 급여 기간으로 세고, 확정매출(구간 판정)·OT관리 기록은 그 달 1일~말일(달력) 기준 그대로예요.
+      const calStartStr = `${p.monthStr}-01`;
+      const calEndStr = p.month === 12 ? `${p.year + 1}-01-01` : `${p.year}-${String(p.month + 1).padStart(2, '0')}-01`;
+      return { ...p, calStartStr, calEndStr, start: new Date(p.startStr + 'T00:00:00'), end: new Date(p.endStr + 'T00:00:00') };
     }
     const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
     function mdLabel(str) { const [, m, d] = str.split('-').map(Number); return `${m}/${d}(${WEEKDAY_KO[weekdayOfStr(str)]})`; }
@@ -292,7 +295,7 @@
     function periodNoteText() {
       const p = getMonthRange();
       const nominal = `${p.year}-${String(p.month).padStart(2, '0')}-15`;
-      let t = `지급일 ${mdLabel(p.payday)}`;
+      let t = `지급일 ${mdLabel(p.payday)} · 매출구간은 ${p.month}월 한 달 기준`;
       if (p.shifted) t += ` · 15일(${holidayNameOf(nominal) || '쉬는 날'})이라 앞당김`;
       if (p.holidayDataMissing) t += ' · 이 해는 공휴일 표가 없어 토·일만 쉬는 날로 봤어요';
       return t;
@@ -359,17 +362,17 @@
       document.getElementById('successBox').style.display = 'none';
       document.getElementById('payrollTbody').innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr>';
 
-      const { startStr, endStr, monthStr } = getMonthRange();
+      const { startStr, endStr, monthStr, calStartStr, calEndStr } = getMonthRange();
       // 서로 무관한 요청은 한꺼번에 보냄
       const [bookingsR, salesR, confirmedRevR, settingsR, payrollSettingsR, ptTiersR, groupTiersR, otR, recordsR, membersR, passPricingR] = await Promise.allSettled([
         fetchPtBookingsForMonth(startStr, endStr),
         fetchPtSalesForPricing(endStr),
-        fetchConfirmedRevenueForMonth(startStr, endStr),
+        fetchConfirmedRevenueForMonth(calStartStr, calEndStr),
         fetchTrainerSalarySettings(),
         fetchPayrollSettings(),
         fetchPtPayrollTiers(),
         fetchGroupPtPayrollTiers(),
-        fetchOtDoneCountsForMonth(startStr, endStr),
+        fetchOtDoneCountsForMonth(calStartStr, calEndStr),
         fetchTrainerPayrollRecords(monthStr),
         fetchMembers(),
         fetchPtPassPricing()
@@ -641,11 +644,11 @@
         ? `${tier.tier_order}구간 (${tierRangeLabel(tier)}) · 기본급 ${formatWon(Number(tier.base_pay) || 0)} · 정률 ${tier.rate}%`
         : '해당 구간 없음';
       const bonusLine = tier && tier.ot_bonus_threshold != null
-        ? `OT보너스: 이번 기간 OT완료 ${calc.otDoneCount}회(바디코디 일정 ${c.ot || 0}회 · OT관리 기록 ${otDoneCountsCache[trainerId] || 0}회 중 큰 값) / 기준 ${tier.ot_bonus_threshold}회 → ${r.otBonusAmount > 0 ? formatWon(r.otBonusAmount) + ' 달성' : '미달성(0원)'}`
+        ? `OT보너스: 이번 달 OT완료 ${calc.otDoneCount}회(바디코디 일정 ${c.ot || 0}회 · OT관리 기록 ${otDoneCountsCache[trainerId] || 0}회 중 큰 값) / 기준 ${tier.ot_bonus_threshold}회 → ${r.otBonusAmount > 0 ? formatWon(r.otBonusAmount) + ' 달성' : '미달성(0원)'}`
         : `성과금(매출 구간 고정): ${formatWon(r.performanceBonus)}`;
       document.getElementById('detailFormula').innerHTML = `
         <div class="row" style="font-weight:700;"><span>적용 구간</span><span>${tierLine}</span></div>
-        <div class="row"><span>이번 기간 확정매출(구간 판정 기준)</span><span>${formatWon(Math.round(calc.confirmedRevenue))}</span></div>
+        <div class="row"><span>이번 달 확정매출(PT관리 화면과 동일 · 구간 판정 기준)</span><span>${formatWon(Math.round(calc.confirmedRevenue))}</span></div>
         <div class="row"><span>이번 기간 소진 매출(출석만 · 수당 계산 기준)</span><span>${formatWon(Math.round(c.revenue))}</span></div>
         <div class="row"><span>이번 기간 수당 (소진매출 × 정률 ${r.rate}%)</span><span>${formatWon(Math.round(r.grossCommission))}</span></div>
         <div class="row sub"><span>− 부가세(${payrollSettingsCache.vat_rate}%)</span><span>${formatWon(Math.round(r.vatAmount))}</span></div>
