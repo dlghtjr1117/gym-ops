@@ -3009,7 +3009,7 @@ async function fetchPtBookingsForMonth(startStr, endStr) {
 async function fetchPtSalesForPricing(beforeStr) {
   const { rows, error } = await fetchAllRows(
     `sales?category=in.(pt_new,pt_renewal)` +
-    `&select=id,member_id,amount,sale_date,payment_method,memo,category,external_sale_no,product:products(name,sessions)&order=sale_date.asc,id.asc`,
+    `&select=id,member_id,staff_id,amount,sale_date,payment_method,memo,category,external_sale_no,product:products(name,sessions)&order=sale_date.asc,id.asc`,
     await authHeaders()
   );
   if (error) await throwApiError(error, 'PT 매출 내역을 불러오지 못했습니다.');
@@ -3025,6 +3025,23 @@ async function fetchPtPassPricing() {
     );
     return error ? [] : rows;
   } catch (e) { return []; }
+}
+
+// 급여 구간 판정에 쓰는 "트레이너별 PT 매출" - 대시보드 "트레이너 성과 지표"와 같은 숫자예요:
+// 매출 입력(sales)의 개인PT 신규/재등록(pt_new·pt_renewal)을 담당 강사(staff_id)별로 합산(환불 음수 행 포함).
+// 기간은 startStr 이상 endStr 미만(정산 달 1일 ~ 다음 달 1일). 담당 강사가 비어 있는 매출은 어느 강사 몫도 아니라서 빼요.
+function computePtSalesByTrainer(ptSales, startStr, endStr) {
+  const out = {};
+  for (const s of Array.isArray(ptSales) ? ptSales : []) {
+    if (!s || !s.staff_id) continue;
+    if (s.category !== 'pt_new' && s.category !== 'pt_renewal') continue;
+    const d = String(s.sale_date || '').slice(0, 10);
+    if (!(d >= startStr && d < endStr)) continue;
+    const amt = Number(s.amount) || 0;
+    const o = out[s.staff_id] || (out[s.staff_id] = { amount: 0, count: 0 });
+    o.amount += amt; o.count += 1;
+  }
+  return out;
 }
 
 async function fetchTrainerSalarySettings() {
@@ -3336,7 +3353,7 @@ function computeTrainerPayroll({
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession, classifyUnitPrice,
-    computeTrainerConsumption, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr,
+    computeTrainerConsumption, computePtSalesByTrainer, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr,
     isRedDay, payrollPaydayOf, payrollPeriodOf, payrollMonthForDate, addDaysStr, holidayNameOf
   };
 }
