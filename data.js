@@ -2924,13 +2924,75 @@ const unuseCoupon = (id) => callCouponRpc('group_pt_unuse_coupon', id, '쿠폰 �
 // 코드와 분리).
 // ==================================================================
 
+// ---- 급여 지급일·계산 기간 -------------------------------------------------------------
+// 급여는 매달 15일에 지급해요. 15일이 토·일·공휴일이면 그 전날로 앞당기고, 전날도 쉬는 날이면 한 번 더 앞당겨요
+// (예: 15일·14일이 둘 다 쉬는 날이면 13일). 급여 계산 기간은 "지난달 지급일 ~ 이번달 지급일 전날"이에요(지급일 당일 수업은 다음 급여로 넘어가요).
+// 공휴일(대체공휴일 포함)은 아래 표를 써요. 표에 없는 해는 토·일만 쉬는 날로 보니, 새해가 되면 이 표에 추가해주세요.
+const PAYDAY_OF_MONTH = 15;
+const KR_PUBLIC_HOLIDAYS = {
+  // 2025
+  '2025-01-01': '신정', '2025-01-27': '임시공휴일', '2025-01-28': '설날 연휴', '2025-01-29': '설날', '2025-01-30': '설날 연휴',
+  '2025-03-01': '삼일절', '2025-03-03': '대체공휴일(삼일절)', '2025-05-05': '어린이날·부처님오신날', '2025-05-06': '대체공휴일',
+  '2025-06-03': '대통령선거일', '2025-06-06': '현충일', '2025-08-15': '광복절',
+  '2025-10-03': '개천절', '2025-10-05': '추석 연휴', '2025-10-06': '추석', '2025-10-07': '추석 연휴', '2025-10-08': '대체공휴일(추석)',
+  '2025-10-09': '한글날', '2025-12-25': '성탄절',
+  // 2026
+  '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
+  '2026-03-01': '삼일절', '2026-03-02': '대체공휴일(삼일절)', '2026-05-05': '어린이날', '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일(부처님오신날)',
+  '2026-06-03': '지방선거일', '2026-06-06': '현충일', '2026-08-15': '광복절', '2026-08-17': '대체공휴일(광복절)',
+  '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
+  '2026-10-03': '개천절', '2026-10-05': '대체공휴일(개천절)', '2026-10-09': '한글날', '2026-12-25': '성탄절',
+  // 2027
+  '2027-01-01': '신정', '2027-02-06': '설날 연휴', '2027-02-07': '설날', '2027-02-08': '설날 연휴', '2027-02-09': '대체공휴일(설날)',
+  '2027-03-01': '삼일절', '2027-05-05': '어린이날', '2027-05-13': '부처님오신날', '2027-06-06': '현충일',
+  '2027-08-15': '광복절', '2027-08-16': '대체공휴일(광복절)', '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴',
+  '2027-10-03': '개천절', '2027-10-04': '대체공휴일(개천절)', '2027-10-09': '한글날', '2027-10-11': '대체공휴일(한글날)', '2027-12-25': '성탄절'
+};
+const KR_HOLIDAY_YEARS = [2025, 2026, 2027];
+function _ymdParts(str) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str)); return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null; }
+function _ymdFromUtc(ms) { const d = new Date(ms); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; }
+// 'YYYY-MM-DD' 날짜에 일수를 더해요(시간대 영향 없이)
+function addDaysStr(str, n) { const [y, m, d] = _ymdParts(str); return _ymdFromUtc(Date.UTC(y, m - 1, d + n)); }
+function weekdayOfStr(str) { const [y, m, d] = _ymdParts(str); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); } // 0=일 … 6=토
+// 쉬는 날(빨간 날) = 토·일 + 공휴일
+function isRedDay(str) { const w = weekdayOfStr(str); return w === 0 || w === 6 || Object.prototype.hasOwnProperty.call(KR_PUBLIC_HOLIDAYS, str); }
+function holidayNameOf(str) {
+  if (KR_PUBLIC_HOLIDAYS[str]) return KR_PUBLIC_HOLIDAYS[str];
+  const w = weekdayOfStr(str); return w === 0 ? '일요일' : w === 6 ? '토요일' : '';
+}
+// 그 달의 급여 지급일('YYYY-MM-DD'). month는 1~12
+function payrollPaydayOf(year, month) {
+  let d = `${year}-${String(month).padStart(2, '0')}-${String(PAYDAY_OF_MONTH).padStart(2, '0')}`;
+  for (let i = 0; i < 20 && isRedDay(d); i++) d = addDaysStr(d, -1);
+  return d;
+}
+// "year년 month월 급여"의 계산 기간: 지난달 지급일(그날 포함) ~ 이번달 지급일 전날. endStr은 지급일(조회용 · 그날 수업은 포함하지 않음)
+function payrollPeriodOf(year, month) {
+  const py = month === 1 ? year - 1 : year, pm = month === 1 ? 12 : month - 1;
+  const prevPayday = payrollPaydayOf(py, pm), payday = payrollPaydayOf(year, month);
+  const startStr = prevPayday, lastDay = addDaysStr(payday, -1);
+  const nominal = `${year}-${String(month).padStart(2, '0')}-${String(PAYDAY_OF_MONTH).padStart(2, '0')}`;
+  return {
+    year, month, monthStr: `${year}-${String(month).padStart(2, '0')}`,
+    prevPayday, payday, startStr, lastDay, endStr: payday,
+    shifted: payday !== nominal, holidayDataMissing: !KR_HOLIDAY_YEARS.includes(year) || !KR_HOLIDAY_YEARS.includes(py)
+  };
+}
+// 오늘이 속한 급여 기간의 (year, month) - 오늘이 이번달 지급일(당일 포함)이 됐으면 다음 달 급여 기간이에요
+function payrollMonthForDate(str) {
+  const [y, m] = _ymdParts(str);
+  if (str >= payrollPaydayOf(y, m)) return m === 12 ? { year: y + 1, month: 1 } : { year: y, month: m + 1 };
+  return { year: y, month: m };
+}
+
 // 이번 달(지점장이 고른 트레이너/월) PT 스케줄 전체를 트레이너 구분 없이 한 번에 가져옴(지점장만
 // 전체가 보임 - RLS: is_manager() or trainer_id=auth.uid()). 출석/결석 둘 다 가져오는 이유는 화면에
 // "당월 출석/결석" 건수를 같이 보여주기 위함(결석도 잔여횟수는 깎이는 이 앱 정책과 맞춤) - 실제
 // 매출·수당 계산에 결석을 넣을지는 아래 computeTrainerConsumption()에서 결정.
 async function fetchPtBookingsForMonth(startStr, endStr) {
   const { rows, error } = await fetchAllRows(
-    `pt_bookings?start_at=gte.${startStr}&start_at=lt.${endStr}&status=in.(attended,absent)` +
+    // 날짜만 쓰면 UTC 자정으로 읽혀서 한국 시간 새벽~오전 9시 수업이 전날로 넘어가요 → 한국 시간(+09:00) 자정 기준으로 조회
+    `pt_bookings?start_at=gte.${startStr}T00:00:00%2B09:00&start_at=lt.${endStr}T00:00:00%2B09:00&status=in.(attended,absent)` +
     `&select=id,trainer_id,member_id,start_at,status,memo`,
     await authHeaders()
   );
@@ -3274,6 +3336,7 @@ function computeTrainerPayroll({
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession, classifyUnitPrice,
-    computeTrainerConsumption, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr
+    computeTrainerConsumption, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr,
+    isRedDay, payrollPaydayOf, payrollPeriodOf, payrollMonthForDate, addDaysStr, holidayNameOf
   };
 }

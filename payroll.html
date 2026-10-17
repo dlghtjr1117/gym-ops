@@ -106,7 +106,7 @@
       <div class="hero-grid" id="payrollHeroGrid">
         <div class="hero-card hero-blue">
           <div class="hero-icon">🏋️</div>
-          <div class="hero-label">개인PT 확정 매출(PT관리 화면과 동일 · 구간 판정 기준)</div>
+          <div class="hero-label">개인PT 확정 매출(계산 기간 기준 · 구간 판정)</div>
           <div class="hero-value hero-value-money"><span id="heroConsumedRevenue">0</span><span class="hero-unit">원</span></div>
           <div class="hero-sub" id="heroConsumedSub">불러오는 중...</div>
         </div>
@@ -136,9 +136,10 @@
       <div class="section">
         <h2>트레이너별 급여</h2>
         <p class="muted" style="margin:-6px 0 6px; font-size:12px;">
-          <b>매출구간</b>(기본급·정률·OT보너스/성과금 결정) = PT 관리(pt.html)의 "확정 매출"과 완전히 같은 숫자(이번 달
-          신규/재등록 "등록" 처리된 계약금액 합계)로 판정 - 계약되는 즉시 그 달 구간이 정해짐 ·
-          <b>개인PT 소진매출</b> = 이번 달 <b>출석</b> 처리된 세션마다 그 시점 결제금액÷회차수를 곱해서 합산(결석/노쇼는 제외) ·
+          <b>계산 기간</b> = 지난달 지급일 ~ 이번달 지급일 전날(지급일 당일 수업은 다음 급여). 급여는 매달 15일에 지급하고, 15일이 토·일·공휴일이면 전날로(전날도 쉬면 그 전날로) 앞당겨요 ·
+          <b>매출구간</b>(기본급·정률·OT보너스/성과금 결정) = PT 관리(pt.html)의 "확정 매출"과 같은 기준(신규/재등록 "등록" 처리된 계약금액 합계)을
+          위 계산 기간에 맞춰 합산한 숫자로 판정(PT 관리 화면은 달력 기준이라 숫자가 다를 수 있어요) - 계약되는 즉시 그 기간 구간이 정해짐 ·
+          <b>개인PT 소진매출</b> = 이번 계산 기간에 <b>출석</b> 처리된 세션마다 그 시점 결제금액÷회차수를 곱해서 합산(결석/노쇼는 제외) ·
           개인PT 확정수업료(실제 지급 수당) = 소진매출×구간정률 → 부가세 10% 제외 → 카드결제 세션분만 카드수수료 제외
           (계약만 하고 아직 진행 안 한 수업분은 구간만 정해질 뿐 수당은 안 나감 - 수업을 실제로 진행한 만큼만 지급) ·
           최종급여 = (개인PT확정수업료+구간기본급+OT보너스/성과금+그룹PT확정수업료) − 프리랜서세(사업소득세+지방소득세)
@@ -272,20 +273,33 @@
     let confirmedRecordsCache = {}; // trainer_id -> record(확정 저장된 값 - 있으면 입력칸 초기값으로 씀)
     let draftInputs = {};           // trainer_id -> { group_confirmed_fee } (이번 화면에서 입력 중인 값)
     let calcCache = {};             // trainer_id -> 계산 결과(모달/저장에서 재사용)
-    let monthAnchor = new Date();
+    // 급여 지급 달(예: 2026년 10월 급여 = 9/16~10/15 수업). 오늘이 속한 급여 기간으로 시작해요.
+    let payMonth = payrollMonthForDate(formatDateStr(new Date()));
     let bookingsWithMemberName = []; // 상세 모달용 (member 이름 포함)
 
+    // 급여 계산 기간: 지난달 지급일(그날 포함) ~ 이번달 지급일 전날. 지급일은 매달 15일, 쉬는 날이면 앞당김(data.js payrollPeriodOf)
     function getMonthRange() {
-      const start = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
-      const end = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1);
-      return { start, end, startStr: formatDateStr(start), endStr: formatDateStr(end), monthStr: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}` };
+      const p = payrollPeriodOf(payMonth.year, payMonth.month);
+      return { ...p, start: new Date(p.startStr + 'T00:00:00'), end: new Date(p.endStr + 'T00:00:00') };
     }
-    function monthLabelText() {
-      const { start } = getMonthRange();
-      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
+    const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+    function mdLabel(str) { const [, m, d] = str.split('-').map(Number); return `${m}/${d}(${WEEKDAY_KO[weekdayOfStr(str)]})`; }
+    function monthLabelText() { return `${payMonth.year}년 ${payMonth.month}월 급여`; }
+    function periodRangeText() {
+      const p = getMonthRange();
+      return `${mdLabel(p.startStr)} ~ ${mdLabel(p.lastDay)} 수업`;
+    }
+    function periodNoteText() {
+      const p = getMonthRange();
+      const nominal = `${p.year}-${String(p.month).padStart(2, '0')}-15`;
+      let t = `지급일 ${mdLabel(p.payday)}`;
+      if (p.shifted) t += ` · 15일(${holidayNameOf(nominal) || '쉬는 날'})이라 앞당김`;
+      if (p.holidayDataMissing) t += ' · 이 해는 공휴일 표가 없어 토·일만 쉬는 날로 봤어요';
+      return t;
     }
     function shiftMonth(dir) {
-      monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1);
+      const m = payMonth.month + dir;
+      payMonth = m < 1 ? { year: payMonth.year - 1, month: 12 } : m > 12 ? { year: payMonth.year + 1, month: 1 } : { year: payMonth.year, month: m };
       draftInputs = {};
       reloadAll();
     }
@@ -340,7 +354,7 @@
     }
 
     async function reloadAll() {
-      document.getElementById('monthLabel').textContent = monthLabelText();
+      document.getElementById('monthLabel').innerHTML = `${escapeHtml(monthLabelText())}<div class="muted" style="font-size:11px;font-weight:500;line-height:1.35;">${escapeHtml(periodRangeText())}<br/>${escapeHtml(periodNoteText())}</div>`;
       document.getElementById('errorBox').style.display = 'none';
       document.getElementById('successBox').style.display = 'none';
       document.getElementById('payrollTbody').innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">불러오는 중...</td></tr>';
@@ -477,7 +491,7 @@
       box.innerHTML = `⚠️ <b>회당단가가 비정상인 회원 ${seen.size}명</b> — 이 단가가 그대로 소진매출·수당에 들어가고 있어요.
         <b>원인은 거의 항상 "결제 한 건의 금액 ÷ 그 결제에 연결된 상품의 회차수"</b>인데, ① 연결된 상품의 회차수가 실제와 다르거나(예: 30회권인데 1회 상품이 연결) ② 분납/부분결제라 결제금액이 총액보다 작거나 ③ 직접 입력·엑셀로 들어간 결제에 엉뚱한 상품이 붙어 있을 때 생겨요.
         아래 "결제 근거"의 날짜·금액·상품을 보고 <a href="sales.html" class="btn-link" style="font-size:12.5px;">매출 입력 →</a>에서 그 결제의 상품(또는 금액)을 바로잡으면 다음 계산부터 정상이 됩니다.
-        <table><thead><tr><th>강사</th><th>회원</th><th class="num">회당단가</th><th class="num">이번 달 출석</th><th>결제 근거</th></tr></thead><tbody>${rows}</tbody></table>`;
+        <table><thead><tr><th>강사</th><th>회원</th><th class="num">회당단가</th><th class="num">이번 기간 출석</th><th>결제 근거</th></tr></thead><tbody>${rows}</tbody></table>`;
       box.style.display = 'block';
     }
 
@@ -606,7 +620,7 @@
         // reloadAll()이 맨 처음에 successBox/errorBox를 다시 숨기기 때문에, 안내 문구는
         // reloadAll()이 다 끝난 다음에 띄워야 바로 가려지지 않음
         await reloadAll();
-        document.getElementById('successBox').textContent = `${monthLabelText()} 급여가 확정 저장되었습니다.`;
+        document.getElementById('successBox').textContent = `${monthLabelText()}가 확정 저장되었습니다.`;
         document.getElementById('successBox').style.display = 'block';
       } catch (e) {
         document.getElementById('errorBox').textContent = e.message;
@@ -620,20 +634,20 @@
     function openDetail(trainerId) {
       const calc = calcCache[trainerId];
       if (!calc) return;
-      document.getElementById('detailTitle').textContent = `${trainerName(trainerId)} · ${monthLabelText()} 급여 상세`;
-      document.getElementById('detailSub').textContent = `출석 ${calc.cons.attended}회 · 결석 ${calc.cons.absent}회 · OT ${calc.cons.ot || 0}회 (단가미확인 ${calc.cons.unpriced}건)`;
+      document.getElementById('detailTitle').textContent = `${trainerName(trainerId)} · ${monthLabelText()} 상세`;
+      document.getElementById('detailSub').textContent = `${periodRangeText()} · 출석 ${calc.cons.attended}회 · 결석 ${calc.cons.absent}회 · OT ${calc.cons.ot || 0}회 (단가미확인 ${calc.cons.unpriced}건)`;
       const r = calc.result, c = calc.cons, tier = calc.tier, s = calc.settings, d = calc.draft;
       const tierLine = tier
         ? `${tier.tier_order}구간 (${tierRangeLabel(tier)}) · 기본급 ${formatWon(Number(tier.base_pay) || 0)} · 정률 ${tier.rate}%`
         : '해당 구간 없음';
       const bonusLine = tier && tier.ot_bonus_threshold != null
-        ? `OT보너스: 이번 달 OT완료 ${calc.otDoneCount}회(바디코디 일정 ${c.ot || 0}회 · OT관리 기록 ${otDoneCountsCache[trainerId] || 0}회 중 큰 값) / 기준 ${tier.ot_bonus_threshold}회 → ${r.otBonusAmount > 0 ? formatWon(r.otBonusAmount) + ' 달성' : '미달성(0원)'}`
+        ? `OT보너스: 이번 기간 OT완료 ${calc.otDoneCount}회(바디코디 일정 ${c.ot || 0}회 · OT관리 기록 ${otDoneCountsCache[trainerId] || 0}회 중 큰 값) / 기준 ${tier.ot_bonus_threshold}회 → ${r.otBonusAmount > 0 ? formatWon(r.otBonusAmount) + ' 달성' : '미달성(0원)'}`
         : `성과금(매출 구간 고정): ${formatWon(r.performanceBonus)}`;
       document.getElementById('detailFormula').innerHTML = `
         <div class="row" style="font-weight:700;"><span>적용 구간</span><span>${tierLine}</span></div>
-        <div class="row"><span>당월 확정매출(PT관리 화면과 동일 · 구간 판정 기준)</span><span>${formatWon(Math.round(calc.confirmedRevenue))}</span></div>
-        <div class="row"><span>당월 소진 매출(출석만 · 수당 계산 기준)</span><span>${formatWon(Math.round(c.revenue))}</span></div>
-        <div class="row"><span>당월 수당 (소진매출 × 정률 ${r.rate}%)</span><span>${formatWon(Math.round(r.grossCommission))}</span></div>
+        <div class="row"><span>이번 기간 확정매출(구간 판정 기준)</span><span>${formatWon(Math.round(calc.confirmedRevenue))}</span></div>
+        <div class="row"><span>이번 기간 소진 매출(출석만 · 수당 계산 기준)</span><span>${formatWon(Math.round(c.revenue))}</span></div>
+        <div class="row"><span>이번 기간 수당 (소진매출 × 정률 ${r.rate}%)</span><span>${formatWon(Math.round(r.grossCommission))}</span></div>
         <div class="row sub"><span>− 부가세(${payrollSettingsCache.vat_rate}%)</span><span>${formatWon(Math.round(r.vatAmount))}</span></div>
         <div class="row sub"><span>− 카드수수료(카드결제분에만 ${s.card_fee_rate || 0}%)</span><span>${formatWon(Math.round(r.cardFeeAmount))}</span></div>
         <div class="row total"><span>개인PT 확정수업료</span><span>${formatWon(Math.round(r.individualConfirmedFee))}</span></div>
@@ -654,7 +668,7 @@
           <td>${statusLabel[s2.status] || s2.status}</td>
           <td class="num">${s2.status === 'absent' ? '-' : (s2.isOt ? 'OT' : (s2.price == null ? '단가 미확인' : formatWon(Math.round(s2.price))))}${s2.status !== 'absent' && s2.entry && s2.entry.flag ? `<span class="odd-badge">${oddLabel(s2.entry.flag)}</span>` : ''}</td>
           <td class="src-note">${s2.isOt ? 'OT(무료 체험 수업) - 단가 없이 OT 횟수로만 셈' : (s2.status === 'absent' || !s2.entry ? '' : escapeHtml(srcText(s2.entry)))}</td>
-        </tr>`).join('') || '<tr><td colspan="5" class="muted">이번 달 소진 세션이 없습니다.</td></tr>';
+        </tr>`).join('') || '<tr><td colspan="5" class="muted">이번 기간 소진 세션이 없습니다.</td></tr>';
       document.getElementById('detailOverlay').style.display = 'flex';
     }
     document.getElementById('closeDetailBtn').addEventListener('click', () => { document.getElementById('detailOverlay').style.display = 'none'; });
