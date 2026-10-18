@@ -118,6 +118,7 @@
   <script src="data.js?v=1792500000"></script>
   <script>
     requireLogin();
+    try { sessionStorage.removeItem('gymops_pc'); } catch (e) {} // 모바일 화면을 골랐으니, 다음에 홈을 열면 다시 기본 동작(폰이면 내 하루)
     document.getElementById('logoutBtn').addEventListener('click', signOut);
 
     const pad2 = (n) => String(n).padStart(2, '0');

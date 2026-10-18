@@ -59,6 +59,10 @@
     </div>
 
     <div class="home-grid">
+      <a class="home-tile" href="my-day.html" id="myDayTile">
+        <div class="home-tile-icon">📱</div>
+        <div class="home-tile-label">내 하루 (모바일 화면)</div>
+      </a>
       <a class="home-tile" href="schedule.html">
         <div class="home-tile-icon">📅</div>
         <div class="home-tile-label">스케줄러</div>
@@ -122,9 +126,10 @@
       // 폰 + 선생님 계정이면 '내 하루'로 (지점장·PC 화면 선택 시 제외)
       if (window.__PHONE && !window.__WANT_PC && profile.role !== 'manager') { location.replace('my-day.html'); return; }
       document.documentElement.style.visibility = '';
-      if (window.__PHONE && profile.role !== 'manager') {
+      // 폰으로 PC 화면을 보고 있을 때: 모바일('내 하루') 화면으로 가는 링크 (지점장 포함)
+      if (window.__PHONE) {
         const sub = document.querySelector('.home-banner .sub');
-        if (sub) sub.innerHTML = '<a href="my-day.html" style="color:#fff; text-decoration:underline;">← 내 하루 화면으로 돌아가기</a>';
+        if (sub) sub.innerHTML = '<a href="my-day.html" style="color:#fff; text-decoration:underline; font-weight:700;">📱 모바일 화면(내 하루)으로 보기</a>';
       }
       const roleLabel = roleLabelOf(profile);
       document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;
