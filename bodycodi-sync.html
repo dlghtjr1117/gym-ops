@@ -1066,7 +1066,7 @@
         `<div class="bc-stat good"><div class="l">${applied ? '맞춘 회원' : '바뀔 회원'}</div><div class="v">${esc(diffs.length)}</div></div>` +
         `<div class="bc-stat ${errs.length ? 'warn' : ''}"><div class="l">확인 못 한 회원</div><div class="v">${esc(errs.length)}</div></div></div>` +
         (diffs.length ? `<details class="bc-det"><summary>${applied ? '맞춘' : '바뀔'} 회원 (앞 ${Math.min(diffs.length, 100)}명)</summary>${tableHtml(['회원', '바뀌는 내용'],
-          diffs.slice(0, 100).map((x) => [x.name, Object.entries(x.patch || {}).map(([k, v]) => `${DATE_KO[k] || k} → ${k === 'pt_remaining_sessions' ? v + '회' : v}`).join(' · ')]))}</details>` : '<div class="bc-ok" style="margin-top:8px;">모두 일치해요. 👍</div>') +
+          diffs.slice(0, 100).map((x) => [x.name, Object.entries(x.patch || {}).map(([k, v]) => `${DATE_KO[k] || k} → ${k === 'pt_remaining_sessions' ? v + '회' : v}`).join(' · ') + (x.renewalTm ? ` · 재등록 TM ${x.renewalTm}건 처리` : (x.extended && x.extended.length ? ` · 만료일 연장(${x.extended.join('·')}) → 진행 중 TM이 있으면 ${applied ? '' : '맞출 때 '}재등록 처리` : ''))]))}</details>` : '<div class="bc-ok" style="margin-top:8px;">모두 일치해요. 👍</div>') +
         (errs.length ? `<details class="bc-det"><summary>확인 못 한 회원 ${errs.length}명</summary>${tableHtml(['회원', '이유'], errs.slice(0, 30).map((x) => [x.name, x.error]))}</details>` : '');
     }
     function datesBusy(on) { $('datesPreviewBtn').disabled = on; $('datesApplyBtn').disabled = on || !datesPreviewed; busy = on; }
