@@ -4,6 +4,18 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<script>
+  /* 휴대폰(좁은 화면)으로 열면 선생님 계정은 '내 하루' 화면으로 안내해요. 지점장 계정, 그리고 ?pc=1(PC 화면으로 보기)로 연 경우는 그대로 PC 화면.
+     노트북·태블릿(화면 폭 600px 넘음)은 항상 PC 화면이에요. 역할은 아래에서 프로필을 읽은 뒤 확인하니, 그 사이엔 화면을 잠깐 가려둬요. */
+  (function () {
+    try {
+      if (/[?&]pc=1\b/.test(location.search)) sessionStorage.setItem('gymops_pc', '1');
+      window.__PHONE = Math.min(window.innerWidth, screen.width || 9999) <= 600;
+      window.__WANT_PC = sessionStorage.getItem('gymops_pc') === '1';
+      if (window.__PHONE && !window.__WANT_PC) document.documentElement.style.visibility = 'hidden';
+    } catch (e) {}
+  })();
+</script>
 <title>센터 매출 관리 - 홈</title>
 <link rel="stylesheet" href="style.css?v=1791480155" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -103,8 +115,16 @@
     (async () => {
       const profile = await getMyProfile();
       if (!profile) {
+        document.documentElement.style.visibility = '';
         document.getElementById('roleBadge').textContent = '프로필을 불러오지 못했어요';
         return;
+      }
+      // 폰 + 선생님 계정이면 '내 하루'로 (지점장·PC 화면 선택 시 제외)
+      if (window.__PHONE && !window.__WANT_PC && profile.role !== 'manager') { location.replace('my-day.html'); return; }
+      document.documentElement.style.visibility = '';
+      if (window.__PHONE && profile.role !== 'manager') {
+        const sub = document.querySelector('.home-banner .sub');
+        if (sub) sub.innerHTML = '<a href="my-day.html" style="color:#fff; text-decoration:underline;">← 내 하루 화면으로 돌아가기</a>';
       }
       const roleLabel = roleLabelOf(profile);
       document.getElementById('roleBadge').textContent = `${roleLabel} · ${profile.name}`;

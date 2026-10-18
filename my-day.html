@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
+<title>센터 매출 관리 - 내 하루</title>
+<link rel="stylesheet" href="style.css?v=1791480155" />
+<style>
+  /* 휴대폰용 '내 하루' 화면: 오늘 내 수업(바디코디 일정) + 내 일일·주간 업무 체크. 업무 체크는 PC 업무 리스트와 같은 데이터(tasks)를 써서 어디서 체크해도 같이 반영돼요 */
+  body { background: var(--slate-50); }
+  .md-wrap { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
+  .md-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 12.5px; }
+  .md-top a, .md-top button { color: var(--slate-500); background: none; border: none; padding: 6px 2px; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
+  .md-hello { background: linear-gradient(135deg, #4338ca, #4f46e5 55%, #818cf8); color: #fff; border-radius: 18px; padding: 18px 18px 16px; box-shadow: 0 10px 30px -14px rgba(15,23,42,0.35); }
+  :root[data-theme="dark"] .md-hello { background: linear-gradient(135deg, #7f1d1d, #dc2626 55%, #f87171); }
+  .md-hello .hi { font-size: 18px; font-weight: 800; }
+  .md-hello .dt { font-size: 13px; opacity: .92; margin-top: 3px; }
+  .md-sum { display: flex; gap: 10px; margin-top: 12px; }
+  .md-sum > div { flex: 1; background: rgba(255,255,255,.16); border-radius: 12px; padding: 8px 10px; }
+  .md-sum b { display: block; font-size: 20px; line-height: 1.15; }
+  .md-sum span { font-size: 11.5px; opacity: .92; }
+  .md-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 16px; margin-top: 14px; overflow: hidden; }
+  .md-h { display: flex; align-items: center; gap: 8px; padding: 13px 14px 10px; font-weight: 800; font-size: 15px; }
+  .md-h small { font-weight: 600; font-size: 12px; color: var(--slate-500); margin-left: auto; }
+  .md-sub { padding: 8px 14px 4px; font-size: 12px; font-weight: 800; color: var(--slate-500); border-top: 1px solid var(--slate-200); background: var(--slate-50); }
+  .md-sub.late { color: #b91c1c; }
+  .md-empty { padding: 16px 14px 18px; color: var(--slate-500); font-size: 13.5px; }
+  .md-note { padding: 10px 14px 12px; color: var(--slate-500); font-size: 12px; border-top: 1px solid var(--slate-200); line-height: 1.5; }
+  /* 오늘 수업 */
+  .md-cls { display: flex; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--slate-200); align-items: stretch; }
+  .md-cls .tm { width: 52px; flex: none; font-size: 13px; font-weight: 800; line-height: 1.25; }
+  .md-cls .tm i { display: block; font-style: normal; font-weight: 500; color: var(--slate-500); font-size: 11.5px; }
+  .md-cls .bd { flex: 1; min-width: 0; border-left: 4px solid #6366f1; padding-left: 10px; }
+  .md-cls.group .bd { border-left-color: #f59e0b; }
+  .md-cls .nm { font-weight: 800; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .md-cls .ex { font-size: 12.5px; color: var(--slate-500); margin-top: 2px; }
+  .md-cls.cancelled { opacity: .55; }
+  .md-cls.cancelled .nm { text-decoration: line-through; }
+  .md-chip { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 99px; margin-left: 6px; vertical-align: 1px; background: #e0e7ff; color: #3730a3; }
+  .md-chip.attended { background: #dcfce7; color: #166534; }
+  .md-chip.absent { background: #fee2e2; color: #991b1b; }
+  .md-chip.cancelled { background: #e2e8f0; color: #475569; }
+  .md-chip.group { background: #fef3c7; color: #92400e; }
+  .md-chip.now { background: #4f46e5; color: #fff; }
+  /* 업무 체크 */
+  .md-task { display: flex; align-items: center; gap: 13px; padding: 12px 14px; border-top: 1px solid var(--slate-200); min-height: 56px; }
+  .md-task input { width: 26px; height: 26px; flex: none; accent-color: #16a34a; }
+  .md-task .tx { flex: 1; min-width: 0; }
+  .md-task .tt { font-size: 15px; font-weight: 700; word-break: break-word; }
+  .md-task .mt { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+  .md-task.done .tt { text-decoration: line-through; color: var(--slate-500); font-weight: 600; }
+  .md-task.late .mt { color: #b91c1c; font-weight: 700; }
+  .md-task.upcoming .tt { color: var(--slate-700); font-weight: 600; }
+  .md-task.saving { opacity: .6; }
+  .md-bar { height: 6px; background: var(--slate-200); border-radius: 99px; margin: 0 14px 12px; overflow: hidden; }
+  .md-bar > i { display: block; height: 100%; background: #22c55e; width: 0; transition: width .25s; }
+  .md-btn { display: block; width: calc(100% - 28px); margin: 0 14px 14px; padding: 12px; border-radius: 12px; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-900); font-weight: 700; font-size: 14px; text-align: center; text-decoration: none; }
+  .md-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50; max-width: 90vw; }
+  .md-toast.on { opacity: .95; }
+  .md-err { color: #b91c1c; font-size: 13px; padding: 12px 14px; }
+</style>
+</head>
+<body>
+  <div class="md-wrap">
+    <div class="md-top">
+      <span id="mdRole" class="muted">불러오는 중...</span>
+      <span>
+        <a href="home.html?pc=1" id="pcLink">PC 화면으로 보기</a>
+        <button type="button" id="logoutBtn">로그아웃</button>
+      </span>
+    </div>
+
+    <div class="md-hello">
+      <div class="hi" id="mdHello">안녕하세요 👋</div>
+      <div class="dt" id="mdDate"></div>
+      <div class="md-sum">
+        <div><b id="sumClass">-</b><span>오늘 수업</span></div>
+        <div><b id="sumTask">-</b><span>오늘 할 일 (남은 것)</span></div>
+      </div>
+    </div>
+
+    <div class="md-card" id="classCard">
+      <div class="md-h">📅 오늘 내 스케줄 <small id="classStamp"></small></div>
+      <div id="classBody"><div class="md-empty">불러오는 중...</div></div>
+      <div class="md-note">수업 등록·변경은 <b>바디코디</b>에서 해주세요. 여기엔 바디코디에서 가져온 일정이 보여요(몇 분 늦게 반영될 수 있어요).</div>
+    </div>
+
+    <div class="md-card" id="taskCard">
+      <div class="md-h">✅ 일일 · 주간 업무 <small id="taskStamp"></small></div>
+      <div class="md-bar"><i id="taskBar"></i></div>
+      <div id="taskBody"><div class="md-empty">불러오는 중...</div></div>
+      <div class="md-note">여기서 체크하면 PC 업무 리스트에도 똑같이 완료로 보여요. 업무 추가·수정은 PC에서 해주세요.</div>
+    </div>
+
+    <a class="md-btn" href="schedule.html">📆 PT 스케줄 전체 보기</a>
+  </div>
+  <div class="md-toast" id="mdToast"></div>
+
+  <script src="config.js?v=1791480155"></script>
+  <script src="auth.js?v=1791700000"></script>
+  <script src="data.js?v=1792500000"></script>
+  <script>
+    requireLogin();
+    document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const hm = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const BOOKING_LABEL = { booked: '예약', attended: '출석', absent: '결석', cancelled: '취소' };
+    const GROUP_LABEL = { future: '예정', cancelled: '취소', no_attendance: '출석 0명', '': '진행' };
+    let me = null, tasksCache = [], bookings = [], groups = [], groupError = '', bookingError = '', lastLoad = 0, toastTimer = null;
+
+    function toast(msg) {
+      const el = document.getElementById('mdToast');
+      el.textContent = msg; el.classList.add('on');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 2600);
+    }
+
+    // ───── 업무: PC 업무 리스트(tasks.html)와 같은 반복·완료 규칙 ─────
+    const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    function occurrenceDate(t, ref = new Date()) {
+      const today = dayStart(ref);
+      if (t.repeat_type === 'weekly' && t.repeat_weekday !== null && t.repeat_weekday !== undefined) {
+        const d = startOfWeek(today); d.setDate(d.getDate() + ((Number(t.repeat_weekday) + 6) % 7)); return d;
+      }
+      if (t.repeat_type === 'monthly' && t.repeat_weekday !== null && t.repeat_weekday !== undefined && t.repeat_week_ordinal !== null && t.repeat_week_ordinal !== undefined) {
+        return nthWeekdayOfMonth(today.getFullYear(), today.getMonth(), Number(t.repeat_weekday), Number(t.repeat_week_ordinal));
+      }
+      return null;
+    }
+    // 'done'(이번 주기 완료) / 'pending'(오늘까지 해야 함) / 'upcoming'(아직 할 날이 안 옴)
+    function dueState(t, ref = new Date()) {
+      if (isTaskDone(t, ref)) return 'done';
+      const occ = occurrenceDate(t, ref);
+      if (occ) return occ <= dayStart(ref) ? 'pending' : 'upcoming';
+      return 'pending';
+    }
+    function isLateTask(t, ref = new Date()) {
+      if (isTaskDone(t, ref)) return false;
+      const today = dayStart(ref), occ = occurrenceDate(t, ref);
+      if (occ) return occ < today;
+      if ((!t.repeat_type || t.repeat_type === 'none') && t.due_date) return t.due_date < formatDateStr(today);
+      return false;
+    }
+    const byTime = (a, b) => String(a.due_time || '99:99').localeCompare(String(b.due_time || '99:99')) || String(a.title).localeCompare(String(b.title), 'ko');
+
+    function taskMeta(t) {
+      const parts = [];
+      const tl = formatTimeLabel(t.due_time); if (tl) parts.push(tl);
+      if (t.repeat_type === 'weekly') parts.push(`매주 ${WEEKDAY_SHORT[t.repeat_weekday]}요일`);
+      else if (t.repeat_type === 'monthly') parts.push(`매월 ${WEEK_ORDINAL_LABELS[t.repeat_week_ordinal] || ''} ${WEEKDAY_SHORT[t.repeat_weekday] || ''}요일`.replace(/\s+/g, ' '));
+      else if (t.repeat_type === 'daily') parts.push('매일');
+      else if (t.due_date) parts.push(`마감 ${Number(t.due_date.slice(5, 7))}/${Number(t.due_date.slice(8, 10))}`);
+      if (t.member && t.member.name) parts.push(t.member.name);
+      if (isLateTask(t)) parts.unshift('⏰ 밀림');
+      return parts.join(' · ');
+    }
+    function taskRow(t) {
+      const done = isTaskDone(t), st = dueState(t), late = isLateTask(t);
+      return `<label class="md-task ${done ? 'done' : ''} ${late ? 'late' : ''} ${st === 'upcoming' && !done ? 'upcoming' : ''}" data-id="${t.id}">
+        <input type="checkbox" ${done ? 'checked' : ''} data-task="${t.id}" />
+        <div class="tx"><div class="tt">${escapeHtml(t.title)}</div><div class="mt">${escapeHtml(taskMeta(t))}</div></div></label>`;
+    }
+
+    function renderTasks() {
+      const now = new Date(), todayStr = formatDateStr(now);
+      const mine = tasksCache.filter(t => t.assignee_id === me.id);
+      const rep = (k) => mine.filter(t => t.repeat_type === k);
+      const daily = rep('daily').sort(byTime);
+      const weekly = rep('weekly').sort((a, b) => ((a.repeat_weekday + 6) % 7) - ((b.repeat_weekday + 6) % 7) || byTime(a, b));
+      const monthly = rep('monthly').filter(t => { const o = occurrenceDate(t, now); return !o || isTaskDone(t, now) || o <= dayStart(now) || (o - dayStart(now)) / 86400000 <= 7; }).sort(byTime);
+      // 반복 없는 개인 업무: 안 한 것 + 오늘 완료한 것
+      const once = mine.filter(t => (!t.repeat_type || t.repeat_type === 'none') && (!isTaskDone(t, now) || (t.last_completed_at && formatDateStr(new Date(t.last_completed_at)) === todayStr))).sort(byTime);
+      const late = [...daily, ...weekly, ...monthly, ...once].filter(t => isLateTask(t, now));
+      const lateIds = new Set(late.map(t => t.id));
+      const notLate = (l) => l.filter(t => !lateIds.has(t.id));
+
+      let html = '';
+      const sec = (label, list, cls = '') => { if (list.length) html += `<div class="md-sub ${cls}">${label} (${list.filter(t => isTaskDone(t)).length}/${list.length})</div>` + list.map(taskRow).join(''); };
+      sec('⏰ 밀린 업무', late, 'late');
+      sec('🗓 일일 업무', notLate(daily));
+      sec('📆 이번 주 주간 업무', notLate(weekly));
+      sec('🗒 월간 업무', notLate(monthly));
+      sec('📝 개인 업무', notLate(once));
+      document.getElementById('taskBody').innerHTML = html || '<div class="md-empty">배정된 업무가 없어요 🎉</div>';
+
+      // 요약: 오늘까지 해야 하는 것(pending) 중 남은 수 / 전체 진행률(일일+이번 주+밀린)
+      const scope = [...daily, ...weekly, ...monthly, ...once];
+      const must = scope.filter(t => dueState(t, now) !== 'upcoming');
+      const total = must.length, doneN = must.filter(t => isTaskDone(t, now)).length;
+      document.getElementById('sumTask').textContent = scope.filter(t => dueState(t, now) === 'pending').length + '개';
+      document.getElementById('taskBar').style.width = total ? Math.round(doneN / total * 100) + '%' : '0';
+      document.getElementById('taskStamp').textContent = total ? `${doneN}/${total} 완료` : '';
+    }
+
+    document.getElementById('taskBody').addEventListener('change', async (e) => {
+      const cb = e.target.closest('input[data-task]'); if (!cb) return;
+      const id = cb.dataset.task, checked = cb.checked, row = cb.closest('.md-task');
+      const t = tasksCache.find(x => x.id === id); if (!t) return;
+      const before = { status: t.status, last_completed_at: t.last_completed_at, last_checked_at: t.last_checked_at };
+      row.classList.add('saving'); cb.disabled = true;
+      try {
+        await toggleTaskDone(id, checked);
+        const nowIso = new Date().toISOString();
+        t.status = checked ? 'done' : 'todo'; t.last_completed_at = checked ? nowIso : null; if (checked) t.last_checked_at = nowIso;
+        renderTasks();
+        if (checked) toast('완료했어요 ✅');
+      } catch (err) {
+        Object.assign(t, before); renderTasks();
+        toast('저장하지 못했어요: ' + err.message);
+      }
+    });
+
+    // ───── 오늘 수업: 개인PT(앱 DB, 바디코디에서 동기화) + 그룹수업(바디코디) ─────
+    function renderClasses() {
+      const now = new Date();
+      const items = [];
+      bookings.forEach(b => {
+        const s = new Date(b.start_at), e = new Date(b.end_at);
+        items.push({ s, e, kind: 'pt', status: b.status, name: b.member ? b.member.name : '(삭제된 회원)',
+          ex: (b.member && b.member.pt_remaining_sessions != null) ? `잔여 ${b.member.pt_remaining_sessions}회` : '', memo: b.memo || '' });
+      });
+      groups.forEach(c => {
+        const s = new Date(c.start), e = new Date(c.end);
+        const who = c.reason === 'future' ? `신청 ${c.members}명${c.capacity ? ` / 정원 ${c.capacity}` : ''}` : `출석 ${c.attended}명${c.members ? ` / 신청 ${c.members}` : ''}`;
+        items.push({ s, e, kind: 'group', status: c.reason === 'cancelled' ? 'cancelled' : '', glabel: GROUP_LABEL[c.reason] || '진행', name: c.title || '그룹수업', ex: who });
+      });
+      items.sort((a, b) => a.s - b.s);
+      const live = items.filter(i => i.status !== 'cancelled');
+      document.getElementById('sumClass').textContent = live.length + '개';
+      let html = items.map(i => {
+        const isNow = i.status !== 'cancelled' && now >= i.s && now < i.e;
+        const chip = i.kind === 'group'
+          ? `<span class="md-chip group">그룹 · ${escapeHtml(i.glabel)}</span>`
+          : `<span class="md-chip ${i.status}">${BOOKING_LABEL[i.status] || escapeHtml(i.status)}</span>`;
+        return `<div class="md-cls ${i.kind === 'group' ? 'group' : ''} ${i.status === 'cancelled' ? 'cancelled' : ''}">
+          <div class="tm">${hm(i.s)}<i>~ ${hm(i.e)}</i></div>
+          <div class="bd"><div class="nm">${escapeHtml(i.name)}${chip}${isNow ? '<span class="md-chip now">진행 중</span>' : ''}</div>
+          <div class="ex">${escapeHtml([i.ex, i.memo].filter(Boolean).join(' · '))}</div></div></div>`;
+      }).join('');
+      if (!items.length) html = '<div class="md-empty">오늘 잡힌 수업이 없어요.</div>';
+      const errs = [bookingError && `개인PT 일정을 불러오지 못했어요: ${bookingError}`, groupError && `그룹수업을 불러오지 못했어요: ${groupError}`].filter(Boolean);
+      if (errs.length) html += `<div class="md-err">${errs.map(escapeHtml).join('<br>')}</div>`;
+      document.getElementById('classBody').innerHTML = html;
+      document.getElementById('classStamp').textContent = `${hm(new Date(lastLoad || Date.now()))} 기준`;
+    }
+
+    async function loadAll(quiet) {
+      if (!me) return;
+      const now = new Date(), start = new Date(now.getFullYear(), now.getMonth(), now.getDate()), end = new Date(start); end.setDate(end.getDate() + 1);
+      const todayStr = formatDateStr(start);
+      const [bk, gr, tk] = await Promise.allSettled([
+        fetchPtBookings(me.id, start.toISOString(), end.toISOString()),
+        fetchGroupClassSchedule(todayStr, todayStr, me.id),
+        fetchTasks()
+      ]);
+      bookingError = bk.status === 'rejected' ? bk.reason.message : ''; bookings = bk.status === 'fulfilled' ? bk.value : bookings;
+      groupError = gr.status === 'rejected' ? gr.reason.message : ''; groups = gr.status === 'fulfilled' ? (gr.value.classes || []) : groups;
+      lastLoad = Date.now();
+      renderClasses();
+      if (tk.status === 'fulfilled') { tasksCache = tk.value; renderTasks(); }
+      else if (!quiet || !tasksCache.length) document.getElementById('taskBody').innerHTML = `<div class="md-err">업무를 불러오지 못했어요: ${escapeHtml(tk.reason.message)}</div>`;
+    }
+
+    (async () => {
+      me = await getMyProfile();
+      if (!me) { document.getElementById('mdRole').textContent = '프로필을 불러오지 못했어요'; return; }
+      document.getElementById('mdRole').textContent = `${roleLabelOf(me)} · ${me.name}`;
+      document.getElementById('mdHello').textContent = `안녕하세요 ${me.name} 선생님.`;
+      const now = new Date();
+      document.getElementById('mdDate').textContent = `${now.getMonth() + 1}월 ${now.getDate()}일 (${WEEKDAY_SHORT[now.getDay()]}) 오늘도 화이팅이에요 💪`;
+      await loadAll(false);
+      // 다른 기기(PC)에서 바뀐 걸 따라가기: 화면으로 돌아올 때, 그리고 켜져 있는 동안 1분마다 다시 불러와요
+      document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastLoad > 15000) loadAll(true); });
+      setInterval(() => { if (!document.hidden && !document.querySelector('.md-task.saving')) loadAll(true); }, 60000);
+    })();
+  </script>
+</body>
+</html>

@@ -203,6 +203,7 @@
     let currentUserId = null;
     let currentUserRole = null;
     let tasksCache = [];
+    let lastTaskLoad = Date.now();
     let trainersCache = [];
     let activeAssigneeFilter = 'all';
 
@@ -655,6 +656,7 @@
     async function loadTasks() {
       const container = document.getElementById('taskBody');
       try {
+        lastTaskLoad = Date.now();
         tasksCache = await fetchTasks();
         renderTrainerTabs();
         renderTaskBody();
@@ -663,6 +665,14 @@
       }
     }
 
+    // 휴대폰('내 하루')에서 체크한 내용이 PC에도 보이게: 이 탭으로 돌아올 때(입력 중이 아니면) 다시 불러옴
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || Date.now() - lastTaskLoad < 15000) return;
+      const a = document.activeElement;
+      if (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type !== 'checkbox') return;
+      if (Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display && m.style.display !== 'none')) return; // 수정 창이 열려 있으면 건드리지 않음
+      lastTaskLoad = Date.now(); loadTasks();
+    });
     document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errorBox = document.getElementById('addErrorBox');
