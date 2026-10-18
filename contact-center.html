@@ -110,7 +110,7 @@
 
   <div class="wrap">
     <h2 style="margin:6px 0 4px;">📞 연락 센터</h2>
-    <p class="muted" style="margin:0 0 12px;">신규상담 · 만료회원 · 그룹PT를 한 곳에서 처리해요. 출근해서 <strong>일일업무</strong>만 위에서부터 돌리고, 결과 버튼을 누르면 <strong>다시 연락할 날에 자동으로 다시 올라와요</strong>. <span id="scopeNote"></span></p>
+    <p class="muted" style="margin:0 0 12px;">신규상담 · 만료회원 · 그룹PT · 장기 미출석 회원을 한 곳에서 처리해요. 출근해서 <strong>일일업무</strong>만 위에서부터 돌리고, 결과 버튼을 누르면 <strong>다시 연락할 날에 자동으로 다시 올라와요</strong>. <span id="scopeNote"></span></p>
 
     <div id="migrationBanner" class="cc-banner" style="display:none;"></div>
     <div id="loadError" class="error-text" style="display:none;"></div>
@@ -144,9 +144,9 @@
     <div id="listArea"><div class="cc-card"><div class="cc-empty">불러오는 중...</div></div></div>
 
     <p class="muted" style="margin:18px 2px 0; font-size:12px;">
-      그룹PT 무제한 회원의 "마지막 방문일" 데이터는 <a href="group-pt.html">바디코디 방문 기록 업로드</a>로 갱신해요 (그룹PT 참석 저조 목록의 기준).
+      장기 미출석은 이용권(헬스·그룹PT·개인PT)이 남아 있는 회원 중 "마지막 방문일"이 오래된 회원이에요(바디코디 회원 연동이 방문일을 갱신해요). 그룹PT 무제한 회원의 "마지막 방문일" 데이터는 <a href="group-pt.html">바디코디 방문 기록 업로드</a>로 갱신해요 (그룹PT 참석 저조 목록의 기준).
     </p>
-    <p class="muted" id="pageVersion" style="margin:6px 2px 24px; font-size:11.5px; text-align:right;">연락 센터 · 2026-10-12 통합판 (상담 직접 추가 포함)</p>
+    <p class="muted" id="pageVersion" style="margin:6px 2px 24px; font-size:11.5px; text-align:right;">연락 센터 · 2026-10-18 (장기 미출석 추가)</p>
   </div>
 
   <!-- 결과 입력 창 -->
@@ -215,7 +215,7 @@
 
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791700000"></script>
-  <script src="data.js?v=1791640000"></script>
+  <script src="data.js?v=1792400000"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -229,6 +229,7 @@
     const LEGACY_GAP = 7;          // 재연락일이 따로 없던 예전 "고민중" 건은 마지막 연락 + 7일 뒤에 자동으로 다시 올라옴
     const LEGACY_STALE_DAYS = 14;  // 그 날짜가 14일도 넘게 지났으면 "방치된 건"으로 따로 모음(일일업무를 덮지 않게)
     const NEVER_CONTACTED_WINDOW = 60; // 신규상담 미연락은 60일 이내 건만 미연락 칸에 (더 오래된 건 예정·진행중 > 방치)
+    const ABSENT_DAY_CHOICES = [14, 30, 60, 90];
     const GPT_LOW_ATTEND_DAYS = 14;    // 그룹PT 무제한: 이 일수 이상 안 오면 미연락 칸에 올림
     const RESULT_LABEL = { called: '통화완료', noanswer: '부재중', thinking: '고민중', registered: '등록', declined: '거절', rolled: '이월' };
     const CHANNEL_LABEL = { phone_auto: '자동통화', naver_place: '네이버 플레이스', carrot: '당근', blog: '블로그', referral: '지인소개',
@@ -249,15 +250,17 @@
     // 상태
     // ------------------------------------------------------------------
     let me = null, isManager = false;
-    let consultRows = [], expiryItems = [], gptItems = [], staffMap = {};
+    let consultRows = [], expiryItems = [], gptItems = [], absentItems = [], staffMap = {};
     let tasks = [];
     let HAS_NEXT = true;                 // migration_83(재연락 날짜 칸) 실행 여부
     let activeTab = 'daily';
     const subFilter = { daily: 'all', todo: 'all', later: 'all', done: 'all' };
     let catFilter = 'all', doneScope = 'month', ownerFilter = 'all', searchText = '';
+    let absentDays = ABSENT_DAY_CHOICES.includes(Number(lsGet('cc_absent_days', '30'))) ? Number(lsGet('cc_absent_days', '30')) : 30; // 이 일수 이상 안 온 이용권 보유 회원이 장기 미출석
     let autoDays = Number(lsGet('cc_auto_days', '7')) || 7;   // 만료 D-N일 이내 미연락 건을 일일업무에 자동 편입
     const showLimit = {};                 // 그룹별 "더 보기" 개수
     let resultCtx = null;
+    let absentLoadError = '';
 
     // ------------------------------------------------------------------
     // 만료(TM) 항목 상태 계산 - expiry.html과 같은 규칙 (이월은 달이 바뀌면 다시 올라옴)
@@ -271,8 +274,9 @@
     }
     const TM_RESULT_TO_STATUS = { called: 'in_progress', thinking: 'in_progress', noanswer: 'no_answer', registered: 'renewed', declined: 'declined', rolled: 'rolled_over' };
     const GPT_RESULT_TO_STATUS = { called: 'contacted', thinking: 'proposed', noanswer: 'contacted', registered: 'converted', declined: 'declined', rolled: 'on_hold' };
-    const DONE_LABEL = { renewed: '등록', converted: '등록', registered: '등록', declined: '거절', rolled_over: '이월' };
-    const DONE_KEY = { renewed: 'registered', converted: 'registered', registered: 'registered', declined: 'declined', rolled_over: 'rolled' };
+    const ABS_RESULT_TO_STATUS = { called: 'contacted', thinking: 'proposed', noanswer: 'no_answer', registered: 'returned', declined: 'declined', rolled: 'on_hold' };
+    const DONE_LABEL = { returned: '복귀', renewed: '등록', converted: '등록', registered: '등록', declined: '거절', rolled_over: '이월' };
+    const DONE_KEY = { returned: 'returned', renewed: 'registered', converted: 'registered', registered: 'registered', declined: 'declined', rolled_over: 'rolled' };
 
     // ------------------------------------------------------------------
     // 세 종류 데이터 → 통일된 "할 일(task)"로 변환
@@ -334,6 +338,26 @@
       };
     }
 
+    // 😴 장기 미출석: 이용권이 남았는데 마지막 방문이 absentDays일 이상 된 회원 (연락 기록은 absence_tm_logs)
+    function absentTask(it) {
+      const m = it.member, lg0 = it.latestLog, st0 = lg0 ? lg0.status : 'not_contacted';
+      const low = it.daysSinceVisit >= absentDays;
+      // 다시 나오기로 했는데 그 뒤로도 또 오래 안 나온 회원은 새로 연락 대상으로 올려요
+      const reopened = st0 === 'returned' && lg0.contact_date && diffDays(TODAY, lg0.contact_date) >= absentDays && low;
+      const lg = reopened ? null : lg0, st = lg ? lg.status : 'not_contacted';
+      const done = st === 'returned' || st === 'declined';
+      if (!done && !low) return null; // 다시 나오기 시작해서 대상에서 빠짐
+      const lastVisit = String(m.last_visit_date).slice(0, 10);
+      return {
+        key: 'a:' + m.id, src: 'absent', kind: 'absent', item: it, memberId: m.id, raw: lg,
+        name: m.name, phone: m.phone, ownerId: m.assigned_trainer_id || null, ownerName: m.trainer && m.trainer.name,
+        headline: it.passLabel || '이용권 보유', sub: `${it.daysSinceVisit}일째 안 옴 · 마지막 방문 ${md(lastVisit)}`, daysSince: it.daysSinceVisit,
+        startDate: null, contacts: [], lastContact: lg && st !== 'not_contacted' ? lg.contact_date : null, nextDate: (lg && lg.next_contact_date) || null,
+        memo: (lg && lg.memo) || '', touched: !!(lg && st !== 'not_contacted'), resultKey: st,
+        done, doneKey: st === 'returned' ? 'returned' : st === 'declined' ? 'declined' : null, doneDate: lg ? lg.contact_date : null
+      };
+    }
+
     // 어느 칸(일일업무/미연락/예정·진행중/보관함)에 둘지
     function classify(t) {
       t.stale = false; t.effNext = null;
@@ -369,6 +393,7 @@
       consultRows.forEach(c => out.push(consultTask(c)));
       expiryItems.forEach(it => out.push(expiryTask(it)));
       gptItems.forEach(it => { const t = gptTask(it); if (t) out.push(t); });
+      absentItems.forEach(it => { const t = absentTask(it); if (t) out.push(t); });
       out.forEach(t => {
         t.ownerName = t.ownerName || staffMap[t.ownerId] || '';
         t.phoneDigits = digitsOf(t.phone);
@@ -407,11 +432,12 @@
         case 'exp_pt': return '<span class="badge badge-orange">만료 · PT</span>';
         case 'exp_etc': return '<span class="badge badge-slate">만료 · 기타</span>';
         case 'gpt': return '<span class="badge badge-purple">그룹PT 무제한</span>';
+        case 'absent': return '<span class="badge badge-slate">😴 장기 미출석</span>';
       }
       return '';
     }
     function ddayBadge(t) {
-      if (t.src === 'gpt') {
+      if (t.src === 'gpt' || t.src === 'absent') {
         const d = t.daysSince;
         return d === null ? '' : `<span class="cc-dd ${d >= 30 ? 'r' : 'o'}">${d}일 미방문</span>`;
       }
@@ -430,7 +456,7 @@
       return `<div class="cc-next far">다음 ${mdw(d)} · ${diff === 1 ? '내일' : diff + '일 뒤'}${auto}</div>`;
     }
     function stepsHtml(t) {
-      if (t.src === 'gpt') return t.touched ? `<div class="cc-steps"><span class="cc-dot done">✓</span><span>${md(t.lastContact)} 연락</span></div>` : '<div class="cc-steps"><span class="cc-dot">1</span><span>처음 연락</span></div>';
+      if (t.src === 'gpt' || t.src === 'absent') return t.touched ? `<div class="cc-steps"><span class="cc-dot done">✓</span><span>${md(t.lastContact)} 연락</span></div>` : '<div class="cc-steps"><span class="cc-dot">1</span><span>처음 연락</span></div>';
       const cs = t.contacts.slice().sort();
       const dots = [0, 1, 2].map(i => cs[i]
         ? `<span class="cc-dot done" title="${i + 1}차 연락 ${cs[i]}">${i + 1}</span><span>${md(cs[i])}</span>`
@@ -447,7 +473,7 @@
         `<button class="cc-btn ok" data-act="called" data-key="${k}">통화완료</button>` +
         `<button class="cc-btn no" data-act="noanswer" data-key="${k}">부재중</button>` +
         `<button class="cc-btn th" data-act="thinking" data-key="${k}">고민중</button>` +
-        `<button class="cc-btn reg" data-act="registered" data-key="${k}">등록</button>` +
+        `<button class="cc-btn reg" data-act="registered" data-key="${k}" ${t.src === 'absent' ? 'title="다시 나오기로 했어요"' : ''}>${t.src === 'absent' ? '복귀' : '등록'}</button>` +
         `<button class="cc-btn rj" data-act="declined" data-key="${k}">거절</button>` +
         `<button class="cc-btn rj" data-act="rolled" data-key="${k}">이월</button>`;
     }
@@ -472,7 +498,7 @@
       const carriedBadge = t.carried ? ' <span class="badge badge-purple" title="지난달에 이월 처리돼서 이번 달로 넘어온 건">이월</span>' : '';
       const memoShown = t.memo || (groupOf(t).find(x => x.memo) || {}).memo || '';
       let c4 = t.done
-        ? `<span class="badge ${t.doneKey === 'registered' ? 'badge-green' : t.doneKey === 'declined' ? 'badge-red' : 'badge-purple'}">${esc(DONE_LABEL[t.resultKey] || RESULT_LABEL[t.doneKey] || '')}</span><div class="cc-sub">${t.doneDate ? '처리 ' + md(t.doneDate) : ''}</div>`
+        ? `<span class="badge ${t.doneKey === 'registered' || t.doneKey === 'returned' ? 'badge-green' : t.doneKey === 'declined' ? 'badge-red' : 'badge-purple'}">${esc(DONE_LABEL[t.resultKey] || RESULT_LABEL[t.doneKey] || '')}</span><div class="cc-sub">${t.doneDate ? '처리 ' + md(t.doneDate) : ''}</div>`
         : stepsHtml(t) + nextLabel(t);
       return `<div class="cc-row ${late ? 'late' : ''}">
         <div>${Array.from(new Set(groupOf(t).map(kindBadge))).join(' ')}</div>
@@ -502,20 +528,23 @@
       const row = document.getElementById('chipRow');
       let defs = [];
       if (activeTab === 'daily') {
-        defs = [['all', '전체'], ['consult', '신규상담'], ['expiry', '만료 회원'], ['gpt', '그룹PT 무제한']];
+        defs = [['all', '전체'], ['consult', '신규상담'], ['expiry', '만료 회원'], ['gpt', '그룹PT 무제한'], ['absent', '😴 장기 미출석']];
       } else if (activeTab === 'todo') {
         defs = [['all', '전체'], ['membership', '🏋️ 회원권 임박'], ['group_pt', '🤸 그룹PT 임박'], ['etcsoon', '💪 PT·기타 임박'],
-          ['newconsult', '🆕 신규상담 미연락'], ['gptlow', '📉 그룹PT 참석 저조'], ['expired', '📦 만료자 DB']];
+          ['newconsult', '🆕 신규상담 미연락'], ['gptlow', '📉 그룹PT 참석 저조'], ['absentlong', '😴 장기 미출석'], ['expired', '📦 만료자 DB']];
       } else if (activeTab === 'later') {
         defs = [['all', '전체'], ['planned', '날짜 잡힌 건'], ['stale', '방치된 건 (날짜 없이 오래됨)']];
       } else {
-        defs = [['all', '전체'], ['registered', '✅ 등록'], ['declined', '🚫 거절(미스)'], ['rolled', '📦 이월']];
+        defs = [['all', '전체'], ['registered', '✅ 등록'], ['returned', '🔄 복귀'], ['declined', '🚫 거절(미스)'], ['rolled', '📦 이월']];
       }
       const cur = subFilter[activeTab];
       let html = defs.map(([k, l]) => `<button class="filter-tab ${cur === k ? 'active' : ''}" data-chip="${k}">${l}${counts[k] !== undefined ? ` (${counts[k]})` : ''}</button>`).join('');
       if (activeTab === 'todo' && cur === 'expired') {
         html += '<span style="width:12px;"></span>' + [['all', '전체'], ['membership', '회원권'], ['group_pt', '그룹PT'], ['pt', 'PT'], ['etc', '기타']]
           .map(([k, l]) => `<button class="filter-tab ${catFilter === k ? 'active' : ''}" data-cat="${k}">${l}</button>`).join('');
+      }
+      if (activeTab === 'todo') {
+        html += `<span class="muted" style="margin-left:auto; font-size:12px; align-self:center;">장기 미출석 기준 <select id="absentDaysSel" style="padding:3px 6px; border:1px solid var(--slate-300); border-radius:6px; background:var(--surface); color:var(--slate-900);">${ABSENT_DAY_CHOICES.map(n => `<option value="${n}" ${n === absentDays ? 'selected' : ''}>${n}일 이상</option>`).join('')}</select> 안 온 이용권 보유 회원</span>`;
       }
       if (activeTab === 'daily') {
         html += `<span class="muted" style="margin-left:auto; font-size:12px; align-self:center;">연락한 적 없는 만료 임박 건은
@@ -532,6 +561,7 @@
     function todoGroup(t) {
       if (t.src === 'consult') return 'newconsult';
       if (t.src === 'gpt') return 'gptlow';
+      if (t.src === 'absent') return 'absentlong';
       if (t.daysLeft !== null && t.daysLeft < 0) return 'expired';
       if (t.kind === 'exp_membership') return 'membership';
       if (t.kind === 'exp_group_pt') return 'group_pt';
@@ -554,7 +584,7 @@
       const lateCnt = daily.filter(t => (t.nextDate || t.effNext) < TODAY).length;
       const bySrc = (s) => daily.filter(t => t.src === s).length;
       document.getElementById('statDaily').textContent = daily.length;
-      document.getElementById('statDailySub').textContent = `신규상담 ${bySrc('consult')} · 만료 ${bySrc('expiry')} · 그룹PT ${bySrc('gpt')}`;
+      document.getElementById('statDailySub').textContent = `신규상담 ${bySrc('consult')} · 만료 ${bySrc('expiry')} · 그룹PT ${bySrc('gpt')} · 장기 미출석 ${bySrc('absent')}`;
       document.getElementById('statLate').textContent = lateCnt;
       const touchedToday = mine.filter(t => t.lastContact === TODAY);
       document.getElementById('statDone').textContent = touchedToday.length;
@@ -564,11 +594,11 @@
       let html = '';
       if (activeTab === 'daily') {
         const f = subFilter.daily;
-        counts = { all: daily.length, consult: bySrc('consult'), expiry: bySrc('expiry'), gpt: bySrc('gpt') };
+        counts = { all: daily.length, consult: bySrc('consult'), expiry: bySrc('expiry'), gpt: bySrc('gpt'), absent: bySrc('absent') };
         let list = q(daily).filter(t => f === 'all' || srcOf(t) === f);
         const overdue = list.filter(t => (t.nextDate || t.effNext) < TODAY).sort(sortByNext);
         const today = list.filter(t => (t.nextDate || t.effNext) >= TODAY).sort((a, b) => {
-          const o = { consult: 0, expiry: 1, gpt: 2 }; return o[a.src] - o[b.src] || (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
+          const o = { consult: 0, expiry: 1, gpt: 2, absent: 3 }; return o[a.src] - o[b.src] || (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
         });
         html += groupHtml('daily-late', '⏰ 밀린 연락', '예정일이 지났는데 아직 처리 안 한 사람이에요', overdue, { red: true });
         html += groupHtml('daily-today', `📅 오늘 예정 · ${mdw(TODAY)}`, '', today,
@@ -583,7 +613,7 @@
         const f = subFilter.todo;
         todo.forEach(t => { t.tg = todoGroup(t); });
         counts = { all: todo.length };
-        ['membership', 'group_pt', 'etcsoon', 'newconsult', 'gptlow', 'expired'].forEach(k => counts[k] = todo.filter(t => t.tg === k).length);
+        ['membership', 'group_pt', 'etcsoon', 'newconsult', 'gptlow', 'absentlong', 'expired'].forEach(k => counts[k] = todo.filter(t => t.tg === k).length);
         const base = q(todo);
         const pick = (k) => base.filter(t => t.tg === k);
         const byDays = (a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
@@ -593,6 +623,7 @@
           ['etcsoon', '💪 PT · 기타 이용권 임박', '', pick('etcsoon').sort(byDays)],
           ['newconsult', '🆕 신규상담 미연락', '아직 한 번도 연락 못 한 문의', pick('newconsult').sort((a, b) => (b.startDate || '') < (a.startDate || '') ? -1 : 1)],
           ['gptlow', '📉 그룹PT 무제한 · 참석 저조', '오래 안 온 순', pick('gptlow').sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))],
+          ['absentlong', '😴 장기 미출석 · 이용권이 남은 회원', `마지막 방문 ${absentDays}일 이상 · 오래 안 온 순 (다시 나오기 시작하면 자동으로 빠져요)`, pick('absentlong').sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))],
           ['expired', '📦 만료자 DB', '만료된 지 얼마 안 된 순 · 재등록 안 한 회원', pick('expired').filter(t => catFilter === 'all' || (CATEGORY_CHIP[t.item.categoryKey] || 'etc') === catFilter)
             .sort((a, b) => b.daysLeft - a.daysLeft)]
         ];
@@ -609,7 +640,7 @@
       } else {
         const f = subFilter.done;
         let pool = done.filter(t => doneScope === 'all' || (t.doneDate || '').slice(0, 7) === THIS_MONTH);
-        counts = { all: pool.length, registered: pool.filter(t => t.doneKey === 'registered').length, declined: pool.filter(t => t.doneKey === 'declined').length, rolled: pool.filter(t => t.doneKey === 'rolled').length };
+        counts = { all: pool.length, registered: pool.filter(t => t.doneKey === 'registered').length, declined: pool.filter(t => t.doneKey === 'declined').length, rolled: pool.filter(t => t.doneKey === 'rolled').length, returned: pool.filter(t => t.doneKey === 'returned').length };
         const list = q(pool).filter(t => f === 'all' || t.doneKey === f).sort((a, b) => ((b.doneDate || '') < (a.doneDate || '') ? -1 : 1));
         html += groupHtml('done', '📦 처리 완료', '재연락일이 없는 완료 건이에요. 잘못 눌렀으면 "되돌리기"로 일일업무에 다시 올려요', list, { empty: '이 기간에 처리 완료된 건이 없어요.' });
       }
@@ -637,7 +668,7 @@
       const phoneToMember = {};
       tasks.forEach(t => { if (t.memberId && t.phoneDigits && t.phoneDigits.length >= 9) phoneToMember[t.phoneDigits] = t.memberId; });
       const personKey = (t) => t.memberId ? 'm:' + t.memberId : (t.phoneDigits && t.phoneDigits.length >= 9 ? (phoneToMember[t.phoneDigits] ? 'm:' + phoneToMember[t.phoneDigits] : 'p:' + t.phoneDigits) : null);
-      const SRC_ORDER = { expiry: 0, gpt: 1, consult: 2 };
+      const SRC_ORDER = { expiry: 0, gpt: 1, absent: 2, consult: 3 };
       const buckets = {};
       list.forEach(t => { t.merged = []; const k = !t.done && personKey(t); if (k) (buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] = buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] || []).push(t); });
       const hidden = new Set();
@@ -657,7 +688,7 @@
       return tasks.filter(o => o.key !== t.key && !o.done && o.bucket !== 'done' &&
         ((t.memberId && o.memberId === t.memberId) || (ph && o.phoneDigits === ph)));
     }
-    const SRC_LABEL = { consult: '신규상담', expiry: '만료', gpt: '그룹PT' };
+    const SRC_LABEL = { consult: '신규상담', expiry: '만료', gpt: '그룹PT', absent: '장기 미출석' };
     function sibLabel(o) { return `${SRC_LABEL[o.src]} · ${o.headline}${o.sub && o.src === 'expiry' ? ' (' + o.sub + ')' : ''}`; }
     function renderSiblings(t, result) {
       const box = document.getElementById('rmSiblings');
@@ -704,6 +735,17 @@
         const key = nextSlot(m, 'tm_contact', '_date');
         if (key) { try { await updateMember(m.id, { [key]: TODAY }); m[key] = TODAY; } catch (e) { /* 연락일 표기 실패는 기록 저장에 영향 없음 */ } }
         // 같은 회원의 다른 상품 줄에도 연락일이 보이도록 같은 member 객체를 쓰고 있음(fetchExpiryBoard가 한 번 불러온 객체)
+      } else if (t.src === 'absent') {
+        const it = t.item, m = it.member;
+        const payload = {
+          member_id: m.id, staff_id: (isManager && m.assigned_trainer_id) || me.id,
+          status: ABS_RESULT_TO_STATUS[result], contact_date: TODAY, memo: composeMemo(t.memo, result, memo).replace(/\[(\d+\/\d+) 등록\]([^·]*)$/, '[$1 복귀]$2'),
+          next_contact_date: result === 'rolled' ? firstDayOfMonthAfter(TODAY, 1) : nd
+        };
+        const rows = await addAbsenceTmLog(payload);
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        it.latestLog = row;
+        (m.absence_tm_logs = m.absence_tm_logs || []).unshift(row);
       } else {
         const it = t.item, m = it.member;
         const payload = {
@@ -762,14 +804,15 @@
     function openResult(t, result) {
       const defaultDays = result === 'called' ? 7 : result === 'noanswer' ? 1 : 3;
       resultCtx = { key: t.key, result, days: defaultDays };
-      const titleMap = { called: '📞 통화완료', thinking: '🤔 고민중', registered: '✅ 등록 처리', declined: '🚫 거절(미스) 처리', rolled: '📦 이월 처리', noanswer: '📵 부재중' };
+      const titleMap = { called: '📞 통화완료', thinking: '🤔 고민중', registered: t.src === 'absent' ? '🔄 다시 나오기로 함' : '✅ 등록 처리', declined: '🚫 거절(미스) 처리', rolled: '📦 이월 처리', noanswer: '📵 부재중' };
       document.getElementById('rmTitle').textContent = `${t.name} 님 · ${titleMap[result]}`;
       document.getElementById('rmSub').textContent = `${t.headline}${t.sub ? ' · ' + t.sub : ''}`;
       const open = OPEN_RESULTS.includes(result);
       document.getElementById('rmDateBox').style.display = open ? '' : 'none';
       const info = document.getElementById('rmInfo');
       info.style.display = 'none';
-      if (result === 'registered') { info.style.display = ''; info.textContent = t.src === 'expiry' ? '재등록 처리해요. 결제 금액은 "매출 입력"에서 따로 등록해주세요.' : '등록 처리해요. 결제 금액은 "매출 입력"에서 따로 등록해주세요.'; }
+      if (result === 'registered' && t.src === 'absent') { info.style.display = ''; info.textContent = '"다시 나오기로 함"으로 기록하고 보관함(복귀)으로 이동해요. 또 오래 안 나오면 다시 올라와요.'; }
+      else if (result === 'registered') { info.style.display = ''; info.textContent = t.src === 'expiry' ? '재등록 처리해요. 결제 금액은 "매출 입력"에서 따로 등록해주세요.' : '등록 처리해요. 결제 금액은 "매출 입력"에서 따로 등록해주세요.'; }
       if (result === 'rolled') { info.style.display = ''; info.textContent = t.src === 'consult' ? '이번 기록은 "이월"로 보관되고, 다음 달 1일자로 새 기록이 만들어져 그날 일일업무에 올라와요.' : t.src === 'expiry' ? '이월로 보관되고, 다음 달이 되면 자동으로 다시 일일업무에 올라와요.' : '보류로 기록되고 다음 달 1일에 다시 일일업무에 올라와요.'; }
       if (result === 'declined') { info.style.display = ''; info.textContent = '처리 완료 보관함으로 이동해요. 잘못 눌렀으면 보관함에서 "되돌리기" 할 수 있어요.'; }
       document.getElementById('rmChips').innerHTML = DATE_CHOICES.map(([n, l]) =>
@@ -883,6 +926,12 @@
         const row = Array.isArray(rows) ? rows[0] : rows;
         it.latestTm = { ...row, memoIds: row.memo ? [row.id] : [] };
         it.tmHistory = [row, ...(it.tmHistory || [])];
+      } else if (t.src === 'absent') {
+        const it = t.item;
+        const rows = await addAbsenceTmLog({ member_id: it.member.id, staff_id: (isManager && it.member.assigned_trainer_id) || me.id,
+          status: (t.raw && t.raw.status) || 'not_contacted', contact_date: TODAY, memo: t.memo || null, next_contact_date: TODAY });
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        it.latestLog = row; (it.member.absence_tm_logs = it.member.absence_tm_logs || []).unshift(row);
       } else {
         const it = t.item;
         const rows = await addGroupPtRetentionLog({ member_id: it.member.id, staff_id: (isManager && it.member.assigned_trainer_id) || me.id,
@@ -913,6 +962,10 @@
         (t.item.tmHistory || []).forEach(l => ev.push({ d: l.contact_date || (l.created_at || '').slice(0, 10), html:
           `<b>${md(l.contact_date || (l.created_at || '').slice(0, 10))}</b> ${esc(TM_STATUS_KO[l.status] || l.status)}${l.next_contact_date ? ` → ${md(l.next_contact_date)} 재연락` : ''}${l.memo ? `<div class="muted">${esc(l.memo)}</div>` : ''}` }));
         if (t.expiryDate) ev.push({ d: t.expiryDate + '~', html: `<b>${md(t.expiryDate)}</b> ${esc(t.headline)} 만료${t.daysLeft < 0 ? '됨' : ' 예정'}` });
+      } else if (t.src === 'absent') {
+        const logs = (t.item.member.absence_tm_logs || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        logs.forEach(l => ev.push({ d: l.contact_date || '', html: `<b>${md(l.contact_date || TODAY)}</b> ${esc(ABSENCE_STATUS_LABEL[l.status] || l.status)}${l.next_contact_date ? ` → ${md(l.next_contact_date)} 재연락` : ''}${l.memo ? `<div class="muted">${esc(l.memo)}</div>` : ''}` }));
+        ev.push({ d: String(t.item.member.last_visit_date).slice(0, 10) + '~', html: `<b>${md(String(t.item.member.last_visit_date).slice(0, 10))}</b> 마지막 방문 (${t.daysSince}일 전)` });
       } else {
         const logs = (t.item.member.group_pt_retention_logs || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         logs.forEach(l => ev.push({ d: l.contact_date || '', html: `<b>${md(l.contact_date || TODAY)}</b> ${esc(GROUP_PT_RETENTION_STATUS_LABEL[l.status] || l.status)}${l.next_contact_date ? ` → ${md(l.next_contact_date)} 재연락` : ''}${l.memo ? `<div class="muted">${esc(l.memo)}</div>` : ''}` }));
@@ -999,6 +1052,7 @@
     });
     document.getElementById('chipRow').addEventListener('change', (e) => {
       if (e.target.id === 'autoDaysSel') { autoDays = Number(e.target.value); lsSet('cc_auto_days', String(autoDays)); buildTasks(); renderList(); }
+      if (e.target.id === 'absentDaysSel') { absentDays = Number(e.target.value); lsSet('cc_absent_days', String(absentDays)); buildTasks(); renderList(); }
       if (e.target.id === 'doneScopeSel') { doneScope = e.target.value; renderList(); }
     });
     document.getElementById('searchBox').addEventListener('input', (e) => { searchText = e.target.value; renderList(); });
@@ -1020,7 +1074,7 @@
       const cands = callCandidates(ev);
       const phoneLabel = formatPhone(ev.phone) || ev.phone || '번호 없음';
       const missed = ev.direction === 'missed';
-      const targetOpts = cands.map(t => `<option value="${esc(t.key)}">${t.src === 'consult' ? '신규상담' : t.src === 'expiry' ? '만료 TM' : '그룹PT'} · ${esc(t.name)} · ${esc(t.headline)}</option>`).join('')
+      const targetOpts = cands.map(t => `<option value="${esc(t.key)}">${t.src === 'consult' ? '신규상담' : t.src === 'expiry' ? '만료 TM' : t.src === 'absent' ? '장기 미출석' : '그룹PT'} · ${esc(t.name)} · ${esc(t.headline)}</option>`).join('')
         + '<option value="new">➕ 새 신규상담(TM)으로 저장</option>';
       const defDays = missed ? 0 : 3;
       return `<div class="cc-call" data-call-id="${ev.id}">
@@ -1137,12 +1191,13 @@
     }
     async function loadAll() {
       try {
-        const [rows, board, gpt, staff, hasNext] = await Promise.all([
+        const [rows, board, gpt, absent, staff, hasNext] = await Promise.all([
           fetchWalkinConsultations(), fetchExpiryBoard(45),
           fetchGroupPtRetentionItems().catch(() => []),
+          fetchAbsenceItems().catch((e) => { absentLoadError = e.message; return []; }),
           fetchStaff().catch(() => []), probeNextDate()
         ]);
-        consultRows = rows; expiryItems = board; gptItems = gpt;
+        consultRows = rows; expiryItems = board; gptItems = gpt; absentItems = absent;
         staff.forEach(p => { staffMap[p.id] = p.name; });
         HAS_NEXT = hasNext && TM_NEXT_DATE_SUPPORTED !== false;
         const banner = document.getElementById('migrationBanner');
@@ -1150,10 +1205,14 @@
           banner.style.display = '';
           banner.innerHTML = '⚠ <b>재연락 날짜 칸이 아직 없어요.</b> Supabase SQL Editor에서 <code>migration_83_contact_center.sql</code>을 한 번 실행해주세요. 그 전에는 "고민중 + 며칠 뒤" 예약이 저장되지 않고, 예전 방식(마지막 연락 후 7일)으로 대신 올라와요.';
         }
+        if (!ABSENCE_LOG_OK || absentLoadError) {
+          banner.style.display = '';
+          banner.innerHTML += (banner.innerHTML ? '<br/>' : '') + (absentLoadError ? `⚠ 장기 미출석 목록을 불러오지 못했어요: ${esc(absentLoadError)}` : '⚠ <b>장기 미출석 연락 기록 표가 아직 없어요.</b> 목록은 보이지만 연락 결과를 저장하려면 Supabase SQL Editor에서 <code>migration_97_absence_tm.sql</code>을 한 번 실행해주세요.');
+        }
         if (isManager) {
           const sel = document.getElementById('ownerFilter');
           const ids = new Set();
-          [...consultRows.map(c => c.created_by), ...expiryItems.map(i => i.member.assigned_trainer_id)].forEach(id => id && ids.add(id));
+          [...consultRows.map(c => c.created_by), ...expiryItems.map(i => i.member.assigned_trainer_id), ...absentItems.map(i => i.member.assigned_trainer_id)].forEach(id => id && ids.add(id));
           sel.innerHTML = '<option value="all">담당: 전체</option>' + Array.from(ids).map(id => `<option value="${id}">${esc(staffMap[id] || '직원')}</option>`).join('') + '<option value="__none">담당 미배정</option>';
           sel.style.display = '';
         }
@@ -1178,8 +1237,8 @@
     });
     async function refreshQuiet() {
       try {
-        const [rows, board, gpt] = await Promise.all([fetchWalkinConsultations(), fetchExpiryBoard(45), fetchGroupPtRetentionItems().catch(() => gptItems)]);
-        consultRows = rows; expiryItems = board; gptItems = gpt; lastLoadedAt = Date.now();
+        const [rows, board, gpt, absent] = await Promise.all([fetchWalkinConsultations(), fetchExpiryBoard(45), fetchGroupPtRetentionItems().catch(() => gptItems), fetchAbsenceItems().catch(() => absentItems)]);
+        consultRows = rows; expiryItems = board; gptItems = gpt; absentItems = absent; lastLoadedAt = Date.now();
         buildTasks(); renderList();
       } catch (e) { /* 조용히 무시 - 다음 기회에 다시 */ }
     }

@@ -865,6 +865,53 @@ async function fetchGroupPtRetentionItems() {
   });
 }
 
+// ---- 😴 장기 미출석 회원 (연락 센터) ----
+// 이용권(헬스·그룹PT·개인PT)이 아직 남아 있는데 마지막 방문일(members.last_visit_date - 바디코디 회원 연동이 갱신)이 오래된 회원을 찾아요.
+// 연락 결과는 absence_tm_logs(migration_97)에 남기고, 그 표가 아직 없으면 목록만 읽고 기록은 막아요(ABSENCE_LOG_OK=false).
+const ABSENCE_MIN_DAYS = 14; // 화면에서 고를 수 있는 가장 짧은 기준(이보다 최근에 온 회원은 아예 안 불러와요)
+const ABSENCE_STATUS_LABEL = { not_contacted: '미연락', contacted: '통화함', proposed: '고민중', no_answer: '부재중', returned: '다시 나오기로 함', declined: '거절', on_hold: '보류' };
+let ABSENCE_LOG_OK = true;
+// 남은 이용권 요약: 끝나는 날이 오늘 이후인 헬스·그룹PT·개인PT + PT 잔여횟수. 하나도 없으면 active=false(만료·무이용권 회원은 대상 아님)
+function absenceActiveInfo(m, todayStr) {
+  const parts = []; let soonest = null;
+  for (const [field, label] of [['membership_end_date', '헬스'], ['group_pt_end_date', '그룹PT'], ['pt_end_date', 'PT']]) {
+    const e = m && m[field] ? String(m[field]).slice(0, 10) : '';
+    if (e && e >= todayStr) { parts.push(`${label} ~${Number(e.slice(5, 7))}/${Number(e.slice(8, 10))}`); if (!soonest || e < soonest) soonest = e; }
+  }
+  const rem = Number(m && m.pt_remaining_sessions);
+  if (rem > 0 && !parts.some((x) => x.startsWith('PT'))) parts.push(`PT 잔여 ${rem}회`);
+  return { active: parts.length > 0, label: parts.join(' · '), soonest };
+}
+async function fetchAbsenceItems() {
+  const todayStr = formatDateStr(new Date());
+  const cut = new Date(todayStr + 'T00:00:00'); cut.setDate(cut.getDate() - ABSENCE_MIN_DAYS);
+  const cutoff = formatDateStr(cut);
+  const headers = await authHeaders();
+  const url = (embed) => `members?select=*,trainer:profiles(name)${embed}&status=neq.left&last_visit_date=lt.${cutoff}&order=name.asc`;
+  let r = await fetchAllRows(url(',absence_tm_logs(id,status,contact_date,memo,created_at,next_contact_date)'), headers);
+  ABSENCE_LOG_OK = true;
+  if (r.error) { ABSENCE_LOG_OK = false; r = await fetchAllRows(url(''), headers); } // migration_97 전: 목록만
+  if (r.error) await throwApiError(r.error, '장기 미출석 회원 목록을 불러오지 못했습니다.');
+  const today = new Date(todayStr + 'T00:00:00');
+  const out = [];
+  for (const m of r.rows) {
+    const info = absenceActiveInfo(m, todayStr);
+    if (!info.active || !m.last_visit_date) continue;
+    const logs = (m.absence_tm_logs || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const daysSinceVisit = Math.round((today - new Date(String(m.last_visit_date).slice(0, 10) + 'T00:00:00')) / 86400000);
+    out.push({ member: m, daysSinceVisit, latestLog: logs[0] || null, passLabel: info.label, soonestEnd: info.soonest });
+  }
+  return out.sort((a, b) => b.daysSinceVisit - a.daysSinceVisit);
+}
+async function addAbsenceTmLog(log) {
+  if (!ABSENCE_LOG_OK) throw new Error('장기 미출석 연락 기록 표가 아직 없어요. Supabase SQL Editor에서 migration_97_absence_tm.sql을 먼저 실행해주세요.');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/absence_tm_logs`, {
+    method: 'POST', headers: { ...(await authHeaders()), 'Prefer': 'return=representation' }, body: JSON.stringify(log)
+  });
+  if (!res.ok) await throwApiError(res, '연락 기록 저장에 실패했습니다.');
+  return res.json();
+}
+
 async function addGroupPtRetentionLog(log) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/group_pt_retention_logs`, {
     method: 'POST',
@@ -3389,6 +3436,7 @@ function computeTrainerPayroll({
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    absenceActiveInfo,
     buildPtPricingIndex, findUnitPriceForSession, findPricingEntryForSession, classifyUnitPrice,
     computeTrainerConsumption, computePtSalesByTrainer, groupFeeForCount, GROUP_PT_FEE_PER_CLASS, isOtBooking, findPtTier, computeTrainerPayroll, roundDownToTen, formatDateStr,
     isRedDay, payrollPaydayOf, payrollPeriodOf, payrollMonthForDate, addDaysStr, holidayNameOf
