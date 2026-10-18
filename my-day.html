@@ -27,6 +27,8 @@
   .md-sub.late { color: #b91c1c; }
   .md-empty { padding: 16px 14px 18px; color: var(--slate-500); font-size: 13.5px; }
   .md-note { padding: 10px 14px 12px; color: var(--slate-500); font-size: 12px; border-top: 1px solid var(--slate-200); line-height: 1.5; }
+  .md-snap { display: block; width: 100%; margin-top: 12px; padding: 15px 12px; border: none; border-radius: 14px; background: #16a34a; color: #fff; font-size: 16px; font-weight: 800; box-shadow: 0 6px 18px -8px rgba(22,163,74,.7); cursor: pointer; }
+  .md-snap:disabled { opacity: .65; }
   /* 오늘 수업 */
   .md-cls { display: flex; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--slate-200); align-items: stretch; }
   .md-cls .tm { width: 52px; flex: none; font-size: 13px; font-weight: 800; line-height: 1.25; }
@@ -78,7 +80,7 @@
 </head>
 <body>
   <div class="md-wrap">
-    <div class="md-top">
+    <div class="md-top no-capture">
       <span id="mdRole" class="muted">불러오는 중...</span>
       <span>
         <a href="home.html?pc=1" id="pcLink">PC 화면으로 보기</a>
@@ -95,24 +97,27 @@
       </div>
     </div>
 
+    <button type="button" class="md-snap no-capture" id="snapBtn">📸 이 화면 이미지 저장 · 카톡 공유</button>
+
     <div class="md-card" id="classCard">
       <div class="md-h">📅 오늘 내 스케줄 <small id="classStamp"></small></div>
       <div id="classBody"><div class="md-empty">불러오는 중...</div></div>
-      <div class="md-note">수업 등록·변경은 <b>바디코디</b>에서 해주세요. 여기엔 바디코디에서 가져온 일정이 보여요(몇 분 늦게 반영될 수 있어요). 개인PT 회원을 누르면 <b>전화·문자</b>를 걸 수 있어요.</div>
+      <div class="md-note no-capture">수업 등록·변경은 <b>바디코디</b>에서 해주세요. 여기엔 바디코디에서 가져온 일정이 보여요(몇 분 늦게 반영될 수 있어요). 개인PT 회원을 누르면 <b>전화·문자</b>를 걸 수 있어요.</div>
     </div>
 
     <div class="md-card" id="taskCard">
       <div class="md-h">✅ 일일 · 주간 업무 <small id="taskStamp"></small></div>
       <div class="md-bar"><i id="taskBar"></i></div>
       <div id="taskBody"><div class="md-empty">불러오는 중...</div></div>
-      <div class="md-note">여기서 체크하면 PC 업무 리스트에도 똑같이 완료로 보여요. 업무 추가·수정은 PC에서 해주세요.</div>
+      <div class="md-note no-capture">여기서 체크하면 PC 업무 리스트에도 똑같이 완료로 보여요. 업무 추가·수정은 PC에서 해주세요.</div>
     </div>
 
-    <a class="md-btn" href="schedule.html">📆 PT 스케줄 전체 보기</a>
+    <a class="md-btn no-capture" href="schedule.html">📆 PT 스케줄 전체 보기</a>
   </div>
   <div class="md-sheet-bg" id="sheetBg"><div class="md-sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
   <div class="md-toast" id="mdToast"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791700000"></script>
   <script src="data.js?v=1792500000"></script>
@@ -286,6 +291,94 @@
     document.getElementById('classBody').addEventListener('click', (e) => { const r = e.target.closest('[data-call]'); if (r) openCallSheet(Number(r.dataset.call)); });
     document.getElementById('sheetBg').addEventListener('click', (e) => { if (e.target.id === 'sheetBg' || e.target.id === 'sheetClose') closeSheet(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+
+    function openImageSheet(blob, fname) {
+      const old = document.getElementById('imgSheet'); if (old) old.remove();
+      const url = URL.createObjectURL(blob);
+      const file = new File([blob], fname, { type: 'image/png' });
+      const canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+      // 대시보드는 PC 화면이라 폰에서 축소/확대된 채 열려 있을 수 있어요. 그대로 띄우면 창이 깨알만 하거나 화면 밖으로 나가서,
+      // 지금 보이는 영역(visualViewport)에 맞춰 폰 화면 크기로 보이게 배율을 보정해요.
+      const wrap = document.createElement('div');
+      wrap.id = 'imgSheet';
+      wrap.style.cssText = 'position:fixed; z-index:9999; background:rgba(15,23,42,.72); overflow:hidden;';
+      wrap.innerHTML =
+        '<div id="imgPanel" style="position:absolute; left:0; bottom:0; transform-origin:0 100%; box-sizing:border-box; background:var(--surface,#fff); color:var(--slate-900,#0f172a); display:flex; flex-direction:column; border-radius:20px 20px 0 0; padding:16px 16px 22px;">' +
+          '<div style="font-weight:800; font-size:16px; margin-bottom:4px;">🖼️ 오늘 내 하루 이미지</div>' +
+          '<div style="font-size:12.5px; color:var(--slate-500,#64748b); margin-bottom:10px;">아래 버튼으로 카톡방에 바로 보내거나 폰에 저장하세요. 이미지를 길게 눌러도 저장할 수 있어요.</div>' +
+          '<div style="flex:1; min-height:0; overflow:auto; border:1px solid var(--slate-200,#e2e8f0); border-radius:12px; background:#f8fafc;"><img alt="내 하루" src="' + url + '" style="display:block; width:100%; height:auto;" /></div>' +
+          '<div id="imgMsg" style="min-height:18px; margin-top:8px; font-size:13px; font-weight:700; color:#16a34a; text-align:center;"></div>' +
+          '<div style="display:flex; gap:10px; margin-top:4px;">' +
+            (canShare ? '<button type="button" id="imgShareBtn" style="flex:1.3; min-width:0; padding:15px 6px; border:none; border-radius:14px; background:#16a34a; color:#fff; font-size:15px; font-weight:800;">📲 카톡 등으로<br>보내기·저장</button>' : '') +
+            '<button type="button" id="imgSaveBtn" style="flex:1; min-width:0; padding:15px 6px; border:1px solid var(--slate-300,#cbd5e1); border-radius:14px; background:var(--surface,#fff); color:inherit; font-size:15px; font-weight:800;">💾 파일로<br>저장</button>' +
+          '</div>' +
+          '<button type="button" id="imgCloseBtn" style="margin-top:10px; padding:10px; background:none; border:none; color:var(--slate-500,#64748b); font-size:14px;">닫기</button>' +
+        '</div>';
+      document.body.appendChild(wrap);
+      const panel = wrap.querySelector('#imgPanel');
+      const layout = () => {
+        const vv = window.visualViewport;
+        const sc = vv && vv.scale ? vv.scale : 1;
+        const vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
+        wrap.style.left = (vv ? vv.offsetLeft : 0) + 'px'; wrap.style.top = (vv ? vv.offsetTop : 0) + 'px';
+        wrap.style.width = vw + 'px'; wrap.style.height = vh + 'px';
+        const dw = Math.min(vw * sc, 560), dh = vh * sc * 0.94; // 기기 화면 기준(보이는 그대로) 크기
+        panel.style.width = dw + 'px'; panel.style.maxHeight = dh + 'px'; panel.style.height = Math.min(dh, 720) + 'px';
+        panel.style.left = ((vw * sc - dw) / 2) / sc + 'px';
+        panel.style.transform = 'scale(' + (1 / sc) + ')';
+      };
+      layout();
+      if (window.visualViewport) { window.visualViewport.addEventListener('resize', layout); window.visualViewport.addEventListener('scroll', layout); }
+      const close = () => {
+        if (window.visualViewport) { window.visualViewport.removeEventListener('resize', layout); window.visualViewport.removeEventListener('scroll', layout); }
+        wrap.remove(); URL.revokeObjectURL(url);
+      };
+      wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+      wrap.querySelector('#imgCloseBtn').addEventListener('click', close);
+      wrap.querySelector('#imgSaveBtn').addEventListener('click', () => {
+        const a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+        wrap.querySelector('#imgMsg').textContent = '✅ 저장했어요. 갤러리/파일 앱을 확인해보세요.';
+      });
+      const sb = wrap.querySelector('#imgShareBtn');
+      if (sb) sb.addEventListener('click', async () => {
+        try { await navigator.share({ files: [file], title: '오늘 내 하루' }); }
+        catch (err) { if (err && err.name !== 'AbortError') { const m = wrap.querySelector('#imgMsg'); m.style.color = '#dc2626'; m.textContent = '공유하지 못했어요. "파일로 저장"을 눌러보세요.'; } }
+      });
+    }
+
+    // ───── 이 화면 전체를 이미지로: 선생님들이 일일 보고를 단톡방에 올릴 때 쓰는 캡쳐 대신 ─────
+    // 인사 카드 + 오늘 스케줄 + 일일·주간 업무 체크 현황을 그대로 이미지로 만들어, 카톡 공유 / 사진·파일 저장을 고르게 해요.
+    // (맨 위 메뉴, 버튼, 안내 문구(no-capture)와 회원 전화 아이콘은 이미지에서 빼요)
+    document.getElementById('snapBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('snapBtn');
+      if (typeof html2canvas !== 'function') { toast('이미지 기능을 불러오지 못했어요. 인터넷 연결을 확인해주세요.'); return; }
+      const label = btn.textContent; btn.disabled = true; btn.textContent = '⏳ 이미지 만드는 중...';
+      try {
+        const el = document.querySelector('.md-wrap');
+        const scale = Math.max(1, Math.min(2, Math.sqrt(10000000 / Math.max(1, el.scrollWidth * el.scrollHeight))));
+        const canvas = await html2canvas(el, {
+          backgroundColor: '#f8fafc', scale, useCORS: true,
+          ignoreElements: (n) => n.classList && n.classList.contains('no-capture'),
+          onclone: (doc) => {
+            doc.documentElement.removeAttribute('data-theme'); // 다크 모드여도 이미지는 항상 밝은 색
+            doc.querySelectorAll('.ph').forEach((x) => x.remove()); // 전화 아이콘은 보고용 이미지에 불필요
+            // 체크박스는 캡쳐 라이브러리가 색을 못 그려서, 같은 모양의 상자로 바꿔 그려요
+            doc.querySelectorAll('.md-task input[type=checkbox]').forEach((cb) => {
+              const box = doc.createElement('span');
+              box.textContent = cb.checked ? '✓' : '';
+              box.style.cssText = 'display:inline-flex; align-items:center; justify-content:center; flex:none; width:26px; height:26px; box-sizing:border-box; border-radius:6px; font-size:19px; font-weight:900; line-height:1; ' +
+                (cb.checked ? 'background:#16a34a; border:2px solid #16a34a; color:#fff;' : 'background:#fff; border:2px solid #94a3b8; color:#fff;');
+              cb.replaceWith(box);
+            });
+          }
+        });
+        const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+        if (!blob) throw new Error('이미지를 만들지 못했어요.');
+        const t = new Date();
+        openImageSheet(blob, `내하루_${me ? me.name : ''}_${t.getFullYear()}${pad2(t.getMonth() + 1)}${pad2(t.getDate())}.png`);
+      } catch (err) { toast('이미지를 만드는 중 문제가 생겼어요: ' + err.message); }
+      btn.disabled = false; btn.textContent = label;
+    });
 
     async function loadAll(quiet) {
       if (!me) return;
