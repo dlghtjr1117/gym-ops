@@ -2294,7 +2294,17 @@
     // 클립보드 복사가 안 되는 구형 브라우저·권한 거부 상황에서는 예전처럼 파일 다운로드로 대신함.
     // 공유 링크 관련 버튼/패널(no-capture 클래스)은 이미지에는 안 나오게 뺌.
     // 휴대폰/태블릿(손가락으로 쓰는 기기)이면 이미지를 복사 대신 "저장·공유" 창으로 처리
-    const IS_TOUCH_DEVICE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, screen.width || 9999) <= 600;
+    // 폰·태블릿 판별: 손가락 위주 기기(pointer: coarse) / 폰·아이패드 UA / "데스크톱 사이트" 모드처럼 UA를 PC로 바꿨어도 터치는 되는데 마우스가 없는 기기 / 화면 폭 600 이하.
+    // (터치스크린 노트북은 마우스·터치패드가 있어서 PC로 취급 → 기존대로 클립보드 복사)
+    const IS_TOUCH_DEVICE = (() => {
+      const mm = (q) => !!(window.matchMedia && window.matchMedia(q).matches);
+      const ua = navigator.userAgent || '';
+      return mm('(pointer: coarse)')
+        || /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+        || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+        || ((navigator.maxTouchPoints || 0) > 0 && !mm('(any-pointer: fine)'))
+        || Math.min(window.innerWidth, screen.width || 9999) <= 600;
+    })();
     if (IS_TOUCH_DEVICE) document.getElementById('saveImageBtn').textContent = '🖼️ 이미지 저장';
     function openImageSheet(blob, fname) {
       const old = document.getElementById('imgSheet'); if (old) old.remove();
@@ -2418,15 +2428,8 @@
         if (copied) {
           showToast('이미지가 복사됐어요. 채팅창에서 Ctrl+V로 붙여넣으면 돼요.');
         } else {
-          const today = new Date();
-          const fname = `매출보고_${today.getFullYear()}${pad2(today.getMonth() + 1)}${pad2(today.getDate())}.png`;
-          const link = document.createElement('a');
-          link.download = fname;
-          link.href = URL.createObjectURL(blob);
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          showToast('이 브라우저에서는 복사가 안 돼서 파일로 대신 저장했어요.');
+          // 이 브라우저에서 복사가 안 되면 저장·공유 창으로 (폰과 같은 창)
+          openImageSheet(blob, fname0);
         }
       } catch (err) {
         alert('이미지를 만드는 중 문제가 생겼어요: ' + err.message);
