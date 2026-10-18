@@ -43,6 +43,21 @@
   .md-chip.cancelled { background: #e2e8f0; color: #475569; }
   .md-chip.group { background: #fef3c7; color: #92400e; }
   .md-chip.now { background: #4f46e5; color: #fff; }
+  /* 회원 연락(해피콜) 시트 */
+  .md-cls.tap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .md-cls.tap:active { background: var(--slate-50); }
+  .md-cls .ph { align-self: center; flex: none; font-size: 20px; opacity: .75; }
+  .md-sheet-bg { position: fixed; inset: 0; background: rgba(15,23,42,.5); z-index: 60; display: none; align-items: flex-end; justify-content: center; }
+  .md-sheet-bg.on { display: flex; }
+  .md-sheet { background: var(--surface); width: 100%; max-width: 560px; border-radius: 20px 20px 0 0; padding: 18px 18px 24px; box-shadow: 0 -10px 40px rgba(15,23,42,.35); }
+  .md-sheet .sn { font-size: 19px; font-weight: 800; }
+  .md-sheet .si { font-size: 13px; color: var(--slate-500); margin-top: 3px; }
+  .md-sheet .sp { font-size: 22px; font-weight: 800; letter-spacing: .5px; margin: 14px 0 12px; }
+  .md-sheet .sb { display: flex; gap: 10px; }
+  .md-sheet .sb a, .md-sheet .sb button { flex: 1; text-align: center; padding: 15px 8px; border-radius: 14px; font-size: 16px; font-weight: 800; text-decoration: none; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-900); cursor: pointer; }
+  .md-sheet .sb a.call { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .md-sheet .sx { display: block; width: 100%; margin-top: 12px; padding: 12px; background: none; border: none; color: var(--slate-500); font-size: 14px; cursor: pointer; }
+  .md-sheet .sw { color: #b91c1c; font-size: 14px; margin: 10px 0 4px; }
   /* 업무 체크 */
   .md-task { display: flex; align-items: center; gap: 13px; padding: 12px 14px; border-top: 1px solid var(--slate-200); min-height: 56px; }
   .md-task input { width: 26px; height: 26px; flex: none; accent-color: #16a34a; }
@@ -83,7 +98,7 @@
     <div class="md-card" id="classCard">
       <div class="md-h">📅 오늘 내 스케줄 <small id="classStamp"></small></div>
       <div id="classBody"><div class="md-empty">불러오는 중...</div></div>
-      <div class="md-note">수업 등록·변경은 <b>바디코디</b>에서 해주세요. 여기엔 바디코디에서 가져온 일정이 보여요(몇 분 늦게 반영될 수 있어요).</div>
+      <div class="md-note">수업 등록·변경은 <b>바디코디</b>에서 해주세요. 여기엔 바디코디에서 가져온 일정이 보여요(몇 분 늦게 반영될 수 있어요). 개인PT 회원을 누르면 <b>전화·문자</b>를 걸 수 있어요.</div>
     </div>
 
     <div class="md-card" id="taskCard">
@@ -95,6 +110,7 @@
 
     <a class="md-btn" href="schedule.html">📆 PT 스케줄 전체 보기</a>
   </div>
+  <div class="md-sheet-bg" id="sheetBg"><div class="md-sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
   <div class="md-toast" id="mdToast"></div>
 
   <script src="config.js?v=1791480155"></script>
@@ -108,7 +124,7 @@
     const hm = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     const BOOKING_LABEL = { booked: '예약', attended: '출석', absent: '결석', cancelled: '취소' };
     const GROUP_LABEL = { future: '예정', cancelled: '취소', no_attendance: '출석 0명', '': '진행' };
-    let me = null, tasksCache = [], bookings = [], groups = [], groupError = '', bookingError = '', lastLoad = 0, toastTimer = null;
+    let callItems = [], me = null, tasksCache = [], bookings = [], groups = [], groupError = '', bookingError = '', lastLoad = 0, toastTimer = null;
 
     function toast(msg) {
       const el = document.getElementById('mdToast');
@@ -217,7 +233,7 @@
       const items = [];
       bookings.forEach(b => {
         const s = new Date(b.start_at), e = new Date(b.end_at);
-        items.push({ s, e, kind: 'pt', status: b.status, name: b.member ? b.member.name : '(삭제된 회원)',
+        items.push({ s, e, kind: 'pt', status: b.status, member: b.member || null, name: b.member ? b.member.name : '(삭제된 회원)',
           ex: (b.member && b.member.pt_remaining_sessions != null) ? `잔여 ${b.member.pt_remaining_sessions}회` : '', memo: b.memo || '' });
       });
       groups.forEach(c => {
@@ -228,15 +244,17 @@
       items.sort((a, b) => a.s - b.s);
       const live = items.filter(i => i.status !== 'cancelled');
       document.getElementById('sumClass').textContent = live.length + '개';
-      let html = items.map(i => {
+      callItems = items;
+      let html = items.map((i, idx) => {
         const isNow = i.status !== 'cancelled' && now >= i.s && now < i.e;
         const chip = i.kind === 'group'
           ? `<span class="md-chip group">그룹 · ${escapeHtml(i.glabel)}</span>`
           : `<span class="md-chip ${i.status}">${BOOKING_LABEL[i.status] || escapeHtml(i.status)}</span>`;
-        return `<div class="md-cls ${i.kind === 'group' ? 'group' : ''} ${i.status === 'cancelled' ? 'cancelled' : ''}">
+        const tap = i.kind === 'pt' && i.member;
+        return `<div class="md-cls ${i.kind === 'group' ? 'group' : ''} ${i.status === 'cancelled' ? 'cancelled' : ''} ${tap ? 'tap' : ''}" ${tap ? `data-call="${idx}"` : ''}>
           <div class="tm">${hm(i.s)}<i>~ ${hm(i.e)}</i></div>
           <div class="bd"><div class="nm">${escapeHtml(i.name)}${chip}${isNow ? '<span class="md-chip now">진행 중</span>' : ''}</div>
-          <div class="ex">${escapeHtml([i.ex, i.memo].filter(Boolean).join(' · '))}</div></div></div>`;
+          <div class="ex">${escapeHtml([i.ex, i.memo].filter(Boolean).join(' · '))}</div></div>${tap ? '<div class="ph" aria-hidden="true">📞</div>' : ''}</div>`;
       }).join('');
       if (!items.length) html = '<div class="md-empty">오늘 잡힌 수업이 없어요.</div>';
       const errs = [bookingError && `개인PT 일정을 불러오지 못했어요: ${bookingError}`, groupError && `그룹수업을 불러오지 못했어요: ${groupError}`].filter(Boolean);
@@ -244,6 +262,29 @@
       document.getElementById('classBody').innerHTML = html;
       document.getElementById('classStamp').textContent = `${hm(new Date(lastLoad || Date.now()))} 기준`;
     }
+
+    // ───── 수업 회원에게 전화·문자(해피콜): 수업 카드를 누르면 아래에서 연락 창이 올라와요 ─────
+    function fmtPhone(raw) {
+      const d = String(raw || '').replace(/\D/g, '');
+      if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+      if (d.length === 10) return d.startsWith('02') ? `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+      return String(raw || '').trim();
+    }
+    function openCallSheet(i) {
+      const it = callItems[i]; if (!it || !it.member) return;
+      const m = it.member, digits = String(m.phone || '').replace(/\D/g, '');
+      const info = `${hm(it.s)}~${hm(it.e)} 수업${BOOKING_LABEL[it.status] ? ' · ' + BOOKING_LABEL[it.status] : ''}${it.ex ? ' · ' + it.ex : ''}`;
+      document.getElementById('sheet').innerHTML = `<div class="sn">${escapeHtml(m.name)}</div><div class="si">${escapeHtml(info)}</div>` +
+        (digits.length >= 9
+          ? `<div class="sp">${escapeHtml(fmtPhone(m.phone))}</div><div class="sb"><a class="call" href="tel:${digits}">📞 전화 걸기</a><a href="sms:${digits}">💬 문자</a></div>`
+          : `<div class="sw">등록된 전화번호가 없어요. PC의 회원 관리에서 번호를 먼저 입력해주세요.</div>`) +
+        `<button type="button" class="sx" id="sheetClose">닫기</button>`;
+      document.getElementById('sheetBg').classList.add('on');
+    }
+    const closeSheet = () => document.getElementById('sheetBg').classList.remove('on');
+    document.getElementById('classBody').addEventListener('click', (e) => { const r = e.target.closest('[data-call]'); if (r) openCallSheet(Number(r.dataset.call)); });
+    document.getElementById('sheetBg').addEventListener('click', (e) => { if (e.target.id === 'sheetBg' || e.target.id === 'sheetClose') closeSheet(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
     async function loadAll(quiet) {
       if (!me) return;
