@@ -7,7 +7,6 @@
 <title>센터 매출 관리 - 회원 관리</title>
 <link rel="stylesheet" href="style.css?v=4100" />
 <script src="shell.js?v=4100" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
   .partial-toggle { display: flex; align-items: center; gap: 5px; margin-top: 5px; font-size: 11.5px; font-weight: 400; color: var(--slate-500); cursor: pointer; }
@@ -97,6 +96,9 @@
       <button type="button" class="btn btn-primary" id="openAddMemberBtn" style="display:none; width:auto; padding:10px 24px;">+ 회원 등록</button>
     </div>
 
+    <!-- 2026-10-19: 월별 회원 현황(이용 중인 회원·신규 등록·재등록률·이탈률) - 지점장 화면에서만 켜짐 -->
+    <div class="section" id="memberTrends" style="display:none; margin-bottom:20px;"></div>
+
     <!-- 2026-09-21 가독성 개선: 회원 목록은 표가 하나뿐이라 대시보드처럼 옆에 다른 표를 붙이기보다,
          이미 화면에서 계산해두고 있던 숫자(전체 회원 수·미수금 있는 회원 수)를 카드로 먼저 보여줘서
          한눈에 현황이 보이게 함(새 데이터 조회 없이 기존 membersCache/openReceivableMemberIds 재사용) -->
@@ -109,18 +111,6 @@
         <div class="label">미수금 있는 회원</div>
         <div class="value" id="memberStatReceivable">-</div>
       </div>
-    </div>
-
-    <div class="panel" id="uploadPanel" style="display:none;">
-      <h3>엑셀로 회원 일괄 등록 / 업데이트</h3>
-      <p class="muted" style="margin-top:-6px; margin-bottom:12px;">
-        세 가지 형식을 자동으로 인식해요: <b>①</b> 기존에 쓰시던 헬스장 관리 프로그램에서 내보낸 원본 엑셀 (이름·휴대폰번호·이용권정보 컬럼이 있는 시트를 자동으로 찾아서, 회원권/개인PT/그룹PT/락커/운동복 정보를 알아서 나눠 담아요) &nbsp;<b>②</b> 아래 간단 양식 &nbsp;<b>③</b> POS "판매내역" 원본 엑셀(결제일시·판매상품·회원명 컬럼이 있는 거래 로그) — 이건 매출 기록을 통째로 채워넣고 회원 현재 상태(만료일·PT잔여횟수)도 같이 최신화해줘요. 여러 상품이 한 번에 묶여 결제된 건(외 N건)은 "미분류(확인필요)"로 일단 등록되니, 매출 입력 화면에서 항목만 다시 골라주시면 돼요.<br/>
-        전화번호가 이미 있는 회원이면 정보가 업데이트되고, 없으면 새로 등록돼요. 같은 파일을 최신 상태로 관리하며 계속 다시 올리시면 돼요.
-        <a href="#" id="downloadTemplate" style="color:var(--indigo-600);">간단 양식 다운로드</a>
-      </p>
-      <input type="file" id="uploadFile" accept=".xlsx,.xls,.csv" />
-      <button type="button" class="btn btn-outline" id="uploadBtn" style="width:auto; padding-left:20px; padding-right:20px; margin-left:10px;">업로드 시작</button>
-      <div id="uploadResult" style="margin-top:14px;"></div>
     </div>
 
     <div class="section">
@@ -412,6 +402,7 @@
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791700000"></script>
   <script src="data.js?v=1791480155"></script>
+  <script src="member-trends.js?v=4101"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -1596,9 +1587,12 @@
         document.getElementById('openAddMemberBtn').style.display = '';
         if (profile.role === 'manager') {
           isManagerFlag = true;
+          try {
+            const mt = document.getElementById('memberTrends');
+            if (window.MemberTrends && mt) { mt.style.display = ''; MemberTrends.mount(mt); }
+          } catch (e) { console.error(e); }
           document.getElementById('deleteColHeader').style.display = '';
           document.getElementById('md_deleteBtn').style.display = '';
-          document.getElementById('uploadPanel').style.display = 'block';
           // 트레이너 목록은 "회원 등록" 팝업의 담당 트레이너 select에서만 쓰이므로, 화면의 핵심인
           // 회원 목록(loadMembers) 로딩을 막지 않도록 기다리지 않고 따로 불러옴
           fetchTrainers().then(list => {
@@ -1626,7 +1620,7 @@
     })();
 
     // 양식 다운로드 (헤더만 있는 CSV)
-    document.getElementById('downloadTemplate').addEventListener('click', (e) => {
+    (document.getElementById('downloadTemplate') || document.createElement('a')).addEventListener('click', (e) => {
       e.preventDefault();
       const csv = '﻿이름,전화번호,담당트레이너,이용권종목,이용권만료일,그룹PT종목,그룹PT만료일,개인PT만료일,개인PT잔여횟수,락커만료일,운동복만료일\n' +
         '홍길동,010-1234-5678,박선생,회원권 3개월,2026-09-30,필라테스,2026-09-15,2026-10-10,8,2026-09-30,2026-09-30\n';
@@ -2015,7 +2009,7 @@
     // 엑셀/CSV 업로드 -> 전화번호 기준으로 있으면 업데이트, 없으면 신규 등록
     // (전체를 try/catch로 감싸서, 파일 읽기/시트 인식 단계에서 오류가 나도
     //  "처리 중..."에 멈춰있지 않고 실제 오류 내용이 화면에 뜨도록 함)
-    document.getElementById('uploadBtn').addEventListener('click', async () => {
+    (document.getElementById('uploadBtn') || document.createElement('button')).addEventListener('click', async () => {  // 엑셀 업로드 칸은 화면에서 뺌(2026-10-19) - 코드는 남겨두되 버튼이 없어도 오류 안 나게
       const fileInput = document.getElementById('uploadFile');
       const resultBox = document.getElementById('uploadResult');
       if (!fileInput.files.length) {
