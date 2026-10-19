@@ -245,6 +245,9 @@
       const ta = document.getElementById('mt_transcript');
       text = (text || '').trim();
       if (!text) return;
+      // 같은 문장이 연달아 반복되는 경우(무음 구간에서 AI가 같은 말을 되풀이하는 현상)는 건너뜀
+      const lastLine = ta.value.trim().split('\n').pop().trim();
+      if (lastLine && lastLine === text) return;
       ta.value = (ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' : '') + text;
       ta.scrollTop = ta.scrollHeight;
     }
@@ -269,7 +272,6 @@
             const f = new FormData();
             f.append('audio', blob, `seg${seg}.${extOf(mime)}`);
             f.append('mode', 'transcribe');
-            f.append('prompt', document.getElementById('mt_transcript').value.slice(-200));
             const r = await callAiForm(f);
             appendTranscript(r.transcript);
             ok = true;
@@ -499,32 +501,70 @@
       checkRecovery();
     }
 
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+    function dateLabel(d) {
+      const [y, m, dd] = String(d).split('-').map(Number);
+      if (!y) return esc(d);
+      return `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')} (${WEEKDAYS[new Date(y, m - 1, dd).getDay()]})`;
+    }
+    // 날짜 묶음을 펼친 상태 기억 (삭제/새로 저장해서 목록이 다시 그려져도 유지)
+    const openDates = new Set();
+
     function renderMeetingCard(m) {
       const canEdit = currentUserRole === 'manager' || m.author_id === currentUserId;
       const authorName = m.author ? m.author.name : '알 수 없음';
       return `
-        <div class="card" style="padding:16px; margin-bottom:12px;">
+        <div class="card" style="padding:16px; margin:8px 0 12px;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div>
-              <div style="font-size:14px; font-weight:700;">${m.title}</div>
-              <div class="muted" style="font-size:12px; margin-top:2px;">${m.meeting_date} · 작성자 ${authorName}${m.attendees ? ' · 참석자 ' + m.attendees : ''}</div>
+              <div style="font-size:14px; font-weight:700;">${esc(m.title)}</div>
+              <div class="muted" style="font-size:12px; margin-top:2px;">작성자 ${esc(authorName)}${m.attendees ? ' · 참석자 ' + esc(m.attendees) : ''}</div>
             </div>
             ${canEdit ? `<button type="button" class="btn-link" style="color:var(--red-600);" onclick="handleDeleteMeeting('${m.id}')">삭제</button>` : ''}
           </div>
-          ${m.summary ? `<div style="margin-top:10px; white-space:pre-wrap; font-size:13px; line-height:1.6;">${m.summary}</div>` : ''}
-          ${m.memo ? `<div class="muted" style="margin-top:8px; font-size:12px; white-space:pre-wrap;">📝 ${m.memo}</div>` : ''}
-          ${m.transcript ? `<details style="margin-top:8px;"><summary class="muted" style="font-size:12px; cursor:pointer;">전체 대화 전사 보기</summary><div class="muted" style="font-size:12px; white-space:pre-wrap; margin-top:6px;">${m.transcript}</div></details>` : ''}
+          ${m.summary ? `<div style="margin-top:10px; white-space:pre-wrap; font-size:13px; line-height:1.6;">${esc(m.summary)}</div>` : ''}
+          ${m.memo ? `<div class="muted" style="margin-top:8px; font-size:12px; white-space:pre-wrap;">📝 ${esc(m.memo)}</div>` : ''}
+          ${m.transcript ? `<details style="margin-top:8px;"><summary class="muted" style="font-size:12px; cursor:pointer;">전체 대화 전사 보기</summary><div class="muted" style="font-size:12px; white-space:pre-wrap; margin-top:6px;">${esc(m.transcript)}</div></details>` : ''}
         </div>
       `;
     }
 
+    // 날짜별로 묶어서 보여줌: 날짜 줄을 누르면 그날의 미팅들이 펼쳐짐 (최신 날짜가 위)
     function renderMeetingList() {
       const container = document.getElementById('meetingListBody');
       if (meetingsCache.length === 0) {
         container.innerHTML = '<p class="muted" style="padding:16px;">아직 기록된 미팅이 없습니다.</p>';
         return;
       }
-      container.innerHTML = meetingsCache.map(renderMeetingCard).join('');
+      const groups = new Map();
+      meetingsCache.forEach(m => {
+        const k = m.meeting_date || '날짜 없음';
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(m);
+      });
+      const keys = Array.from(groups.keys()).sort().reverse();
+      container.innerHTML = keys.map(k => {
+        const list = groups.get(k);
+        const titles = list.map(m => esc(m.title)).join(' · ');
+        return `
+          <details class="mt-day" data-date="${esc(k)}" ${openDates.has(k) ? 'open' : ''} style="margin-bottom:10px; border:1px solid var(--slate-200); border-radius:12px; padding:0 14px; background:var(--card-bg, transparent);">
+            <summary style="cursor:pointer; padding:12px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; list-style-position:inside;">
+              <span class="muted" style="font-size:12px;">▸</span><b style="font-size:14px;">${dateLabel(k)}</b>
+              <span class="muted" style="font-size:12px;">미팅 ${list.length}건</span>
+              <span class="muted" style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">${titles}</span>
+            </summary>
+            ${list.map(renderMeetingCard).join('')}
+          </details>`;
+      }).join('');
+      container.querySelectorAll('details.mt-day').forEach(d => {
+        d.addEventListener('toggle', () => {
+          const k = d.getAttribute('data-date');
+          if (d.open) openDates.add(k); else openDates.delete(k);
+        });
+      });
     }
 
     async function handleDeleteMeeting(id) {
@@ -563,6 +603,7 @@
           memo: document.getElementById('mt_memo').value.trim() || null,
           transcript: document.getElementById('mt_transcript').value.trim() || null
         });
+        openDates.add(document.getElementById('mt_date').value);   // 방금 저장한 날짜는 목록에서 펼쳐서 보여줌
         const savedSid = currentSid;
         currentSid = null;
         sessionDoneSegs.clear();
