@@ -45,8 +45,9 @@
       <h3>미팅 기록 추가</h3>
       <p class="muted" style="margin:-6px 0 12px;">
         직원 회의(지점장·트레이너) 내용을 기록해두는 곳이에요. 직접 타이핑해도 되고,
-        "AI 녹음 시작"을 누르면 마이크로 회의를 녹음했다가 멈추는 순간 자동으로 텍스트로 옮기고 요약까지 해줘요
-        (전사/요약 내용은 저장 전에 자유롭게 고칠 수 있어요).
+        "AI 녹음 시작"을 누르면 마이크로 회의를 녹음하면서 약 30초마다 자동으로 텍스트로 옮겨 "전체 대화 전사" 칸에 쌓고,
+        녹음을 멈추면 요약·실행 전략까지 정리해줘요 (전사/요약 내용은 저장 전에 자유롭게 고칠 수 있어요).
+        녹음 중에 상단 메뉴를 누르면 녹음이 끊기지 않도록 새 탭으로 열려요. 이 화면 탭은 닫지 마세요.
       </p>
       <div id="addErrorBox" class="error-text"></div>
       <div id="addSuccessBox" class="success-text"></div>
@@ -56,6 +57,8 @@
           <div class="field" style="grid-column: span 2;"><label>제목</label><input type="text" id="mt_title" placeholder="예: 8월 4주차 직원회의" required /></div>
           <div class="field"><label>참석자</label><input type="text" id="mt_attendees" placeholder="예: 이호석, 김유빈" /></div>
         </div>
+
+        <div id="recoverBox" class="card" style="display:none; padding:12px 14px; margin-bottom:14px; background:var(--slate-50); border:1px solid #f59e0b; font-size:13px;"></div>
 
         <div class="card" style="padding:14px; margin-bottom:14px; background:var(--slate-50);">
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -77,8 +80,8 @@
             <textarea id="mt_memo" rows="2" placeholder="예: 다음 회의 전까지 락커룸 청소 당번표 공유하기" style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
           </div>
           <div class="field">
-            <label>전체 대화 전사 (AI 녹음 결과 · 필요할 때만 펼쳐보세요)</label>
-            <textarea id="mt_transcript" rows="4" placeholder="AI 녹음을 사용하면 회의 전체 내용이 텍스트로 여기에 담겨요." style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
+            <label>전체 대화 전사 (AI 녹음 결과 · 녹음 중 약 30초마다 여기에 쌓여요)</label>
+            <textarea id="mt_transcript" rows="8" placeholder="AI 녹음을 사용하면 회의 전체 내용이 텍스트로 여기에 담겨요." style="width:100%; resize:vertical; padding:9px 12px; border:1px solid var(--slate-200); border-radius:9px; font:inherit;"></textarea>
           </div>
         </div>
 
@@ -117,35 +120,222 @@
       return `${m}:${s}`;
     }
 
-    // ---- AI 녹음 ----
-    // 브라우저 마이크 권한을 받아 녹음을 시작. 멈추면 녹음 파일을 transcribeAndSummarize()로 보내서
-    // 전사+요약을 자동으로 받아와 화면 칸에 채워 넣음 (Edge Function 배포가 안 되어 있으면 에러 메시지가 뜸)
+    // ---- AI 녹음 (구간 녹음 + 실시간 전사 + 복구) ----
+    // 녹음하는 동안 약 30초 단위로 조각을 잘라 바로 AI(전사)로 보내고, 나온 글을 "전체 대화 전사" 칸에 이어 붙임.
+    // 녹음을 멈추면 쌓인 전사 전체를 한 번에 요약함. 녹음 조각은 5초마다 이 브라우저(IndexedDB)에도 저장해 두기 때문에
+    // 실수로 다른 화면으로 이동/새로고침해도 "저장 안 된 녹음 복구"로 이어서 정리할 수 있음.
+    // 녹음 중 상단 메뉴를 누르면 이 화면이 끊기지 않도록 해당 화면을 새 탭으로 열어줌.
+    const SEG_MS = 30000;      // 한 구간 길이
+    const SLICE_MS = 5000;     // 구간 안에서 임시 저장하는 간격
+    const REC_DB = 'gymops_meeting_rec';
+    let recStream = null;
+    let curRec = null;         // 현재 녹음 중인 MediaRecorder
+    let segTimer = null;
+    let segIdx = 0;
+    let recActive = false;     // 녹음 중 여부
+    let currentSid = null;     // 이 화면에서 작업 중인 녹음 세션 id (저장/버리기 하면 정리됨)
+    let txQueue = Promise.resolve();
+    let pendingTx = 0;         // 전사 대기/진행 중인 구간 수
+    let doneTx = 0, failTx = 0, totalSeg = 0;
+    let recMime = '';
+    let summarizing = false;
+    let curStopP = Promise.resolve();   // 현재 구간 녹음이 완전히 멈출 때까지 기다리는 용도
+
+    // ---- 브라우저 임시 저장소(IndexedDB) ----
+    let _db = null;
+    function idb() {
+      if (_db) return _db;
+      _db = new Promise((resolve, reject) => {
+        if (!window.indexedDB) return reject(new Error('no idb'));
+        const rq = indexedDB.open(REC_DB, 1);
+        rq.onupgradeneeded = () => {
+          const d = rq.result;
+          d.createObjectStore('chunks', { autoIncrement: true });
+          d.createObjectStore('sessions', { keyPath: 'sid' });
+        };
+        rq.onsuccess = () => resolve(rq.result);
+        rq.onerror = () => reject(rq.error);
+      });
+      _db.catch(() => {});
+      return _db;
+    }
+    async function idbRun(store, mode, fn) {
+      const d = await idb();
+      return new Promise((resolve, reject) => {
+        const tx = d.transaction(store, mode);
+        const st = tx.objectStore(store);
+        const out = fn(st);
+        tx.oncomplete = () => resolve(out && 'result' in out ? out.result : undefined);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    }
+    const safe = (p) => p.catch(() => {});   // 임시 저장이 안 돼도(비공개 모드 등) 녹음/전사는 계속 진행
+    function idbPutChunk(rec) { return safe(idbRun('chunks', 'readwrite', st => st.add(rec))); }
+    function idbPutSession(rec) { return safe(idbRun('sessions', 'readwrite', st => st.put(rec))); }
+    async function idbAllSessions() { try { return (await idbRun('sessions', 'readonly', st => st.getAll())) || []; } catch (e) { return []; } }
+    async function idbAllChunks() { try { return (await idbRun('chunks', 'readonly', st => st.getAll())) || []; } catch (e) { return []; } }
+    async function idbDeleteChunks(pred) {
+      try {
+        const d = await idb();
+        await new Promise((resolve, reject) => {
+          const tx = d.transaction('chunks', 'readwrite');
+          const rq = tx.objectStore('chunks').openCursor();
+          rq.onsuccess = () => {
+            const c = rq.result;
+            if (!c) return;
+            if (pred(c.value)) c.delete();
+            c.continue();
+          };
+          tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+        });
+      } catch (e) { /* ignore */ }
+    }
+    async function discardSession(sid) {
+      if (!sid) return;
+      await idbDeleteChunks(c => c.sid === sid);
+      try { await idbRun('sessions', 'readwrite', st => st.delete(sid)); } catch (e) { /* ignore */ }
+    }
+
+    // 현재 폼 내용 + 진행 상태를 세션으로 저장 (복구용)
+    const sessionDoneSegs = new Set();
+    function saveSessionDraft() {
+      if (!currentSid) return;
+      idbPutSession({
+        sid: currentSid,
+        updatedAt: Date.now(),
+        title: document.getElementById('mt_title').value,
+        date: document.getElementById('mt_date').value,
+        attendees: document.getElementById('mt_attendees').value,
+        memo: document.getElementById('mt_memo').value,
+        summary: document.getElementById('mt_summary').value,
+        transcript: document.getElementById('mt_transcript').value,
+        doneSegs: Array.from(sessionDoneSegs)
+      });
+    }
+    ['mt_title', 'mt_date', 'mt_attendees', 'mt_memo', 'mt_summary', 'mt_transcript'].forEach(id => {
+      let h = null;
+      document.getElementById(id).addEventListener('input', () => { clearTimeout(h); h = setTimeout(saveSessionDraft, 600); });
+    });
+
+    // ---- 서버(AI) 호출 ----
+    async function callAiForm(form) {
+      const token = await getValidAccessToken();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-summarize`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+        body: form
+      });
+      if (!res.ok) await throwApiError(res, 'AI 정리에 실패했습니다.');
+      return res.json();
+    }
+    async function callAiSummarize(transcript) {
+      const token = await getValidAccessToken();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-summarize`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'summarize', transcript })
+      });
+      if (!res.ok) await throwApiError(res, 'AI 요약에 실패했습니다.');
+      return res.json();
+    }
+
+    function extOf(mime) { return /mp4|aac/.test(mime) ? 'mp4' : /ogg/.test(mime) ? 'ogg' : 'webm'; }
+    function appendTranscript(text) {
+      const ta = document.getElementById('mt_transcript');
+      text = (text || '').trim();
+      if (!text) return;
+      ta.value = (ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' : '') + text;
+      ta.scrollTop = ta.scrollHeight;
+    }
+    function updateRecStatus() {
+      const el = document.getElementById('recStatus');
+      if (recActive) {
+        el.textContent = `🔴 녹음 중... (정리된 구간 ${doneTx}개${pendingTx ? ' · 정리 중 ' + pendingTx + '개' : ''}${failTx ? ' · 실패 ' + failTx + '개' : ''}) · 다른 메뉴는 새 탭으로 열려요`;
+      } else if (pendingTx) {
+        el.textContent = `AI가 남은 녹음 ${pendingTx}구간을 글로 옮기는 중이에요...`;
+      }
+    }
+
+    // 구간 하나를 전사해서 전사 칸에 이어 붙임 (실패하면 2번 더 시도, 그래도 안 되면 조각은 보관)
+    function enqueueSegment(sid, seg, blob, mime) {
+      pendingTx += 1;
+      updateRecStatus();
+      txQueue = txQueue.then(async () => {
+        let ok = false, lastErr = null;
+        for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+          try {
+            if (attempt) await new Promise(r => setTimeout(r, 2000 * attempt));
+            const f = new FormData();
+            f.append('audio', blob, `seg${seg}.${extOf(mime)}`);
+            f.append('mode', 'transcribe');
+            f.append('prompt', document.getElementById('mt_transcript').value.slice(-200));
+            const r = await callAiForm(f);
+            appendTranscript(r.transcript);
+            ok = true;
+          } catch (e) { lastErr = e; }
+        }
+        pendingTx -= 1;
+        if (ok) {
+          doneTx += 1;
+          sessionDoneSegs.add(seg);
+          await idbDeleteChunks(c => c.sid === sid && c.seg === seg);
+          saveSessionDraft();
+        } else {
+          failTx += 1;
+          const eb = document.getElementById('recErrorBox');
+          eb.textContent = `일부 구간(${seg + 1}번째)을 글로 옮기지 못했어요. 녹음은 이 브라우저에 보관 중이니, 새로고침하면 나오는 "저장 안 된 녹음 복구"에서 다시 시도할 수 있어요. (${lastErr ? lastErr.message : ''})`;
+          eb.style.display = 'block';
+        }
+        updateRecStatus();
+      });
+      return txQueue;
+    }
+
+    // ---- 녹음 구간 시작 ----
+    function startSegment() {
+      const seg = segIdx++;
+      totalSeg = segIdx;
+      const sid = currentSid;
+      const rec = recMime ? new MediaRecorder(recStream, { mimeType: recMime }) : new MediaRecorder(recStream);
+      const mime = rec.mimeType || recMime || 'audio/webm';
+      const parts = [];
+      let seq = 0;
+      rec.ondataavailable = (e) => {
+        if (!e.data || e.data.size === 0) return;
+        parts.push(e.data);
+        idbPutChunk({ sid, seg, seq: seq++, mime, blob: e.data });
+      };
+      rec.onstop = () => {
+        const blob = new Blob(parts, { type: mime });
+        if (blob.size > 2000) enqueueSegment(sid, seg, blob, mime);   // 너무 짧은(거의 빈) 조각은 건너뜀
+        else idbDeleteChunks(c => c.sid === sid && c.seg === seg);
+      };
+      curStopP = new Promise(r => rec.addEventListener('stop', () => r()));
+      rec.start(SLICE_MS);
+      curRec = rec;
+      // 다음 구간은 지금 구간을 끊기 "전에" 시작해서 끊김 없이 이어지게 함
+      segTimer = setTimeout(() => {
+        if (!recActive) return;
+        const old = curRec;
+        startSegment();
+        try { if (old && old.state !== 'inactive') old.stop(); } catch (e) { /* ignore */ }
+      }, SEG_MS);
+    }
+
     async function startRecording() {
       const errorBox = document.getElementById('recErrorBox');
       errorBox.style.display = 'none';
+      if (recActive) return;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
-        mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach(track => track.stop());
-          clearInterval(recTimerHandle);
-          document.getElementById('recTimer').style.display = 'none';
-          const blob = new Blob(audioChunks, { type: 'audio/webm' });
-          document.getElementById('recStatus').textContent = 'AI가 녹음 내용을 정리하는 중이에요... (음성 길이에 따라 몇 초~1분 정도 걸려요)';
-          try {
-            const result = await transcribeAndSummarize(blob);
-            document.getElementById('mt_transcript').value = result.transcript || '';
-            document.getElementById('mt_summary').value = result.summary || '';
-            document.getElementById('recStatus').textContent = result.summary ? '✅ AI 정리가 완료됐어요. 아래 내용을 확인하고 저장해주세요.' : (result.warning || '전사는 됐는데 요약은 실패했어요. 전사 내용을 참고해 직접 요약해주세요.');
-          } catch (err) {
-            errorBox.textContent = err.message;
-            errorBox.style.display = 'block';
-            document.getElementById('recStatus').textContent = '';
-          }
-        };
-        mediaRecorder.start();
+        recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recMime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+        if (!currentSid) currentSid = String(Date.now());
+        segIdx = 0; doneTx = 0; failTx = 0; totalSeg = 0;
+        sessionDoneSegs.clear();
+        recActive = true;
+        saveSessionDraft();
+        startSegment();
         recSeconds = 0;
         document.getElementById('recTimer').style.display = '';
         document.getElementById('recTimer').textContent = '00:00';
@@ -155,19 +345,159 @@
         }, 1000);
         document.getElementById('recStartBtn').style.display = 'none';
         document.getElementById('recStopBtn').style.display = '';
-        document.getElementById('recStatus').textContent = '🔴 녹음 중...';
+        updateRecStatus();
+        try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { window.__wl = l; }).catch(() => {}); } catch (e) { /* ignore */ }
       } catch (err) {
+        recActive = false;
         errorBox.textContent = '마이크를 사용할 수 없어요. 브라우저의 마이크 권한을 허용해주세요. (' + err.message + ')';
         errorBox.style.display = 'block';
       }
     }
-    function stopRecording() {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+
+    async function stopRecording() {
+      if (!recActive) return;
+      recActive = false;
+      clearTimeout(segTimer);
+      clearInterval(recTimerHandle);
+      document.getElementById('recTimer').style.display = 'none';
       document.getElementById('recStartBtn').style.display = '';
       document.getElementById('recStopBtn').style.display = 'none';
+      try { if (curRec && curRec.state !== 'inactive') curRec.stop(); } catch (e) { /* ignore */ }
+      if (recStream) recStream.getTracks().forEach(t => t.stop());
+      try { if (window.__wl) window.__wl.release(); } catch (e) { /* ignore */ }
+      updateRecStatus();
+      await Promise.race([curStopP, new Promise(r => setTimeout(r, 5000))]);   // 마지막 구간이 완전히 멈춰 전사 대기열에 등록될 때까지 기다림
+      await txQueue;
+      await finishWithSummary();
+    }
+
+    // 쌓인 전사 전체를 요약해서 요약 칸에 채움
+    async function finishWithSummary() {
+      const errorBox = document.getElementById('recErrorBox');
+      const status = document.getElementById('recStatus');
+      const transcript = document.getElementById('mt_transcript').value.trim();
+      if (!transcript) {
+        status.textContent = failTx ? '글로 옮기지 못한 구간이 있어요. 위 안내를 확인해주세요.' : '인식된 음성이 없어요. 마이크 위치/볼륨을 확인하고 다시 녹음해보세요.';
+        return;
+      }
+      summarizing = true;
+      status.textContent = 'AI가 요약과 실행 전략을 정리하는 중이에요...';
+      try {
+        const r = await callAiSummarize(transcript);
+        document.getElementById('mt_summary').value = r.summary || '';
+        status.textContent = r.summary
+          ? '✅ AI 정리가 완료됐어요. 아래 내용을 확인하고 저장해주세요.' + (failTx ? ` (옮기지 못한 구간 ${failTx}개 있음)` : '')
+          : (r.warning || '전사는 됐는데 요약은 실패했어요. 전사 내용을 참고해 직접 요약해주세요.');
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+        status.textContent = '전사는 됐어요. 요약만 실패했으니 전사 내용을 참고해 직접 요약하거나 다시 시도해주세요.';
+      } finally {
+        summarizing = false;
+        saveSessionDraft();
+      }
     }
     document.getElementById('recStartBtn').addEventListener('click', startRecording);
     document.getElementById('recStopBtn').addEventListener('click', stopRecording);
+
+    // ---- 실수로 화면을 벗어나는 것 막기 ----
+    // 1) 녹음 중 상단 메뉴/링크를 누르면 현재 화면은 그대로 두고 새 탭에서 열어줌 (녹음은 계속됨)
+    document.addEventListener('click', (e) => {
+      if (!recActive) return;
+      const a = e.target.closest && e.target.closest('a[href]');
+      if (!a || e.defaultPrevented) return;
+      const href = a.getAttribute('href') || '';
+      if (!href || href.startsWith('#') || href.startsWith('javascript:') || a.target === '_blank') return;
+      e.preventDefault();
+      window.open(a.href, '_blank');
+      const st = document.getElementById('recStatus');
+      st.textContent = '🔴 녹음은 이 탭에서 계속되고 있어요. 방금 누른 화면은 새 탭으로 열었어요.';
+      setTimeout(updateRecStatus, 4000);
+    }, true);
+    // 2) 로그아웃은 녹음이 끊기므로 한 번 더 확인
+    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+      if ((recActive || pendingTx) && !confirm('녹음/AI 정리가 진행 중이에요. 로그아웃하면 중단돼요. 그래도 로그아웃할까요?')) e.stopImmediatePropagation();
+    }, true);
+    // 3) 탭 닫기/새로고침/뒤로가기 경고
+    window.addEventListener('beforeunload', (e) => {
+      if (recActive || pendingTx || summarizing) { e.preventDefault(); e.returnValue = ''; return ''; }
+    });
+
+    // ---- 저장 안 된 녹음 복구 ----
+    async function checkRecovery() {
+      const box = document.getElementById('recoverBox');
+      if (!box) return;
+      const sessions = await idbAllSessions();
+      const chunks = await idbAllChunks();
+      const now = Date.now();
+      const alive = [];
+      for (const s of sessions) {
+        const mine = chunks.filter(c => c.sid === s.sid);
+        const hasContent = mine.length > 0 || (s.transcript && s.transcript.trim()) || (s.summary && s.summary.trim());
+        if (!hasContent || now - (s.updatedAt || 0) > 3 * 86400000) { await discardSession(s.sid); continue; }
+        alive.push({ s, n: new Set(mine.map(c => c.seg)).size });
+      }
+      if (!alive.length) { box.style.display = 'none'; return; }
+      alive.sort((a, b) => (b.s.updatedAt || 0) - (a.s.updatedAt || 0));
+      box.style.display = 'block';
+      box.innerHTML = alive.map(({ s, n }) => {
+        const when = new Date(s.updatedAt || Number(s.sid)).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const title = (s.title || '').trim() || '(제목 없음)';
+        return `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:4px 0;">
+          <span>⚠️ 저장하지 못한 녹음이 있어요 · <b>${title.replace(/</g, '&lt;')}</b> · ${when}${n ? ` · 아직 글로 못 옮긴 녹음 ${n}구간` : ''}</span>
+          <button type="button" class="btn btn-primary" style="width:auto; padding:6px 14px;" data-recover="${s.sid}">복구하기</button>
+          <button type="button" class="btn btn-outline" style="width:auto; padding:6px 14px;" data-discard="${s.sid}">버리기</button>
+        </div>`;
+      }).join('');
+    }
+    document.addEventListener('click', async (e) => {
+      const rb = e.target.closest && e.target.closest('[data-recover]');
+      const db = e.target.closest && e.target.closest('[data-discard]');
+      if (db) {
+        if (!confirm('이 녹음 기록을 완전히 버릴까요? 되돌릴 수 없어요.')) return;
+        await discardSession(db.getAttribute('data-discard'));
+        if (currentSid === db.getAttribute('data-discard')) currentSid = null;
+        checkRecovery();
+      } else if (rb) {
+        if (recActive) { alert('녹음 중에는 복구할 수 없어요. 녹음을 먼저 멈춰주세요.'); return; }
+        await recoverSession(rb.getAttribute('data-recover'));
+      }
+    });
+    async function recoverSession(sid) {
+      const errorBox = document.getElementById('recErrorBox');
+      errorBox.style.display = 'none';
+      const sessions = await idbAllSessions();
+      const s = sessions.find(x => x.sid === sid);
+      if (!s) { checkRecovery(); return; }
+      currentSid = sid;
+      sessionDoneSegs.clear();
+      (s.doneSegs || []).forEach(n => sessionDoneSegs.add(n));
+      document.getElementById('mt_title').value = s.title || '';
+      document.getElementById('mt_date').value = s.date || document.getElementById('mt_date').value;
+      document.getElementById('mt_attendees').value = s.attendees || '';
+      document.getElementById('mt_memo').value = s.memo || '';
+      document.getElementById('mt_summary').value = s.summary || '';
+      document.getElementById('mt_transcript').value = s.transcript || '';
+      const chunks = (await idbAllChunks()).filter(c => c.sid === sid);
+      const bySeg = new Map();
+      chunks.forEach(c => { if (!bySeg.has(c.seg)) bySeg.set(c.seg, []); bySeg.get(c.seg).push(c); });
+      const segs = Array.from(bySeg.keys()).sort((a, b) => a - b);
+      doneTx = 0; failTx = 0;
+      if (segs.length) {
+        document.getElementById('recStatus').textContent = `복구 중... 남은 녹음 ${segs.length}구간을 글로 옮기는 중이에요.`;
+        for (const seg of segs) {
+          const list = bySeg.get(seg).sort((a, b) => a.seq - b.seq);
+          const mime = list[0].mime || 'audio/webm';
+          const blob = new Blob(list.map(c => c.blob), { type: mime });
+          if (blob.size > 2000) await enqueueSegment(sid, seg, blob, mime);
+          else await idbDeleteChunks(c => c.sid === sid && c.seg === seg);
+        }
+      }
+      await txQueue;
+      document.getElementById('recoverBox').style.display = 'none';
+      await finishWithSummary();
+      checkRecovery();
+    }
 
     function renderMeetingCard(m) {
       const canEdit = currentUserRole === 'manager' || m.author_id === currentUserId;
@@ -233,6 +563,10 @@
           memo: document.getElementById('mt_memo').value.trim() || null,
           transcript: document.getElementById('mt_transcript').value.trim() || null
         });
+        const savedSid = currentSid;
+        currentSid = null;
+        sessionDoneSegs.clear();
+        discardSession(savedSid).then(checkRecovery);
         successBox.textContent = '미팅 기록이 저장되었습니다.';
         successBox.style.display = 'block';
         document.getElementById('mt_title').value = '';
@@ -258,6 +592,7 @@
         currentUserRole = profile.role;
       }
       loadMeetings();
+      checkRecovery();
     })();
   </script>
 </body>
