@@ -227,7 +227,7 @@
   .pc-split { font-size: 12.5px; color: var(--slate-500); display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .pc-split b { color: var(--slate-700); font-weight: 700; }
   .pc-rows { border-top: 1px solid var(--slate-200); }
-  .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--slate-100); }
+  .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--slate-100, #eef2f6); }
   .pc-row:last-of-type { border-bottom: 0; }
   .pc-row .l { font-size: 12.5px; color: var(--slate-500); min-width: 0; }
   .pc-row .r { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -235,7 +235,7 @@
   .pc-chip { display: inline-block; min-width: 54px; text-align: center; padding: 3px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .pc-chip.up { background: #dcfce7; color: #15803d; }
   .pc-chip.down { background: #fee2e2; color: #b91c1c; }
-  .pc-chip.flat { background: var(--slate-100); color: var(--slate-500); }
+  .pc-chip.flat { background: var(--slate-100, #eef2f6); color: var(--slate-500); }
   :root[data-theme="dark"] .pc-chip.up { background: rgba(34,197,94,.16); color: #4ade80; }
   :root[data-theme="dark"] .pc-chip.down { background: rgba(239,68,68,.16); color: #f87171; }
   .pc-foot { margin-top: 4px; padding-top: 11px; border-top: 1px solid var(--slate-200); font-size: 12.5px; color: var(--slate-500); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -249,6 +249,57 @@
   .pc-bd button { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--slate-200); background: var(--surface); color: var(--slate-600); font-size: 11.5px; font-weight: 600; cursor: pointer; }
   .pc-bd button:hover { border-color: var(--indigo-600); color: var(--indigo-600); }
   .pc-skel { color: var(--slate-400); }
+
+  /* ===== 트레이너 성과 지표 리디자인 (2026-10-19) ===== */
+  .sp-ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .sp-h { display: flex; align-items: center; gap: 8px; }
+  .sp-h .sp-ic { width: 20px; height: 20px; color: var(--indigo-600); }
+  .sp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+  .sp-stat { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
+  .sp-stat .ico { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); color: var(--indigo-600); display: grid; place-items: center; flex: none; }
+  .sp-stat .ico .sp-ic { width: 20px; height: 20px; }
+  .sp-stat .lb { font-size: 12.5px; color: var(--slate-500); font-weight: 500; }
+  .sp-stat .vl { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; color: var(--slate-900); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .sp-sub { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--slate-900); }
+  .sp-sub .sp-ic { color: #d99a1c; width: 17px; height: 17px; }
+  .sp-sub small { font-weight: 500; color: var(--slate-500); font-size: 12px; }
+  .sp-top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+  .sp-tc { position: relative; background: var(--surface); border: 1px solid var(--slate-200); border-radius: 16px; padding: 18px 20px 16px; cursor: pointer; transition: box-shadow .15s, border-color .15s, transform .15s; }
+  .sp-tc:hover { box-shadow: 0 6px 18px rgba(15,23,42,.08); border-color: var(--slate-300); transform: translateY(-1px); }
+  .sp-tc:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 2px; }
+  .sp-tc .top { display: flex; align-items: center; justify-content: space-between; }
+  .sp-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; letter-spacing: .02em; padding: 4px 10px 4px 5px; border-radius: 999px; }
+  .sp-badge b { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; color: #fff; }
+  .sp-r1 .sp-badge { background: #fef6e0; color: #a8730a; } .sp-r1 .sp-badge b { background: linear-gradient(135deg, #f7c04a, #d99a1c); }
+  .sp-r2 .sp-badge { background: #eef1f5; color: #4b5668; } .sp-r2 .sp-badge b { background: linear-gradient(135deg, #b4bdcb, #7b8798); }
+  .sp-r3 .sp-badge { background: #fdf0e6; color: #a2531d; } .sp-r3 .sp-badge b { background: linear-gradient(135deg, #f0a068, #c26a2d); }
+  :root[data-theme="dark"] .sp-r1 .sp-badge { background: rgba(247,192,74,.14); color: #f7c04a; }
+  :root[data-theme="dark"] .sp-r2 .sp-badge { background: rgba(180,189,203,.14); color: #cbd2dd; }
+  :root[data-theme="dark"] .sp-r3 .sp-badge { background: rgba(240,160,104,.14); color: #f0a068; }
+  .sp-tc .share { font-size: 12px; color: var(--slate-500); font-variant-numeric: tabular-nums; }
+  .sp-tc .nm { font-size: 20px; font-weight: 800; margin-top: 14px; color: var(--slate-900); letter-spacing: -0.01em; }
+  .sp-tc .am { font-size: 15px; font-weight: 700; margin-top: 4px; color: var(--slate-700); font-variant-numeric: tabular-nums; }
+  .sp-tc .am span { color: var(--slate-500); font-weight: 500; }
+  .sp-tc .tr { height: 6px; border-radius: 999px; background: var(--slate-100, #eef2f6); margin-top: 14px; overflow: hidden; }
+  .sp-tc .tr > div { height: 100%; border-radius: 999px; }
+  .sp-r1 .tr > div { background: linear-gradient(90deg, #f7c04a, #d99a1c); } .sp-r2 .tr > div { background: linear-gradient(90deg, #c4ccd8, #7b8798); } .sp-r3 .tr > div { background: linear-gradient(90deg, #f0a068, #c26a2d); }
+  .sp-tw { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 16px; padding: 6px 8px; overflow-x: auto; }
+  #staffPerfTable { width: 100%; min-width: 640px; border-collapse: collapse; background: transparent; border: 0; table-layout: auto; }
+  #staffPerfTable th { text-align: left; font-size: 12px; font-weight: 600; color: var(--slate-500); padding: 12px 12px; border-bottom: 1px solid var(--slate-200); background: transparent; white-space: nowrap; }
+  #staffPerfTable td { padding: 13px 12px; border-bottom: 1px solid var(--slate-100, #eef2f6); font-size: 14px; background: transparent; color: var(--slate-900); font-variant-numeric: tabular-nums; }
+  #staffPerfTable tbody tr:last-child td { border-bottom: 0; }
+  #staffPerfTable tbody tr { cursor: pointer; transition: background .12s; }
+  #staffPerfTable tbody tr:hover td { background: var(--slate-50); }
+  #staffPerfTable .rk { width: 56px; } #staffPerfTable .num { text-align: right; white-space: nowrap; }
+  .sp-rk { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 12.5px; font-weight: 800; background: var(--slate-100, #eef2f6); color: var(--slate-600); }
+  .sp-rk.g1 { background: linear-gradient(135deg, #f7c04a, #d99a1c); color: #fff; } .sp-rk.g2 { background: linear-gradient(135deg, #b4bdcb, #7b8798); color: #fff; } .sp-rk.g3 { background: linear-gradient(135deg, #f0a068, #c26a2d); color: #fff; }
+  .sp-name { font-weight: 700; } .sp-title { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: var(--slate-100, #eef2f6); color: var(--slate-500); font-size: 11px; font-weight: 600; }
+  .sp-amt { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+  .sp-amt .bar { width: 110px; height: 7px; border-radius: 999px; background: var(--slate-100, #eef2f6); overflow: hidden; flex: none; }
+  .sp-amt .bar > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--indigo-700), var(--indigo-600)); }
+  .sp-amt b { min-width: 96px; text-align: right; font-weight: 800; }
+  .sp-zero { color: var(--slate-400); }
+  @media (max-width: 860px) { .sp-stats, .sp-top { grid-template-columns: 1fr; } .sp-amt .bar { display: none; } }
 </style>
 </head>
 <body>
@@ -465,33 +516,27 @@
     </div>
 
     <div class="section">
-      <h2>🏋️ 트레이너 성과 지표 <span class="muted" style="font-weight:400;font-size:12px;" id="staffPerfMonthLabel">(이번 달)</span></h2>
+      <h2 class="sp-h"><svg class="sp-ic" viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>트레이너 성과 지표 <span class="muted" style="font-weight:400;font-size:12px;" id="staffPerfMonthLabel">(이번 달)</span></h2>
       <p class="muted" style="margin:-6px 0 12px;font-size:13px;">이번 달 개인PT 매출만 트레이너별로 모아서, 누가 PT매출을 얼마나 올렸는지 순위와 표로 보여드려요(헬스이용권·그룹PT 등 PT 외 매출과 지점장 매출은 제외, 팀장은 포함). 이름을 클릭하면 그 트레이너가 이번 달에 누구를, 몇 회짜리로, 신규인지 재등록인지 등록시켰는지 상세 내역이 나와요.</p>
 
-      <div class="grid-3" id="staffPerfSummaryGrid" style="margin-bottom:14px;">
-        <div class="stat-card">
-          <div class="label">👥 총 트레이너</div>
-          <div class="value" id="staffPerfHeadcount">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">💰 1인당 평균 PT매출</div>
-          <div class="value" id="staffPerfAvgPtAmount">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">🤸 1인당 평균 PT건수</div>
-          <div class="value" id="staffPerfAvgPtCount">-</div>
-        </div>
+      <div class="sp-stats" id="staffPerfSummaryGrid">
+        <div class="sp-stat"><div class="ico"><svg class="sp-ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20.5v-.5a6 6 0 0 1 6-6h1a6 6 0 0 1 6 6v.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M21.5 20.5v-.5a6 6 0 0 0-4-5.6"/></svg></div>
+          <div><div class="lb">총 트레이너</div><div class="vl" id="staffPerfHeadcount">-</div></div></div>
+        <div class="sp-stat"><div class="ico"><svg class="sp-ic" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H19a2 2 0 0 1 2 2v2"/><path d="M3 7.5V17a2.5 2.5 0 0 0 2.5 2.5H19a2 2 0 0 0 2-2V10a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 6.5"/><circle cx="16.5" cy="14" r="1.2"/></svg></div>
+          <div><div class="lb">1인당 평균 PT매출</div><div class="vl" id="staffPerfAvgPtAmount">-</div></div></div>
+        <div class="sp-stat"><div class="ico"><svg class="sp-ic" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8"/></svg></div>
+          <div><div class="lb">1인당 평균 PT건수</div><div class="vl" id="staffPerfAvgPtCount">-</div></div></div>
       </div>
 
-      <p class="muted" style="margin:0 0 8px;font-size:12px;font-weight:600;">🏆 TOP 3 (PT매출 기준)</p>
-      <div class="grid-3" id="staffPerfTop3Grid" style="margin-bottom:18px;">
+      <p class="sp-sub"><svg class="sp-ic" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>TOP 3 <small>PT매출 기준</small></p>
+      <div class="sp-top" id="staffPerfTop3Grid">
         <p class="muted" style="padding:8px 0;">불러오는 중...</p>
       </div>
 
-      <div style="overflow-x:auto;">
-        <table id="staffPerfTable" class="table-fixed">
+      <div class="sp-tw">
+        <table id="staffPerfTable">
           <thead><tr>
-            <th style="width:8%;">순위</th><th>이름</th><th style="text-align:right;">PT매출</th><th style="text-align:right;">PT건수</th>
+            <th>순위</th><th>이름</th><th style="text-align:right;">PT매출</th><th style="text-align:right;">PT건수</th>
             <th style="text-align:right;">신규</th><th style="text-align:right;">재등록</th>
           </tr></thead>
           <tbody id="staffPerfTableBody"><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
@@ -1271,17 +1316,18 @@
       document.getElementById('staffPerfAvgPtAmount').textContent = headcount > 0 ? formatWon(Math.round(ptAmountSum / headcount)) : '-';
       document.getElementById('staffPerfAvgPtCount').textContent = headcount > 0 ? `${(ptCountSum / headcount).toFixed(1)}건` : '-';
 
-      const medals = ['🥇', '🥈', '🥉'];
       const top3 = rows.filter(r => r.ptAmount > 0).slice(0, 3);
       const top3Grid = document.getElementById('staffPerfTop3Grid');
+      const maxAmt = Math.max(1, ...rows.map(r => r.ptAmount));
       if (top3.length === 0) {
         top3Grid.innerHTML = '<p class="muted" style="padding:8px 0;">이 달에는 아직 담당 트레이너가 지정된 PT매출 기록이 없어요.</p>';
       } else {
         top3Grid.innerHTML = top3.map((r, i) => `
-          <div class="stat-card clickable rank-${i + 1}" data-staff-id="${escapeHtml(r.id)}" role="button" tabindex="0">
-            <div class="label">${medals[i]} TOP ${i + 1}</div>
-            <div class="value">${escapeHtml(r.name)}</div>
-            <div class="delta muted">${formatWon(r.ptAmount)} · ${r.ptCount}건</div>
+          <div class="sp-tc sp-r${i + 1}" data-staff-id="${escapeHtml(r.id)}" role="button" tabindex="0">
+            <div class="top"><span class="sp-badge"><b>${i + 1}</b>TOP ${i + 1}</span><span class="share">전체의 ${ptAmountSum > 0 ? Math.round(r.ptAmount / ptAmountSum * 100) : 0}%</span></div>
+            <div class="nm">${escapeHtml(r.name)}</div>
+            <div class="am">${formatWon(r.ptAmount)} <span>· ${r.ptCount}건</span></div>
+            <div class="tr"><div style="width:${Math.max(4, r.ptAmount / maxAmt * 100).toFixed(1)}%"></div></div>
           </div>
         `).join('');
       }
@@ -1291,14 +1337,15 @@
         tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:16px;">등록된 트레이너가 없습니다.</td></tr>';
         return;
       }
+      const cnt = n => n > 0 ? `${n}건` : '<span class="sp-zero">0건</span>';
       tbody.innerHTML = rows.map((r, i) => `
         <tr class="clickable-row" data-staff-id="${escapeHtml(r.id)}" tabindex="0">
-          <td>${r.ptAmount > 0 ? i + 1 : '-'}</td>
-          <td>${escapeHtml(r.name)}${r.title ? ` <span class="muted" style="font-size:11px;">${escapeHtml(r.title)}</span>` : ''}</td>
-          <td style="text-align:right;">${formatWon(r.ptAmount)}</td>
-          <td style="text-align:right;">${r.ptCount}건</td>
-          <td style="text-align:right;">${r.newCount}건</td>
-          <td style="text-align:right;">${r.renewalCount}건</td>
+          <td class="rk">${r.ptAmount > 0 ? `<span class="sp-rk${i < 3 ? ' g' + (i + 1) : ''}">${i + 1}</span>` : '<span class="sp-zero">-</span>'}</td>
+          <td><span class="sp-name">${escapeHtml(r.name)}</span>${r.title ? `<span class="sp-title">${escapeHtml(r.title)}</span>` : ''}</td>
+          <td class="num"><div class="sp-amt"><div class="bar"><div style="width:${(r.ptAmount / maxAmt * 100).toFixed(1)}%"></div></div><b>${r.ptAmount > 0 ? formatWon(r.ptAmount) : '<span class="sp-zero">0원</span>'}</b></div></td>
+          <td class="num">${cnt(r.ptCount)}</td>
+          <td class="num">${cnt(r.newCount)}</td>
+          <td class="num">${cnt(r.renewalCount)}</td>
         </tr>
       `).join('');
     }
