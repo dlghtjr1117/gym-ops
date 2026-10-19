@@ -26,6 +26,55 @@
 
   .breakdown-panel { margin-top: 14px; padding: 18px; border: 1px solid var(--slate-200); border-radius: 14px; background: var(--surface); }
   .breakdown-body { display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-start; margin-top: 16px; }
+
+  /* ---- 매출 보고 아래: 일별 꺾은선 그래프 + 매출 구성 순위표 (2026-10-19) ---- */
+  .rp-card { background: var(--surface); border: 1px solid var(--slate-200); border-radius: 14px; padding: 16px 18px 12px; margin-top: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .rp-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .rp-card h3 { margin: 0; font-size: 14.5px; font-weight: 650; } .rp-sub { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+  .rp-legend { display: flex; gap: 14px; font-size: 12px; color: var(--slate-700); flex-wrap: wrap; }
+  .rp-legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .rp-box { position: relative; margin-top: 8px; }
+  .rp-box svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .rp-tip { position: absolute; top: 6px; pointer-events: none; z-index: 5; padding: 9px 12px; border-radius: 10px; font-size: 12px; line-height: 1.6; background: var(--surface); border: 1px solid var(--slate-300); box-shadow: 0 8px 24px rgba(0,0,0,.14); display: none; white-space: nowrap; }
+  .rp-tip .d { color: var(--slate-500); margin-bottom: 2px; } .rp-tip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; } .rp-tip b { font-variant-numeric: tabular-nums; }
+
+  /* 매출 추이: 형광 그라데이션 막대 패널(항상 어두운 바탕) */
+  .rp-neon { --slate-900:#f3f5fa; --slate-700:#c5cbd8; --slate-500:#8a93a6; --slate-300:rgba(255,255,255,.2); --slate-200:rgba(255,255,255,.10); --surface:#1a2130;
+    position: relative; overflow: hidden; margin-top: 16px; border-radius: 18px; padding: 20px; color: #e9edf6;
+    background: radial-gradient(120% 90% at 50% 0%, #1a2233 0%, #121826 55%, #0d121d 100%); border: 1px solid rgba(255,255,255,.09); box-shadow: 0 18px 50px -20px rgba(0,0,0,.55); }
+  .rp-neon::before { content: ""; position: absolute; left: 8%; right: 8%; top: 0; height: 2px; background: linear-gradient(90deg, transparent, #ef6aa5 35%, #9b6bff 65%, transparent); opacity: .9; }
+  .rp-neon-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 22px; }
+  @media (max-width: 900px) { .rp-neon-grid { grid-template-columns: 1fr; } }
+  .rp-neon-col { min-width: 0; }
+  .rp-neon-title { font-size: 14px; font-weight: 650; color: #fff; margin-bottom: 6px; } .rp-neon-sub { font-size: 12px; font-weight: 400; color: #8a93a6; margin-left: 8px; }
+  .rp-nlegend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #c5cbd8; margin-bottom: 4px; }
+  .rp-nlegend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; box-shadow: 0 0 8px currentColor; }
+  .rp-neon .rp-tip { background: #1d2536; border-color: rgba(255,255,255,.16); color: #e9edf6; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .rp-neon .rp-tip .d { color: #8a93a6; }
+  .rp-vbars { display: flex; align-items: flex-end; justify-content: space-around; gap: 10px; height: 190px; padding: 6px 2px 0; }
+  .rp-vbar { flex: 1; max-width: 74px; border-radius: 12px 12px 5px 5px; min-height: 6px; }
+  .rp-vlabels { display: flex; justify-content: space-around; gap: 10px; margin-top: 12px; }
+  .rp-vl { flex: 1; text-align: center; min-width: 0; }
+  .rp-vl svg { width: 18px; height: 18px; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 4px; }
+  .rp-vl .n { font-size: 12.5px; font-weight: 650; color: #e9edf6; } .rp-vl .a { font-size: 15px; font-weight: 800; color: #fff; margin-top: 6px; font-variant-numeric: tabular-nums; } .rp-vl .p { font-size: 11.5px; color: #8a93a6; margin-top: 3px; }
+  /* 순위표: 흰 카드(다크 모드에서는 어두운 카드) + 형광 그라데이션 막대 */
+  .rp-rank { margin-top: 16px; border-radius: 14px; padding: 18px 20px 14px; background: var(--surface); border: 1px solid var(--slate-200); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .rp-rank h3 { margin: 0; font-size: 15px; font-weight: 650; } .rp-rank .rp-sub { color: var(--slate-500); }
+  .rp-rank table { width: 100%; border-collapse: collapse; background: transparent; border: 0; margin-top: 10px; min-width: 640px; }
+  .rp-rank th { text-align: left; font-size: 12px; font-weight: 600; color: var(--slate-500); padding: 10px 10px; border-bottom: 1px solid var(--slate-200); background: transparent; }
+  .rp-rank td { padding: 13px 10px; border-bottom: 1px solid var(--slate-200); font-size: 14px; background: transparent; color: var(--slate-900); font-variant-numeric: tabular-nums; }
+  .rp-rank tr:last-child td { border-bottom: 0; }
+  .rp-rank .rk { width: 54px; } .rp-rank .nm { font-weight: 650; } .rp-rank .amt { font-weight: 800; white-space: nowrap; }
+  .rp-rank .bar { display: flex; align-items: center; gap: 12px; min-width: 190px; }
+  .rp-rank .bar .tr { flex: 1; height: 11px; border-radius: 6px; background: var(--slate-50); border: 1px solid var(--slate-200); overflow: hidden; }
+  .rp-rank .bar .tr > div { height: 100%; border-radius: 6px; }
+  .rp-rank .bar span { width: 48px; text-align: right; color: var(--slate-700); font-size: 13px; }
+  .rp-rank .prev { color: var(--slate-700); white-space: nowrap; }
+  .rp-rank .up { color: #16a34a; font-weight: 700; white-space: nowrap; } .rp-rank .down { color: #dc2626; font-weight: 700; white-space: nowrap; } .rp-rank .flat { color: var(--slate-400); }
+  :root[data-theme="dark"] .rp-rank .up { color: #5fe0a0; } :root[data-theme="dark"] .rp-rank .down { color: #ff7d7d; }
+  .rp-rank .scroll { overflow-x: auto; }
+  .rp-rank .foot { margin-top: 10px; font-size: 11.5px; color: var(--slate-500); }
+  .rp-medal { width: 26px; height: 26px; display: block; margin: 0 auto 0 4px; } .rp-num { display: inline-block; width: 26px; text-align: center; font-weight: 700; color: var(--slate-500); margin-left: 4px; }
   .breakdown-chart-wrap { flex: 0 0 190px; display: flex; flex-direction: column; align-items: center; }
   .breakdown-chart-total { margin-top: 12px; text-align: center; }
   .breakdown-chart-total .amt { font-size: 17px; font-weight: 700; }
@@ -158,6 +207,52 @@
   }
   .flyer-cal-cell input:focus { border-color: var(--indigo-600); outline: none; }
   .flyer-cal-weekday { text-align: center; font-size: 10.5px; color: var(--slate-500); padding-bottom: 2px; }
+
+  /* ===== 오늘 / 이번 주 / 이번 달 매출 카드 (2026-10-19) - 일간·주간·월간 탭 + 카드 6개를 카드 3개로 합침 ===== */
+  .report-tabs, #reportSummaryGrid, #monthSummaryLabel, #monthSummaryGrid { display: none !important; }
+  .pc-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .pc-bar .report-nav { margin-bottom: 0; flex: 1 1 auto; }
+  .pc-abbr { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--slate-200); background: var(--surface); color: var(--slate-700); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .pc-abbr:hover { background: var(--slate-50); }
+  .pc-abbr.on { border-color: var(--indigo-600); color: var(--indigo-600); background: var(--accent-soft); }
+  .pc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 14px; }
+  @media (max-width: 980px) { .pc-grid { grid-template-columns: 1fr; } }
+  .pc-card { position: relative; background: var(--surface); border: 1px solid var(--slate-200); border-radius: 16px; padding: 20px 22px 16px; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; box-shadow: 0 1px 2px rgba(15,23,42,.04); text-align: left; }
+  .pc-card:hover { border-color: var(--slate-300); box-shadow: 0 4px 14px rgba(15,23,42,.07); }
+  .pc-card.sel { border-color: var(--indigo-600); box-shadow: 0 0 0 3px var(--accent-soft), 0 4px 14px rgba(15,23,42,.06); }
+  .pc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .pc-title { font-size: 15px; font-weight: 800; color: var(--slate-900); display: flex; align-items: center; gap: 8px; }
+  .pc-title svg { width: 16px; height: 16px; stroke: var(--indigo-600); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .pc-live { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: #16a34a; }
+  .pc-live i { width: 7px; height: 7px; border-radius: 50%; background: #16a34a; box-shadow: 0 0 0 0 rgba(22,163,74,.5); animation: pcPulse 1.8s infinite; }
+  @keyframes pcPulse { 0% { box-shadow: 0 0 0 0 rgba(22,163,74,.45); } 70% { box-shadow: 0 0 0 7px rgba(22,163,74,0); } 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); } }
+  .pc-range { font-size: 12px; color: var(--slate-500); margin-top: 3px; }
+  .pc-amt { font-size: 34px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em; color: var(--slate-900); margin: 14px 0 4px; font-variant-numeric: tabular-nums; word-break: keep-all; }
+  .pc-split { font-size: 12.5px; color: var(--slate-500); display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .pc-split b { color: var(--slate-700); font-weight: 700; }
+  .pc-rows { border-top: 1px solid var(--slate-200); }
+  .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--slate-100); }
+  .pc-row:last-of-type { border-bottom: 0; }
+  .pc-row .l { font-size: 12.5px; color: var(--slate-500); min-width: 0; }
+  .pc-row .r { display: flex; align-items: center; gap: 8px; flex: none; }
+  .pc-row .v { font-size: 14px; font-weight: 700; color: var(--slate-900); font-variant-numeric: tabular-nums; }
+  .pc-chip { display: inline-block; min-width: 54px; text-align: center; padding: 3px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .pc-chip.up { background: #dcfce7; color: #15803d; }
+  .pc-chip.down { background: #fee2e2; color: #b91c1c; }
+  .pc-chip.flat { background: var(--slate-100); color: var(--slate-500); }
+  :root[data-theme="dark"] .pc-chip.up { background: rgba(34,197,94,.16); color: #4ade80; }
+  :root[data-theme="dark"] .pc-chip.down { background: rgba(239,68,68,.16); color: #f87171; }
+  .pc-foot { margin-top: 4px; padding-top: 11px; border-top: 1px solid var(--slate-200); font-size: 12.5px; color: var(--slate-500); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .pc-foot b.up { color: #16a34a; } .pc-foot b.down { color: #dc2626; } .pc-foot b.flat { color: var(--slate-600); }
+  .pc-target { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--slate-50); border: 1px solid var(--slate-200); font-size: 12px; color: var(--slate-600); }
+  .pc-target .top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; margin-bottom: 6px; flex-wrap: wrap; }
+  .pc-target .tr { height: 6px; border-radius: 999px; background: var(--slate-200); overflow: hidden; }
+  .pc-target .tr > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--indigo-600), var(--indigo-700)); }
+  .pc-target .sub { margin-top: 6px; color: var(--slate-500); }
+  .pc-bd { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .pc-bd button { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--slate-200); background: var(--surface); color: var(--slate-600); font-size: 11.5px; font-weight: 600; cursor: pointer; }
+  .pc-bd button:hover { border-color: var(--indigo-600); color: var(--indigo-600); }
+  .pc-skel { color: var(--slate-400); }
 </style>
 </head>
 <body>
@@ -219,12 +314,20 @@
         <button type="button" class="report-tab" data-mode="weekly">주간 매출 보고</button>
         <button type="button" class="report-tab" data-mode="monthly">월간 매출 보고</button>
       </div>
-      <div class="report-nav">
-        <button type="button" class="report-nav-arrow" id="reportPrevBtn">◀</button>
-        <div class="report-period-label" id="reportPeriodLabel">-</div>
-        <button type="button" class="report-nav-arrow" id="reportNextBtn">▶</button>
-        <input type="date" id="reportDatePicker" />
-        <button type="button" class="btn-link" id="reportTodayBtn">오늘</button>
+      <div class="pc-bar">
+        <div class="report-nav">
+          <button type="button" class="report-nav-arrow" id="reportPrevBtn">◀</button>
+          <div class="report-period-label" id="reportPeriodLabel">-</div>
+          <button type="button" class="report-nav-arrow" id="reportNextBtn">▶</button>
+          <input type="date" id="reportDatePicker" />
+          <button type="button" class="btn-link" id="reportTodayBtn">오늘</button>
+        </div>
+        <button type="button" class="pc-abbr no-capture" id="pcAbbrBtn" aria-pressed="false">₩ 축약 금액</button>
+      </div>
+      <div class="pc-grid" id="pcGrid">
+        <div class="pc-card" data-mode="daily" role="button" tabindex="0"></div>
+        <div class="pc-card" data-mode="weekly" role="button" tabindex="0"></div>
+        <div class="pc-card" data-mode="monthly" role="button" tabindex="0"></div>
       </div>
       <div class="hero-grid" id="reportSummaryGrid" style="margin-top:14px;">
         <div class="hero-card hero-blue">
@@ -331,6 +434,8 @@
         </div>
       </div>
 
+      <!-- 매출 상세 표(날짜/회원명/항목…)는 화면에서 숨김(2026-10-19) - 안의 코드는 그대로라 아래 div의 display:none만 지우면 다시 보임 -->
+      <div id="reportSalesHiddenWrap" style="display:none;">
       <table id="reportSalesTable" style="margin-top:14px;">
         <thead><tr><th>날짜</th><th>회원명</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
         <tbody><tr><td colspan="6" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
@@ -340,6 +445,27 @@
         <div class="muted" id="reportSalesPageLabel">-</div>
         <button type="button" class="report-nav-arrow" id="reportSalesNextBtn">▶</button>
       </div>
+      </div>
+
+      <div class="rp-neon" id="rpLineCard">
+        <div class="rp-neon-grid">
+          <div class="rp-neon-col">
+            <div class="rp-neon-title">매출 추이 <span class="rp-neon-sub" id="rpLineSub">불러오는 중...</span></div>
+            <div class="rp-nlegend" id="rpLegend"></div>
+            <div class="rp-box" id="rpLine"></div>
+          </div>
+          <div class="rp-neon-col">
+            <div class="rp-neon-title" id="rpCurTitle">매출 구성</div>
+            <div id="rpCur"></div>
+          </div>
+        </div>
+      </div>
+      <div class="rp-rank" id="rpRank">
+        <h3>매출 구성</h3><div class="rp-sub" id="rpRankSub">불러오는 중...</div>
+        <div class="scroll"><table><thead><tr><th>순위</th><th>구분</th><th>매출</th><th>매출 비중</th><th id="rpPrevHead">직전 매출</th><th>증감률</th></tr></thead><tbody id="rpRankBody"></tbody></table></div>
+        <div class="foot" id="rpRankFoot"></div>
+      </div>
+
     </div>
 
     <div class="section">
@@ -658,6 +784,143 @@
       renderReportSalesPage();
     });
 
+    // ======== 매출 보고 아래: 꺾은선 그래프 + 매출 구성 순위표 (2026-10-19) ========
+    // 꺾은선: 일간=최근 14일(보고 날짜 포함) / 주간=그 주 7일 / 월간=그 달 하루하루. 총매출·FC·PT 세 줄.
+    // 순위표: 지금 보고 있는 기간을 회원권·개인PT·그룹PT·기타로 나눠서 많이 나온 순으로, 직전 기간(어제/지난 주/지난 달)과 비교.
+    const RP_GROUPS = [
+      { key: 'membership', label: '회원권', c1: '#6cc6e8', c2: '#2b6f92', icon: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/>' },
+      { key: 'pt', label: '개인PT', c1: '#a07bff', c2: '#4a2fb0', icon: '<path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/>' },
+      { key: 'group_pt', label: '그룹PT', c1: '#6fe0a5', c2: '#2a8a5f', icon: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20.5v-.5a6 6 0 0 1 6-6h1a6 6 0 0 1 6 6v.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M21.5 20.5v-.5a6 6 0 0 0-4-5.6"/>' },
+      { key: 'other', label: '기타', c1: '#f4b650', c2: '#9a6210', icon: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>' }
+    ];
+    function rpColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'; }
+    function rpGroup(sale) {
+      if (sale.category && PT_SALE_CATEGORIES.includes(sale.category)) return 'pt';
+      const g = saleCategoryGroup(sale);
+      return (g === 'membership' || g === 'group_pt') ? g : (g === 'pt' ? 'pt' : 'other');
+    }
+    function rpMan(v) { v = Math.round(v || 0); return Math.abs(v) >= 100000000 ? `${(v / 100000000).toFixed(1)}억` : `${Math.round(v / 10000).toLocaleString()}만`; }
+    function rpNice(v, steps) {
+      if (!(v > 0)) return steps;
+      const raw = v / steps, pow = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / pow;
+      return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * pow * steps;
+    }
+    let rpToken = null, rpData = null;
+    async function renderReportCharts(sales, start, end) {
+      const token = Date.now() + ':' + Math.random(); rpToken = token;
+      try {
+        // 꺾은선 구간
+        let cs, ce;
+        if (reportMode === 'daily') { cs = addDays(start, -13); ce = end; }
+        else if (reportMode === 'weekly') { cs = start; ce = end; }
+        else { cs = start; ce = end; }
+        const todayD = new Date(); todayD.setHours(0, 0, 0, 0);
+        if (ce > addDays(todayD, 1)) ce = addDays(todayD, 1);      // 앞으로 올 날짜는 그리지 않음
+        if (ce <= cs) ce = addDays(cs, 1);
+        // 직전 기간(비교용)
+        let ps, pe, prevLabel;
+        if (reportMode === 'daily') { ps = addDays(start, -1); pe = start; prevLabel = '어제'; }
+        else if (reportMode === 'weekly') { ps = addDays(start, -7); pe = start; prevLabel = '지난 주'; }
+        else { ps = addMonths(start, -1); pe = start; prevLabel = '지난 달'; }
+        const [lineSales, prevSales] = await Promise.all([
+          fetchSalesInRange(toDateStr(cs), toDateStr(ce)),
+          fetchSalesInRange(toDateStr(ps), toDateStr(pe))
+        ]);
+        if (rpToken !== token) return;
+        rpData = { sales, start, end, cs, ce, lineSales, prevSales, prevLabel };
+        drawReportCharts();
+      } catch (err) {
+        const sub = document.getElementById('rpLineSub'); if (sub) sub.textContent = err.message || '그래프를 불러오지 못했어요';
+      }
+    }
+    function drawReportCharts() {
+      if (!rpData) return;
+      const { sales, start, end, cs, ce, lineSales, prevSales, prevLabel } = rpData;
+      // ---------- 일별 형광 막대 (회원권·개인PT·그룹PT·기타를 쌓음) ----------
+      const days = [];
+      for (let d = new Date(cs); d < ce; d = addDays(d, 1)) days.push({ date: new Date(d), key: toDateStr(d), total: 0, n: 0, g: { membership: 0, pt: 0, group_pt: 0, other: 0 } });
+      const idx = {}; days.forEach((x, i) => idx[x.key] = i);
+      lineSales.forEach(s => {
+        const i = idx[s.sale_date]; if (i === undefined) return;
+        const a = Number(s.amount) || 0; days[i].total += a; days[i].n++; days[i].g[rpGroup(s)] += a;
+      });
+      const label = reportMode === 'daily' ? '최근 14일' : reportMode === 'weekly' ? '이번 주' : `${start.getMonth() + 1}월`;
+      document.getElementById('rpLineSub').textContent = `${label} 하루 매출 · ${toDateStr(cs).slice(5).replace('-', '/')} – ${toDateStr(addDays(ce, -1)).slice(5).replace('-', '/')}`;
+      document.getElementById('rpLegend').innerHTML = RP_GROUPS.map(k => `<span><i style="background:linear-gradient(180deg,${k.c1},${k.c2}); color:${k.c1}"></i>${k.label}</span>`).join('');
+      const grid = 'rgba(255,255,255,.07)', muted = '#8a93a6';
+      const W = window.innerWidth < 620 ? 360 : 640, H = 250, L = 48, R = 12, T = 22, B = 28, n = days.length;
+      const maxV = rpNice(Math.max(1000000, ...days.map(x => x.total)), 4);
+      const slot = (W - L - R) / n, bw = Math.max(6, Math.min(34, slot * 0.62));
+      const xAt = i => L + slot * i + slot / 2;
+      const yAt = v => T + (1 - v / maxV) * (H - T - B);
+      let defs = '<defs>' + RP_GROUPS.map(k => `<linearGradient id="rg_${k.key}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${k.c1}"/><stop offset="1" stop-color="${k.c2}" stop-opacity=".78"/></linearGradient>`).join('') + '</defs>';
+      let g = '';
+      for (let k = 0; k <= 4; k++) { const v = maxV * k / 4; g += `<line x1="${L}" x2="${W - R}" y1="${yAt(v)}" y2="${yAt(v)}" stroke="${grid}"/><text x="${L - 8}" y="${yAt(v) + 4}" text-anchor="end" font-size="11" fill="${muted}">${k === 0 ? '0' : rpMan(v)}</text>`; }
+      const stepX = n <= 8 ? 1 : Math.ceil(n / 7);
+      let bars = '';
+      const mi = days.reduce((b, x, i) => x.total > days[b].total ? i : b, 0);
+      days.forEach((x, i) => {
+        let acc = 0; const bx = xAt(i) - bw / 2;
+        const parts = RP_GROUPS.filter(k => x.g[k.key] > 0);
+        parts.forEach((k, pi) => {
+          const v = x.g[k.key], y0 = yAt(acc), y1 = yAt(acc + v); acc += v;
+          const h = Math.max(0, y0 - y1 - 2);
+          const top = pi === parts.length - 1, r = top ? Math.min(6, bw / 2, h) : 2;
+          if (h > 0) bars += `<rect x="${bx}" y="${y1}" width="${bw}" height="${h}" rx="${r}" fill="url(#rg_${k.key})" style="filter:drop-shadow(0 0 6px ${k.c1}66)"/>`;
+        });
+        if ((i % stepX === 0 && (n - 1 - i >= stepX * 0.6 || i === n - 1)) || i === n - 1) bars += `<text x="${xAt(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="${muted}">${x.date.getDate()}일</text>`;
+      });
+      if (days[mi].total > 0) bars += `<text x="${xAt(mi)}" y="${yAt(days[mi].total) - 8}" text-anchor="${mi > n * 0.85 ? 'end' : mi < n * 0.08 ? 'start' : 'middle'}" font-size="11.5" font-weight="800" fill="#fff">최고 ${rpMan(days[mi].total)}</text>`;
+      const el = document.getElementById('rpLine');
+      el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="일별 매출 구성 막대 그래프">${defs}${g}${bars}<line id="rpGuide" y1="${T}" y2="${H - B}" stroke="rgba(255,255,255,.28)" stroke-dasharray="3 3" style="display:none"/></svg><div class="rp-tip" id="rpTip"></div>`;
+      const svg = el.querySelector('svg'), tip = document.getElementById('rpTip'), guide = document.getElementById('rpGuide');
+      function show(cx) {
+        const r = svg.getBoundingClientRect(), vx = (cx - r.left) / r.width * W;
+        let b = 0, bd = 1e9; for (let i = 0; i < n; i++) { const dd = Math.abs(xAt(i) - vx); if (dd < bd) { bd = dd; b = i; } }
+        const x = days[b];
+        guide.setAttribute('x1', xAt(b)); guide.setAttribute('x2', xAt(b)); guide.style.display = '';
+        tip.innerHTML = `<div class="d">${x.date.getMonth() + 1}월 ${x.date.getDate()}일 (${WEEKDAY_KR[x.date.getDay()]}) · ${x.n}건</div>` +
+          RP_GROUPS.map(k => `<div><i style="background:linear-gradient(180deg,${k.c1},${k.c2})"></i>${k.label} <b>${formatWon(x.g[k.key])}</b></div>`).join('') +
+          `<div style="margin-top:2px;">합계 <b>${formatWon(x.total)}</b></div>`;
+        tip.style.display = 'block';
+        const px = xAt(b) / W * r.width, tw = tip.offsetWidth;
+        tip.style.left = Math.max(0, Math.min(r.width - tw, px + 14 + tw > r.width ? px - tw - 14 : px + 14)) + 'px';
+      }
+      svg.addEventListener('pointermove', e => show(e.clientX)); svg.addEventListener('pointerdown', e => show(e.clientX));
+      svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; guide.style.display = 'none'; });
+
+      // ---------- 오른쪽: 이 기간 구성 (세로 형광 막대 + 아이콘·금액·비중) ----------
+      const sumCur = (() => { const o = { membership: 0, pt: 0, group_pt: 0, other: 0 }; let t = 0; sales.forEach(s => { const a = Number(s.amount) || 0; o[rpGroup(s)] += a; t += a; }); o.total = t; return o; })();
+      document.getElementById('rpCurTitle').textContent = `${getReportPeriodLabel(start, end)} 매출 구성`;
+      const maxCat = Math.max(1, ...RP_GROUPS.map(k => Math.max(0, sumCur[k.key])));
+      document.getElementById('rpCur').innerHTML = sumCur.total > 0
+        ? `<div class="rp-vbars">${RP_GROUPS.map(k => `<div class="rp-vbar" title="${k.label} ${formatWon(sumCur[k.key])}" style="height:${Math.max(3, Math.max(0, sumCur[k.key]) / maxCat * 100).toFixed(1)}%; background:linear-gradient(180deg,${k.c1},${k.c2}); box-shadow:0 0 22px -2px ${k.c1}88, 0 0 2px ${k.c1}aa inset;"></div>`).join('')}</div>` +
+          `<div class="rp-vlabels">${RP_GROUPS.map(k => `<div class="rp-vl"><svg viewBox="0 0 24 24" style="stroke:${k.c1}">${k.icon}</svg><div class="n">${k.label}</div><div class="a">${rpMan(sumCur[k.key])}</div><div class="p">전체의 ${Math.round(Math.max(0, sumCur[k.key]) / sumCur.total * 100)}%</div></div>`).join('')}</div>`
+        : '<p style="padding:24px 0; color:#8a93a6;">이 기간에는 등록된 매출이 없어요.</p>';
+
+      // ---------- 매출 구성 순위표 ----------
+      const sum = arr => { const o = { membership: 0, pt: 0, group_pt: 0, other: 0 }; let t = 0; arr.forEach(s => { const a = Number(s.amount) || 0; o[rpGroup(s)] += a; t += a; }); o.total = t; return o; };
+      const cur = sum(sales), prv = sum(prevSales);
+      document.getElementById('rpRankSub').textContent = `${getReportPeriodLabel(start, end)} · ${sales.length}건 · 합계 ${formatWon(cur.total)}`;
+      document.getElementById('rpPrevHead').textContent = `${prevLabel} 매출`;
+      const rows = RP_GROUPS.map(k => ({ ...k, amt: cur[k.key], prev: prv[k.key] })).sort((a, b) => b.amt - a.amt);
+      const medal = (i) => {
+        const col = ['#f0a73a', '#94a3b8', '#d9782f'][i];
+        return `<svg class="rp-medal" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="6"/><path d="M8.5 3 10 8.5M15.5 3 14 8.5"/><path d="M12 11.5v5M10.8 12.5 12 11.5"/></svg>`;
+      };
+      document.getElementById('rpRankBody').innerHTML = cur.total > 0 || prv.total > 0 ? rows.map((k, i) => {
+        const pct = cur.total > 0 ? Math.max(0, k.amt) / cur.total * 100 : 0;
+        let gr;
+        if (k.prev > 0) { const d = (k.amt - k.prev) / k.prev * 100; gr = Math.abs(d) < 0.05 ? '<span class="flat">-</span>' : `<span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(1)}%</span>`; }
+        else gr = k.amt > 0 ? '<span class="up">▲ 신규</span>' : '<span class="flat">-</span>';
+        return `<tr><td class="rk">${(i < 3 && k.amt > 0) ? medal(i) : `<span class="rp-num">${i + 1}</span>`}</td><td class="nm">${k.label}</td><td class="amt">${formatWon(k.amt)}</td>` +
+          `<td><div class="bar"><div class="tr"><div style="width:${pct.toFixed(1)}%; background:linear-gradient(90deg, ${k.c2}, ${k.c1}); box-shadow:0 0 10px ${k.c1}55;"></div></div><span>${pct.toFixed(1)}%</span></div></td>` +
+          `<td class="prev">${formatWon(k.prev)}</td><td>${gr}</td></tr>`;
+      }).join('') : '<tr><td colspan="6" style="color:var(--slate-500); padding:20px 10px;">이 기간에는 등록된 매출이 없어요.</td></tr>';
+      document.getElementById('rpRankFoot').textContent = `※ 매출 비중 = 해당 구분 매출 ÷ 이 기간 총매출 · 증감률 = ${prevLabel} 같은 구분 매출 대비`;
+    }
+    document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('#themeToggleBtn')) setTimeout(drawReportCharts, 50); });
+
     async function loadReport() {
       const { start, end } = getReportRange();
       document.getElementById('reportPeriodLabel').textContent = getReportPeriodLabel(start, end);
@@ -694,11 +957,170 @@
         reportSalesByDate = dateOrder.map(d => ({ date: d, rows: byDate[d] }));
         reportSalesPage = 1; // 날짜/기간을 옮길 때마다 1페이지부터 다시 보여줌
         renderReportSalesPage();
+        renderReportCharts(sales, start, end);
       } catch (err) {
         document.getElementById('reportTotalAmount').textContent = '오류';
         tbody.innerHTML = `<tr><td colspan="6" class="error-text" style="display:table-cell;">${err.message}</td></tr>`;
       }
     }
+
+
+    // ======== 오늘 / 이번 주 / 이번 달 매출 카드 (2026-10-19) ========
+    // 일간·주간·월간 탭 + 카드 6개를 흰 카드 3개로 합침. 카드를 누르면 그 기간(reportMode)으로 아래 그래프가 바뀜.
+    // 비교 기준: 오늘=어제 / 최근 13주 같은 요일 평균, 이번 주=전주 같은 요일까지 / 최근 13주 평균,
+    // 이번 달=전달 같은 일자까지 / 최근 3개월 평균. 금액은 FC(개인PT 제외)·PT(개인PT)로 나눠 보여줌.
+    let pcAbbr = false;
+    try { pcAbbr = localStorage.getItem('gymops_pc_abbr') === '1'; } catch (e) {}
+    let pcModel = null, pcTargets = null, pcToken = null;
+    const pcCache = {};
+    const PC_ICON = {
+      daily: '<svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 3v3M16 3v3"/><circle cx="12" cy="15" r="1.4"/></svg>',
+      weekly: '<svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 3v3M16 3v3M7 14h10"/></svg>',
+      monthly: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>'
+    };
+    function pcFmt(v) {
+      v = Math.round(Number(v) || 0);
+      if (!pcAbbr) return '₩ ' + v.toLocaleString('ko-KR');
+      if (Math.abs(v) >= 100000000) return '₩ ' + (v / 100000000).toFixed(2).replace(/\.?0+$/, '') + '억';
+      return '₩ ' + Math.round(v / 10000).toLocaleString('ko-KR') + '만';
+    }
+    function pcChip(cur, base) {
+      if (!(base > 0)) return cur > 0 ? '<span class="pc-chip up">신규</span>' : '<span class="pc-chip flat">-</span>';
+      const d = (cur - base) / base * 100;
+      if (Math.abs(d) < 0.05) return '<span class="pc-chip flat">0.0%</span>';
+      return `<span class="pc-chip ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(1)}%</span>`;
+    }
+    function pcDay(by, d) { return by[toDateStr(d)] || { t: 0, fc: 0, pt: 0 }; }
+    function pcSum(by, from, n) {
+      const r = { t: 0, fc: 0, pt: 0 };
+      for (let i = 0; i < n; i++) { const x = pcDay(by, addDays(from, i)); r.t += x.t; r.fc += x.fc; r.pt += x.pt; }
+      return r;
+    }
+    async function pcLoad() {
+      const token = Date.now() + ':' + Math.random(); pcToken = token;
+      const ref0 = new Date(reportRefDate.getFullYear(), reportRefDate.getMonth(), reportRefDate.getDate());
+      const ws = startOfWeek(ref0), ms = new Date(ref0.getFullYear(), ref0.getMonth(), 1);
+      const from = [addDays(ref0, -91), addDays(ws, -91), addMonths(ms, -3)].reduce((a, b) => (a < b ? a : b));
+      const to = [addDays(ws, 7), addMonths(ms, 1)].reduce((a, b) => (a > b ? a : b));
+      const key = toDateStr(from) + '|' + toDateStr(to);
+      let rows;
+      const hit = pcCache[key];
+      if (hit && Date.now() - hit.at < 30000) rows = hit.rows;
+      else {
+        const r = await fetchAllRows(`sales?select=category,amount,sale_date&sale_date=gte.${toDateStr(from)}&sale_date=lt.${toDateStr(to)}&order=sale_date.desc,id`, await authHeaders());
+        if (r.error) throw new Error('매출을 불러오지 못했습니다.');
+        rows = r.rows; pcCache[key] = { at: Date.now(), rows };
+      }
+      if (pcToken !== token) return;
+      const by = {};
+      rows.forEach(s => {
+        const x = by[s.sale_date] || (by[s.sale_date] = { t: 0, fc: 0, pt: 0 });
+        const a = Number(s.amount) || 0; x.t += a;
+        if (s.category && PT_SALE_CATEGORIES.includes(s.category)) x.pt += a; else x.fc += a;
+      });
+      const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+      // 일
+      const dayCur = pcDay(by, ref0), yest = pcDay(by, addDays(ref0, -1));
+      let wdSum = 0; for (let k = 1; k <= 13; k++) wdSum += pcDay(by, addDays(ref0, -7 * k)).t;
+      // 주
+      const we = addDays(ws, 6);
+      const weekLive = today0 >= ws && today0 <= we;
+      const wn = weekLive ? Math.round((today0 - ws) / 86400000) + 1 : 7;
+      const weekCur = pcSum(by, ws, 7), prevWk = pcSum(by, addDays(ws, -7), wn);
+      let wkSum = 0; for (let k = 1; k <= 13; k++) wkSum += pcSum(by, addDays(ws, -7 * k), wn).t;
+      // 월
+      const dim = new Date(ref0.getFullYear(), ref0.getMonth() + 1, 0).getDate();
+      const monLive = today0.getFullYear() === ref0.getFullYear() && today0.getMonth() === ref0.getMonth();
+      const mn = monLive ? today0.getDate() : dim;
+      const monCur = pcSum(by, ms, dim);
+      const pm = addMonths(ms, -1), pdim = new Date(pm.getFullYear(), pm.getMonth() + 1, 0).getDate(), mnPrev = Math.min(mn, pdim);
+      const prevMon = pcSum(by, pm, mnPrev);
+      let moSum = 0; for (let k = 1; k <= 3; k++) { const q = addMonths(ms, -k); moSum += pcSum(by, q, Math.min(mn, new Date(q.getFullYear(), q.getMonth() + 1, 0).getDate())).t; }
+      pcModel = {
+        monthStr: refMonthStr(),
+        daily: { live: toDateStr(ref0) === toDateStr(today0), cur: dayCur, ref: ref0, prev: yest.t, avg: wdSum / 13 },
+        weekly: { live: weekLive, cur: weekCur, ws, we, n: wn, prev: prevWk.t, avg: wkSum / 13 },
+        monthly: { live: monLive, cur: monCur, ms, dim, n: mn, nPrev: mnPrev, prev: prevMon.t, avg: moSum / 3 }
+      };
+    }
+    function pcFoot(cur, avg) {
+      if (!(avg > 0)) return '<span>비교할 최근 3개월 데이터가 아직 없어요</span>';
+      const d = (cur - avg) / avg * 100;
+      if (Math.abs(d) < 0.05) return '<span>최근 3개월 평균과 같아요</span>';
+      return `<span>최근 3개월 평균 대비</span><b class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : '-'}${Math.abs(d).toFixed(1)}% ${d > 0 ? '증가' : '감소'}</b>`;
+    }
+    function pcRender() {
+      document.getElementById('pcAbbrBtn').classList.toggle('on', pcAbbr);
+      document.getElementById('pcAbbrBtn').setAttribute('aria-pressed', pcAbbr ? 'true' : 'false');
+      document.querySelectorAll('#pcGrid .pc-card').forEach(c => c.classList.toggle('sel', c.dataset.mode === reportMode));
+      if (!pcModel) return;
+      const M = pcModel, wd = WEEKDAY_KR, md = d => `${d.getMonth() + 1}월 ${d.getDate()}일`;
+      const card = (mode, o) => {
+        const c = document.querySelector(`#pcGrid .pc-card[data-mode="${mode}"]`); if (!c) return;
+        c.innerHTML = `
+          <div class="pc-head"><div><div class="pc-title">${PC_ICON[mode]}${o.title}</div><div class="pc-range">${o.range}</div></div>${o.live ? '<span class="pc-live"><i></i>실시간</span>' : ''}</div>
+          <div class="pc-amt">${pcFmt(o.cur.t)}</div>
+          <div class="pc-split"><span>FC <b>${pcFmt(o.cur.fc)}</b></span><span>PT <b>${pcFmt(o.cur.pt)}</b></span></div>
+          <div class="pc-rows">
+            <div class="pc-row"><span class="l">${o.l1}</span><span class="r"><span class="v">${pcFmt(o.prev)}</span>${pcChip(o.cur.t, o.prev)}</span></div>
+            <div class="pc-row"><span class="l">${o.l2}</span><span class="r"><span class="v">${pcFmt(o.avg)}</span>${pcChip(o.cur.t, o.avg)}</span></div>
+          </div>
+          <div class="pc-foot">${pcFoot(o.cur.t, o.avg)}</div>${o.extra || ''}`;
+      };
+      const d = M.daily, w = M.weekly, m = M.monthly;
+      card('daily', { title: d.live ? '오늘' : '하루', live: d.live, range: `${md(d.ref)} (${wd[d.ref.getDay()]})`, cur: d.cur, prev: d.prev, avg: d.avg,
+        l1: d.live ? '어제 총 매출액' : '전날 총 매출액', l2: `최근 3개월 ${wd[d.ref.getDay()]}요일 평균 매출` });
+      const lastWd = wd[addDays(w.ws, w.n - 1).getDay()];
+      card('weekly', { title: w.live ? '이번 주' : '한 주', live: w.live, range: `${md(w.ws)} ~ ${md(w.we)}`, cur: w.cur, prev: w.prev, avg: w.avg,
+        l1: w.n === 7 ? '전주 매출' : `전주 월~${lastWd} 매출`, l2: w.n === 7 ? '최근 3개월 주간 평균 매출' : `최근 3개월 월~${lastWd} 평균 매출` });
+      // 월 카드: 목표/달성률 + 분류별 보기
+      let extra = '';
+      const T = pcTargets && pcTargets.month === M.monthStr ? pcTargets : null;
+      if (T && T.total > 0) {
+        const pct = m.cur.t / T.total * 100;
+        extra += `<div class="pc-target"><div class="top"><span>목표 ${pcFmt(T.total)}</span><span>달성률 ${pct.toFixed(1)}%</span></div><div class="tr"><div style="width:${Math.min(100, pct).toFixed(1)}%"></div></div>` +
+          `<div class="sub">${T.fc > 0 ? `FC ${(m.cur.fc / T.fc * 100).toFixed(1)}%` : 'FC 목표 미설정'} · ${T.pt > 0 ? `PT ${(m.cur.pt / T.pt * 100).toFixed(1)}%` : 'PT 목표 미설정'}</div></div>`;
+      } else if (T) {
+        extra += '<div class="pc-target"><div class="top"><span>목표 미설정</span></div><div class="sub">아래 \'FC 목표 매출\' 칸에서 정할 수 있어요</div></div>';
+      }
+      extra += '<div class="pc-bd no-capture"><button type="button" data-bd="monthTotalCard">전체 분류별 ▾</button><button type="button" data-bd="monthFcCard">FC 분류별 ▾</button><button type="button" data-bd="monthPtCard">PT 트레이너별 ▾</button></div>';
+      card('monthly', { title: m.live ? '이번 달' : `${m.ms.getMonth() + 1}월`, live: m.live, range: `${m.ms.getFullYear()}년 ${m.ms.getMonth() + 1}월 1일 ~ ${m.dim}일`, cur: m.cur, prev: m.prev, avg: m.avg,
+        l1: `전달 1~${m.nPrev}일 매출`, l2: `최근 3개월 1~${m.n}일 평균 매출`, extra });
+    }
+    async function renderPeriodCards() {
+      pcRender();
+      try { await pcLoad(); pcRender(); }
+      catch (err) { document.querySelectorAll('#pcGrid .pc-card').forEach(c => { if (!c.innerHTML.trim()) c.innerHTML = `<div class="pc-skel">${err.message || '불러오지 못했어요'}</div>`; }); }
+    }
+    document.querySelectorAll('#pcGrid .pc-card').forEach(c => {
+      const pick = () => {
+        if (reportMode === c.dataset.mode) return;
+        reportMode = c.dataset.mode;
+        document.querySelectorAll('.report-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === reportMode));
+        onReportNav();
+      };
+      c.addEventListener('click', (e) => {
+        const bd = e.target.closest && e.target.closest('[data-bd]');
+        if (bd) {
+          e.stopPropagation();
+          const el = document.getElementById(bd.dataset.bd); if (el) el.click();
+          setTimeout(() => { const ids = ['monthBreakdownPanel', 'fcBreakdownPanel', 'ptBreakdownPanel']; for (const id of ids) { const p = document.getElementById(id); if (p && p.style.display !== 'none') { p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); break; } } }, 120);
+          return;
+        }
+        pick();
+      });
+      c.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); pick(); } });
+    });
+    document.getElementById('pcAbbrBtn').addEventListener('click', () => {
+      pcAbbr = !pcAbbr; try { localStorage.setItem('gymops_pc_abbr', pcAbbr ? '1' : '0'); } catch (e) {}
+      pcRender();
+    });
+    // 보고 있는 날짜가 오늘일 때만 1분마다 숫자를 새로고침 ("실시간")
+    setInterval(() => {
+      if (document.hidden) return;
+      const t = new Date();
+      if (pcModel && (pcModel.daily.live || pcModel.weekly.live || pcModel.monthly.live)) { Object.keys(pcCache).forEach(k => delete pcCache[k]); renderPeriodCards(); }
+    }, 60000);
 
     // 매출 보고 탭/화살표로 기준 날짜가 바뀔 때마다 "매출 보고" 카드 하나만이 아니라, 그 날짜가 속한
     // 달을 같이 보는 이번 달 매출/상품별 재등록 현황/워크인·미스까지 같이 새로고침함 ("월간매출로 10월로
@@ -707,6 +1129,7 @@
     function onReportNav() {
       loadReport();
       refreshMonthPinnedSections();
+      renderPeriodCards();
     }
 
     document.querySelectorAll('.report-tab').forEach(btn => {
@@ -1406,6 +1829,8 @@
           .filter(t => t.period_type === 'monthly' && t.period_start === toDateStr(monthStart))
           .reduce((sum, t) => sum + Number(t.target_amount), 0);
         fillSummaryCards('month', monthBucket, { total: fcTarget + ptTarget, fc: fcTarget, pt: ptTarget });
+        pcTargets = { month: monthStr, total: fcTarget + ptTarget, fc: fcTarget, pt: ptTarget };
+        if (typeof pcRender === 'function') pcRender();
         setMoneyInputValue('fcTargetInput', fcTarget || null);
       } catch (err) {
         document.getElementById('monthTotalAmount').textContent = '오류';
