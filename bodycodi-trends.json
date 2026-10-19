@@ -1,0 +1,128 @@
+{
+ "asOf": "2026-10-20",
+ "source": "바디코디 AI(오픈API) 실측",
+ "validMembers": {
+  "total": 683,
+  "usableNow": 672,
+  "holding": 4,
+  "future": 7
+ },
+ "renewalOverall": {
+  "window": "2025-09~2026-08",
+  "expiries": 4139,
+  "renewed": 1312,
+  "rate": 0.317
+ },
+ "months": [
+  {
+   "m": "2025-10",
+   "visitors": 441,
+   "newMembers": 198,
+   "expiries": 328,
+   "renewed": 81,
+   "renewalRate": 0.247,
+   "churnRate": 0.753
+  },
+  {
+   "m": "2025-11",
+   "visitors": 469,
+   "newMembers": 111,
+   "expiries": 220,
+   "renewed": 69,
+   "renewalRate": 0.3136,
+   "churnRate": 0.6864
+  },
+  {
+   "m": "2025-12",
+   "visitors": 492,
+   "newMembers": 111,
+   "expiries": 280,
+   "renewed": 99,
+   "renewalRate": 0.3536,
+   "churnRate": 0.6464
+  },
+  {
+   "m": "2026-01",
+   "visitors": 556,
+   "newMembers": 131,
+   "expiries": 325,
+   "renewed": 101,
+   "renewalRate": 0.3108,
+   "churnRate": 0.6892
+  },
+  {
+   "m": "2026-02",
+   "visitors": 551,
+   "newMembers": 123,
+   "expiries": 476,
+   "renewed": 160,
+   "renewalRate": 0.3361,
+   "churnRate": 0.6639
+  },
+  {
+   "m": "2026-03",
+   "visitors": 550,
+   "newMembers": 93,
+   "expiries": 368,
+   "renewed": 127,
+   "renewalRate": 0.3451,
+   "churnRate": 0.6549
+  },
+  {
+   "m": "2026-04",
+   "visitors": 509,
+   "newMembers": 68,
+   "expiries": 286,
+   "renewed": 90,
+   "renewalRate": 0.3147,
+   "churnRate": 0.6853
+  },
+  {
+   "m": "2026-05",
+   "visitors": 568,
+   "newMembers": 129,
+   "expiries": 323,
+   "renewed": 124,
+   "renewalRate": 0.3839,
+   "churnRate": 0.6161
+  },
+  {
+   "m": "2026-06",
+   "visitors": 641,
+   "newMembers": 113,
+   "expiries": 273,
+   "renewed": 89,
+   "renewalRate": 0.326,
+   "churnRate": 0.674
+  },
+  {
+   "m": "2026-07",
+   "visitors": 680,
+   "newMembers": 97,
+   "expiries": 309,
+   "renewed": 78,
+   "renewalRate": 0.2524,
+   "churnRate": 0.7476
+  },
+  {
+   "m": "2026-08",
+   "visitors": 665,
+   "newMembers": 77,
+   "expiries": 676,
+   "renewed": 202,
+   "renewalRate": 0.2988,
+   "churnRate": 0.7012
+  },
+  {
+   "m": "2026-09",
+   "visitors": 625,
+   "newMembers": 72
+  },
+  {
+   "m": "2026-10",
+   "visitors": null,
+   "newMembers": 44,
+   "partial": true
+  }
+ ]
+}

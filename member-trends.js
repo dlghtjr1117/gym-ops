@@ -1,7 +1,9 @@
-/* member-trends.js - 회원 관리 맨 위 "월별 회원 현황" 대시보드 (2026-10-19)
-   월별 회원 수 / 신규 등록 / 재등록률 / 이탈률을 숫자 + 선 그래프로 보여줌. 지표 분석(metrics.html)과 같은
-   계산(computeMonthlyMetrics)을 그대로 써서 두 화면 숫자가 항상 같음. 외부 라이브러리 없음(순수 SVG).
-   사용: MemberTrends.mount(document.getElementById('memberTrends'))  — 지점장 전용(트레이너 화면에선 안 불러옴) */
+/* member-trends.js - 회원 관리 맨 위 "월별 회원 현황" 대시보드 (2026-10-19, 10-20 바디코디 기준으로 재작성)
+   이용 회원 수 / 신규 등록 / 재등록률 / 이탈률을 숫자 + 선 그래프로 보여줌. 외부 라이브러리 없음(순수 SVG).
+   ⚠ 숫자는 앱 DB의 "현재 만료일"로 과거를 역산하지 않고, 바디코디(오픈API)가 직접 계산한 값을
+     bodycodi-trends.json 에 담아 그대로 보여줘요. (앱 DB로 역산하면 재등록한 회원의 만료일이 뒤로 밀려서
+     과거 달 재등록률이 0~6%, 이탈률이 100%처럼 엉터리로 나옴)
+   사용: MemberTrends.mount(document.getElementById('memberTrends'))  — 지점장 전용 */
 (function () {
   const CSS = `
   :root { --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --mx-muted:#898781; --mx-grid:#e1e0d9; }
@@ -48,6 +50,10 @@
   .mt-tile .tv small { font-size:14px; font-weight:600; color:var(--slate-500); margin-left:2px; }
   .mt-tile .ts { font-size:11.5px; color:var(--slate-500); min-height:16px; }
   .mt-card-sub { font-size:12px; color:var(--slate-500); margin:2px 0 8px; }
+  .mt-def { margin-top:14px; font-size:12.5px; color:var(--slate-600); }
+  .mt-def summary { cursor:pointer; color:var(--slate-500); font-weight:600; }
+  .mt-def ul { margin:8px 0 6px 18px; padding:0; line-height:1.7; } .mt-def p { margin:8px 0; }
+  .mt-tile .ts .mx-chip { margin-right:4px; }
   .mt-err { padding:14px; color:var(--slate-500); font-size:13px; }
   `;
   const ICONS = {
@@ -139,12 +145,8 @@
   }
 
 
-  let raw = null, rawEarliest = null, months = 6, root = null;
-  async function ensureRaw(list) {
-    if (raw && rawEarliest && list[0] >= rawEarliest) return;
-    rawEarliest = list[0];
-    raw = await fetchMetricsRawData(list[0]);
-  }
+
+  let data = null, nMonths = 6, root = null, last = null;
   function tile(id, title, icon) {
     return `<div class="mt-tile"><div class="tl"><span class="ic"><svg viewBox="0 0 24 24">${ICONS[icon]}</svg></span>${title}</div>` +
       `<div class="tv" id="mtV_${id}">-</div><div class="ts" id="mtC_${id}"></div></div>`;
@@ -159,60 +161,80 @@
     el.innerHTML = `
       <div class="mt-head"><h2><svg viewBox="0 0 24 24">${ICONS.chart}</svg>월별 회원 현황 <span class="mt-sub" id="mtSub"></span></h2>
         <div class="mx-seg" id="mtRange"><button type="button" data-n="6" class="on">6개월</button><button type="button" data-n="12">12개월</button></div></div>
-      <div class="mt-tiles">${tile('members', '이용 중인 회원', 'members')}${tile('new', '이번 달 신규 등록', 'new')}${tile('renew', '재등록률', 'renew')}${tile('churn', '이탈률', 'churn')}</div>
-      <div class="mx-grid2">${card('members', '월별 회원 수')}${card('new', '월별 신규 등록')}${card('renew', '월별 재등록률')}${card('churn', '월별 이탈률')}</div>`;
+      <div class="mt-tiles">${tile('members', '유효 회원', 'members')}${tile('new', '이번 달 신규 등록', 'new')}${tile('renew', '재등록률', 'renew')}${tile('churn', '이탈률', 'churn')}</div>
+      <div class="mx-grid2">${card('members', '월별 이용 회원 수')}${card('new', '월별 신규 등록')}${card('renew', '월별 재등록률')}${card('churn', '월별 이탈률')}</div>
+      <details class="mt-def"><summary>이 숫자는 어떻게 계산했나요?</summary><div id="mtDef"></div></details>`;
     el.querySelector('#mtRange').addEventListener('click', e => {
       const b = e.target.closest('button[data-n]'); if (!b) return;
-      months = Number(b.dataset.n);
+      nMonths = Number(b.dataset.n);
       el.querySelectorAll('#mtRange button').forEach(x => x.classList.toggle('on', x === b));
-      load();
+      if (data) draw();
     });
-    window.addEventListener('resize', (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => { if (last) draw(last); }, 200); }; })());
+    window.addEventListener('resize', (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => { if (data) draw(); }, 200); }; })());
     load();
   }
-  let last = null;
   async function load() {
     try {
-      const end = monthStrOf(new Date());
-      const list = []; for (let i = months - 1; i >= 0; i--) list.push(addM(end, -i));
-      await ensureRaw(list);
-      last = list.map(m => computeMonthlyMetrics(m, raw));
-      draw(last);
+      const res = await fetch('bodycodi-trends.json?v=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('bodycodi-trends.json 파일을 찾지 못했어요 (' + res.status + ')');
+      data = await res.json();
+      draw();
     } catch (err) {
       console.error('월별 회원 현황 오류', err);
       root.querySelector('#mtSub').textContent = '';
       ['members', 'new', 'renew', 'churn'].forEach(id => { const b = root.querySelector('#mx_' + id); if (b) b.innerHTML = `<div class="mt-err">불러오지 못했어요: ${(err && err.message) || err}</div>`; });
     }
   }
-  function draw(ms) {
-    const lastM = ms[ms.length - 1], prevM = ms.length >= 2 ? ms[ms.length - 2] : null;
-    const range = `${monthLabel(ms[0].monthStr)} – ${monthLabel(lastM.monthStr)}`;
-    const pend = lastM.pending > 0;
+  const dayDiff = s => Math.floor((Date.now() - Date.parse(s + 'T00:00:00+09:00')) / 86400000);
+  function draw() {
+    const all = data.months.map(x => Object.assign({ monthStr: x.m }, x));
+    const ms = all.slice(-nMonths);
+    const range = `${monthLabel(ms[0].monthStr)} – ${monthLabel(ms[ms.length - 1].monthStr)}`;
     const pctF = v => `${(v * 100).toFixed(1)}%`;
-    root.querySelector('#mtSub').textContent = `${range} · 지표 분석과 같은 기준`;
+    const asOf = data.asOf, age = dayDiff(asOf);
+    const asOfTxt = `${Number(asOf.slice(5, 7))}월 ${Number(asOf.slice(8, 10))}일`;
+    root.querySelector('#mtSub').innerHTML = `바디코디 기준 · ${asOfTxt} 계산` + (age > 40 ? ` <b style="color:#dc2626">· ${age}일 전 숫자예요, 새로 계산이 필요해요</b>` : '');
+    const cur = all[all.length - 1], prev = all[all.length - 2];
+    const meas = all.filter(x => x.renewalRate !== undefined);
+    const m1 = meas[meas.length - 1], m0 = meas[meas.length - 2];
+    const V = data.validMembers;
+    // ---- 숫자 카드 ----
+    const set = (id, big, ts) => { root.querySelector('#mtV_' + id).innerHTML = big; root.querySelector('#mtC_' + id).innerHTML = ts; };
+    set('members', `${V.total}<small>명</small>`, `<span>이용 중 ${V.usableNow} · 홀딩 ${V.holding} · 이용 예정 ${V.future} (${asOfTxt} 기준)</span>`);
+    set('new', `${cur.newMembers}<small>명</small>`, `<span>${cur.partial ? '이번 달 진행 중' : monthShort(cur.monthStr)} · 지난 달 ${prev.newMembers}명</span>`);
+    set('renew', m1 ? pctF(m1.renewalRate) : '-', m1 ? `${m0 ? deltaChip(m1.renewalRate, m0.renewalRate, { isRate: true }) + ' ' : ''}<span>${monthShort(m1.monthStr)} 만료 회원 기준</span>` : '');
+    set('churn', m1 ? pctF(m1.churnRate) : '-', m1 ? `${m0 ? deltaChip(m1.churnRate, m0.churnRate, { isRate: true, higherIsBetter: false }) + ' ' : ''}<span>${monthShort(m1.monthStr)} 만료 회원 기준</span>` : '');
+    // ---- 그래프 ----
     const cfgs = [
-      { id: 'members', vals: ms.map(m => m.activeMemberCount), fmt: v => `${v}명`, isRate: false, label: '월별 회원 수',
-        big: `${lastM.activeMemberCount}<small>명</small>`, sub: `이용 중인 회원 수 · ${range}`, chip: deltaChip(lastM.activeMemberCount, prevM && prevM.activeMemberCount),
-        tip: i => `신규 ${ms[i].newMemberCount}명 · 만료 예정 ${ms[i].totalCohort}건` },
-      { id: 'new', vals: ms.map(m => m.newMemberCount), fmt: v => `${v}명`, isRate: false, label: '월별 신규 등록',
-        big: `${lastM.newMemberCount}<small>명</small>`, sub: `그 달 새로 등록한 회원 수 · ${range}`, chip: deltaChip(lastM.newMemberCount, prevM && prevM.newMemberCount),
-        tip: i => `총 회원 ${ms[i].activeMemberCount}명 중 ${ms[i].newRate === null ? '-' : pctF(ms[i].newRate)}` },
-      { id: 'renew', vals: ms.map(m => m.renewalRate), fmt: pctF, isRate: true, label: '월별 재등록률',
-        big: lastM.renewalRate === null ? '-' : pctF(lastM.renewalRate), sub: `만료 예정 회원 중 재등록한 비율 · ${range}`, chip: deltaChip(lastM.renewalRate, prevM && prevM.renewalRate, { isRate: true }), hollowLast: pend,
-        tip: i => `만료 예정 ${ms[i].totalCohort}건 중 재등록 ${ms[i].renewed}${ms[i].pending > 0 ? ` · 집계중 ${ms[i].pending}` : ''}` },
-      { id: 'churn', vals: ms.map(m => m.churnRate), fmt: pctF, isRate: true, label: '월별 이탈률',
-        big: lastM.churnRate === null ? '-' : pctF(lastM.churnRate), sub: `만료 후 30일 안에 재등록하지 않은 비율 · ${range}`, chip: deltaChip(lastM.churnRate, prevM && prevM.churnRate, { isRate: true, higherIsBetter: false }), hollowLast: pend,
-        tip: i => `만료 예정 ${ms[i].totalCohort}건 중 이탈 ${ms[i].churned}${ms[i].pending > 0 ? ` · 집계중 ${ms[i].pending}` : ''}` }
+      { id: 'members', vals: ms.map(m => m.visitors === undefined ? null : m.visitors), fmt: v => `${v}명`, isRate: false, label: '월별 이용 회원 수',
+        sub: `그 달에 한 번이라도 방문한 회원(출입·수업 출석) · ${range}`, tip: i => `신규 등록 ${ms[i].newMembers}명` },
+      { id: 'new', vals: ms.map(m => m.newMembers), fmt: v => `${v}명`, isRate: false, label: '월별 신규 등록', hollowLast: !!cur.partial,
+        sub: `그 달 새로 등록한 회원 수(결제 기준) · ${range}`, tip: i => ms[i].partial ? `이번 달 진행 중(${asOfTxt}까지)` : `이 달 새로 결제한 회원` },
+      { id: 'renew', vals: ms.map(m => m.renewalRate === undefined ? null : m.renewalRate), fmt: pctF, isRate: true, label: '월별 재등록률',
+        sub: `그 달 만료된 이용권 중 30일 안에 다시 이어진 비율 · ${range}`, tip: i => `만료 ${ms[i].expiries}건 중 재등록 ${ms[i].renewed}건` },
+      { id: 'churn', vals: ms.map(m => m.churnRate === undefined ? null : m.churnRate), fmt: pctF, isRate: true, label: '월별 이탈률',
+        sub: `그 달 만료 후 30일 안에 이어지지 않은 비율 · ${range}`, tip: i => `만료 ${ms[i].expiries}건 중 이어지지 않음 ${ms[i].expiries - ms[i].renewed}건` }
     ];
     cfgs.forEach(c => {
-      root.querySelector('#mtV_' + c.id).innerHTML = c.big;
-      root.querySelector('#mtC_' + c.id).innerHTML = c.chip || '<span style="color:var(--slate-400)">지난 달 비교 데이터 없음</span>';
       root.querySelector('#mxSub_' + c.id).textContent = c.sub;
       drawAreaChart(root.querySelector('#mx_' + c.id), ms, c);
     });
-    const note = pend ? `속이 빈 점 = ${monthLabel(lastM.monthStr)}은 아직 집계중(만료 후 30일이 안 지난 ${lastM.pending}건)이라 숫자가 더 바뀔 수 있어요.` : '';
+    const lastMeas = m1 ? monthLabel(m1.monthStr) : '';
+    const note = m1 && ms[ms.length - 1].monthStr > m1.monthStr ? `${monthShort(m1.monthStr)} 다음 달부터는 만료 후 30일이 지나야 집계돼서 비어 있어요.` : '';
     root.querySelector('#mxNote_renew').textContent = note;
     root.querySelector('#mxNote_churn').textContent = note;
+    root.querySelector('#mxNote_new').textContent = cur.partial ? `${monthShort(cur.monthStr)}은 ${asOfTxt}까지 숫자라 속이 빈 점으로 표시했어요.` : '';
+    const o = data.renewalOverall;
+    root.querySelector('#mtDef').innerHTML = `
+      <p>모든 숫자는 <b>바디코디가 직접 계산한 값</b>이에요(앱 안에서 다시 계산하지 않아요).</p>
+      <ul>
+        <li><b>유효 회원</b>: 지금 이용 가능·홀딩·이용 예정 이용권을 1개 이상 가진 회원(바디코디 회원검색 '유효회원'과 같은 기준).</li>
+        <li><b>월별 이용 회원</b>: 그 달에 출입 체크인이나 수업 출석이 한 번이라도 있는 회원 수.</li>
+        <li><b>신규 등록</b>: 바디코디 '월간 매출 보고'의 신규등록 인원(그 달 결제일 기준).</li>
+        <li><b>재등록률</b>: 그 달에 끝난 이용권(락커·운동복 제외) 중, 끝난 뒤 30일 안에 같은 종류 이용권이 이어진 비율. 최근 12개월(${o.window.replace('~', ' ~ ')}) 전체는 <b>${pctF(o.rate)}</b>(만료 ${o.expiries.toLocaleString()}건 중 ${o.renewed.toLocaleString()}건).</li>
+        <li><b>이탈률</b>: 100% − 재등록률. 이용권 단위라서 헬스·PT를 따로 쓰는 회원은 각각 셉니다.</li>
+      </ul>
+      <p>⚠ 탈퇴 처리된 회원은 바디코디에서 조회되지 않아 재등록률이 실제보다 약간 높게(이탈률은 낮게) 나올 수 있어요.</p>`;
   }
   window.MemberTrends = { mount };
 })();
