@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 직원 관리</title>
-<link rel="stylesheet" href="style.css?v=1791480155" />
+<link rel="stylesheet" href="style.css?v=4100" />
+<script src="shell.js?v=4100" defer></script>
 <style>
   /* 이 페이지 전용 - 권한 드롭다운을 뱃지처럼 보이게 */
   .role-select {
@@ -17,7 +18,7 @@
      다크 모드에서 이 변수가 브랜드 포인트색(크림슨)을 따라가면서 이 연한 배경 위에서는 대비가
      약해짐 - badge-blue와 같은 이유로 라이트 모드 때 값(진한 인디고)으로 고정해서, "지점장" 표시가
      다크 모드에서도 항상 또렷하게 보이도록 함 */
-  .role-select.role-manager { background-color: #e0e7ff; color: #4338ca; }
+  .role-select.role-manager { background-color: var(--accent-soft-2); color: var(--indigo-700); }
   .role-select.role-lead { background-color: #d1fae5; color: #047857; }
   .role-select.role-fc { background-color: #fce7f3; color: #be185d; }
   .role-select.role-trainer { background-color: var(--slate-200); color: var(--slate-700); }

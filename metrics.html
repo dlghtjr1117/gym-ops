@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 지표 분석</title>
-<link rel="stylesheet" href="style.css?v=1791480155" />
+<link rel="stylesheet" href="style.css?v=4100" />
+<script src="shell.js?v=4100" defer></script>
 <style>
   /* 이 페이지 전용 - 지표 카드 5개를 한 줄에(좁은 화면에선 2줄/1줄로) */
   .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
@@ -275,8 +276,8 @@
       return `
         <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">
           <title>최근 ${values.length}개월 추이: ${vals.map(v => Math.round(v * 100) / 100).join(' → ')}</title>
-          <path d="${d}" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3" fill="#4f46e5" />
+          <path d="${d}" fill="none" style="stroke:var(--indigo-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3" style="fill:var(--indigo-600)" />
         </svg>`;
     }
 

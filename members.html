@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 회원 관리</title>
-<link rel="stylesheet" href="style.css?v=1791480155" />
+<link rel="stylesheet" href="style.css?v=4100" />
+<script src="shell.js?v=4100" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* 이 페이지 전용 - 미수금(분할 결제) 체크박스/입력칸 */
@@ -43,7 +44,7 @@
   .membership-card .mc-field .f-value { display: block; font-size: 13.5px; font-weight: 700; color: #0f172a; }
   /* 유효 카드일 때만 종류별로 다른 색을 입혀서 한눈에 구분되게 함(만료 카드는 전부 무채색 톤으로 통일) */
   .membership-card.is-valid.cat-membership { background: #f5f7ff; border-color: #dbe4ff; }
-  .membership-card.is-valid.cat-membership .mc-ribbon { background: #4f46e5; }
+  .membership-card.is-valid.cat-membership .mc-ribbon { background: var(--indigo-600); }
   .membership-card.is-valid.cat-membership .mc-period { background: #e8ecff; }
   .membership-card.is-valid.cat-group_pt { background: #faf5ff; border-color: #ecd9ff; }
   .membership-card.is-valid.cat-group_pt .mc-ribbon { background: #9333ea; }

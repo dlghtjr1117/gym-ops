@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script>try{if(localStorage.getItem("gymops_theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}</script>
 <title>센터 매출 관리 - 연락 센터</title>
-<link rel="stylesheet" href="style.css?v=1791480155" />
+<link rel="stylesheet" href="style.css?v=4100" />
+<script src="shell.js?v=4100" defer></script>
 <style>
   .count-pill { font-size: 11.5px; font-weight: 700; background: var(--slate-100); color: var(--slate-700); border-radius: 999px; padding: 2px 9px; }
   .cc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 4px 0 14px; }
@@ -56,7 +57,7 @@
   .cc-btn:disabled { opacity: .5; cursor: default; }
   .cc-btn.ok { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
   .cc-btn.no { background: #fff7ed; border-color: #fdba74; color: #c2410c; }
-  .cc-btn.th { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
+  .cc-btn.th { background: var(--accent-soft); border-color: var(--indigo-600); color: var(--indigo-700); }
   .cc-btn.reg { background: var(--indigo-600); border-color: var(--indigo-600); color: #fff; }
   .cc-btn.rj { background: var(--slate-100); color: var(--slate-500); }
   .cc-btn.plan { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
@@ -64,11 +65,11 @@
   .cc-more { display: block; width: 100%; padding: 10px; border: none; border-top: 1px solid var(--slate-200); background: var(--slate-50); color: var(--indigo-600); font-weight: 800; cursor: pointer; }
   .cc-banner { border-radius: 12px; padding: 11px 14px; margin: 0 0 12px; font-size: 13px; line-height: 1.55; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; }
 
-  .cc-opt { display: inline-block; padding: 7px 14px; border-radius: 999px; border: 1.5px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-weight: 800; margin: 3px 4px 3px 0; font-size: 12.5px; cursor: pointer; }
+  .cc-opt { display: inline-block; padding: 7px 14px; border-radius: 999px; border: 1.5px solid var(--accent-soft-2); background: var(--accent-soft); color: var(--indigo-700); font-weight: 800; margin: 3px 4px 3px 0; font-size: 12.5px; cursor: pointer; }
   .cc-opt.sel { background: var(--indigo-600); color: #fff; border-color: var(--indigo-600); }
   .cc-tl { border-left: 3px solid var(--slate-200); margin: 6px 0 0 8px; padding-left: 14px; }
   .cc-tl > div { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; position: relative; }
-  .cc-tl > div:before { content: ""; position: absolute; left: -21px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: #a5b4fc; border: 2px solid var(--surface); }
+  .cc-tl > div:before { content: ""; position: absolute; left: -21px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: var(--indigo-600); border: 2px solid var(--surface); }
   .cc-tl > div.today:before { background: #f97316; }
   .cc-field { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid var(--slate-300); border-radius: 8px; background: var(--surface); color: var(--slate-900); box-sizing: border-box; }
   .cc-hint { font-size: 12px; color: #047857; background: #ecfdf5; border-radius: 10px; padding: 9px 12px; line-height: 1.55; margin-top: 12px; }
@@ -215,7 +216,7 @@
 
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791700000"></script>
-  <script src="data.js?v=1792400000"></script>
+  <script src="data.js?v=1792500000"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -512,6 +513,33 @@
     }
     const HEAD_ROW = '<div class="cc-row head"><div>구분</div><div>이름 / 전화</div><div>상품 · 현황</div><div>연락 현황</div><div>마지막 메모</div><div>결과 처리</div></div>';
 
+    // 장기 미출석이 비어 보일 때의 안내: 일일업무에는 "오늘 연락할 날로 담은 사람"만 올라오고, 대상 전체는 미연락 탭에 있어요
+    function absentEmptyHtml(inDaily, todoList) {
+      const waiting = (todoList || []).filter(t => t.src === 'absent').length;
+      const total = absentItems.length;
+      if (inDaily && waiting > 0) {
+        return `<div class="cc-card"><div class="cc-empty">😴 오늘 연락하기로 담은 장기 미출석 회원은 없어요.<br/>대상 <b>${waiting}명</b>은 <b>미연락 탭</b>에 있어요 (일일업무에는 "오늘 할 일에 담기"나 결과를 남긴 사람만 올라와요).<br/><button class="btn btn-secondary" style="margin-top:8px;" data-goto-absent="1">미연락 탭에서 장기 미출석 보기 →</button></div></div>`;
+      }
+      if (total > 0) return ''; // 다른 탭(예정·보관함 등)에 있음
+      return `<div class="cc-card"><div class="cc-empty">😴 ${absentDays}일 이상 안 온 이용권 보유 회원이 없다고 나와요.<div id="absDiag" class="muted" style="margin-top:8px; font-size:12px;">원인을 확인하는 중...</div></div></div>`;
+    }
+    let absDiagFor = null;
+    async function fillAbsDiag() {
+      const el = document.getElementById('absDiag');
+      if (!el || absDiagFor === absentDays) return;
+      absDiagFor = absentDays;
+      try {
+        const d = await fetchAbsenceDiagnosis(absentDays);
+        if (d.total === null) { el.textContent = '확인하지 못했어요.'; return; }
+        const hint = d.noVisit > d.total * 0.5
+          ? '마지막 방문일이 비어 있는 회원이 절반이 넘어요. "바디코디 연동" 화면에서 회원 반영하기를 실행하면 채워져요.'
+          : d.old === 0 ? `마지막 방문일이 ${absentDays}일 넘은 회원이 한 명도 없어요. 기준 일수를 14일로 낮춰서 확인해보세요.`
+          : d.active === 0 ? '오래 안 온 회원은 있지만 모두 이용권이 끝났거나 없는 회원이에요(이용권 만료일이 앱에 비어 있을 수도 있어요).'
+          : '';
+        el.innerHTML = `전체 ${d.total}명 중 · 마지막 방문일이 비어 있는 회원 <b>${d.noVisit ?? '?'}명</b> · ${absentDays}일 넘게 안 온 회원 <b>${d.old ?? '?'}명</b> · 그중 이용권이 남은 회원 <b>${d.active ?? '?'}명</b>${hint ? '<br/>' + esc(hint) : ''}`;
+      } catch (e) { el.textContent = '확인하지 못했어요: ' + e.message; }
+    }
+
     function groupHtml(gkey, title, sub, list, { red = false, empty = '' } = {}) {
       if (!list.length) return empty ? `<div class="cc-card"><div class="cc-empty">${empty}</div></div>` : '';
       const limit = showLimit[gkey] || 40;
@@ -602,8 +630,8 @@
         });
         html += groupHtml('daily-late', '⏰ 밀린 연락', '예정일이 지났는데 아직 처리 안 한 사람이에요', overdue, { red: true });
         html += groupHtml('daily-today', `📅 오늘 예정 · ${mdw(TODAY)}`, '', today,
-          { empty: overdue.length || daily.length === 0 ? (daily.length === 0 ? '🎉 오늘 연락할 사람이 없어요. "미연락" 탭에서 미리 연락할 사람을 담아도 좋아요.' : '') : '' });
-        if (!overdue.length && !today.length && daily.length > 0) html += '<div class="cc-card"><div class="cc-empty">검색/필터에 맞는 사람이 없어요.</div></div>';
+          { empty: f === 'absent' ? '' : overdue.length || daily.length === 0 ? (daily.length === 0 ? '🎉 오늘 연락할 사람이 없어요. "미연락" 탭에서 미리 연락할 사람을 담아도 좋아요.' : '') : '' });
+        if (!overdue.length && !today.length && (daily.length > 0 || f === 'absent')) html += (f === 'absent' ? absentEmptyHtml(true, todo) : '') || '<div class="cc-card"><div class="cc-empty">검색/필터에 맞는 사람이 없어요.</div></div>';
         // 오늘 처리한 사람
         const tdone = q(touchedToday);
         if (tdone.length) {
@@ -628,6 +656,7 @@
             .sort((a, b) => b.daysLeft - a.daysLeft)]
         ];
         defs.forEach(([k, title, sub, list]) => { if (f === 'all' || f === k) html += groupHtml('todo-' + k, title, sub, list); });
+        if (!html && f === 'absentlong') html = absentEmptyHtml(false, todo);
         if (!html) html = '<div class="cc-card"><div class="cc-empty">연락 안 한 사람이 없어요 👍</div></div>';
       } else if (activeTab === 'later') {
         const f = subFilter.later;
@@ -645,6 +674,7 @@
         html += groupHtml('done', '📦 처리 완료', '재연락일이 없는 완료 건이에요. 잘못 눌렀으면 "되돌리기"로 일일업무에 다시 올려요', list, { empty: '이 기간에 처리 완료된 건이 없어요.' });
       }
       area.innerHTML = html;
+      fillAbsDiag();
       renderChips(counts);
     }
 
@@ -873,6 +903,11 @@
     // 목록 클릭 처리 (이벤트 위임)
     // ------------------------------------------------------------------
     document.getElementById('listArea').addEventListener('click', async (e) => {
+      if (e.target.closest('[data-goto-absent]')) {
+        activeTab = 'todo'; subFilter.todo = 'absentlong';
+        document.querySelectorAll('.cc-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === 'todo'));
+        renderList(); return;
+      }
       const more = e.target.closest('[data-more]');
       if (more) { showLimit[more.dataset.more] = (showLimit[more.dataset.more] || 40) + 60; renderList(); return; }
       const btn = e.target.closest('[data-act]'); if (!btn) return;
