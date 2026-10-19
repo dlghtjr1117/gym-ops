@@ -38,25 +38,21 @@
   .rp-tip { position: absolute; top: 6px; pointer-events: none; z-index: 5; padding: 9px 12px; border-radius: 10px; font-size: 12px; line-height: 1.6; background: var(--surface); border: 1px solid var(--slate-300); box-shadow: 0 8px 24px rgba(0,0,0,.14); display: none; white-space: nowrap; }
   .rp-tip .d { color: var(--slate-500); margin-bottom: 2px; } .rp-tip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; } .rp-tip b { font-variant-numeric: tabular-nums; }
 
-  /* 매출 추이: 형광 그라데이션 막대 패널(항상 어두운 바탕) */
-  .rp-neon { --slate-900:#f3f5fa; --slate-700:#c5cbd8; --slate-500:#8a93a6; --slate-300:rgba(255,255,255,.2); --slate-200:rgba(255,255,255,.10); --surface:#1a2130;
-    position: relative; overflow: hidden; margin-top: 16px; border-radius: 18px; padding: 20px; color: #e9edf6;
-    background: radial-gradient(120% 90% at 50% 0%, #1a2233 0%, #121826 55%, #0d121d 100%); border: 1px solid rgba(255,255,255,.09); box-shadow: 0 18px 50px -20px rgba(0,0,0,.55); }
-  .rp-neon::before { content: ""; position: absolute; left: 8%; right: 8%; top: 0; height: 2px; background: linear-gradient(90deg, transparent, #ef6aa5 35%, #9b6bff 65%, transparent); opacity: .9; }
+  /* 매출 추이: 형광 그라데이션 막대 패널(흰 카드, 다크 모드에서는 어두운 카드) */
+  .rp-neon { position: relative; overflow: hidden; margin-top: 16px; border-radius: 18px; padding: 20px; color: var(--slate-900);
+    background: var(--surface); border: 1px solid var(--slate-200); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
   .rp-neon-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 22px; }
   @media (max-width: 900px) { .rp-neon-grid { grid-template-columns: 1fr; } }
   .rp-neon-col { min-width: 0; }
-  .rp-neon-title { font-size: 14px; font-weight: 650; color: #fff; margin-bottom: 6px; } .rp-neon-sub { font-size: 12px; font-weight: 400; color: #8a93a6; margin-left: 8px; }
-  .rp-nlegend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #c5cbd8; margin-bottom: 4px; }
-  .rp-nlegend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; box-shadow: 0 0 8px currentColor; }
-  .rp-neon .rp-tip { background: #1d2536; border-color: rgba(255,255,255,.16); color: #e9edf6; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
-  .rp-neon .rp-tip .d { color: #8a93a6; }
+  .rp-neon-title { font-size: 14px; font-weight: 650; color: var(--slate-900); margin-bottom: 6px; } .rp-neon-sub { font-size: 12px; font-weight: 400; color: var(--slate-500); margin-left: 8px; }
+  .rp-nlegend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--slate-600); margin-bottom: 4px; }
+  .rp-nlegend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; box-shadow: 0 0 6px currentColor; }
   .rp-vbars { display: flex; align-items: flex-end; justify-content: space-around; gap: 10px; height: 190px; padding: 6px 2px 0; }
   .rp-vbar { flex: 1; max-width: 74px; border-radius: 12px 12px 5px 5px; min-height: 6px; }
   .rp-vlabels { display: flex; justify-content: space-around; gap: 10px; margin-top: 12px; }
   .rp-vl { flex: 1; text-align: center; min-width: 0; }
   .rp-vl svg { width: 18px; height: 18px; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 4px; }
-  .rp-vl .n { font-size: 12.5px; font-weight: 650; color: #e9edf6; } .rp-vl .a { font-size: 15px; font-weight: 800; color: #fff; margin-top: 6px; font-variant-numeric: tabular-nums; } .rp-vl .p { font-size: 11.5px; color: #8a93a6; margin-top: 3px; }
+  .rp-vl .n { font-size: 12.5px; font-weight: 650; color: var(--slate-700); } .rp-vl .a { font-size: 15px; font-weight: 800; color: var(--slate-900); margin-top: 6px; font-variant-numeric: tabular-nums; } .rp-vl .p { font-size: 11.5px; color: var(--slate-500); margin-top: 3px; }
   /* 순위표: 흰 카드(다크 모드에서는 어두운 카드) + 형광 그라데이션 막대 */
   .rp-rank { margin-top: 16px; border-radius: 14px; padding: 18px 20px 14px; background: var(--surface); border: 1px solid var(--slate-200); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
   .rp-rank h3 { margin: 0; font-size: 15px; font-weight: 650; } .rp-rank .rp-sub { color: var(--slate-500); }
@@ -847,7 +843,8 @@
       const label = reportMode === 'daily' ? '최근 14일' : reportMode === 'weekly' ? '이번 주' : `${start.getMonth() + 1}월`;
       document.getElementById('rpLineSub').textContent = `${label} 하루 매출 · ${toDateStr(cs).slice(5).replace('-', '/')} – ${toDateStr(addDays(ce, -1)).slice(5).replace('-', '/')}`;
       document.getElementById('rpLegend').innerHTML = RP_GROUPS.map(k => `<span><i style="background:linear-gradient(180deg,${k.c1},${k.c2}); color:${k.c1}"></i>${k.label}</span>`).join('');
-      const grid = 'rgba(255,255,255,.07)', muted = '#8a93a6';
+      const dk = document.documentElement.getAttribute('data-theme') === 'dark';
+      const grid = dk ? 'rgba(255,255,255,.08)' : 'rgba(15,23,42,.08)', muted = dk ? '#8a93a6' : '#64748b', ink = dk ? '#fff' : '#0f172a', guideC = dk ? 'rgba(255,255,255,.28)' : 'rgba(15,23,42,.25)';
       const W = window.innerWidth < 620 ? 360 : 640, H = 250, L = 48, R = 12, T = 22, B = 28, n = days.length;
       const maxV = rpNice(Math.max(1000000, ...days.map(x => x.total)), 4);
       const slot = (W - L - R) / n, bw = Math.max(6, Math.min(34, slot * 0.62));
@@ -866,13 +863,13 @@
           const v = x.g[k.key], y0 = yAt(acc), y1 = yAt(acc + v); acc += v;
           const h = Math.max(0, y0 - y1 - 2);
           const top = pi === parts.length - 1, r = top ? Math.min(6, bw / 2, h) : 2;
-          if (h > 0) bars += `<rect x="${bx}" y="${y1}" width="${bw}" height="${h}" rx="${r}" fill="url(#rg_${k.key})" style="filter:drop-shadow(0 0 6px ${k.c1}66)"/>`;
+          if (h > 0) bars += `<rect x="${bx}" y="${y1}" width="${bw}" height="${h}" rx="${r}" fill="url(#rg_${k.key})" style="filter:drop-shadow(0 0 ${dk ? 6 : 4}px ${k.c1}${dk ? '66' : '55'})"/>`;
         });
         if ((i % stepX === 0 && (n - 1 - i >= stepX * 0.6 || i === n - 1)) || i === n - 1) bars += `<text x="${xAt(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="${muted}">${x.date.getDate()}일</text>`;
       });
-      if (days[mi].total > 0) bars += `<text x="${xAt(mi)}" y="${yAt(days[mi].total) - 8}" text-anchor="${mi > n * 0.85 ? 'end' : mi < n * 0.08 ? 'start' : 'middle'}" font-size="11.5" font-weight="800" fill="#fff">최고 ${rpMan(days[mi].total)}</text>`;
+      if (days[mi].total > 0) bars += `<text x="${xAt(mi)}" y="${yAt(days[mi].total) - 8}" text-anchor="${mi > n * 0.85 ? 'end' : mi < n * 0.08 ? 'start' : 'middle'}" font-size="11.5" font-weight="800" fill="${ink}">최고 ${rpMan(days[mi].total)}</text>`;
       const el = document.getElementById('rpLine');
-      el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="일별 매출 구성 막대 그래프">${defs}${g}${bars}<line id="rpGuide" y1="${T}" y2="${H - B}" stroke="rgba(255,255,255,.28)" stroke-dasharray="3 3" style="display:none"/></svg><div class="rp-tip" id="rpTip"></div>`;
+      el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="일별 매출 구성 막대 그래프">${defs}${g}${bars}<line id="rpGuide" y1="${T}" y2="${H - B}" stroke="${guideC}" stroke-dasharray="3 3" style="display:none"/></svg><div class="rp-tip" id="rpTip"></div>`;
       const svg = el.querySelector('svg'), tip = document.getElementById('rpTip'), guide = document.getElementById('rpGuide');
       function show(cx) {
         const r = svg.getBoundingClientRect(), vx = (cx - r.left) / r.width * W;
@@ -896,7 +893,7 @@
       document.getElementById('rpCur').innerHTML = sumCur.total > 0
         ? `<div class="rp-vbars">${RP_GROUPS.map(k => `<div class="rp-vbar" title="${k.label} ${formatWon(sumCur[k.key])}" style="height:${Math.max(3, Math.max(0, sumCur[k.key]) / maxCat * 100).toFixed(1)}%; background:linear-gradient(180deg,${k.c1},${k.c2}); box-shadow:0 0 22px -2px ${k.c1}88, 0 0 2px ${k.c1}aa inset;"></div>`).join('')}</div>` +
           `<div class="rp-vlabels">${RP_GROUPS.map(k => `<div class="rp-vl"><svg viewBox="0 0 24 24" style="stroke:${k.c1}">${k.icon}</svg><div class="n">${k.label}</div><div class="a">${rpMan(sumCur[k.key])}</div><div class="p">전체의 ${Math.round(Math.max(0, sumCur[k.key]) / sumCur.total * 100)}%</div></div>`).join('')}</div>`
-        : '<p style="padding:24px 0; color:#8a93a6;">이 기간에는 등록된 매출이 없어요.</p>';
+        : '<p style="padding:24px 0; color:var(--slate-500);">이 기간에는 등록된 매출이 없어요.</p>';
 
       // ---------- 매출 구성 순위표 ----------
       const sum = arr => { const o = { membership: 0, pt: 0, group_pt: 0, other: 0 }; let t = 0; arr.forEach(s => { const a = Number(s.amount) || 0; o[rpGroup(s)] += a; t += a; }); o.total = t; return o; };
