@@ -361,6 +361,7 @@
 
       <div id="md_tab_sales" style="display:none;">
         <p class="muted" style="margin:-4px 0 14px;">이 회원님에게 지금까지 기록된 매출 내역 전체예요. "담당"은 여기서 바로 바꿀 수 있어요(지점장만 가능 - 대시보드 트레이너 실적에도 바로 반영돼요). 그 외 금액·항목 등을 고치거나 건을 삭제하려면 <a href="sales.html">매출 입력</a> 화면에서 할 수 있어요.</p>
+        <div id="md_sales_recv" style="margin-bottom:12px;"></div>
         <table id="md_sales_table">
           <thead><tr><th>날짜</th><th>항목</th><th>담당</th><th>결제수단</th><th style="text-align:right;">금액</th></tr></thead>
           <tbody id="md_sales_tbody"><tr><td colspan="5" class="muted" style="padding:14px;">불러오는 중...</td></tr></tbody>
@@ -868,32 +869,52 @@
     function renderReceivablesSection() {
       const section = document.getElementById('md_receivables_section');
       const box = document.getElementById('md_receivables_list');
+      const salesBox = document.getElementById('md_sales_recv');
       if (currentDetailReceivables.length === 0) {
         section.style.display = 'none';
         box.innerHTML = '';
+        if (salesBox) salesBox.innerHTML = '';
         return;
       }
       section.style.display = 'block';
       box.innerHTML = currentDetailReceivables.map(r => {
         const remaining = Number(r.total_amount) - Number(r.paid_amount);
         const registeredDate = r.created_at ? r.created_at.slice(0, 10) : '-';
+        const fromBody = !!r.bodycodi_component_id; // 바디코디 결제에서 넘어온 미수금은 잔금도 바디코디에서 받아요(앱에서 또 받으면 매출이 두 번 잡힘)
         return `
           <div class="receivable-card">
             <div class="r-title">${escapeHtml(r.item_name)} · 잔금 ${formatWon(remaining)}</div>
             <div class="r-detail">
               정상가 ${formatWon(r.total_amount)} · 지금까지 ${formatWon(r.paid_amount)} 받음 · 등록일 ${registeredDate}
             </div>
-            <button type="button" class="btn btn-outline" data-id="${r.id}" style="width:auto; padding:6px 16px; margin-top:8px; font-size:12.5px;">잔금 받기</button>
+            ${fromBody
+              ? `<div class="r-detail" style="margin-top:6px;">🔗 바디코디 결제에서 가져온 미수금이에요. 잔금을 바디코디에서 받으면 여기도 자동으로 줄어들어요.</div>`
+              : `<button type="button" class="btn btn-outline" data-id="${r.id}" style="width:auto; padding:6px 16px; margin-top:8px; font-size:12.5px;">잔금 받기</button>`}
           </div>`;
       }).join('');
       box.querySelectorAll('button[data-id]').forEach(btn => {
         btn.addEventListener('click', () => openReceivablePay(btn.dataset.id));
       });
+      // "판매내역" 탭 맨 위에도 같은 미수금을 요약해서 보여줌 (결제 내역과 한 화면에서 보도록)
+      if (salesBox) {
+        const total = currentDetailReceivables.reduce((a, r) => a + Number(r.total_amount), 0);
+        const paid = currentDetailReceivables.reduce((a, r) => a + Number(r.paid_amount), 0);
+        const owed = total - paid;
+        salesBox.innerHTML = `
+          <div class="receivable-card">
+            <div class="r-title">⚠️ 미수금 잔액 ${formatWon(owed)}</div>
+            <div class="r-detail">
+              ${currentDetailReceivables.map(r => `${escapeHtml(r.item_name)} <b>${formatWon(Number(r.total_amount) - Number(r.paid_amount))}</b> <span style="opacity:.8;">(정상가 ${formatWon(r.total_amount)} 중 ${formatWon(r.paid_amount)} 받음)</span>`).join('<br/>')}
+              <div style="margin-top:6px;">정상가 합계 ${formatWon(total)} · 지금까지 받은 금액 ${formatWon(paid)}${currentDetailReceivables.some(r => r.bodycodi_component_id) ? ' · 🔗 바디코디에서 잔금을 받으면 자동으로 줄어들어요' : ''}</div>
+            </div>
+          </div>`;
+      }
     }
 
     function openReceivablePay(receivableId) {
       const r = currentDetailReceivables.find(x => x.id === receivableId);
       if (!r) return;
+      if (r.bodycodi_component_id) { alert('바디코디 결제에서 가져온 미수금이에요. 잔금은 바디코디에서 받으면 자동으로 반영돼요.'); return; }
       currentPayingReceivable = r;
       const remaining = Number(r.total_amount) - Number(r.paid_amount);
       document.getElementById('rp_name').textContent = r.item_name;
