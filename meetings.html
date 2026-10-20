@@ -11,14 +11,14 @@
   /* 미팅 기록 목록 - 읽기 편한 카드 디자인 (라이트/다크 모두 대응: 색은 투명도 있는 틴트로 처리) */
   #meetingListBody { max-width: 980px; }
   .mt-day { margin-bottom: 14px; border: 1px solid var(--slate-200); border-radius: 16px; background: var(--surface); overflow: hidden; }
-  .mt-day > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 20px; }
+  .mt-day > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 18px 22px; }
   .mt-day > summary::-webkit-details-marker { display: none; }
-  .mt-chev { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; background: var(--slate-100, rgba(100,116,139,.12)); color: var(--slate-500); font-size: 11px; transition: transform .15s; }
+  .mt-chev { display: inline-block; width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%; background: var(--slate-100, rgba(100,116,139,.12)); color: var(--slate-500); font-size: 12px; transition: transform .15s; }
   .mt-day[open] > summary .mt-chev { transform: rotate(90deg); }
   .mt-day > summary:hover { background: rgba(99,102,241,.05); }
-  .mt-date { font-size: 17px; font-weight: 800; color: var(--slate-900); letter-spacing: -.2px; }
-  .mt-count { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(99,102,241,.12); color: var(--indigo-600); }
-  .mt-preview { flex: 1 1 200px; min-width: 0; font-size: 13px; color: var(--slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mt-date { font-size: 20px; font-weight: 800; color: var(--slate-900); letter-spacing: -.2px; }
+  .mt-count { font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: rgba(99,102,241,.12); color: var(--indigo-600); }
+  .mt-preview { flex: 1 1 200px; min-width: 0; font-size: 17px; font-weight: 600; color: var(--slate-700, var(--slate-600)); letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mt-day-body { padding: 4px 20px 20px; border-top: 1px solid var(--slate-200); }
   .mt-card { margin-top: 16px; padding: 22px 24px; border: 1px solid var(--slate-200); border-radius: 14px; background: var(--surface); box-shadow: 0 1px 3px rgba(15,23,42,.05); }
   .mt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
