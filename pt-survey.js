@@ -222,13 +222,14 @@
   function closeModal() { overlay().style.display = 'none'; }
   function openModal(html) { const ov = overlay(); document.getElementById('svBox').innerHTML = html; ov.style.display = ''; return document.getElementById('svBox'); }
 
-  function openSurvey(c, existing) {
+  function openSurvey(c, existing, draft) {
     const snapshot = existing && existing.answers && existing.answers.length;
     const qs = snapshot
       ? existing.answers.map(a => ({ id: a.qid, question: a.question, kind: a.kind || 'text' }))
       : questions.filter(q => q.active).map(q => ({ id: q.id, question: q.question, kind: q.kind }));
     const ans = {};
     (existing && existing.answers || []).forEach(a => { ans[a.qid] = { score: a.score || null, answer: a.answer || '' }; });
+    if (draft && draft.keep) Object.keys(draft.keep).forEach(k => { ans[k] = draft.keep[k]; });
     const status0 = existing ? existing.status : 'answered';
     const who = existing && existing.member ? existing.member : { name: c.member_name, phone: c.member_phone };
     const trainerName = existing ? (existing.trainer && existing.trainer.name) : c.trainer_name;
@@ -236,6 +237,9 @@
       <div class="modal-header"><div><h3>⭐ PT 만족도 조사 · ${esc(who.name)}</h3>
         <div class="muted" style="font-size:12.5px;">${who.phone ? `<a href="tel:${esc(String(who.phone).replace(/\D/g, ''))}">${esc(who.phone)}</a> · ` : ''}담당 ${esc(trainerName || '-')}${c ? ` · ${md(c.sale_date)} 등록 · ${c.attended_count}회 출석` : ''}</div></div>
         <button class="modal-close" id="svClose" type="button">×</button></div>
+      ${existing && existing.status === 'answered' ? '' : (ctx.isManager
+        ? '<div style="margin:-4px 0 6px;"><button class="btn btn-secondary" id="svEditInModal" type="button" style="width:auto;padding:5px 12px;font-size:12.5px;">✏️ 질문 수정 · 추가</button></div>'
+        : '<div class="muted" style="font-size:12px;margin:-4px 0 6px;">질문 수정은 지점장 계정에서 할 수 있어요.</div>')}
       ${qs.length ? '' : '<p class="muted">질문이 아직 없어요. 지점장이 "질문 편집"에서 질문을 추가해주세요.</p>'}
       <div id="svQs">${qs.map((q, i) => `
         <div class="sv-q" data-qid="${esc(q.id)}" data-kind="${esc(q.kind)}">
@@ -248,13 +252,21 @@
         ${[['answered', '✅ 통화 완료 (답변 저장)'], ['no_answer', '📵 부재중 (내일 다시)'], ['on_hold', '⏳ 나중에 다시'], ['declined', '🚫 조사 거절']].map(([k, l]) => `<label class="${status0 === k ? 'on' : ''}"><input type="radio" name="svStatus" value="${k}" ${status0 === k ? 'checked' : ''}/>${l}</label>`).join('')}
       </div>
       <div id="svNextRow" style="display:${status0 === 'on_hold' ? '' : 'none'}; margin-bottom:8px;"><label class="muted" style="font-size:12.5px;">다시 연락할 날짜 </label><input type="date" id="svNext" value="${esc(existing && existing.next_contact_date || addDays(ctx.today, 3))}" class="sv-ta" style="width:auto;min-height:0;padding:6px 9px;"/></div>
-      <textarea class="sv-ta" id="svMemo" placeholder="메모 (선택) — 전체 느낌, 후속 조치 등" style="min-height:48px;">${esc(existing && existing.memo || '')}</textarea>
+      <textarea class="sv-ta" id="svMemo" placeholder="메모 (선택) — 전체 느낌, 후속 조치 등" style="min-height:48px;">${esc(draft ? draft.memo : (existing && existing.memo || ''))}</textarea>
       <div id="svMsg" style="color:#dc2626; font-size:12.5px; margin-top:6px; display:none;"></div>
       <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
         <button class="btn btn-secondary" id="svCancel" type="button" style="width:auto;">닫기</button>
         <button class="btn btn-primary" id="svSave" type="button" style="width:auto;">저장</button>
       </div>`);
     box.querySelector('#svClose').onclick = box.querySelector('#svCancel').onclick = closeModal;
+    const edBtn = box.querySelector('#svEditInModal');
+    if (edBtn) edBtn.onclick = () => {
+      // 지금까지 적은 답변을 잠깐 들고 있다가, 질문을 고치고 돌아오면 그대로 이어서 쓸 수 있게
+      const keep = {};
+      box.querySelectorAll('.sv-q').forEach(el => { const sc = el.querySelector('.sv-score button.on'); keep[el.dataset.qid] = { score: sc ? Number(sc.dataset.score) : null, answer: el.querySelector('textarea').value }; });
+      const keepMemo = box.querySelector('#svMemo').value;
+      openEditor(() => { openSurvey(c, existing, { keep, memo: keepMemo }); });
+    };
     box.querySelectorAll('.sv-score button').forEach(btn => btn.addEventListener('click', () => {
       const wrap = btn.parentElement, on = btn.classList.contains('on');
       wrap.querySelectorAll('button').forEach(x => x.classList.remove('on'));
@@ -303,7 +315,7 @@
   }
 
   // ------------------------------------------------------------------ 질문 편집 (지점장)
-  function openEditor() {
+  function openEditor(onClose) {
     const draw = () => {
       const box = openModal(`
         <div class="modal-header"><div><h3>✏️ 만족도 질문 편집</h3><div class="muted" style="font-size:12.5px;">바꾸는 즉시 저장돼요. 이미 저장된 답변에는 그때의 질문이 그대로 남아요. 빼고 싶은 질문은 "사용 안 함"으로 두면 돼요.</div></div>
@@ -320,7 +332,7 @@
           <button class="btn btn-secondary" id="svAddQ" style="width:auto;">➕ 질문 추가</button>
           <button class="btn btn-primary" id="svDone" style="width:auto;">완료</button></div>`);
       const hdr = async () => ({ ...(await authHeaders()), 'Prefer': 'return=representation', 'Content-Type': 'application/json' });
-      box.querySelector('#svClose').onclick = box.querySelector('#svDone').onclick = () => { closeModal(); ctx.rerender(); };
+      box.querySelector('#svClose').onclick = box.querySelector('#svDone').onclick = () => { if (onClose) onClose(); else { closeModal(); ctx.rerender(); } };
       box.querySelector('#svAddQ').onclick = async () => {
         const pos = questions.length ? Math.max(...questions.map(q => q.position)) + 1 : 1;
         const res = await fetch(`${SUPABASE_URL}/rest/v1/pt_survey_questions`, { method: 'POST', headers: await hdr(), body: JSON.stringify({ position: pos, question: '새 질문을 입력해주세요', kind: 'text', active: true }) });
