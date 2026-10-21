@@ -412,13 +412,22 @@
       return false;
     }
 
+    // 개인PT 횟수를 다 쓴 회원(남은 0회): 바디코디에는 유효한 PT 이용권이 없는데 앱에 옛 PT 만료일만 남아 있어서 "PT 임박"으로 뜨는 경우
+    // 이미 연락 처리해서 보관함에 간 기록은 그대로 두고, 아직 처리 안 한 것만 숨겨요
+    function isPtUsedUp(it) {
+      if (it.categoryKey !== 'pt') return false;
+      const r = it.member && it.member.pt_remaining_sessions;
+      if (r === null || r === undefined || r === '') return false;
+      return Number(r) <= 0 && !tmStatusInfo(it).done;
+    }
+
     function buildTasks() {
       const out = [];
       expiryRowCount = {};
       expiryItems.forEach(it => { expiryRowCount[it.member.id] = (expiryRowCount[it.member.id] || 0) + 1; });
       consultRows.forEach(c => out.push(consultTask(c)));
       trialHiddenCount = 0;
-      expiryItems.forEach(it => { if (isTrialItem(it)) { it.isTrial = true; if (hideTrial) { trialHiddenCount++; return; } } else it.isTrial = false; out.push(expiryTask(it)); });
+      expiryItems.forEach(it => { if (isTrialItem(it) || isPtUsedUp(it)) { it.isTrial = true; if (hideTrial) { trialHiddenCount++; return; } } else it.isTrial = false; out.push(expiryTask(it)); });
       gptItems.forEach(it => { const t = gptTask(it); if (t) out.push(t); });
       absentItems.forEach(it => { const t = absentTask(it); if (t) out.push(t); });
       out.forEach(t => {
@@ -516,7 +525,7 @@
       if (t.src !== 'expiry') return '';
       if (t.kind === 'exp_pt') {
         const r = t.item && t.item.member ? t.item.member.pt_remaining_sessions : null;
-        return r === null || r === undefined ? '' : `<span class="badge ${Number(r) <= 3 ? 'badge-red' : 'badge-orange'}" style="font-size:12px;">남은 ${Number(r)}회</span>`;
+        return r === null || r === undefined ? '<span class="badge badge-slate" style="font-size:12px;">횟수 미확인</span>' : `<span class="badge ${Number(r) <= 3 ? 'badge-red' : 'badge-orange'}" style="font-size:12px;">남은 ${Number(r)}회</span>`;
       }
       if (t.kind === 'exp_group_pt' && t.daysLeft !== null) {
         if (t.daysLeft < 0) return '';
@@ -615,7 +624,7 @@
         html += `<span class="muted" style="font-size:12px; align-self:center; margin-left:8px;">만료 후 <select id="expiredDaysSel" style="padding:3px 6px; border:1px solid var(--slate-300); border-radius:6px; background:var(--surface); color:var(--slate-900);">${EXPIRED_DAY_CHOICES.map(n => `<option value="${n}" ${n === expiredDays ? 'selected' : ''}>${n === 0 ? '전체 기간' : n + '일 이내'}</option>`).join('')}</select></span>`;
       }
       if (activeTab === 'todo' || activeTab === 'daily') {
-        html += `<label class="muted" style="font-size:12px; align-self:center; margin-left:12px; display:inline-flex; gap:5px; align-items:center; cursor:pointer;" title="무료 PT, 그룹PT 체험권, 무료 헬스 이용권, 일일권 등 재등록 연락 대상이 아닌 이용권"><input type="checkbox" id="hideTrialChk" ${hideTrial ? 'checked' : ''}/> 체험·무료 이용권 숨기기${hideTrial && trialHiddenCount ? ` <b>(${trialHiddenCount}건 숨김)</b>` : ''}</label>`;
+        html += `<label class="muted" style="font-size:12px; align-self:center; margin-left:12px; display:inline-flex; gap:5px; align-items:center; cursor:pointer;" title="무료 PT, 그룹PT 체험권, 무료 헬스 이용권, 일일권, 그리고 PT 횟수를 다 쓴(남은 0회) 회원처럼 재등록 연락 대상이 아닌 항목"><input type="checkbox" id="hideTrialChk" ${hideTrial ? 'checked' : ''}/> 체험·무료·횟수 소진 PT 숨기기${hideTrial && trialHiddenCount ? ` <b>(${trialHiddenCount}건 숨김)</b>` : ''}</label>`;
       }
       if (activeTab === 'todo') {
         html += `<span class="muted" style="margin-left:auto; font-size:12px; align-self:center;">장기 미출석 기준 <select id="absentDaysSel" style="padding:3px 6px; border:1px solid var(--slate-300); border-radius:6px; background:var(--surface); color:var(--slate-900);">${ABSENT_DAY_CHOICES.map(n => `<option value="${n}" ${n === absentDays ? 'selected' : ''}>${n}일 이상</option>`).join('')}</select> 안 온 이용권 보유 회원</span>`;
