@@ -726,7 +726,10 @@ async function fetchExpiryBoard(daysAhead = 45) {
   const limitDate = new Date();
   limitDate.setDate(limitDate.getDate() + daysAhead);
   const limitStr = limitDate.toISOString().slice(0, 10);
-  const orClause = EXPIRY_CATEGORIES.filter(c => c.field).map(c => `${c.field}.lte.${limitStr}`).join(',');
+  // 개인PT는 만료일이 멀어도 남은 횟수가 적으면(5회 이하) 재등록 연락 대상이라 같이 가져옴
+  const PT_FEW_LEFT = 5;
+  const orClause = EXPIRY_CATEGORIES.filter(c => c.field).map(c => `${c.field}.lte.${limitStr}`).join(',') +
+    `,and(pt_remaining_sessions.gt.0,pt_remaining_sessions.lte.${PT_FEW_LEFT},pt_end_date.not.is.null)`;
 
   // 연락 센터(migration_83)의 next_contact_date 칸이 아직 없는 DB에서도 기존 화면이 안 깨지게, 실패하면 칸 빼고 다시 조회
   const tmLogsQuery = async () => {
@@ -777,7 +780,8 @@ async function fetchExpiryBoard(daysAhead = 45) {
     for (const cat of EXPIRY_CATEGORIES) {
       if (!cat.field) continue;
       const endDate = m[cat.field];
-      if (!endDate || endDate > limitStr) continue;
+      const ptFewLeft = cat.key === 'pt' && endDate && Number(m.pt_remaining_sessions) > 0 && Number(m.pt_remaining_sessions) <= PT_FEW_LEFT;
+      if (!endDate || (endDate > limitStr && !ptFewLeft)) continue;
       if (isExcludedFromExpiry(m, cat.key)) continue; // 일일입장권 · 추석패스권은 제외
       seen.add(`${m.id}|${cat.key}`);
       items.push({ member: m, categoryKey: cat.key, categoryLabel: cat.label, productLabel: labelFor(m, cat),
@@ -902,6 +906,26 @@ async function fetchAbsenceItems() {
     out.push({ member: m, daysSinceVisit, latestLog: logs[0] || null, passLabel: info.label, soonestEnd: info.soonest });
   }
   return out.sort((a, b) => b.daysSinceVisit - a.daysSinceVisit);
+}
+// 장기 미출석이 0명일 때 "왜 0인지" 화면에서 바로 보여주려고, 회원 수를 단계별로 세어요 (읽기만 해요)
+async function fetchAbsenceDiagnosis(days) {
+  const todayStr = formatDateStr(new Date());
+  const cut = new Date(todayStr + 'T00:00:00'); cut.setDate(cut.getDate() - days);
+  const cutoff = formatDateStr(cut);
+  const headers = { ...(await authHeaders()), Prefer: 'count=exact', Range: '0-0' };
+  const count = async (q) => {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/members?select=id&${q}`, { headers });
+    if (!res.ok) return null;
+    const m = String(res.headers.get('content-range') || '').match(/\/(\d+)$/);
+    return m ? Number(m[1]) : null;
+  };
+  const [total, noVisit, old] = await Promise.all([
+    count('status=neq.left'),
+    count('status=neq.left&last_visit_date=is.null'),
+    count(`status=neq.left&last_visit_date=lt.${cutoff}`)
+  ]);
+  const active = await count(`status=neq.left&last_visit_date=lt.${cutoff}&or=(membership_end_date.gte.${todayStr},group_pt_end_date.gte.${todayStr},pt_end_date.gte.${todayStr},pt_remaining_sessions.gt.0)`);
+  return { total, noVisit, old, active, days, cutoff };
 }
 async function addAbsenceTmLog(log) {
   if (!ABSENCE_LOG_OK) throw new Error('장기 미출석 연락 기록 표가 아직 없어요. Supabase SQL Editor에서 migration_97_absence_tm.sql을 먼저 실행해주세요.');

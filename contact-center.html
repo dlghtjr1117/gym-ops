@@ -217,7 +217,7 @@
 
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791700000"></script>
-  <script src="data.js?v=1792500000"></script>
+  <script src="data.js?v=1793000000"></script>
   <script src="pt-survey.js?v=1"></script>
   <script>
     requireLogin();
@@ -511,9 +511,23 @@
       return n ? ` <span class="cc-dup" title="같은 사람의 다른 연락 건이 ${n}건 더 있어요. 등록 처리할 때 같이 정리할 수 있어요">동일인 +${n}</span>` : '';
     }
     // 상품·현황 칸: 한 건이면 예전처럼 두 줄, 여러 건이 묶였으면 상품마다 한 줄로 컴팩트하게
+    // 상품별 "남은 것" 표시: 그룹PT = 남은 개월 수, 개인PT = 남은 횟수
+    function remainLabel(t) {
+      if (t.src !== 'expiry') return '';
+      if (t.kind === 'exp_pt') {
+        const r = t.item && t.item.member ? t.item.member.pt_remaining_sessions : null;
+        return r === null || r === undefined ? '' : `<span class="badge ${Number(r) <= 3 ? 'badge-red' : 'badge-orange'}" style="font-size:12px;">남은 ${Number(r)}회</span>`;
+      }
+      if (t.kind === 'exp_group_pt' && t.daysLeft !== null) {
+        if (t.daysLeft < 0) return '';
+        const mo = t.daysLeft / 30;
+        return `<span class="badge badge-purple" style="font-size:12px;">남은 ${mo < 1 ? Math.max(1, t.daysLeft) + '일' : (Math.round(mo * 10) / 10) + '개월'}</span>`;
+      }
+      return '';
+    }
     function productCell(t) {
       const g = groupOf(t);
-      if (g.length === 1) return `<div>${esc(t.headline)}<div class="cc-sub">${ddayBadge(t)} ${t.sub && t.src !== 'expiry' ? esc(t.sub) : ''}</div>${t.src === 'expiry' && t.sub ? `<div class="cc-sub">${esc(t.sub)}</div>` : ''}</div>`;
+      if (g.length === 1) return `<div>${esc(t.headline)} ${remainLabel(t)}<div class="cc-sub">${ddayBadge(t)} ${t.sub && t.src !== 'expiry' ? esc(t.sub) : ''}</div>${t.src === 'expiry' && t.sub ? `<div class="cc-sub">${esc(t.sub)}</div>` : ''}</div>`;
       const seen = new Set();
       return g.filter(x => { const k = x.src + '|' + x.headline + '|' + (x.sub || ''); if (seen.has(k)) return false; seen.add(k); return true; })
         .map(x => `<div style="padding:1px 0;">${esc(x.headline)} ${ddayBadge(x)}${x.src === 'expiry' && x.expiryDate ? ` <span class="cc-sub">${mdw(x.expiryDate)}</span>` : ''}${x.src === 'consult' ? ' <span class="cc-sub">상담</span>' : ''}</div>`).join('');
@@ -584,7 +598,7 @@
       if (activeTab === 'daily') {
         defs = [['all', '전체'], ['consult', '신규상담'], ['expiry', '만료 회원'], ['gpt', '그룹PT 무제한'], ['absent', '😴 장기 미출석']];
       } else if (activeTab === 'todo') {
-        defs = [['all', '전체'], ['membership', '🏋️ 회원권 임박'], ['group_pt', '🤸 그룹PT 임박'], ['etcsoon', '💪 PT·기타 임박'],
+        defs = [['all', '전체'], ['membership', '🏋️ 헬스 이용권'], ['group_pt', '🤸 그룹PT'], ['pt', '💪 개인PT'], ['etc', '🔒 락커·운동복'],
           ['newconsult', '🆕 신규상담 미연락'], ['gptlow', '📉 그룹PT 참석 저조'], ['absentlong', '😴 장기 미출석'], ['expired', '📦 만료자 DB']];
       } else if (activeTab === 'later') {
         defs = [['all', '전체'], ['planned', '날짜 잡힌 건'], ['stale', '방치된 건 (날짜 없이 오래됨)']];
@@ -625,7 +639,7 @@
       if (t.daysLeft !== null && t.daysLeft < 0) return 'expired';
       if (t.kind === 'exp_membership') return 'membership';
       if (t.kind === 'exp_group_pt') return 'group_pt';
-      return 'etcsoon';
+      return t.kind === 'exp_pt' ? 'pt' : 'etc';
     }
 
     function renderList() {
@@ -677,14 +691,17 @@
         const f = subFilter.todo;
         todo.forEach(t => { t.tg = todoGroup(t); });
         counts = { all: todo.filter(t => t.tg !== 'expired').length };
-        ['membership', 'group_pt', 'etcsoon', 'newconsult', 'gptlow', 'absentlong', 'expired'].forEach(k => counts[k] = todo.filter(t => t.tg === k).length);
+        ['membership', 'group_pt', 'pt', 'etc', 'newconsult', 'gptlow', 'absentlong', 'expired'].forEach(k => counts[k] = todo.filter(t => t.tg === k).length);
         const base = q(todo);
         const pick = (k) => base.filter(t => t.tg === k);
         const byDays = (a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
+        const ptLeft = (t) => { const r = t.item && t.item.member ? t.item.member.pt_remaining_sessions : null; return r === null || r === undefined ? 9999 : Number(r); };
+        const byPtLeft = (a, b) => ptLeft(a) - ptLeft(b) || byDays(a, b);
         const defs = [
-          ['membership', '🏋️ 회원권 임박', '남은 일수가 적은 순', pick('membership').sort(byDays)],
-          ['group_pt', '🤸 그룹PT 임박', '남은 일수가 적은 순', pick('group_pt').sort(byDays)],
-          ['etcsoon', '💪 PT · 기타 이용권 임박', '', pick('etcsoon').sort(byDays)],
+          ['membership', '🏋️ 헬스 이용권', '만료가 가까운 순', pick('membership').sort(byDays)],
+          ['group_pt', '🤸 그룹PT', '남은 개월 수가 적은 순', pick('group_pt').sort(byDays)],
+          ['pt', '💪 개인PT', '남은 PT 횟수가 적은 순 (횟수가 같으면 만료가 가까운 순)', pick('pt').sort(byPtLeft)],
+          ['etc', '🔒 락커 · 운동복', '만료가 가까운 순', pick('etc').sort(byDays)],
           ['newconsult', '🆕 신규상담 미연락', '아직 한 번도 연락 못 한 문의', pick('newconsult').sort((a, b) => (b.startDate || '') < (a.startDate || '') ? -1 : 1)],
           ['gptlow', '📉 그룹PT 무제한 · 참석 저조', '오래 안 온 순', pick('gptlow').sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))],
           ['absentlong', '😴 장기 미출석 · 이용권이 남은 회원', `마지막 방문 ${absentDays}일 이상 · 오래 안 온 순 (다시 나오기 시작하면 자동으로 빠져요)`, pick('absentlong').sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))],
@@ -737,7 +754,7 @@
       const personKey = (t) => t.memberId ? 'm:' + t.memberId : (t.phoneDigits && t.phoneDigits.length >= 9 ? (phoneToMember[t.phoneDigits] ? 'm:' + phoneToMember[t.phoneDigits] : 'p:' + t.phoneDigits) : null);
       const SRC_ORDER = { expiry: 0, gpt: 1, absent: 2, consult: 3 };
       const buckets = {};
-      list.forEach(t => { t.merged = []; const k = !t.done && personKey(t); if (k) (buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] = buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] || []).push(t); });
+      list.forEach(t => { t.merged = []; const pk = !t.done && personKey(t); const k = pk && (t.src === 'expiry' ? pk + '|' + t.kind : pk); if (k) (buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] = buckets[(t.bucket === 'later' ? 'later' : 'act') + '|' + k] || []).push(t); });
       const hidden = new Set();
       Object.values(buckets).forEach(g => {
         if (g.length < 2) return;
