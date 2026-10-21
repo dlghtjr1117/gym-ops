@@ -147,7 +147,7 @@
     <p class="muted" style="margin:18px 2px 0; font-size:12px;">
       장기 미출석은 이용권(헬스·그룹PT·개인PT)이 남아 있는 회원 중 "마지막 방문일"이 오래된 회원이에요(바디코디 회원 연동이 방문일을 갱신해요). 그룹PT 무제한 회원의 "마지막 방문일" 데이터는 <a href="group-pt.html">바디코디 방문 기록 업로드</a>로 갱신해요 (그룹PT 참석 저조 목록의 기준).
     </p>
-    <p class="muted" id="pageVersion" style="margin:6px 2px 24px; font-size:11.5px; text-align:right;">연락 센터 · 2026-10-18 (장기 미출석 추가)</p>
+    <p class="muted" id="pageVersion" style="margin:6px 2px 24px; font-size:11.5px; text-align:right;">연락 센터 · 2026-10-21 (체험·무료 숨기기 · 만료자 DB 분리)</p>
   </div>
 
   <!-- 결과 입력 창 -->
@@ -231,6 +231,7 @@
     const LEGACY_STALE_DAYS = 14;  // 그 날짜가 14일도 넘게 지났으면 "방치된 건"으로 따로 모음(일일업무를 덮지 않게)
     const NEVER_CONTACTED_WINDOW = 60; // 신규상담 미연락은 60일 이내 건만 미연락 칸에 (더 오래된 건 예정·진행중 > 방치)
     const ABSENT_DAY_CHOICES = [14, 30, 60, 90];
+    const EXPIRED_DAY_CHOICES = [30, 60, 90, 180, 0]; // 0 = 전체 기간
     const GPT_LOW_ATTEND_DAYS = 14;    // 그룹PT 무제한: 이 일수 이상 안 오면 미연락 칸에 올림
     const RESULT_LABEL = { called: '통화완료', noanswer: '부재중', thinking: '고민중', registered: '등록', declined: '거절', rolled: '이월' };
     const CHANNEL_LABEL = { phone_auto: '자동통화', naver_place: '네이버 플레이스', carrot: '당근', blog: '블로그', referral: '지인소개',
@@ -258,6 +259,11 @@
     const subFilter = { daily: 'all', todo: 'all', later: 'all', done: 'all' };
     let catFilter = 'all', doneScope = 'month', ownerFilter = 'all', searchText = '';
     let absentDays = ABSENT_DAY_CHOICES.includes(Number(lsGet('cc_absent_days', '30'))) ? Number(lsGet('cc_absent_days', '30')) : 30; // 이 일수 이상 안 온 이용권 보유 회원이 장기 미출석
+    // 체험·무료 이용권(무료 PT 2회, 그룹PT 체험권, 무료 헬스 등)은 재등록 연락 대상이 아니라서 기본으로 숨겨요
+    let hideTrial = lsGet('cc_hide_trial', '1') === '1';
+    let trialHiddenCount = 0;
+    let paidMap = null; // 회원id -> 실제 돈 낸 이력이 있는 매출 항목 Set (불러오기 실패하면 null → 이력 기준 판별은 건너뜀)
+    let expiredDays = EXPIRED_DAY_CHOICES.includes(Number(lsGet('cc_expired_days', '90'))) ? Number(lsGet('cc_expired_days', '90')) : 90; // 만료자 DB에 보여줄 "만료 후 N일 이내"
     let autoDays = Number(lsGet('cc_auto_days', '7')) || 7;   // 만료 D-N일 이내 미연락 건을 일일업무에 자동 편입
     const showLimit = {};                 // 그룹별 "더 보기" 개수
     let resultCtx = null;
@@ -387,12 +393,30 @@
       return 'todo';
     }
 
+    // 체험·무료 이용권인지: 이름에 무료/체험 등이 들어 있거나, 개인PT인데 돈 낸 PT 매출 이력이 전혀 없고 남은 횟수가 적은 경우(무료 2회 PT 등)
+    const TRIAL_RE = /무료|체험|이벤트|시범|일일\s*(입장|권)|추석\s*패스|(^|[^A-Za-z])OT([^A-Za-z]|$)/i;
+    function isTrialItem(it) {
+      const m = it.member, k = it.categoryKey;
+      if (k === 'membership' || k === 'group_pt') {
+        const label = k === 'membership' ? m.membership_type : m.group_pt_type;
+        return TRIAL_RE.test(String(label || ''));
+      }
+      if (k === 'pt') {
+        if (!paidMap) return false;
+        const paid = paidMap[m.id];
+        const rem = m.pt_remaining_sessions;
+        return !(paid && paid.has('pt')) && (rem === null || rem === undefined || Number(rem) <= 3);
+      }
+      return false;
+    }
+
     function buildTasks() {
       const out = [];
       expiryRowCount = {};
       expiryItems.forEach(it => { expiryRowCount[it.member.id] = (expiryRowCount[it.member.id] || 0) + 1; });
       consultRows.forEach(c => out.push(consultTask(c)));
-      expiryItems.forEach(it => out.push(expiryTask(it)));
+      trialHiddenCount = 0;
+      expiryItems.forEach(it => { if (isTrialItem(it)) { it.isTrial = true; if (hideTrial) { trialHiddenCount++; return; } } else it.isTrial = false; out.push(expiryTask(it)); });
       gptItems.forEach(it => { const t = gptTask(it); if (t) out.push(t); });
       absentItems.forEach(it => { const t = absentTask(it); if (t) out.push(t); });
       out.forEach(t => {
@@ -571,6 +595,12 @@
         html += '<span style="width:12px;"></span>' + [['all', '전체'], ['membership', '회원권'], ['group_pt', '그룹PT'], ['pt', 'PT'], ['etc', '기타']]
           .map(([k, l]) => `<button class="filter-tab ${catFilter === k ? 'active' : ''}" data-cat="${k}">${l}</button>`).join('');
       }
+      if (activeTab === 'todo' && cur === 'expired') {
+        html += `<span class="muted" style="font-size:12px; align-self:center; margin-left:8px;">만료 후 <select id="expiredDaysSel" style="padding:3px 6px; border:1px solid var(--slate-300); border-radius:6px; background:var(--surface); color:var(--slate-900);">${EXPIRED_DAY_CHOICES.map(n => `<option value="${n}" ${n === expiredDays ? 'selected' : ''}>${n === 0 ? '전체 기간' : n + '일 이내'}</option>`).join('')}</select></span>`;
+      }
+      if (activeTab === 'todo' || activeTab === 'daily') {
+        html += `<label class="muted" style="font-size:12px; align-self:center; margin-left:12px; display:inline-flex; gap:5px; align-items:center; cursor:pointer;" title="무료 PT, 그룹PT 체험권, 무료 헬스 이용권, 일일권 등 재등록 연락 대상이 아닌 이용권"><input type="checkbox" id="hideTrialChk" ${hideTrial ? 'checked' : ''}/> 체험·무료 이용권 숨기기${hideTrial && trialHiddenCount ? ` <b>(${trialHiddenCount}건 숨김)</b>` : ''}</label>`;
+      }
       if (activeTab === 'todo') {
         html += `<span class="muted" style="margin-left:auto; font-size:12px; align-self:center;">장기 미출석 기준 <select id="absentDaysSel" style="padding:3px 6px; border:1px solid var(--slate-300); border-radius:6px; background:var(--surface); color:var(--slate-900);">${ABSENT_DAY_CHOICES.map(n => `<option value="${n}" ${n === absentDays ? 'selected' : ''}>${n}일 이상</option>`).join('')}</select> 안 온 이용권 보유 회원</span>`;
       }
@@ -603,9 +633,11 @@
       const area = document.getElementById('listArea');
 
       // 탭 숫자 / 상단 카드
-      const daily = bucketOf('daily'), todo = bucketOf('todo'), later = bucketOf('later'), done = bucketOf('done');
+      const daily = bucketOf('daily'), later = bucketOf('later'), done = bucketOf('done');
+      // 미연락: 만료된 지 오래된 DB는 "만료 후 N일 이내"만 남기고, 탭 숫자에는 만료자 DB를 빼서 진짜 연락할 사람 수만 보이게
+      const todo = bucketOf('todo').filter(t => { t.tg = todoGroup(t); return t.tg !== 'expired' || expiredDays === 0 || -t.daysLeft <= expiredDays; });
       document.getElementById('tabDaily').textContent = daily.length;
-      document.getElementById('tabTodo').textContent = todo.length;
+      document.getElementById('tabTodo').textContent = todo.filter(t => t.tg !== 'expired').length;
       document.getElementById('tabLater').textContent = later.length;
       document.getElementById('tabDone').textContent = done.length;
       document.querySelector('[data-tab="daily"]').classList.toggle('hot', daily.some(t => (t.nextDate || t.effNext) < TODAY));
@@ -640,7 +672,7 @@
       } else if (activeTab === 'todo') {
         const f = subFilter.todo;
         todo.forEach(t => { t.tg = todoGroup(t); });
-        counts = { all: todo.length };
+        counts = { all: todo.filter(t => t.tg !== 'expired').length };
         ['membership', 'group_pt', 'etcsoon', 'newconsult', 'gptlow', 'absentlong', 'expired'].forEach(k => counts[k] = todo.filter(t => t.tg === k).length);
         const base = q(todo);
         const pick = (k) => base.filter(t => t.tg === k);
@@ -652,10 +684,11 @@
           ['newconsult', '🆕 신규상담 미연락', '아직 한 번도 연락 못 한 문의', pick('newconsult').sort((a, b) => (b.startDate || '') < (a.startDate || '') ? -1 : 1)],
           ['gptlow', '📉 그룹PT 무제한 · 참석 저조', '오래 안 온 순', pick('gptlow').sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))],
           ['absentlong', '😴 장기 미출석 · 이용권이 남은 회원', `마지막 방문 ${absentDays}일 이상 · 오래 안 온 순 (다시 나오기 시작하면 자동으로 빠져요)`, pick('absentlong').sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))],
-          ['expired', '📦 만료자 DB', '만료된 지 얼마 안 된 순 · 재등록 안 한 회원', pick('expired').filter(t => catFilter === 'all' || (CATEGORY_CHIP[t.item.categoryKey] || 'etc') === catFilter)
+          ['expired', '📦 만료자 DB', `만료된 지 얼마 안 된 순 · 만료 후 ${expiredDays === 0 ? '전체 기간' : expiredDays + '일 이내'} · 재등록 안 한 회원`, pick('expired').filter(t => catFilter === 'all' || (CATEGORY_CHIP[t.item.categoryKey] || 'etc') === catFilter)
             .sort((a, b) => b.daysLeft - a.daysLeft)]
         ];
-        defs.forEach(([k, title, sub, list]) => { if (f === 'all' || f === k) html += groupHtml('todo-' + k, title, sub, list); });
+        defs.forEach(([k, title, sub, list]) => { if (f === k || (f === 'all' && k !== 'expired')) html += groupHtml('todo-' + k, title, sub, list); });
+        if (f === 'all' && counts.expired) html += `<div class="cc-card"><div class="cc-empty" style="padding:14px;">📦 만료된 회원 DB <b>${counts.expired}명</b>은 일부러 아래로 뺐어요. 위의 <b>임박 · 신규상담 · 장기 미출석</b>부터 연락하고, 시간이 날 때 <button class="btn btn-secondary" style="display:inline-block; width:auto; margin-left:6px; padding:4px 12px;" data-chip-go="expired">만료자 DB 보기</button></div></div>`;
         if (!html && f === 'absentlong') html = absentEmptyHtml(false, todo);
         if (!html) html = '<div class="cc-card"><div class="cc-empty">연락 안 한 사람이 없어요 👍</div></div>';
       } else if (activeTab === 'later') {
@@ -903,6 +936,7 @@
     // 목록 클릭 처리 (이벤트 위임)
     // ------------------------------------------------------------------
     document.getElementById('listArea').addEventListener('click', async (e) => {
+      if (e.target.closest('[data-chip-go]')) { subFilter.todo = e.target.closest('[data-chip-go]').dataset.chipGo; renderList(); return; }
       if (e.target.closest('[data-goto-absent]')) {
         activeTab = 'todo'; subFilter.todo = 'absentlong';
         document.querySelectorAll('.cc-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === 'todo'));
@@ -1087,6 +1121,8 @@
     });
     document.getElementById('chipRow').addEventListener('change', (e) => {
       if (e.target.id === 'autoDaysSel') { autoDays = Number(e.target.value); lsSet('cc_auto_days', String(autoDays)); buildTasks(); renderList(); }
+      if (e.target.id === 'expiredDaysSel') { expiredDays = Number(e.target.value); lsSet('cc_expired_days', String(expiredDays)); renderList(); }
+      if (e.target.id === 'hideTrialChk') { hideTrial = e.target.checked; lsSet('cc_hide_trial', hideTrial ? '1' : '0'); buildTasks(); renderList(); }
       if (e.target.id === 'absentDaysSel') { absentDays = Number(e.target.value); lsSet('cc_absent_days', String(absentDays)); buildTasks(); renderList(); }
       if (e.target.id === 'doneScopeSel') { doneScope = e.target.value; renderList(); }
     });
@@ -1224,14 +1260,25 @@
         return res.ok;
       } catch (e) { return true; }
     }
+    // 돈 낸 이력(매출 0원 초과)이 있는 회원·항목 — 무료 PT 같은 체험 이용권을 가려내는 데 써요. 실패하면 이력 기준 판별만 건너뛰어요.
+    async function loadPaidMap() {
+      try {
+        const r = await fetchAllRows(`sales?select=member_id,category&amount=gt.0&member_id=not.is.null&category=in.(pt_new,pt_renewal,group_pt_new,group_pt_renewal,membership_new,membership_renewal)&order=id.asc`, await authHeaders());
+        if (r.error) return null;
+        const map = {};
+        r.rows.forEach(x => { const k = String(x.category).startsWith('pt_') ? 'pt' : String(x.category).startsWith('group_pt') ? 'group_pt' : 'membership'; (map[x.member_id] = map[x.member_id] || new Set()).add(k); });
+        return map;
+      } catch (e) { return null; }
+    }
     async function loadAll() {
       try {
-        const [rows, board, gpt, absent, staff, hasNext] = await Promise.all([
+        const [rows, board, gpt, absent, staff, hasNext, paid] = await Promise.all([
           fetchWalkinConsultations(), fetchExpiryBoard(45),
           fetchGroupPtRetentionItems().catch(() => []),
           fetchAbsenceItems().catch((e) => { absentLoadError = e.message; return []; }),
-          fetchStaff().catch(() => []), probeNextDate()
+          fetchStaff().catch(() => []), probeNextDate(), loadPaidMap()
         ]);
+        paidMap = paid;
         consultRows = rows; expiryItems = board; gptItems = gpt; absentItems = absent;
         staff.forEach(p => { staffMap[p.id] = p.name; });
         HAS_NEXT = hasNext && TM_NEXT_DATE_SUPPORTED !== false;
