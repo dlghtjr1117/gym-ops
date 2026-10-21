@@ -134,6 +134,7 @@
       <button class="cc-tab" data-tab="todo">📋 미연락 <i id="tabTodo">0</i></button>
       <button class="cc-tab" data-tab="later">⏳ 예정 · 진행중 <i id="tabLater">0</i></button>
       <button class="cc-tab" data-tab="done">📦 처리 완료 보관함 <i id="tabDone">0</i></button>
+      <button class="cc-tab" data-tab="survey">⭐ 만족도 조사 <i id="tabSurvey">0</i></button>
       <div class="cc-tools">
         <button type="button" class="btn btn-primary" id="addConsultBtn" style="width:auto;padding:7px 14px;font-size:13px;">➕ 상담 추가</button>
         <select id="ownerFilter" style="display:none;"></select>
@@ -217,6 +218,7 @@
   <script src="config.js?v=1791480155"></script>
   <script src="auth.js?v=1791700000"></script>
   <script src="data.js?v=1792500000"></script>
+  <script src="pt-survey.js?v=1"></script>
   <script>
     requireLogin();
     document.getElementById('logoutBtn').addEventListener('click', signOut);
@@ -650,6 +652,8 @@
       document.getElementById('statDone').textContent = touchedToday.length;
       document.getElementById('statReg').textContent = done.filter(t => t.doneKey === 'registered' && (t.doneDate || '').slice(0, 7) === THIS_MONTH).length;
 
+      if (window.PtSurvey) { PtSurvey.setSearch(searchText); document.getElementById('tabSurvey').textContent = PtSurvey.pendingCount(); }
+      if (activeTab === 'survey') { if (window.PtSurvey) PtSurvey.render(area, document.getElementById('chipRow')); return; }
       let counts = {};
       let html = '';
       if (activeTab === 'daily') {
@@ -936,6 +940,7 @@
     // 목록 클릭 처리 (이벤트 위임)
     // ------------------------------------------------------------------
     document.getElementById('listArea').addEventListener('click', async (e) => {
+      if (activeTab === 'survey' && window.PtSurvey && PtSurvey.handleClick(e)) return;
       if (e.target.closest('[data-chip-go]')) { subFilter.todo = e.target.closest('[data-chip-go]').dataset.chipGo; renderList(); return; }
       if (e.target.closest('[data-goto-absent]')) {
         activeTab = 'todo'; subFilter.todo = 'absentlong';
@@ -1115,11 +1120,13 @@
       renderList();
     }));
     document.getElementById('chipRow').addEventListener('click', (e) => {
+      if (activeTab === 'survey' && window.PtSurvey && PtSurvey.handleClick(e)) return;
       const chip = e.target.closest('[data-chip]'), cat = e.target.closest('[data-cat]');
       if (chip) { subFilter[activeTab] = chip.dataset.chip; renderList(); }
       else if (cat) { catFilter = cat.dataset.cat; renderList(); }
     });
     document.getElementById('chipRow').addEventListener('change', (e) => {
+      if (activeTab === 'survey' && window.PtSurvey) { PtSurvey.handleChange(e); return; }
       if (e.target.id === 'autoDaysSel') { autoDays = Number(e.target.value); lsSet('cc_auto_days', String(autoDays)); buildTasks(); renderList(); }
       if (e.target.id === 'expiredDaysSel') { expiredDays = Number(e.target.value); lsSet('cc_expired_days', String(expiredDays)); renderList(); }
       if (e.target.id === 'hideTrialChk') { hideTrial = e.target.checked; lsSet('cc_hide_trial', hideTrial ? '1' : '0'); buildTasks(); renderList(); }
@@ -1279,6 +1286,7 @@
           fetchStaff().catch(() => []), probeNextDate(), loadPaidMap()
         ]);
         paidMap = paid;
+        if (window.PtSurvey) { PtSurvey.init({ me, isManager, today: TODAY, rerender: () => renderList(), onCount: (n) => { document.getElementById('tabSurvey').textContent = n; } }); PtSurvey.load().then(() => renderList()); }
         consultRows = rows; expiryItems = board; gptItems = gpt; absentItems = absent;
         staff.forEach(p => { staffMap[p.id] = p.name; });
         HAS_NEXT = hasNext && TM_NEXT_DATE_SUPPORTED !== false;
