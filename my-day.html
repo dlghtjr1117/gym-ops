@@ -410,7 +410,7 @@
       });
       const sb = wrap.querySelector('#imgShareBtn');
       if (sb) sb.addEventListener('click', async () => {
-        try { await navigator.share({ files: [file], title: '오늘 내 하루' }); }
+        try { await navigator.share({ files: [file] }); }
         catch (err) { if (err && err.name !== 'AbortError') { const m = wrap.querySelector('#imgMsg'); m.style.color = '#dc2626'; m.textContent = '공유하지 못했어요. "파일로 저장"을 눌러보세요.'; } }
       });
     }
