@@ -75,6 +75,20 @@
   .md-btn { display: block; width: calc(100% - 28px); margin: 0 14px 14px; padding: 12px; border-radius: 12px; border: 1px solid var(--slate-300); background: var(--surface); color: var(--slate-900); font-weight: 700; font-size: 14px; text-align: center; text-decoration: none; }
   .md-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50; max-width: 90vw; }
   .md-toast.on { opacity: .95; }
+  /* 📩 만족도 조사 결과 도착 (문자 알림처럼) */
+  .md-msg { display: flex; gap: 11px; align-items: flex-start; padding: 12px 14px; border-top: 1px solid var(--slate-200); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .md-msg:active { background: var(--slate-50); }
+  .md-msg .av { width: 38px; height: 38px; flex: none; border-radius: 50%; background: #e0e7ff; display: flex; align-items: center; justify-content: center; font-size: 19px; position: relative; }
+  .md-msg .bx { flex: 1; min-width: 0; }
+  .md-msg .tt { font-size: 14.5px; line-height: 1.4; font-weight: 600; color: var(--slate-700); }
+  .md-msg.new .tt { font-weight: 800; color: var(--slate-900); }
+  .md-msg .mt { font-size: 12px; color: var(--slate-500); margin-top: 3px; }
+  .md-msg.new .av::after { content: ''; position: absolute; top: -1px; right: -1px; width: 11px; height: 11px; border-radius: 50%; background: #ef4444; border: 2px solid var(--surface); }
+  .md-newtag { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 99px; background: #ef4444; color: #fff; margin-left: 6px; vertical-align: 1px; }
+  .md-qa { margin-top: 12px; max-height: 52vh; overflow: auto; }
+  .md-qa .q { font-size: 13px; font-weight: 800; margin-top: 11px; line-height: 1.4; }
+  .md-qa .a { font-size: 14.5px; margin-top: 3px; padding: 8px 10px; background: var(--slate-50); border-radius: 10px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .md-qa .sc { display: inline-block; font-weight: 800; color: #4f46e5; margin-right: 6px; }
   .md-err { color: #b91c1c; font-size: 13px; padding: 12px 14px; }
 </style>
 </head>
@@ -94,10 +108,16 @@
       <div class="md-sum">
         <div><b id="sumClass">-</b><span>오늘 수업</span></div>
         <div><b id="sumTask">-</b><span>오늘 할 일 (남은 것)</span></div>
+        <div id="sumSurveyBox" style="display:none;"><b id="sumSurvey">0</b><span>새 만족도 결과</span></div>
       </div>
     </div>
 
     <button type="button" class="md-snap no-capture" id="snapBtn">📸 이 화면 이미지 저장 · 카톡 공유</button>
+
+    <div class="md-card no-capture" id="surveyCard" style="display:none;">
+      <div class="md-h">💬 회원 만족도 결과 <span id="surveyNew"></span><small id="surveyStamp"></small></div>
+      <div id="surveyBody"></div>
+    </div>
 
     <div class="md-card" id="classCard">
       <div class="md-h">📅 오늘 내 스케줄 <small id="classStamp"></small></div>
@@ -380,6 +400,68 @@
       btn.disabled = false; btn.textContent = label;
     });
 
+    // ───── 📩 PT 만족도 조사 결과 도착 알림 (연락 센터에서 직원이 답변을 저장하면 담당 선생님에게 뜸) ─────
+    let surveyMsgs = [], surveyUseLs = false;
+    const lsSeen = () => { try { return JSON.parse(localStorage.getItem('md_survey_seen') || '[]'); } catch (e) { return []; } };
+    const lsMark = (id) => { try { const a = lsSeen(); if (!a.includes(id)) { a.push(id); localStorage.setItem('md_survey_seen', JSON.stringify(a.slice(-200))); } } catch (e) { /* 무시 */ } };
+    const isSeen = (r) => surveyUseLs ? lsSeen().includes(r.id) : !!r.trainer_seen_at;
+    function avgScore(r) { const s = (r.answers || []).filter(a => a.score).map(a => a.score); return s.length ? s.reduce((x, y) => x + y, 0) / s.length : null; }
+    function agoText(iso) {
+      const d = new Date(iso), diff = (Date.now() - d.getTime()) / 60000;
+      if (diff < 1) return '방금'; if (diff < 60) return `${Math.floor(diff)}분 전`; if (diff < 1440) return `${Math.floor(diff / 60)}시간 전`;
+      return `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+    async function loadSurvey() {
+      if (!me || !me.id) return;
+      const since = new Date(); since.setDate(since.getDate() - 30);
+      const base = `pt_survey_responses?trainer_id=eq.${me.id}&status=eq.answered&created_at=gte.${since.toISOString()}&order=created_at.desc&limit=30`;
+      const cols = 'id,contact_date,created_at,answers,memo,member:member_id(name,phone),staff:staff_id(name)';
+      try {
+        let r = await fetchAllRows(`${base}&select=${cols},trainer_seen_at`, await authHeaders());
+        surveyUseLs = false;
+        if (r.error) { r = await fetchAllRows(`${base}&select=${cols}`, await authHeaders()); surveyUseLs = true; }   // 확인 시각 칸이 아직 없으면 이 폰에만 기억
+        if (r.error) { surveyMsgs = []; } else surveyMsgs = r.rows;
+      } catch (e) { surveyMsgs = []; }
+      renderSurvey();
+    }
+    function renderSurvey() {
+      const card = document.getElementById('surveyCard');
+      const unread = surveyMsgs.filter(r => !isSeen(r)).length;
+      document.getElementById('sumSurveyBox').style.display = surveyMsgs.length ? '' : 'none';
+      document.getElementById('sumSurvey').textContent = unread;
+      if (!surveyMsgs.length) { card.style.display = 'none'; return; }
+      card.style.display = '';
+      document.getElementById('surveyNew').innerHTML = unread ? `<span class="md-newtag">새 ${unread}</span>` : '';
+      document.getElementById('surveyBody').innerHTML = surveyMsgs.slice(0, 8).map((r, i) => {
+        const nm = r.member ? r.member.name : '회원', av = avgScore(r), nw = !isSeen(r);
+        return `<div class="md-msg ${nw ? 'new' : ''}" data-sv="${i}"><div class="av">📩</div><div class="bx">
+          <div class="tt">${escapeHtml(nm)} 회원님 PT 만족도 조사 결과가 도착했어요</div>
+          <div class="mt">${av !== null ? `평균 ${av.toFixed(1)}점 · ` : ''}${r.staff ? escapeHtml(r.staff.name) + ' 조사 · ' : ''}${agoText(r.created_at)}</div></div></div>`;
+      }).join('');
+    }
+    async function markSeen(r) {
+      if (isSeen(r)) return;
+      if (surveyUseLs) lsMark(r.id);
+      else {
+        r.trainer_seen_at = new Date().toISOString();
+        try { await fetch(`${SUPABASE_URL}/rest/v1/rpc/pt_survey_mark_seen`, { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_id: r.id }) }); } catch (e) { /* 다음에 다시 시도 */ }
+      }
+      renderSurvey();
+    }
+    function openSurveySheet(i) {
+      const r = surveyMsgs[i]; if (!r) return;
+      const nm = r.member ? r.member.name : '회원', av = avgScore(r), digits = String(r.member && r.member.phone || '').replace(/\D/g, '');
+      const qa = (r.answers || []).filter(a => a.answer || a.score).map(a => `<div class="q">${escapeHtml(a.question)}</div><div class="a">${a.score ? `<span class="sc">${a.score}점</span>` : ''}${escapeHtml(a.answer || '')}</div>`).join('');
+      document.getElementById('sheet').innerHTML = `<div class="sn">📩 ${escapeHtml(nm)} 회원님 만족도 조사</div>
+        <div class="si">${r.contact_date || ''} · ${r.staff ? escapeHtml(r.staff.name) + ' 조사' : ''}${av !== null ? ` · 평균 ${av.toFixed(1)}점` : ''}</div>
+        <div class="md-qa">${qa || '<div class="md-empty">저장된 답변이 없어요.</div>'}${r.memo ? `<div class="q">메모</div><div class="a">${escapeHtml(r.memo)}</div>` : ''}</div>
+        ${digits.length >= 9 ? `<div class="sb" style="margin-top:14px;"><a class="call" href="tel:${digits}">📞 회원님께 전화</a><a href="sms:${digits}">💬 문자</a></div>` : ''}
+        <button type="button" class="sx" id="sheetClose">닫기</button>`;
+      document.getElementById('sheetBg').classList.add('on');
+      markSeen(r);
+    }
+    document.getElementById('surveyBody').addEventListener('click', (e) => { const m = e.target.closest('[data-sv]'); if (m) openSurveySheet(Number(m.dataset.sv)); });
+
     async function loadAll(quiet) {
       if (!me) return;
       const now = new Date(), start = new Date(now.getFullYear(), now.getMonth(), now.getDate()), end = new Date(start); end.setDate(end.getDate() + 1);
@@ -392,6 +474,7 @@
       bookingError = bk.status === 'rejected' ? bk.reason.message : ''; bookings = bk.status === 'fulfilled' ? bk.value : bookings;
       groupError = gr.status === 'rejected' ? gr.reason.message : ''; groups = gr.status === 'fulfilled' ? (gr.value.classes || []) : groups;
       lastLoad = Date.now();
+      loadSurvey();
       renderClasses();
       if (tk.status === 'fulfilled') { tasksCache = tk.value; renderTasks(); }
       else if (!quiet || !tasksCache.length) document.getElementById('taskBody').innerHTML = `<div class="md-err">업무를 불러오지 못했어요: ${escapeHtml(tk.reason.message)}</div>`;
