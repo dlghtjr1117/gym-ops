@@ -89,6 +89,47 @@
   .md-qa .q { font-size: 13px; font-weight: 800; margin-top: 11px; line-height: 1.4; }
   .md-qa .a { font-size: 14.5px; margin-top: 3px; padding: 8px 10px; background: var(--slate-50); border-radius: 10px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
   .md-qa .sc { display: inline-block; font-weight: 800; color: #4f46e5; margin-right: 6px; }
+  /* 🤸 그룹 강사: 그룹PT 스케줄 (오늘 · 내일 · 이번 주) */
+
+  .gp-seg{display:flex;background:var(--slate-100,#eef2f6);border-radius:12px;padding:3px;margin:12px 14px 4px}
+  .gp-seg b{flex:1;text-align:center;padding:8px 0;border-radius:10px;font-size:13.5px;color:var(--slate-500);font-weight:700}
+  .gp-seg b.on{background:var(--surface,#fff);color:var(--slate-900);box-shadow:0 1px 4px rgba(15,23,42,.12)}
+  .gc{display:flex;gap:12px;padding:14px;border-top:1px solid var(--slate-200)}
+  .gc .tm{width:54px;flex:none;font-weight:800;font-size:15px;line-height:1.25}
+  .gc .tm i{display:block;font-style:normal;font-weight:500;color:var(--slate-500);font-size:11.5px}
+  .gc .bd{flex:1;min-width:0;border-left:4px solid #f59e0b;padding-left:11px}
+  .gc.done .bd{border-left-color:#94a3b8}.gc.done{opacity:.72}
+  .gc.next .bd{border-left-color:#4f46e5}.gc.next{background:rgba(79,70,229,.06)}
+  .gc .nm{font-weight:800;font-size:15px}
+  .gc .ex{font-size:12.5px;color:var(--slate-500);margin-top:3px}
+  .gc .ppl{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .gc .ppl span{font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:#fef3c7;color:#92400e}
+  .gc .ppl span.more{background:var(--slate-100,#eef2f6);color:var(--slate-600,#475569)}
+  .gc .go{align-self:center;color:var(--slate-400,#94a3b8);font-size:20px}
+  .pill{display:inline-block;font-size:11px;font-weight:800;padding:1px 8px;border-radius:99px;margin-left:6px;vertical-align:1px}
+  .pill.now{background:#4f46e5;color:#fff}.pill.end{background:#e2e8f0;color:#475569}.pill.up{background:#fef3c7;color:#92400e}
+  .bar2{height:6px;background:var(--slate-200);border-radius:99px;margin-top:8px;overflow:hidden}.bar2 i{display:block;height:100%;background:#f59e0b}
+  .ar{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--slate-200)}
+  .ar .av{width:36px;height:36px;border-radius:50%;background:#fef3c7;color:#92400e;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .ar .n{flex:1;font-weight:700;font-size:15px}.ar .n small{display:block;font-weight:500;color:var(--slate-500);font-size:12px;margin-top:1px}
+  .st{font-size:12px;font-weight:800;padding:3px 10px;border-radius:99px}
+  .st.r{background:#e0e7ff;color:#3730a3}.st.a{background:#dcfce7;color:#166534}.st.x{background:#fee2e2;color:#991b1b}
+  .ar .tel{font-size:20px}
+  .sheet-static-x{position:relative;background:var(--surface);border-radius:20px 20px 0 0;padding:18px 18px 22px;box-shadow:0 -10px 40px rgba(15,23,42,.18)}
+  .lbl-x{position:absolute;top:8px;left:8px;background:#0f172a;color:#fff;font-size:11px;padding:2px 8px;border-radius:99px;z-index:5}
+
+.dayh{display:flex;align-items:baseline;gap:8px;padding:10px 14px 6px;border-top:1px solid var(--slate-200);background:var(--slate-50);font-weight:800;font-size:13px}
+ .dayh small{font-weight:600;color:var(--slate-500);font-size:12px}.dayh .tg{margin-left:auto;font-size:11px;font-weight:800;padding:1px 8px;border-radius:99px;background:#4f46e5;color:#fff}
+ .dayh.past{color:var(--slate-500)}
+ .wk{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--slate-200)}
+ .wk .t{width:50px;font-weight:800;font-size:14px;flex:none}
+ .wk .m{flex:1;min-width:0}.wk .m b{font-size:14px}.wk .m small{display:block;color:var(--slate-500);font-size:12px;margin-top:1px}
+ .wk .cn{font-weight:800;font-size:13px;padding:3px 10px;border-radius:99px;background:#fef3c7;color:#92400e;flex:none}
+ .wk .cn.d{background:#e2e8f0;color:#475569}.wk .cn.z{background:var(--slate-100,#eef2f6);color:var(--slate-500)}
+ .wk.empty{color:var(--slate-500);font-size:13px;padding:10px 14px}
+ .sumrow{display:flex;gap:8px;padding:6px 14px 10px}.sumrow div{flex:1;background:var(--slate-50);border-radius:12px;padding:8px 10px}.sumrow b{display:block;font-size:18px}.sumrow span{font-size:11.5px;color:var(--slate-500)}
+
+  .gc { cursor: pointer; -webkit-tap-highlight-color: transparent; } .gc:active, .wk:active { background: var(--slate-50); } .wk { cursor: pointer; }
   .md-err { color: #b91c1c; font-size: 13px; padding: 12px 14px; }
 </style>
 </head>
@@ -108,6 +149,7 @@
       <div class="md-sum">
         <div><b id="sumClass">-</b><span>오늘 수업</span></div>
         <div><b id="sumTask">-</b><span>오늘 할 일 (남은 것)</span></div>
+        <div id="sumGroupBox" style="display:none;"><b id="sumGroup">0명</b><span>오늘 참석 예정</span></div>
         <div id="sumSurveyBox" style="display:none;"><b id="sumSurvey">0</b><span>새 만족도 결과</span></div>
       </div>
     </div>
@@ -117,6 +159,13 @@
     <div class="md-card no-capture" id="surveyCard" style="display:none;">
       <div class="md-h">💬 회원 만족도 결과 <span id="surveyNew"></span><small id="surveyStamp"></small></div>
       <div id="surveyBody"></div>
+    </div>
+
+    <div class="md-card" id="groupCard" style="display:none;">
+      <div class="md-h">🤸 그룹PT 스케줄 <small id="groupStamp"></small></div>
+      <div class="gp-seg" id="gpSeg"><b data-gt="today" class="on">오늘</b><b data-gt="tomorrow">내일</b><b data-gt="week">이번 주</b></div>
+      <div id="groupBody"></div>
+      <div class="md-note no-capture">수업을 누르면 참석 예정 명단이 나와요. 예약·취소는 <b>바디코디</b>에서 하고, 여기엔 바디코디 내용이 보여요(몇 분 늦게 반영될 수 있어요).</div>
     </div>
 
     <div class="md-card" id="classCard">
@@ -400,6 +449,113 @@
       btn.disabled = false; btn.textContent = label;
     });
 
+
+    // ───── 🤸 그룹 강사: 그룹PT 스케줄(오늘·내일·이번 주) + 참석 예정 명단 ─────
+    let weekGroups = [], groupTab = 'today', groupAtt = false;
+    const dkey = (iso) => formatDateStr(new Date(iso));
+    const gCap = (c) => (c.capacity ? ` · 정원 ${c.capacity}명` : '');
+    const gRes = (c) => (c.reserved != null ? c.reserved : (c.attendees ? c.attendees.filter(a => a.status === 'reserved').length : 0));
+    function gState(c, now) {
+      if (c.reason === 'cancelled') return 'cancel';
+      const s = new Date(c.start), e = new Date(c.end);
+      if (e < now) return 'end'; if (s <= now) return 'live'; return 'up';
+    }
+    function weekRange() {
+      const now = new Date(), d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      return { from: formatDateStr(mon), to: formatDateStr(sun), mon };
+    }
+    function previewNames(c) {
+      if (!c.attendees || !c.attendees.length) return '';
+      const list = c.attendees.filter(a => a.status === 'reserved' || a.status === 'waiting');
+      if (!list.length) return '';
+      const nm = list.slice(0, 3).map(a => `<span>${escapeHtml(a.name)}</span>`).join('');
+      return `<div class="ppl">${nm}${list.length > 3 ? `<span class="more">+${list.length - 3}명</span>` : ''}</div>`;
+    }
+    function gcRow(c, i, now, nextIdx) {
+      const st = gState(c, now), s = new Date(c.start), e = new Date(c.end);
+      const pill = st === 'end' ? '<span class="pill end">종료</span>' : st === 'live' ? '<span class="pill now">진행 중</span>' : st === 'cancel' ? '<span class="pill end">취소</span>'
+        : (i === nextIdx ? '<span class="pill now">곧 시작</span>' : '<span class="pill up">예정</span>');
+      const ex = st === 'end' ? `출석 ${c.attended}명 · 결석 ${c.absent}명${gCap(c)}` : `참석 예정 ${gRes(c)}명${gCap(c)}`;
+      const bar = st === 'end' && c.capacity ? `<div class="bar2"><i style="width:${Math.min(100, Math.round(c.attended / c.capacity * 100))}%"></i></div>` : '';
+      return `<div class="gc ${st === 'end' ? 'done' : (i === nextIdx || st === 'live') ? 'next' : ''}" data-gid="${escapeHtml(c.id)}"><div class="tm">${hm(s)}<i>~${hm(e)}</i></div>
+        <div class="bd"><div class="nm">${escapeHtml(c.title || '그룹PT')} ${pill}</div><div class="ex">${ex}</div>${bar}${st === 'end' ? '' : previewNames(c)}</div><div class="go">›</div></div>`;
+    }
+    function renderGroupCard() {
+      const card = document.getElementById('groupCard');
+      const hasAny = weekGroups.length > 0;
+      card.style.display = hasAny ? '' : 'none';
+      // 오늘 개인PT 수업이 없는 그룹 강사는 "오늘 내 스케줄"(개인PT용) 카드를 감춰요 — 그룹 스케줄이 같은 내용을 더 자세히 보여줘요
+      document.getElementById('classCard').style.display = hasAny && !bookings.length ? 'none' : '';
+      document.getElementById('sumGroupBox').style.display = hasAny ? '' : 'none';
+      if (!hasAny) return;
+      const now = new Date(), today = formatDateStr(now), tom = formatDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const todays = weekGroups.filter(c => dkey(c.start) === today);
+      const upRes = todays.filter(c => gState(c, now) !== 'end' && gState(c, now) !== 'cancel').reduce((n, c) => n + gRes(c), 0);
+      document.getElementById('sumGroup').textContent = upRes + '명';
+      document.querySelectorAll('#gpSeg b').forEach(b => b.classList.toggle('on', b.dataset.gt === groupTab));
+      document.getElementById('groupStamp').textContent = `${hm(now)} 기준`;
+      const body = document.getElementById('groupBody');
+      const dayTitle = (k) => { const d = new Date(k + 'T00:00:00'); return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY_SHORT[d.getDay()]})`; };
+      const nextIdxOf = (list) => list.findIndex(c => gState(c, now) === 'up' && (new Date(c.start) - now) < 3 * 3600000);
+      if (groupTab === 'today' || groupTab === 'tomorrow') {
+        const key = groupTab === 'today' ? today : tom;
+        const list = weekGroups.filter(c => dkey(c.start) === key);
+        let html = '';
+        if (groupTab === 'tomorrow') {
+          const n = list.reduce((a, c) => a + gRes(c), 0);
+          html += `<div class="sumrow"><div><b>${list.length}개</b><span>내일 수업</span></div><div><b>${n}명</b><span>참석 예정</span></div></div>`;
+          if (tom > weekRange().to) html += '<div class="md-empty">내일은 다음 주예요. 다음 주 일정은 주가 바뀌면 보여요.</div>';
+        }
+        const ni = groupTab === 'today' ? nextIdxOf(list) : -1;
+        html += list.length ? list.map((c, i) => gcRow(c, i, now, ni)).join('') : (tom > weekRange().to && groupTab === 'tomorrow' ? '' : `<div class="md-empty">${groupTab === 'today' ? '오늘' : '내일'}은 예정된 그룹수업이 없어요.</div>`);
+        body.innerHTML = html;
+      } else {
+        const { mon } = weekRange();
+        const done = weekGroups.filter(c => gState(c, now) === 'end').reduce((n, c) => n + c.attended, 0);
+        const left = weekGroups.filter(c => ['up', 'live'].includes(gState(c, now))).reduce((n, c) => n + gRes(c), 0);
+        let html = `<div class="sumrow"><div><b>${weekGroups.length}개</b><span>이번 주 수업</span></div><div><b>${done}명</b><span>출석 완료</span></div><div><b>${left}명</b><span>남은 참석 예정</span></div></div>`;
+        for (let k = 0; k < 7; k++) {
+          const d = new Date(mon); d.setDate(mon.getDate() + k); const key = formatDateStr(d);
+          const list = weekGroups.filter(c => dkey(c.start) === key);
+          const past = key < today, isToday = key === today;
+          const attN = list.filter(c => gState(c, now) === 'end').reduce((n, c) => n + c.attended, 0), resN = list.filter(c => gState(c, now) !== 'end').reduce((n, c) => n + gRes(c), 0);
+          const sub = !list.length ? '수업 없음' : `수업 ${list.length}개${past ? ` · 출석 ${attN}명` : (resN ? ` · 예약 ${resN}명` : '')}`;
+          html += `<div class="dayh ${past ? 'past' : ''}">${dayTitle(key)} <small>${sub}</small>${isToday ? '<span class="tg">오늘</span>' : ''}</div>`;
+          if (!list.length) html += '<div class="wk empty" style="cursor:default;">예정된 수업이 없어요</div>';
+          list.forEach(c => {
+            const st = gState(c, now), s = new Date(c.start);
+            const m = st === 'end' ? `종료 · 출석 ${c.attended} · 결석 ${c.absent}` : `참석 예정 ${gRes(c)}명`;
+            html += `<div class="wk" data-gid="${escapeHtml(c.id)}"><div class="t">${hm(s)}</div><div class="m"><b>${escapeHtml(c.title || '그룹PT')}</b><small>${m}</small></div><span class="cn ${st === 'end' ? 'd' : ''}">${st === 'end' ? c.attended : gRes(c)}${c.capacity ? '/' + c.capacity : ''}</span></div>`;
+          });
+        }
+        body.innerHTML = html;
+      }
+    }
+    const ST_LABEL = { reserved: '예약', attended: '출석', absent: '결석', waiting: '대기', other: '기타' };
+    const ST_CLS = { reserved: 'r', attended: 'a', absent: 'x', waiting: 'r', other: 'r' };
+    function openGroupSheet(id) {
+      const c = weekGroups.find(x => x.id === id); if (!c) return;
+      const s = new Date(c.start), e = new Date(c.end), d = new Date(dkey(c.start) + 'T00:00:00');
+      const order = { reserved: 0, waiting: 1, attended: 2, absent: 3, other: 4 };
+      const list = (c.attendees || []).slice().sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name, 'ko'));
+      const resList = list.filter(a => a.status === 'reserved' || a.status === 'waiting');
+      const phones = (resList.length ? resList : list).map(a => String(a.phone || '').replace(/\D/g, '')).filter(p => p.length >= 9);
+      const rows = list.map(a => {
+        const dg = String(a.phone || '').replace(/\D/g, '');
+        return `<div class="ar"><div class="av">${escapeHtml((a.name || '?').replace(/^[^가-힣A-Za-z]+/, '').charAt(0) || '?')}</div><div class="n">${escapeHtml(a.name)}<small>${dg.length >= 9 ? escapeHtml(fmtPhone(a.phone)) : '번호 없음'}</small></div><span class="st ${ST_CLS[a.status]}">${ST_LABEL[a.status]}</span>${dg.length >= 9 ? `<a class="tel" href="tel:${dg}" style="text-decoration:none;">📞</a>` : ''}</div>`;
+      }).join('');
+      const info = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_SHORT[d.getDay()]}) · 참석 예정 <b>${gRes(c)}명</b> · 출석 ${c.attended} · 결석 ${c.absent}${gCap(c)}`;
+      document.getElementById('sheet').innerHTML = `<div class="sn">🤸 ${hm(s)}~${hm(e)} ${escapeHtml(c.title || '그룹PT')}</div><div class="si">${info}</div>
+        <div class="md-qa" style="max-height:48vh;">${rows || `<div class="md-empty">${c.attendees ? '이 수업에는 아직 예약한 회원이 없어요.' : '참석자 명단을 바디코디에서 받지 못했어요. (바디코디 연동 함수 업데이트가 필요할 수 있어요)'}</div>`}</div>
+        ${phones.length ? `<div class="sb" style="margin-top:12px;"><a class="call" href="sms:${phones.join(',')}">💬 참석자 전체 문자</a><button type="button" id="sheetClose2">닫기</button></div>` : '<button type="button" class="sx" id="sheetClose">닫기</button>'}`;
+      const b2 = document.getElementById('sheetClose2'); if (b2) b2.onclick = () => document.getElementById('sheetBg').classList.remove('on');
+      document.getElementById('sheetBg').classList.add('on');
+    }
+    document.getElementById('gpSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-gt]'); if (b) { groupTab = b.dataset.gt; renderGroupCard(); } });
+    document.getElementById('groupBody').addEventListener('click', (e) => { const r = e.target.closest('[data-gid]'); if (r) openGroupSheet(r.dataset.gid); });
+
     // ───── 📩 PT 만족도 조사 결과 도착 알림 (연락 센터에서 직원이 답변을 저장하면 담당 선생님에게 뜸) ─────
     let surveyMsgs = [], surveyUseLs = false;
     const lsSeen = () => { try { return JSON.parse(localStorage.getItem('md_survey_seen') || '[]'); } catch (e) { return []; } };
@@ -468,14 +624,15 @@
       const todayStr = formatDateStr(start);
       const [bk, gr, tk] = await Promise.allSettled([
         fetchPtBookings(me.id, start.toISOString(), end.toISOString()),
-        fetchGroupClassSchedule(todayStr, todayStr, me.id),
+        fetchGroupClassSchedule(weekRange().from, weekRange().to, me.id, true),
         fetchTasks()
       ]);
       bookingError = bk.status === 'rejected' ? bk.reason.message : ''; bookings = bk.status === 'fulfilled' ? bk.value : bookings;
-      groupError = gr.status === 'rejected' ? gr.reason.message : ''; groups = gr.status === 'fulfilled' ? (gr.value.classes || []) : groups;
+      groupError = gr.status === 'rejected' ? gr.reason.message : ''; weekGroups = gr.status === 'fulfilled' ? (gr.value.classes || []) : weekGroups; groups = weekGroups.filter(c => dkey(c.start) === todayStr);
       lastLoad = Date.now();
       loadSurvey();
       renderClasses();
+      renderGroupCard();
       if (tk.status === 'fulfilled') { tasksCache = tk.value; renderTasks(); }
       else if (!quiet || !tasksCache.length) document.getElementById('taskBody').innerHTML = `<div class="md-err">업무를 불러오지 못했어요: ${escapeHtml(tk.reason.message)}</div>`;
     }

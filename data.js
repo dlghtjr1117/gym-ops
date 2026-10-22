@@ -3136,11 +3136,11 @@ async function fetchGroupClassCounts(fromStr, toStr) {
 }
 // PT 스케줄 화면용: 한 주(최대 14일)의 그룹수업을 바디코디에서 읽어와요. 지점장은 profileId로 직원을 고르고, 트레이너는 본인 것만 와요.
 // 돌려주는 값: { classes:[{id,start,end,title,attended,members,capacity,counted,reason}], linked }
-async function fetchGroupClassSchedule(fromStr, toStr, profileId) {
+async function fetchGroupClassSchedule(fromStr, toStr, profileId, withAttendees) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/${BODYCODI_SYNC_FN_NAME}`, {
     method: 'POST',
     headers: await authHeaders(),
-    body: JSON.stringify({ action: 'group_class_schedule', from: fromStr, to: toStr, profile_id: profileId || undefined })
+    body: JSON.stringify({ action: 'group_class_schedule', from: fromStr, to: toStr, profile_id: profileId || undefined, with_attendees: withAttendees ? true : undefined })
   });
   let data = null;
   try { data = await res.json(); } catch (e) { /* 아래에서 처리 */ }
