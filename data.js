@@ -1818,14 +1818,15 @@ const reactivateStaff = (id) => callStaffRpc('reactivate_staff', id, '직원 복
 // 직원 직급 변경: 'trainer'(트레이너) / 'lead'(팀장 = 관리자 권한 + 직급 팀장) / 'fc'(FC = 관리자 권한 + 직급 FC) / 'manager'(지점장).
 // RLS 정책상 지점장만 성공함 (migration_25 필요). 팀장 직급 저장은 migration_77 필요.
 async function updateProfileRole(id, kind) {
-  const role = kind === 'trainer' ? 'trainer' : 'manager';
-  const body = { role, job_title: kind === 'lead' ? '팀장' : kind === 'fc' ? 'FC' : null };
+  const role = (kind === 'trainer' || kind === 'group') ? 'trainer' : 'manager';
+  const body = { role, job_title: kind === 'lead' ? '팀장' : kind === 'fc' ? 'FC' : kind === 'group' ? '그룹강사' : null };
   const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...(await authHeaders()), 'Prefer': 'return=minimal' },
     body: JSON.stringify(body)
   });
   if (!res.ok) {
+    if (kind === 'group') throw new Error('그룹강사 직급을 저장하지 못했어요. Supabase에서 migration_101_group_instructor_title.sql을 먼저 실행해주세요.');
     if (kind === 'fc') throw new Error('FC 직급을 저장하지 못했어요. Supabase에서 migration_87_fc_job_title.sql을 먼저 실행해주세요.');
     if (kind === 'lead' || res.status === 400) throw new Error('팀장 직급을 저장하지 못했어요. Supabase에서 migration_77_profile_job_title.sql을 먼저 실행해주세요.');
     await throwApiError(res, '권한 변경에 실패했습니다.');

@@ -132,7 +132,7 @@ function requireLogin() {
 function roleLabelOf(p) {
   if (!p) return '트레이너';
   if (p.role === 'manager') return p.job_title === '팀장' ? '팀장' : p.job_title === 'FC' ? 'FC' : '지점장'; // FC는 관리자 권한 + 직급 FC (migration_87)
-  return '트레이너';
+  return p.job_title === '그룹강사' ? '그룹강사' : '트레이너';
 }
 
 async function getMyProfile() {

@@ -20,6 +20,7 @@
      다크 모드에서도 항상 또렷하게 보이도록 함 */
   .role-select.role-manager { background-color: var(--accent-soft-2); color: var(--indigo-700); }
   .role-select.role-lead { background-color: #d1fae5; color: #047857; }
+  .role-select.role-group { background-color: #fef3c7; color: #92400e; }
   .role-select.role-fc { background-color: #fce7f3; color: #be185d; }
   .role-select.role-trainer { background-color: var(--slate-200); color: var(--slate-700); }
 </style>
@@ -63,7 +64,7 @@
 
     <div class="section">
       <h2>직원 목록</h2>
-      <p class="muted" style="margin:-4px 0 12px;">직급 칸을 클릭해서 트레이너 / 팀장 / 지점장으로 바로 전환할 수 있어요. 팀장·지점장으로 바꾸면 그 직원도 전체 회원 · 매출 · PT 기록을 다 볼 수 있게 돼요. 본인 직급은 실수로 잠기는 걸 막기 위해 여기서 바꿀 수 없어요 — 다른 지점장에게 부탁해주세요.<br>퇴사한 직원은 오른쪽 <b>삭제</b> 버튼으로 정리할 수 있어요. 삭제하면 로그인이 막히고 선택 목록에서 사라지지만, 그 직원의 <b>매출 · PT · 회원 담당 기록은 그대로 남아요</b>(실수로 삭제해도 아래 "퇴사한 직원 보기"에서 복구할 수 있어요).</p>
+      <p class="muted" style="margin:-4px 0 12px;">직급 칸을 클릭해서 트레이너 / 그룹강사 / 팀장 / FC / 지점장으로 바로 전환할 수 있어요. 그룹강사는 트레이너와 권한이 같고(본인 수업·업무만 보여요) 폰 화면에 그룹PT 스케줄이 먼저 떠요. 팀장·지점장으로 바꾸면 그 직원도 전체 회원 · 매출 · PT 기록을 다 볼 수 있게 돼요. 본인 직급은 실수로 잠기는 걸 막기 위해 여기서 바꿀 수 없어요 — 다른 지점장에게 부탁해주세요.<br>퇴사한 직원은 오른쪽 <b>삭제</b> 버튼으로 정리할 수 있어요. 삭제하면 로그인이 막히고 선택 목록에서 사라지지만, 그 직원의 <b>매출 · PT · 회원 담당 기록은 그대로 남아요</b>(실수로 삭제해도 아래 "퇴사한 직원 보기"에서 복구할 수 있어요).</p>
       <table id="staffTable" style="max-width:800px;">
         <thead><tr><th>이름</th><th>연락처</th><th>가입일</th><th>직급</th><th></th></tr></thead>
         <tbody><tr><td colspan="5" class="muted" style="padding:16px;">불러오는 중...</td></tr></tbody>
@@ -125,9 +126,9 @@
     }
 
     // 직급 3가지: trainer(트레이너) / lead(팀장 - 관리자 권한 + job_title '팀장') / manager(지점장)
-    const KIND_LABEL = { trainer: '트레이너', lead: '팀장', fc: 'FC', manager: '지점장' };
-    function kindOf(p) { return p.role !== 'manager' ? 'trainer' : (p.job_title === '팀장' ? 'lead' : p.job_title === 'FC' ? 'fc' : 'manager'); }
-    function roleClass(p) { return kindOf(p) === 'trainer' ? 'role-trainer' : (kindOf(p) === 'lead' ? 'role-lead' : (kindOf(p) === 'fc' ? 'role-fc' : 'role-manager')); }
+    const KIND_LABEL = { trainer: '트레이너', group: '그룹강사', lead: '팀장', fc: 'FC', manager: '지점장' };
+    function kindOf(p) { return p.role !== 'manager' ? (p.job_title === '그룹강사' ? 'group' : 'trainer') : (p.job_title === '팀장' ? 'lead' : p.job_title === 'FC' ? 'fc' : 'manager'); }
+    function roleClass(p) { return kindOf(p) === 'group' ? 'role-group' : kindOf(p) === 'trainer' ? 'role-trainer' : (kindOf(p) === 'lead' ? 'role-lead' : (kindOf(p) === 'fc' ? 'role-fc' : 'role-manager')); }
 
     let allProfiles = [];
     function renderStaffTable(fullList) {
@@ -150,6 +151,7 @@
           <td>
             <select class="role-select ${roleClass(p)}" data-id="${p.id}" ${canEdit ? '' : 'disabled'}>
               <option value="trainer" ${kindOf(p) === 'trainer' ? 'selected' : ''}>트레이너</option>
+              <option value="group" ${kindOf(p) === 'group' ? 'selected' : ''}>그룹강사</option>
               <option value="lead" ${kindOf(p) === 'lead' ? 'selected' : ''}>팀장</option>
               <option value="fc" ${kindOf(p) === 'fc' ? 'selected' : ''}>FC</option>
               <option value="manager" ${kindOf(p) === 'manager' ? 'selected' : ''}>지점장</option>
@@ -181,14 +183,14 @@
             const person = list.find(x => x.id === id);
             const prevKind = person ? kindOf(person) : 'trainer';
             const roleLabel = KIND_LABEL[newKind];
-            if (!confirm(`이 직원을 ${roleLabel}(으)로 전환할까요?${newKind === 'trainer' ? '' : '\n(관리자 권한이 부여돼요)'}`)) {
+            if (!confirm(`이 직원을 ${roleLabel}(으)로 전환할까요?${newKind === 'trainer' || newKind === 'group' ? '' : '\n(관리자 권한이 부여돼요)'}`)) {
               sel.value = prevKind; // 취소하면 원래 값으로 되돌림
               return;
             }
             sel.disabled = true;
             try {
               await updateProfileRole(id, newKind);
-              if (person) { person.role = newKind === 'trainer' ? 'trainer' : 'manager'; person.job_title = newKind === 'lead' ? '팀장' : newKind === 'fc' ? 'FC' : null; }
+              if (person) { person.role = (newKind === 'trainer' || newKind === 'group') ? 'trainer' : 'manager'; person.job_title = newKind === 'lead' ? '팀장' : newKind === 'fc' ? 'FC' : newKind === 'group' ? '그룹강사' : null; }
               sel.className = 'role-select ' + (person ? roleClass(person) : 'role-trainer');
               showToast(`${roleLabel}(으)로 변경되었습니다.`);
             } catch (err) {
